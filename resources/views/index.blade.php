@@ -7,7 +7,7 @@
         @vite('resources/css/app.css')
         @livewireStyles
     </head>
-    <body class="antialiased">
+    <body x-cloak class="antialiased">
         @vite('resources/js/app.js')
         @livewireScripts
     </body>
