@@ -1,7 +1,7 @@
 @extends('layouts.base')
 
 @section('body')
-    <div class="h-screen w-screen flex items-center justify-center flex-col">
+    <div class="h-screen w-screen flex items-center justify-center flex-col my-20">
         <div class="w-96">
             <a href="{{ url('/') }}">
                 <img class="hidden dark:block" src="{{ asset('img/devoption-dark.svg') }}" alt="DevOption Logo">
