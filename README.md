@@ -1,10 +1,10 @@
 <p align="center"><a href="https://devoption.io" target="_blank"><img src="https://raw.githubusercontent.com/devoption/devoption/main/public/img/devoption.svg" width="400" alt="DevOption Logo"></a></p>
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+<a href="https://github.com/devoption/devoption/actions"><img src="https://github.com/devoption/devoption/workflows/tests/badge.svg" alt="Build Status"></a>
+<a href="https://packagist.org/packages/devoptn/devoptn"><img src="https://img.shields.io/packagist/dt/devoptn/devoptn" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/devoptn/devoptn"><img src="https://img.shields.io/packagist/v/devoptn/devoptn" alt="Latest Stable Version"></a>
+<a href="https://packagist.org/packages/devoptn/devoptn"><img src="https://img.shields.io/packagist/l/devoptn/devoptn" alt="License"></a>
 </p>
 
 ## About Laravel
