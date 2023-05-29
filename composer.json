@@ -1,8 +1,8 @@
 {
-    "name": "laravel/laravel",
+    "name": "devoptn/devoptn",
     "type": "project",
-    "description": "The Laravel Framework.",
-    "keywords": ["framework", "laravel"],
+    "description": "Modern Software Development Platform",
+    "keywords": ["development", "devoption", "devoptn"],
     "license": "MIT",
     "require": {
         "php": "^8.1",
