@@ -18,6 +18,17 @@
 
 DevOption is a modern, open-source, software development platform. Of course this is vague (for now)... we don't want to give away too much just yet. We are currently in the early stages of development and are looking for contributors to help us build the platform. If you are interested in contributing, please read the [contributing guide](CONTRIBUTING.md).
 
+## Screenshots
+
+### Login
+
+<p align="center">
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/devoption/devoption/main/public/img/screenshots/login-dark.jpeg">
+        <img width="400" alt="DevOption Logo" src="https://raw.githubusercontent.com/devoption/devoption/main/public/img/screenshots/login-light.jpeg">
+    </picture>
+</p>
+
 ## Contributing
 
 Thank you for considering contributing to the DevOption Platform! The contribution guide can be found in the [contributing guide](CONTRIBUTING.md).
