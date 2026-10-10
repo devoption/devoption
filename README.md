@@ -10,6 +10,21 @@ empty Home and About pages with shared navigation. It does not create files,
 provision infrastructure, or contact a service. There is no installer, project
 management, runtime cluster, or published release yet.
 
+## Screenshots
+
+These are the current local Home and About pages. Both are empty placeholders;
+the screenshots show the shared header, navigation, and theme only.
+
+**Home (`/`)**
+
+![DevOption Home page with the logo, Home and About navigation, and “No home content yet.”](docs/screenshots/home.jpg)
+
+**About (`/about`)**
+
+![DevOption About page with About selected and “No about content yet.”](docs/screenshots/about.jpg)
+
+See the [capture instructions](docs/screenshots/README.md) when updating the UI.
+
 ## Try it locally
 
 You need Git, Rust **1.99.0**, and your operating system's C build tools/linker.

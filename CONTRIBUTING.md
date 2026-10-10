@@ -35,6 +35,12 @@ The only direct push to `main` is the initial repository bootstrap under
 [#1](https://github.com/devoption/devoption/issues/1). All later work uses topic
 branches and PRs, including fixes to bootstrap CI. Do not push directly to `main`.
 
+Every commit that changes visible UI must refresh the affected page screenshots
+in `docs/screenshots/` in that same commit. Shared layout or theme changes require
+both Home and About captures. Reuse the existing filenames; non-UI commits keep
+the existing images. Add a capture and README embed when adding a main page.
+Follow the [capture instructions](docs/screenshots/README.md).
+
 Dependency updates follow this same issue-first process. Keep `Cargo.lock`
 committed, use locked builds, and verify action updates against official upstream
 release tags before pinning their full commit SHA. No registry publication is
