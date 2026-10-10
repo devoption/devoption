@@ -1,5 +1,4 @@
-use axum::response::Html;
-
+/// The pages currently available in DevOption.
 pub enum Page {
     Home,
     Projects,
@@ -9,7 +8,8 @@ pub enum Page {
 const STYLES: &str = include_str!("../assets/theme.css");
 const LOGO: &str = include_str!("../assets/devoption.svg");
 
-pub fn render(page: Page) -> Html<String> {
+/// Render a complete HTML document independently of the HTTP server.
+pub fn render(page: Page) -> String {
     // All rendered values are static; no request data is interpolated into HTML.
     let (title, path, message) = match page {
         Page::Home => ("Home", "/", "No home content yet."),
@@ -36,7 +36,7 @@ pub fn render(page: Page) -> Html<String> {
     })
     .collect();
 
-    Html(format!(
+    format!(
         "<!doctype html>
 <html lang=\"en\">
 <head>
@@ -58,5 +58,5 @@ pub fn render(page: Page) -> Html<String> {
   <footer>In development</footer>
 </body>
 </html>"
-    ))
+    )
 }

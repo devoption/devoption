@@ -65,8 +65,13 @@ name = "devoption-cli"
 version = "0.1.0-dev"
 dependencies = [
  "axum",
+ "devoption-ui",
  "tokio",
 ]
+
+[[package]]
+name = "devoption-ui"
+version = "0.1.0-dev"
 
 [[package]]
 name = "futures-core"

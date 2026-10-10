@@ -77,7 +77,7 @@ or data yet.
 The header uses the approved DevOption SVG. Its `dev` lettering follows the
 primary purple color in the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/).
 Shared color, spacing, and typography values live in
-`crates/devoption-cli/assets/theme.css`. There is no theme chooser yet.
+`crates/devoption-ui/assets/theme.css`. There is no theme chooser yet.
 
 GET returns HTTP 200 with HTML for each page; HEAD returns headers without a
 body. Unknown paths return 404; unsupported methods on these pages return 405.
@@ -124,9 +124,15 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 ## Where this is going
 
 DevOption's own code will stay in **one monorepo**, split into Rust modules and
-crates when real boundaries justify them. There is one crate now:
-`crates/devoption-cli`, with small `server` and shared `pages` modules. No
-factory/runtime services or placeholder crates are included.
+crates when real boundaries justify them. There are two crates now:
+
+- `crates/devoption-cli` owns the command line and HTTP routes/server. It builds
+  the single `devoption` executable.
+- `crates/devoption-ui` owns shared HTML rendering and the CSS/SVG assets. It is
+  a library with no external dependencies; the server wraps its HTML in responses.
+
+Both compile into the same executable. No factory/runtime services, business
+domain crate, or placeholder crates are included.
 
 Future work may add easy self-hosted installation, a full administration and
 development factory cluster, lighter runtime clusters, source control, CI,
