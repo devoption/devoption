@@ -1,9 +1,8 @@
 use std::{io, net::Ipv4Addr};
 
-use axum::{Router, routing::get};
+use axum::{Router, response::Html, routing::get};
+use devoption_ui::Page;
 use tokio::{net::TcpListener, runtime::Builder};
-
-use crate::pages::{self, Page};
 
 pub fn run(port: u16) -> io::Result<()> {
     Builder::new_current_thread()
@@ -16,9 +15,18 @@ pub fn run(port: u16) -> io::Result<()> {
                 listener.local_addr()?
             );
             let app = Router::new()
-                .route("/", get(|| async { pages::render(Page::Home) }))
-                .route("/projects", get(|| async { pages::render(Page::Projects) }))
-                .route("/about", get(|| async { pages::render(Page::About) }));
+                .route(
+                    "/",
+                    get(|| async { Html(devoption_ui::render(Page::Home)) }),
+                )
+                .route(
+                    "/projects",
+                    get(|| async { Html(devoption_ui::render(Page::Projects)) }),
+                )
+                .route(
+                    "/about",
+                    get(|| async { Html(devoption_ui::render(Page::About)) }),
+                );
             axum::serve(listener, app).await
         })
 }

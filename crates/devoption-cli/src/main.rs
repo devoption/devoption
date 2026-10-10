@@ -1,6 +1,5 @@
 use std::{env, process::ExitCode};
 
-mod pages;
 mod server;
 
 const HELP: &str = "DevOption — software factory foundation

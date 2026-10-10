@@ -36,6 +36,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Extracted the existing renderer and CSS/SVG assets into a dependency-free
+  `devoption-ui` library; the CLI keeps HTTP handling and remains the only binary.
+  Page output and screenshots are unchanged
+  ([#25](https://github.com/devoption/devoption/issues/25)).
 - Put the README's contribution links in a list and separate its sponsorship link
   for easier reading; document the owner-authorized PR-and-CI protection now
   enabled on `main`

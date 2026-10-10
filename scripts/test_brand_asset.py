@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 import xml.etree.ElementTree as ET
 
-ASSET = Path(__file__).resolve().parents[1] / "crates/devoption-cli/assets/devoption.svg"
+ASSET = Path(__file__).resolve().parents[1] / "crates/devoption-ui/assets/devoption.svg"
 SVG = "{http://www.w3.org/2000/svg}"
 
 
