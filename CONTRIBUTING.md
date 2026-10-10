@@ -37,7 +37,7 @@ branches and PRs, including fixes to bootstrap CI. Do not push directly to `main
 
 Every commit that changes visible UI must refresh the affected page screenshots
 in `docs/screenshots/` in that same commit. Shared layout or theme changes require
-both Home and About captures. Reuse the existing filenames; non-UI commits keep
+all main-page captures. Reuse the existing filenames; non-UI commits keep
 the existing images. Add a capture and README embed when adding a main page.
 Follow the [capture instructions](docs/screenshots/README.md).
 

@@ -2,6 +2,7 @@ use axum::response::Html;
 
 pub enum Page {
     Home,
+    Projects,
     About,
 }
 
@@ -12,19 +13,28 @@ pub fn render(page: Page) -> Html<String> {
     // All rendered values are static; no request data is interpolated into HTML.
     let (title, path, message) = match page {
         Page::Home => ("Home", "/", "No home content yet."),
+        Page::Projects => (
+            "Projects",
+            "/projects",
+            "Project management is not available yet.",
+        ),
         Page::About => ("About", "/about", "No about content yet."),
     };
-    let navigation: String = [("/", "Home"), ("/about", "About")]
-        .into_iter()
-        .map(|(href, label)| {
-            let current = if href == path {
-                " aria-current=\"page\""
-            } else {
-                ""
-            };
-            format!("<a href=\"{href}\"{current}>{label}</a>")
-        })
-        .collect();
+    let navigation: String = [
+        ("/", "Home"),
+        ("/projects", "Projects"),
+        ("/about", "About"),
+    ]
+    .into_iter()
+    .map(|(href, label)| {
+        let current = if href == path {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        format!("<a href=\"{href}\"{current}>{label}</a>")
+    })
+    .collect();
 
     Html(format!(
         "<!doctype html>

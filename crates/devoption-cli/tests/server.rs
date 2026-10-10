@@ -64,6 +64,11 @@ fn pages_share_layout_and_have_working_navigation() {
     let (_server, address) = start();
     for (path, title, message) in [
         ("/", "Home", "No home content yet."),
+        (
+            "/projects",
+            "Projects",
+            "Project management is not available yet.",
+        ),
         ("/about", "About", "No about content yet."),
     ] {
         let get = request(
@@ -78,10 +83,25 @@ fn pages_share_layout_and_have_working_navigation() {
         assert!(body.contains(&format!("<h1>{title}</h1>")));
         assert!(body.contains(message));
         assert!(body.contains("<a class=\"brand\" href=\"/\" aria-label=\"DevOption home\"><svg "));
-        assert!(body.contains("<nav aria-label=\"Main navigation\">"));
-        assert!(body.contains("href=\"/\""));
-        assert!(body.contains("href=\"/about\""));
-        assert!(body.contains(&format!("href=\"{path}\" aria-current=\"page\"")));
+        let navigation = body
+            .split_once("<nav aria-label=\"Main navigation\">")
+            .unwrap()
+            .1
+            .split_once("</nav>")
+            .unwrap()
+            .0;
+        for (href, label) in [
+            ("/", "Home"),
+            ("/projects", "Projects"),
+            ("/about", "About"),
+        ] {
+            let current = if href == path {
+                " aria-current=\"page\""
+            } else {
+                ""
+            };
+            assert!(navigation.contains(&format!("<a href=\"{href}\"{current}>{label}</a>")));
+        }
         assert_eq!(body.matches("aria-current=\"page\"").count(), 1);
         assert!(body.contains("href=\"#main-content\""));
         assert!(body.contains("<main id=\"main-content\" tabindex=\"-1\">"));
@@ -104,12 +124,16 @@ fn errors_do_not_stop_the_server() {
         "GET /missing HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
     );
     assert!(missing.starts_with("HTTP/1.1 404 Not Found"));
-    let post = request(
-        address,
-        "POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-    );
-    assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
-    assert!(post.contains("allow: GET,HEAD"));
+    for path in ["/", "/projects", "/about"] {
+        let post = request(
+            address,
+            &format!(
+                "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            ),
+        );
+        assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
+        assert!(post.contains("allow: GET,HEAD"));
+    }
     let malformed = request(address, "GET / INVALID\r\n\r\n");
     assert!(malformed.starts_with("HTTP/1.1 400 Bad Request"));
     let healthy = request(

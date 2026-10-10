@@ -13,7 +13,7 @@ Usage: devoption [--help | --version]
   serve         Start HTTP on 127.0.0.1:3000; Ctrl+C stops the process
   --port PORT   Override the port (0 chooses a free port)
 
-The local server shows Home and About placeholders. Factory and runtime services are not implemented.";
+The local server shows Home, Projects, and About placeholders. Factory and runtime services are not implemented.";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();

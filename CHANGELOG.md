@@ -7,6 +7,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- An empty Projects page at `/projects` in the shared navigation, with active-page
+  state, request tests, and updated screenshots of all three main pages
+  ([#12](https://github.com/devoption/devoption/issues/12)).
 - Tracked Home and About screenshots in the README, with fixed-viewport capture
   instructions and a requirement to refresh affected images in UI-changing commits
   ([#10](https://github.com/devoption/devoption/issues/10)).

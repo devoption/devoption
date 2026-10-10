@@ -17,6 +17,7 @@ pub fn run(port: u16) -> io::Result<()> {
             );
             let app = Router::new()
                 .route("/", get(|| async { pages::render(Page::Home) }))
+                .route("/projects", get(|| async { pages::render(Page::Projects) }))
                 .route("/about", get(|| async { pages::render(Page::About) }));
             axum::serve(listener, app).await
         })

@@ -6,6 +6,7 @@ Keep one image per main page at a stable filename; Git records earlier versions.
 | Page | Local URL | File |
 | --- | --- | --- |
 | Home | http://127.0.0.1:3000/ | `home.jpg` |
+| Projects | http://127.0.0.1:3000/projects | `projects.jpg` |
 | About | http://127.0.0.1:3000/about | `about.jpg` |
 
 From the repository root, start the app after the [normal setup](../../README.md#try-it-locally):
@@ -30,6 +31,6 @@ dimensions. Use an available browser capture tool with the same settings; this
 repository does not install a screenshot runner or run visual regression CI.
 
 Commit refreshed images with each UI change. Shared layout/theme changes refresh
-both pages. Non-UI changes retain the existing files, without duplicate captures
+all main pages. Non-UI changes retain the existing files, without duplicate captures
 or timestamps in filenames. When a new main page is added, extend the table and
 root README with its real screenshot.
