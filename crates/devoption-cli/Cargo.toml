@@ -1,0 +1,16 @@
+[package]
+name = "devoption-cli"
+description = "The initial DevOption command-line scaffold"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "devoption"
+path = "src/main.rs"
+
+[lints]
+workspace = true
