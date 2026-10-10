@@ -21,20 +21,28 @@ pub fn render(page: Page) -> String {
         Page::About => ("About", "/about", "No about content yet."),
     };
     let navigation: String = [
-        ("/", "Home"),
-        ("/projects", "Projects"),
-        ("/about", "About"),
+        ("/", "Home", "M3 10 12 3l9 7v11h-6v-7H9v7H3Z"),
+        ("/projects", "Projects", "M3 7V4h6l3 3h9v13H3Z"),
+        (
+            "/about",
+            "About",
+            "M12 16v-4M12 8h.01M21 12a9 9 0 1 1-18 0a9 9 0 0 1 18 0",
+        ),
     ]
     .into_iter()
-    .map(|(href, label)| {
+    .map(|(href, label, icon_path)| {
         let current = if href == path {
             " aria-current=\"page\""
         } else {
             ""
         };
-        format!("<a href=\"{href}\"{current}>{label}</a>")
+        format!(
+            "<a href=\"{href}\"{current}>{}<span>{label}</span></a>",
+            icon(icon_path)
+        )
     })
     .collect();
+    let profile_icon = icon("M20 21v-2a8 8 0 0 0-16 0v2M16 7a4 4 0 1 1-8 0a4 4 0 0 1 8 0");
 
     format!(
         "<!doctype html>
@@ -47,16 +55,38 @@ pub fn render(page: Page) -> String {
 </head>
 <body>
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
-  <header>
+  <aside class=\"sidebar\" aria-label=\"Sidebar\">
     <a class=\"brand\" href=\"/\" aria-label=\"DevOption home\">{LOGO}</a>
     <nav aria-label=\"Main navigation\">{navigation}</nav>
-  </header>
-  <main id=\"main-content\" tabindex=\"-1\">
-    <h1>{title}</h1>
-    <p>{message}</p>
-  </main>
-  <footer>In development</footer>
+    <div class=\"profile-area\">
+      <button class=\"profile-trigger\" type=\"button\" popovertarget=\"profile-popup\" aria-label=\"Profile menu\">
+        <span class=\"profile-avatar\">{profile_icon}</span>
+        <span class=\"profile-label\">Local preview</span><span class=\"chevron\" aria-hidden=\"true\"></span>
+      </button>
+      <section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">
+        <h2 id=\"profile-title\">Local preview</h2>
+        <p class=\"profile-note\">Account features are not available yet.</p>
+        <details class=\"appearance\">
+          <summary>Appearance</summary>
+          <p class=\"theme-preview\"><span class=\"theme-swatch\" aria-hidden=\"true\"></span><span>Nord purple<small>Current theme</small></span></p>
+        </details>
+      </section>
+    </div>
+  </aside>
+  <div class=\"workspace\">
+    <header class=\"content-header\"><p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p></header>
+    <main id=\"main-content\" tabindex=\"-1\">
+      <h1>{title}</h1>
+      <p>{message}</p>
+    </main>
+  </div>
 </body>
 </html>"
+    )
+}
+
+fn icon(path: &str) -> String {
+    format!(
+        "<svg class=\"icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\" focusable=\"false\"><path d=\"{path}\"/></svg>"
     )
 }

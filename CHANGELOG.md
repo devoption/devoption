@@ -36,6 +36,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Recreated the approved sidebar/header shell, with spacious content, responsive
+  navigation, and a compact local-preview popup containing read-only Appearance
+  information; refreshed all main-page screenshots
+  ([#27](https://github.com/devoption/devoption/issues/27)).
 - Extracted the existing renderer and CSS/SVG assets into a dependency-free
   `devoption-ui` library; the CLI keeps HTTP handling and remains the only binary.
   Page output and screenshots are unchanged

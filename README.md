@@ -6,14 +6,14 @@ factory: a place to manage the work of building, testing, and running software.
 **Today this repository is a small foundation, not a working software factory.**
 It contains a Rust workspace, a command-line program with a localhost-only HTTP
 server, behavioral tests, and contribution and release checks. The server shows
-empty Home, Projects, and About pages with shared navigation. It does not create
+empty Home, Projects, and About pages in a shared sidebar layout. It does not create
 files, provision infrastructure, or contact a service. There is no installer,
 project management, runtime cluster, or published release yet.
 
 ## Screenshots
 
 These are the current local Home, Projects, and About pages. All are empty
-placeholders; the screenshots show the shared header, navigation, and theme only.
+placeholders; the screenshots show the shared sidebar, header, and theme only.
 
 **Home (`/`)**
 
@@ -70,14 +70,18 @@ curl --include http://127.0.0.1:3000/
 ```
 
 Open **http://127.0.0.1:3000/** in your browser. Home (`/`), Projects (`/projects`),
-and About (`/about`) share a header and navigation, with the current page marked.
+and About (`/about`) share a sidebar and header, with the current page marked.
 All three pages are clearly empty placeholders; there are no project controls
 or data yet.
 
-The header uses the approved DevOption SVG. Its `dev` lettering follows the
+The sidebar uses the approved DevOption SVG. Its `dev` lettering follows the
 primary purple color in the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/).
 Shared color, spacing, and typography values live in
-`crates/devoption-ui/assets/theme.css`. There is no theme chooser yet.
+`crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
+popup; its **Appearance** section shows the current theme. Account features and
+theme switching are not implemented. The popup uses native HTML popover support
+in modern browsers; Escape or a click outside closes it. On narrow screens,
+navigation moves above the content.
 
 GET returns HTTP 200 with HTML for each page; HEAD returns headers without a
 body. Unknown paths return 404; unsupported methods on these pages return 405.

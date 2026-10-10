@@ -100,12 +100,31 @@ fn pages_share_layout_and_have_working_navigation() {
             } else {
                 ""
             };
-            assert!(navigation.contains(&format!("<a href=\"{href}\"{current}>{label}</a>")));
+            let link = navigation
+                .split_once(&format!("<a href=\"{href}\"{current}>"))
+                .unwrap()
+                .1
+                .split_once("</a>")
+                .unwrap()
+                .0;
+            assert!(link.contains(&format!("<span>{label}</span>")));
         }
         assert_eq!(body.matches("aria-current=\"page\"").count(), 1);
         assert!(body.contains("href=\"#main-content\""));
         assert!(body.contains("<main id=\"main-content\" tabindex=\"-1\">"));
-        assert!(body.contains("<footer>In development</footer>"));
+        assert!(body.contains("<header class=\"content-header\">"));
+        assert!(body.contains("In development</p>"));
+        assert!(body.contains("popovertarget=\"profile-popup\" aria-label=\"Profile menu\""));
+        let (before, popup) = body
+            .split_once("<section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">")
+            .unwrap();
+        let (popup, after) = popup.split_once("</section>").unwrap();
+        assert!(popup.contains("id=\"profile-title\""));
+        assert!(popup.contains("Account features are not available yet."));
+        assert!(popup.contains("<summary>Appearance</summary>"));
+        assert!(popup.contains("Nord purple"));
+        assert!(!before.contains("Nord purple"));
+        assert!(!after.contains("Nord purple"));
 
         let head = request(
             address,
