@@ -37,6 +37,12 @@ fn invalid_commands_fail_without_success_output() {
         vec!["start"],
         vec!["--help", "start"],
         vec!["--version", "-V"],
+        vec!["serve", "--port"],
+        vec!["serve", "--port", "abc"],
+        vec!["serve", "--port", "65536"],
+        vec!["serve", "--port", "-1"],
+        vec!["serve", "--host", "0.0.0.0"],
+        vec!["serve", "--port", "0", "extra"],
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_devoption"))
             .args(args)

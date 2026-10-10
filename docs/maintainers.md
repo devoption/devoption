@@ -37,12 +37,18 @@ Verified against official sources on 2026-10-10:
 - [actions/checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1)
   resolves to `3d3c42e5aac5ba805825da76410c181273ba90b1` in the official
   `actions/checkout` repository. Every use disables credential persistence.
+- [Axum 0.8.9](https://docs.rs/axum/0.8.9/axum/) and
+  [Tokio 1.53.2](https://docs.rs/tokio/1.53.2/tokio/), verified against their
+  crates.io release metadata. Direct versions are exact; transitive versions and
+  registry checksums are committed in `Cargo.lock`. Default features are disabled;
+  the local server enables only HTTP/1 and the needed Tokio runtime/network support.
 
 Actions use full commit SHAs following
 [GitHub's security guidance](https://docs.github.com/en/actions/reference/security/secure-use).
 Ubuntu runner images and their included tools still change over time; the
-workflow does not claim a fully hermetic build. The Rust crate has no third-party
-dependencies, and Python automation uses only the standard library.
+workflow does not claim a fully hermetic build. Fetch Rust dependencies with
+`cargo fetch --locked` before running offline checks. Python automation uses only
+the standard library.
 
 Create an issue before updating pins, dependencies, or tooling. Validate workflows
 with [actionlint](https://github.com/rhysd/actionlint), verify upstream release

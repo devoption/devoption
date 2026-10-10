@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A localhost-only `devoption serve` command with plain-text GET/HEAD responses,
+  HTTP error handling, configurable port, startup errors, and real request tests;
+  locked Axum/Tokio dependencies and a CI fetch step
+  ([#4](https://github.com/devoption/devoption/issues/4)).
 - A dependency-free Rust workspace and CLI scaffold with help/version output,
   explicit unsupported-input errors, and command-level tests
   ([#1](https://github.com/devoption/devoption/issues/1)).
