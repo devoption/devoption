@@ -70,12 +70,20 @@ pub fn render(page: Page) -> String {
         <p class=\"profile-note\">Account features are not available yet.</p>
         <details class=\"appearance\">
           <summary>Appearance</summary>
-          <p class=\"theme-preview\"><span class=\"theme-swatch\" aria-hidden=\"true\"></span><span>Nord purple<small>Current theme</small></span></p>
+          <p class=\"theme-preview\"><span class=\"theme-swatch\" aria-hidden=\"true\"></span><span><span id=\"appearance-name\">Nord purple</span><small>Current theme</small></span></p>
           <div class=\"mode-choice\">
             <label for=\"appearance-mode\">Mode</label>
             <select id=\"appearance-mode\" aria-describedby=\"appearance-status\" disabled>
               <option value=\"dark\">Dark</option>
               <option value=\"light\">Light</option>
+            </select>
+          </div>
+          <div class=\"mode-choice\">
+            <label for=\"appearance-accent\">Accent</label>
+            <select id=\"appearance-accent\" aria-describedby=\"appearance-status\" disabled>
+              <option value=\"purple\">Purple</option>
+              <option value=\"blue\">Blue</option>
+              <option value=\"green\">Green</option>
             </select>
           </div>
           <p id=\"appearance-status\" role=\"status\">Enable JavaScript to change appearance.</p>

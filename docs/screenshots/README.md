@@ -19,8 +19,8 @@ cargo run --locked --offline -- serve
 1. If source or assets changed, stop and restart the server, then refresh the page.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   In the profile popup's Appearance section, choose **Dark** for the main-page
-   captures. The browser remembers this selection.
+   In the profile popup's Appearance section, choose **Dark** and **Purple** for
+   the main-page captures. The browser remembers these choices.
 3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
    outline, open menu, or developer overlay in the capture.
 4. Capture the browser content viewport as JPEG, excluding browser/desktop chrome.
@@ -28,10 +28,11 @@ cargo run --locked --offline -- serve
 5. Inspect the saved images for readable text, complete content, and the correct
    active navigation link. Check their embeds in the root README before committing.
 
-For `appearance-light.jpg`, open Projects, select **Light** in Appearance, and
-leave the popup expanded with the save confirmation visible. Capture the same
-viewport, then return to **Dark**. Refresh this image when the control or light
-palette changes. Never capture unrelated browser or profile data.
+For `appearance-light.jpg`, open Projects, select **Light** and **Blue** in
+Appearance, and leave the popup expanded with the save confirmation visible.
+Capture the same viewport, then return to **Dark** and **Purple**. Refresh this
+image when the controls or light palette changes. Never capture unrelated
+browser or profile data.
 
 The initial images were captured with Codex's browser screenshot tool at these
 dimensions. Use an available browser capture tool with the same settings; this

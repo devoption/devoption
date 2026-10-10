@@ -129,6 +129,16 @@ fn pages_share_layout_and_have_working_navigation() {
         );
         assert!(popup.contains("<option value=\"dark\">Dark</option>"));
         assert!(popup.contains("<option value=\"light\">Light</option>"));
+        assert!(popup.contains("<label for=\"appearance-accent\">Accent</label>"));
+        assert!(
+            popup.contains(
+                "id=\"appearance-accent\" aria-describedby=\"appearance-status\" disabled"
+            )
+        );
+        for (value, label) in [("purple", "Purple"), ("blue", "Blue"), ("green", "Green")] {
+            assert!(popup.contains(&format!("<option value=\"{value}\">{label}</option>")));
+        }
+        assert!(popup.contains("id=\"appearance-name\">Nord purple</span>"));
         assert!(popup.contains("id=\"appearance-status\" role=\"status\""));
         assert!(before.contains("<script>"));
         assert!(before.find("</script>").unwrap() < before.find("</head>").unwrap());
