@@ -36,6 +36,23 @@
   --color-shadow: #2e344026;
 }
 
+:root[data-accent="blue"] {
+  --color-primary: #81a1c1;
+  --color-selected: #354455;
+}
+:root[data-accent="green"] {
+  --color-primary: #a3be8c;
+  --color-selected: #3a4748;
+}
+:root[data-appearance="light"][data-accent="blue"] {
+  --color-primary: #4b6f93;
+  --color-selected: #d5e1ed;
+}
+:root[data-appearance="light"][data-accent="green"] {
+  --color-primary: #4f7044;
+  --color-selected: #dce6de;
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0;

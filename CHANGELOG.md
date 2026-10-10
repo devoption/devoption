@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Purple, Blue, and Green primary accents inside Appearance, saved independently
+  of light/dark mode with Purple as the default. Shared colors and the logo's
+  `dev` lettering follow the accent; tests cover all six combinations, persistence,
+  invalid values, and storage failures. Refreshed the Appearance capture and
+  recaptured the unchanged default pages
+  ([#31](https://github.com/devoption/devoption/issues/31)).
 - A Dark/Light selector inside Appearance, defaulting to Nord dark-purple and
   saving the choice in browser-local storage, with safe invalid/blocked-storage
   fallbacks and a readable light palette. Added dependency-free script/contrast

@@ -1,34 +1,46 @@
 (() => {
-  const key = "devoption.appearance";
-  let mode = "dark";
+  const settings = [
+    { id: "appearance-mode", key: "devoption.appearance", attribute: "appearance", label: "Mode", values: ["dark", "light"] },
+    { id: "appearance-accent", key: "devoption.accent", attribute: "accent", label: "Accent", values: ["purple", "blue", "green"] },
+  ];
   let storageReadable = true;
-  try {
-    if (localStorage.getItem(key) === "light") mode = "light";
-  } catch {
-    storageReadable = false;
+  // Apply each saved choice independently, before body rendering.
+  for (const setting of settings) {
+    let value = setting.values[0];
+    try {
+      const saved = localStorage.getItem(setting.key);
+      if (setting.values.includes(saved)) value = saved;
+    } catch {
+      storageReadable = false;
+    }
+    document.documentElement.dataset[setting.attribute] = value;
   }
-
-  // This script runs in the head so the saved mode applies before body rendering.
-  document.documentElement.dataset.appearance = mode;
   document.addEventListener("DOMContentLoaded", () => {
-    const choice = document.getElementById("appearance-mode");
     const status = document.getElementById("appearance-status");
-    choice.value = mode;
-    choice.disabled = false;
+    const updateName = () => {
+      document.getElementById("appearance-name").textContent = `Nord ${document.documentElement.dataset.accent}`;
+    };
+    updateName();
     status.textContent = storageReadable
-      ? "Saved only in this browser when you choose a mode."
-      : "Your browser could not read the saved choice. Using dark mode.";
+      ? "Changes are saved only in this browser."
+      : "Some saved choices could not be read. Defaults are in use for those choices.";
 
-    choice.addEventListener("change", () => {
-      mode = choice.value === "light" ? "light" : "dark";
-      choice.value = mode;
-      document.documentElement.dataset.appearance = mode;
-      try {
-        localStorage.setItem(key, mode);
-        status.textContent = "Saved in this browser.";
-      } catch {
-        status.textContent = "This choice applies to this page only. Your browser could not save it.";
-      }
-    });
+    for (const setting of settings) {
+      const choice = document.getElementById(setting.id);
+      choice.value = document.documentElement.dataset[setting.attribute];
+      choice.disabled = false;
+      choice.addEventListener("change", () => {
+        const value = setting.values.includes(choice.value) ? choice.value : setting.values[0];
+        choice.value = value;
+        document.documentElement.dataset[setting.attribute] = value;
+        updateName();
+        try {
+          localStorage.setItem(setting.key, value);
+          status.textContent = `${setting.label} saved in this browser.`;
+        } catch {
+          status.textContent = `${setting.label} changed for this page only. Your browser could not save it.`;
+        }
+      });
+    }
   });
 })();

@@ -27,9 +27,9 @@ mode. All are empty placeholders; the screenshots show the shared shell.
 
 ![DevOption About page with About selected and “No about content yet.”](docs/screenshots/about.jpg)
 
-**Appearance (light mode)**
+**Appearance (light mode, blue accent)**
 
-![The Appearance section with Light selected, the Nord-purple theme, and browser-local save confirmation](docs/screenshots/appearance-light.jpg)
+![The Appearance section with Light and Blue selected, the Nord-blue theme, and browser-local save confirmation](docs/screenshots/appearance-light.jpg)
 
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
@@ -79,17 +79,19 @@ All three pages are clearly empty placeholders; there are no project controls
 or data yet.
 
 The sidebar uses the approved DevOption SVG. Its `dev` lettering follows the
-primary purple color in the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/);
-light mode uses a darker purple for contrast.
+selected primary accent from the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/);
+light mode uses darker counterparts for contrast.
 Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
-popup. Open **Appearance**, then choose **Dark** or **Light** under **Mode**.
-Dark is the default. The choice is saved only in this browser for this address
-and port; it applies when navigating or reloading. Other open tabs pick it up
-when reloaded. Missing or invalid saved choices use dark mode. If browser storage
+popup. Open **Appearance**, then choose **Dark** or **Light** under **Mode**, and
+**Purple**, **Blue**, or **Green** under **Accent**. Dark and Purple are the defaults.
+Each choice is saved only in this browser for this address and port; it applies
+when navigating or reloading. Other open tabs pick it up when reloaded. Missing
+or invalid values use that setting's default without resetting the other choice.
+Existing saved mode choices are preserved. If browser storage
 is blocked or full, the page stays usable and Appearance explains any read/save
 failure; an unsaved change lasts only for the current page. JavaScript is required
-to switch modes; without it, the pages still work in dark mode.
+to change either setting; without it, the pages still work in dark mode with Purple.
 
 Account features, additional palettes, and automatic system mode are not
 implemented. The popup uses native HTML popover support
