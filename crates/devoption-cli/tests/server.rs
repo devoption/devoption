@@ -60,23 +60,39 @@ fn request(address: SocketAddr, request: &str) -> String {
 }
 
 #[test]
-fn serves_get_and_head_on_loopback() {
+fn pages_share_layout_and_have_working_navigation() {
     let (_server, address) = start();
-    let get = request(
-        address,
-        "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-    );
-    let (headers, body) = get.split_once("\r\n\r\n").unwrap();
-    assert!(headers.starts_with("HTTP/1.1 200 OK"));
-    assert!(headers.contains("content-type: text/plain; charset=utf-8"));
-    assert_eq!(body, "DevOption local server\n");
+    for (path, title, message) in [
+        ("/", "Home", "No home content yet."),
+        ("/about", "About", "No about content yet."),
+    ] {
+        let get = request(
+            address,
+            &format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"),
+        );
+        let (headers, body) = get.split_once("\r\n\r\n").unwrap();
+        assert!(headers.starts_with("HTTP/1.1 200 OK"));
+        assert!(headers.contains("content-type: text/html; charset=utf-8"));
+        assert!(body.starts_with("<!doctype html>"));
+        assert!(body.contains(&format!("<title>{title} · DevOption</title>")));
+        assert!(body.contains(&format!("<h1>{title}</h1>")));
+        assert!(body.contains(message));
+        assert!(body.contains("<nav aria-label=\"Main navigation\">"));
+        assert!(body.contains("href=\"/\""));
+        assert!(body.contains("href=\"/about\""));
+        assert!(body.contains(&format!("href=\"{path}\" aria-current=\"page\"")));
+        assert_eq!(body.matches("aria-current=\"page\"").count(), 1);
+        assert!(body.contains("href=\"#main-content\""));
+        assert!(body.contains("<main id=\"main-content\" tabindex=\"-1\">"));
+        assert!(body.contains("<footer>In development</footer>"));
 
-    let head = request(
-        address,
-        "HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-    );
-    assert!(head.starts_with("HTTP/1.1 200 OK"));
-    assert_eq!(head.split_once("\r\n\r\n").unwrap().1, "");
+        let head = request(
+            address,
+            &format!("HEAD {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"),
+        );
+        assert!(head.starts_with("HTTP/1.1 200 OK"));
+        assert_eq!(head.split_once("\r\n\r\n").unwrap().1, "");
+    }
 }
 
 #[test]
