@@ -54,6 +54,11 @@ Open **http://127.0.0.1:3000/** in your browser. Home (`/`) and About (`/about`)
 share a header and navigation, with the current page marked. Both pages are
 clearly empty placeholders; there are no project controls or data yet.
 
+The header uses the approved DevOption SVG. Its `dev` lettering follows the
+primary purple color in the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/).
+Shared color, spacing, and typography values live in
+`crates/devoption-cli/assets/theme.css`. There is no theme chooser yet.
+
 GET returns HTTP 200 with HTML for either page; HEAD returns headers without a
 body. Unknown paths return 404; unsupported methods on these pages return 405.
 Malformed HTTP requests are rejected by the HTTP library.

@@ -7,6 +7,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- The approved DevOption SVG in the shared header, with original path geometries,
+  primary-color `dev` lettering, and basic Nord-purple color/spacing/type values
+  ([#8](https://github.com/devoption/devoption/issues/8)).
 - Shared HTML layout and working Home/About navigation with active-page state,
   a keyboard skip link, and explicit empty content; request tests cover both pages
   ([#6](https://github.com/devoption/devoption/issues/6)).

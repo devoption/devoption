@@ -77,6 +77,8 @@ fn pages_share_layout_and_have_working_navigation() {
         assert!(body.contains(&format!("<title>{title} · DevOption</title>")));
         assert!(body.contains(&format!("<h1>{title}</h1>")));
         assert!(body.contains(message));
+        assert!(body.contains("aria-label=\"DevOption home\""));
+        assert!(body.contains("<svg "));
         assert!(body.contains("<nav aria-label=\"Main navigation\">"));
         assert!(body.contains("href=\"/\""));
         assert!(body.contains("href=\"/about\""));
