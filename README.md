@@ -4,9 +4,9 @@ DevOption is an early open-source project working toward a self-hosted software
 factory: a place to manage the work of building, testing, and running software.
 
 **Today this repository is a small foundation, not a working software factory.**
-It contains a Rust workspace, one command-line program with help and version
-output, behavioral tests, and contribution and release checks. The program does
-not start a server, create files, provision infrastructure, or contact a service.
+It contains a Rust workspace, a command-line program with a localhost-only HTTP
+server, behavioral tests, and contribution and release checks. The server returns
+plain text; it does not create files, provision infrastructure, or contact a service.
 There is no installer, product UI, runtime cluster, or published release yet.
 
 ## Try it locally
@@ -16,14 +16,15 @@ Use the [official Rust installation guide](https://www.rust-lang.org/tools/insta
 if Rust is missing; it explains platform prerequisites. With rustup installed,
 the checked-in `rust-toolchain.toml` selects the version and components
 automatically. An existing system Rust installation at the same version also works.
-The first rustup setup needs internet access; this crate has no third-party Rust
-dependencies and builds offline afterward.
+The first rustup setup and dependency fetch need internet access. After fetching
+the locked dependencies, builds and tests can run offline.
 
 In a terminal:
 
 ```sh
 git clone https://github.com/devoption/devoption.git
 cd devoption
+cargo fetch --locked
 cargo run --locked --offline -- --help
 cargo run --locked --offline -- --version
 ```
@@ -33,9 +34,39 @@ this identifies development source, not a release. Running without arguments
 also shows help. Unsupported commands (such as `start`) exit with code 2 and
 an error on standard error.
 
+## Run the local server
+
+From the repository folder, after the setup above:
+
+```sh
+cargo run --locked --offline -- serve
+```
+
+Wait for `Listening on http://127.0.0.1:3000 (Ctrl+C to stop)`. In a second
+terminal, run:
+
+```sh
+curl --include http://127.0.0.1:3000/
+```
+
+GET `/` returns HTTP 200 and `DevOption local server` as plain text. HEAD `/`
+returns headers without a body. Unknown paths return 404; unsupported methods
+on `/` return 405. Malformed HTTP requests are rejected by the HTTP library.
+There is no web interface yet.
+
+Press **Ctrl+C** in the server terminal to stop the process. This increment does
+not implement graceful request draining. If the port is busy, startup exits with
+code 1 and an error. Choose another port with
+`cargo run --locked --offline -- serve --port 3001`. Port `0` selects a free port
+and prints the actual address. Invalid ports/options exit with code 2.
+
+The address is always IPv4 loopback (`127.0.0.1`); there is no host/bind option.
+This server is for local development, with no authentication or TLS. Do not
+expose it through a proxy or use it as a production service.
+
 ## Build and check
 
-Run these commands from the repository folder:
+Run these commands from the repository folder after `cargo fetch --locked`:
 
 ```sh
 cargo build --workspace --locked --offline
@@ -45,7 +76,8 @@ cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 ```
 
 The executable is `target/debug/devoption` (`devoption.exe` on Windows).
-Tests exercise the actual command's help, version, and invalid-input behavior.
+Tests exercise the actual command's help, version, and invalid-input behavior,
+plus real loopback HTTP requests, error responses, and an occupied-port failure.
 GitHub CI runs on Ubuntu; local validation also covers macOS. Windows is not yet
 covered by CI.
 
@@ -60,7 +92,8 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 
 DevOption's own code will stay in **one monorepo**, split into Rust modules and
 crates when real boundaries justify them. There is one crate now:
-`crates/devoption-cli`. No services or placeholder crates are included.
+`crates/devoption-cli`, with a small `server` module. No factory/runtime services
+or placeholder crates are included.
 
 Future work may add easy self-hosted installation, a full administration and
 development factory cluster, lighter runtime clusters, source control, CI,

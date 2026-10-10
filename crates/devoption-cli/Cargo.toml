@@ -1,12 +1,16 @@
 [package]
 name = "devoption-cli"
-description = "The initial DevOption command-line scaffold"
+description = "The DevOption command line and local development server"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "=1.53.2", default-features = false, features = ["net", "rt"] }
 
 [[bin]]
 name = "devoption"
