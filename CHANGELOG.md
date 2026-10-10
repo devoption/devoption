@@ -13,3 +13,7 @@ Entries describe implemented changes, not the roadmap.
 - MIT licensing for DevOption Labs LLC, tested setup instructions, contribution
   and security guidance, issue/PR templates, and GitHub sponsorship metadata
   ([#1](https://github.com/devoption/devoption/issues/1)).
+- Read-only GitHub CI for formatting, linting, tests, issue-linked contribution
+  metadata, and changelog changes; manual release validation that extracts dated,
+  version-matched notes without publishing
+  ([#1](https://github.com/devoption/devoption/issues/1)).

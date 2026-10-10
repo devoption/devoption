@@ -1,0 +1,36 @@
+name: Release check
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Prepared stable version, without v (for example 0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    # The reused CI also declares an issue-reading PR job (skipped for releases).
+    permissions:
+      contents: read
+      issues: read
+    uses: ./.github/workflows/ci.yml
+
+  notes:
+    name: Validate release notes
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require the reviewed main branch
+        run: test "$GITHUB_REF" = 'refs/heads/main'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate and show notes (no publication)
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 scripts/release_notes.py "$RELEASE_VERSION" >> "$GITHUB_STEP_SUMMARY"
