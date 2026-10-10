@@ -6,6 +6,7 @@ pub enum Page {
 }
 
 const STYLES: &str = include_str!("../assets/theme.css");
+const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
 
 /// Render a complete HTML document independently of the HTTP server.
@@ -52,6 +53,7 @@ pub fn render(page: Page) -> String {
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
   <title>{title} · DevOption</title>
   <style>{STYLES}</style>
+  <script>{APPEARANCE}</script>
 </head>
 <body>
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
@@ -69,6 +71,14 @@ pub fn render(page: Page) -> String {
         <details class=\"appearance\">
           <summary>Appearance</summary>
           <p class=\"theme-preview\"><span class=\"theme-swatch\" aria-hidden=\"true\"></span><span>Nord purple<small>Current theme</small></span></p>
+          <div class=\"mode-choice\">
+            <label for=\"appearance-mode\">Mode</label>
+            <select id=\"appearance-mode\" aria-describedby=\"appearance-status\" disabled>
+              <option value=\"dark\">Dark</option>
+              <option value=\"light\">Light</option>
+            </select>
+          </div>
+          <p id=\"appearance-status\" role=\"status\">Enable JavaScript to change appearance.</p>
         </details>
       </section>
     </div>
