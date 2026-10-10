@@ -1,6 +1,6 @@
 (() => {
   const settings = [
-    { id: "appearance-mode", key: "devoption.appearance", attribute: "appearance", label: "Mode", values: ["dark", "light"] },
+    { id: "appearance-mode", key: "devoption.appearance", attribute: "appearance", label: "Mode", values: ["dark", "light", "system"] },
     { id: "appearance-accent", key: "devoption.accent", attribute: "accent", label: "Accent", values: ["purple", "blue", "green"] },
   ];
   let storageReadable = true;
@@ -13,8 +13,19 @@
     } catch {
       storageReadable = false;
     }
-    document.documentElement.dataset[setting.attribute] = value;
+    setting.value = value;
   }
+  const deviceScheme = matchMedia("(prefers-color-scheme: dark)");
+  const apply = () => {
+    for (const setting of settings) {
+      const value = setting.attribute === "appearance" && setting.value === "system"
+        ? (deviceScheme.matches ? "dark" : "light")
+        : setting.value;
+      document.documentElement.dataset[setting.attribute] = value;
+    }
+  };
+  apply();
+  deviceScheme.addEventListener("change", apply);
   document.addEventListener("DOMContentLoaded", () => {
     const status = document.getElementById("appearance-status");
     const updateName = () => {
@@ -27,12 +38,13 @@
 
     for (const setting of settings) {
       const choice = document.getElementById(setting.id);
-      choice.value = document.documentElement.dataset[setting.attribute];
+      choice.value = setting.value;
       choice.disabled = false;
       choice.addEventListener("change", () => {
         const value = setting.values.includes(choice.value) ? choice.value : setting.values[0];
         choice.value = value;
-        document.documentElement.dataset[setting.attribute] = value;
+        setting.value = value;
+        apply();
         updateName();
         try {
           localStorage.setItem(setting.key, value);

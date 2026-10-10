@@ -76,6 +76,7 @@ pub fn render(page: Page) -> String {
             <select id=\"appearance-mode\" aria-describedby=\"appearance-status\" disabled>
               <option value=\"dark\">Dark</option>
               <option value=\"light\">Light</option>
+              <option value=\"system\">System</option>
             </select>
           </div>
           <div class=\"mode-choice\">
