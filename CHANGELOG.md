@@ -7,6 +7,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Shared HTML layout and working Home/About navigation with active-page state,
+  a keyboard skip link, and explicit empty content; request tests cover both pages
+  ([#6](https://github.com/devoption/devoption/issues/6)).
 - A localhost-only `devoption serve` command with plain-text GET/HEAD responses,
   HTTP error handling, configurable port, startup errors, and real request tests;
   locked Axum/Tokio dependencies and a CI fetch step
