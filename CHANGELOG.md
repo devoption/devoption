@@ -7,6 +7,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Tracked Home and About screenshots in the README, with fixed-viewport capture
+  instructions and a requirement to refresh affected images in UI-changing commits
+  ([#10](https://github.com/devoption/devoption/issues/10)).
 - The approved DevOption SVG in the shared header, with original path geometries,
   primary-color `dev` lettering, and basic Nord-purple color/spacing/type values
   ([#8](https://github.com/devoption/devoption/issues/8)).

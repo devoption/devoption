@@ -1,0 +1,35 @@
+# Page screenshots
+
+These images show the real local app, including its current empty placeholders.
+Keep one image per main page at a stable filename; Git records earlier versions.
+
+| Page | Local URL | File |
+| --- | --- | --- |
+| Home | http://127.0.0.1:3000/ | `home.jpg` |
+| About | http://127.0.0.1:3000/about | `about.jpg` |
+
+From the repository root, start the app after the [normal setup](../../README.md#try-it-locally):
+
+```sh
+cargo run --locked --offline -- serve
+```
+
+1. If source or assets changed, stop and restart the server, then refresh the page.
+   The HTML, CSS, and SVG are compiled into the executable.
+2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
+   Use the app's default Nord theme; there is currently no theme setting.
+3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
+   outline, open menu, or developer overlay in the capture.
+4. Capture the browser content viewport as JPEG, excluding browser/desktop chrome.
+   Replace the corresponding file above. Do not include private data or use a mockup.
+5. Inspect the saved images for readable text, complete content, and the correct
+   active navigation link. Check their embeds in the root README before committing.
+
+The initial images were captured with Codex's browser screenshot tool at these
+dimensions. Use an available browser capture tool with the same settings; this
+repository does not install a screenshot runner or run visual regression CI.
+
+Commit refreshed images with each UI change. Shared layout/theme changes refresh
+both pages. Non-UI changes retain the existing files, without duplicate captures
+or timestamps in filenames. When a new main page is added, extend the table and
+root README with its real screenshot.
