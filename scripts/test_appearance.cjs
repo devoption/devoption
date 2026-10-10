@@ -11,11 +11,13 @@ const accentKey = "devoption.accent";
 
 // Run the shipped script against storage faults and a minimal event-driven DOM.
 // Real browser checks cover native select/popover behavior and rendered layout.
-function page(saved = new Map(), faults = {}) {
+function page(saved = new Map(), faults = {}, deviceDark = false) {
   const choice = Object.assign(new EventTarget(), { value: "dark", disabled: true });
   const accent = Object.assign(new EventTarget(), { value: "purple", disabled: true });
   const name = { textContent: "Nord purple" };
   const status = { textContent: "Enable JavaScript to change appearance." };
+  const deviceScheme = Object.assign(new EventTarget(), { matches: deviceDark });
+  const writes = [];
   const document = Object.assign(new EventTarget(), {
     documentElement: { dataset: {} },
     getElementById: (id) => ({
@@ -25,6 +27,10 @@ function page(saved = new Map(), faults = {}) {
   });
   runInNewContext(script, {
     document,
+    matchMedia(query) {
+      assert.equal(query, "(prefers-color-scheme: dark)");
+      return deviceScheme;
+    },
     get localStorage() {
       if (faults.access) throw new Error("Storage blocked");
       return {
@@ -33,6 +39,7 @@ function page(saved = new Map(), faults = {}) {
           return saved.get(name) ?? null;
         },
         setItem(name, value) {
+          writes.push([name, value]);
           if (faults.write === true || faults.write === name) throw new Error("Quota exceeded");
           saved.set(name, value);
         },
@@ -45,6 +52,11 @@ function page(saved = new Map(), faults = {}) {
     accent,
     name,
     status,
+    writes,
+    changeDevice(dark) {
+      deviceScheme.matches = dark;
+      deviceScheme.dispatchEvent(new Event("change"));
+    },
     ready: () => document.dispatchEvent(new Event("DOMContentLoaded")),
     choose(value) {
       choice.value = value;
@@ -114,7 +126,7 @@ test("an existing mode preference is preserved when no accent has been saved", (
 });
 
 test("unknown or malformed values fall back without discarding the other valid choice", () => {
-  for (const value of ["", "system", "LIGHT", "null", '{"mode":"light"}', "<script>"]) {
+  for (const value of ["", "auto", "SYSTEM", "LIGHT", "null", '{"mode":"light"}', "<script>"]) {
     const current = page(new Map([[key, value], [accentKey, "green"]]));
     current.ready();
     assert.equal(current.root.dataset.appearance, "dark");
@@ -174,6 +186,85 @@ test("a failed write keeps the current page usable and preserves the previous ch
   assert.match(current.status.textContent, /could not save/);
   assert.equal(page(saved).root.dataset.appearance, "light");
   assert.equal(page(saved).root.dataset.accent, "green");
+});
+
+test("saved System resolves either device scheme before rendering and keeps every accent", () => {
+  for (const deviceDark of [false, true]) {
+    for (const accent of ["purple", "blue", "green"]) {
+      const saved = new Map([[key, "system"], [accentKey, accent]]);
+      const current = page(saved, {}, deviceDark);
+      assert.equal(current.root.dataset.appearance, deviceDark ? "dark" : "light");
+      assert.equal(current.root.dataset.accent, accent);
+      current.ready();
+      assert.equal(current.choice.value, "system");
+      assert.equal(current.accent.value, accent);
+      current.changeDevice(!deviceDark);
+      assert.equal(current.root.dataset.appearance, deviceDark ? "light" : "dark");
+      assert.equal(current.choice.value, "system");
+      assert.equal(current.root.dataset.accent, accent);
+      assert.equal(current.name.textContent, `Nord ${accent}`);
+      assert.equal(saved.get(key), "system");
+      assert.equal(current.writes.length, 0);
+    }
+  }
+});
+
+test("System persists as a choice and explicit modes stop following device changes", () => {
+  const saved = new Map([[accentKey, "blue"]]);
+  const current = page(saved);
+  current.ready();
+  current.choose("system");
+  assert.equal(saved.get(key), "system");
+  for (const dark of [true, false]) {
+    current.changeDevice(dark);
+    assert.equal(current.root.dataset.appearance, dark ? "dark" : "light");
+    assert.equal(current.choice.value, "system");
+    const reloaded = page(saved, {}, dark);
+    reloaded.ready();
+    assert.equal(reloaded.root.dataset.appearance, dark ? "dark" : "light");
+    assert.equal(reloaded.choice.value, "system");
+  }
+  assert.equal(current.writes.length, 1);
+  for (const mode of ["light", "dark"]) {
+    current.choose(mode);
+    for (const dark of [true, false]) {
+      current.changeDevice(dark);
+      assert.equal(current.root.dataset.appearance, mode);
+      assert.equal(current.choice.value, mode);
+      assert.equal(current.root.dataset.accent, "blue");
+      assert.equal(saved.get(key), mode);
+    }
+    const reloaded = page(saved, {}, mode === "light");
+    assert.equal(reloaded.root.dataset.appearance, mode);
+  }
+  current.choose("system");
+  current.changeDevice(true);
+  current.chooseAccent("green");
+  current.changeDevice(false);
+  assert.equal(current.root.dataset.appearance, "light");
+  assert.equal(current.root.dataset.accent, "green");
+  assert.equal(current.choice.value, "system");
+  assert.equal(saved.get(key), "system");
+  assert.equal(current.writes.length, 5);
+});
+
+test("unavailable storage still allows page-local System mode without changing the default", () => {
+  for (const faults of [{ access: true }, { read: true, write: true }]) {
+    const current = page(new Map(), faults);
+    current.ready();
+    current.changeDevice(true);
+    current.changeDevice(false);
+    assert.equal(current.root.dataset.appearance, "dark");
+    assert.equal(current.choice.value, "dark");
+    current.choose("system");
+    assert.equal(current.root.dataset.appearance, "light");
+    assert.match(current.status.textContent, /page only.*could not save/);
+    current.changeDevice(true);
+    assert.equal(current.root.dataset.appearance, "dark");
+    assert.equal(current.choice.value, "system");
+    assert.equal(current.root.dataset.accent, "purple");
+    assert.equal(page(new Map(), faults).root.dataset.appearance, "dark");
+  }
 });
 
 test("text and interactive accents retain contrast across all six combinations", () => {

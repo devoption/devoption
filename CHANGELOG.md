@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A System mode in Appearance that follows live device color-scheme changes
+  while preserving the selected accent. Explicit choices and the dark-purple
+  default stay unchanged; tests cover saved System, device changes, and storage
+  failure. Refreshed Appearance evidence and recaptured the default pages
+  ([#33](https://github.com/devoption/devoption/issues/33)).
 - Purple, Blue, and Green primary accents inside Appearance, saved independently
   of light/dark mode with Purple as the default. Shared colors and the logo's
   `dev` lettering follow the accent; tests cover all six combinations, persistence,

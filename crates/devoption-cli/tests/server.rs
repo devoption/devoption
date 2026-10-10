@@ -129,6 +129,7 @@ fn pages_share_layout_and_have_working_navigation() {
         );
         assert!(popup.contains("<option value=\"dark\">Dark</option>"));
         assert!(popup.contains("<option value=\"light\">Light</option>"));
+        assert!(popup.contains("<option value=\"system\">System</option>"));
         assert!(popup.contains("<label for=\"appearance-accent\">Accent</label>"));
         assert!(
             popup.contains(

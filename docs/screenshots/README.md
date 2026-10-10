@@ -28,11 +28,12 @@ cargo run --locked --offline -- serve
 5. Inspect the saved images for readable text, complete content, and the correct
    active navigation link. Check their embeds in the root README before committing.
 
-For `appearance-light.jpg`, open Projects, select **Light** and **Blue** in
-Appearance, and leave the popup expanded with the save confirmation visible.
-Capture the same viewport, then return to **Dark** and **Purple**. Refresh this
-image when the controls or light palette changes. Never capture unrelated
-browser or profile data.
+For `appearance-light.jpg`, open Projects and use browser developer tools to
+emulate a light device color scheme. Select **System** and **Blue** in Appearance,
+and leave the popup expanded with the save confirmation visible. Capture the
+same viewport, then clear device emulation and return to **Dark** and **Purple**.
+Refresh this image when the controls or light palette changes. Never capture
+unrelated browser or profile data.
 
 The initial images were captured with Codex's browser screenshot tool at these
 dimensions. Use an available browser capture tool with the same settings; this

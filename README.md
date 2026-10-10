@@ -27,9 +27,9 @@ mode. All are empty placeholders; the screenshots show the shared shell.
 
 ![DevOption About page with About selected and “No about content yet.”](docs/screenshots/about.jpg)
 
-**Appearance (light mode, blue accent)**
+**Appearance (System following a light device preference, blue accent)**
 
-![The Appearance section with Light and Blue selected, the Nord-blue theme, and browser-local save confirmation](docs/screenshots/appearance-light.jpg)
+![The Appearance section with System and Blue selected, following an emulated light device preference](docs/screenshots/appearance-light.jpg)
 
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
@@ -83,8 +83,12 @@ selected primary accent from the basic [Nord palette](https://www.nordtheme.com/
 light mode uses darker counterparts for contrast.
 Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
-popup. Open **Appearance**, then choose **Dark** or **Light** under **Mode**, and
-**Purple**, **Blue**, or **Green** under **Accent**. Dark and Purple are the defaults.
+popup. Open **Appearance**, then choose **Dark**, **Light**, or **System** under
+**Mode**, and **Purple**, **Blue**, or **Green** under **Accent**. Dark and Purple
+are the defaults.
+System follows the device color scheme reported by your browser, including changes
+while the page is open. It keeps your chosen accent. Explicit Dark and Light choices
+stay fixed when the device preference changes.
 Each choice is saved only in this browser for this address and port; it applies
 when navigating or reloading. Other open tabs pick it up when reloaded. Missing
 or invalid values use that setting's default without resetting the other choice.
@@ -93,10 +97,9 @@ is blocked or full, the page stays usable and Appearance explains any read/save
 failure; an unsaved change lasts only for the current page. JavaScript is required
 to change either setting; without it, the pages still work in dark mode with Purple.
 
-Account features, additional palettes, and automatic system mode are not
-implemented. The popup uses native HTML popover support
-in modern browsers; Escape or a click outside closes it. On narrow screens,
-navigation moves above the content.
+Account features and additional palettes are not implemented. The popup uses
+native HTML popover support in modern browsers; Escape or a click outside closes
+it. On narrow screens, navigation moves above the content.
 
 GET returns HTTP 200 with HTML for each page; HEAD returns headers without a
 body. Unknown paths return 404; unsupported methods on these pages return 405.
