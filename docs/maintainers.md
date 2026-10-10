@@ -1,25 +1,32 @@
 # Repository maintenance
 
+## Main branch protection
+
+With owner authorization under [#2](https://github.com/devoption/devoption/issues/2),
+GitHub branch protection was enabled and read back on 2026-10-10:
+
+- Changes to `main` require a pull request, including for administrators.
+- `Rust and repository checks` and `Issue and change documentation` must pass;
+  both must come from GitHub Actions. The PR branch must be up to date.
+- Zero approving reviews are required, so a sole maintainer can merge a PR
+  after CI passes. No bypass actors were added.
+- Force pushes and branch deletion are disabled.
+
+These settings live in GitHub, not in the workflow files. Review changes to
+workflows and validation scripts carefully; passing checks alone are not review.
+
 ## Settings that still need owner decisions
 
-At bootstrap, no repository rulesets or private vulnerability reporting were
-enabled. Secret scanning and push protection were also reported disabled.
-This work does not change repository security settings or create credentials.
+Private vulnerability reporting, secret scanning, and push protection remain
+disabled. No unrelated security settings or credentials were changed. An owner
+can separately review and authorize the following:
 
-Before accepting outside contributions, an owner should separately review and
-authorize the desired settings:
-
-- Protect `main`: require PRs, at least one approval, resolved review discussions,
-  and the `Rust and repository checks` and `Issue and change documentation`
-  checks. Require a current branch and prevent force pushes and deletion.
-  Consider review requirements for workflow/security changes and restrict bypass.
 - Enable private vulnerability reporting and update `SECURITY.md` once verified.
 - Review secret scanning/push protection availability and Actions settings.
   Keep default token permissions read-only and require approval for external
   contributors' workflow runs as appropriate.
 
-Until enabled, these are desired protections, **not enforced guarantees**.
-Changes to workflows or validation scripts need careful human review too.
+These remaining settings are recommendations, not enabled protections.
 
 ## Verified upstream pins
 

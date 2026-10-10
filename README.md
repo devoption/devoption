@@ -72,9 +72,14 @@ delivery promises.
 ## Get involved
 
 Start with a small [issue](https://github.com/devoption/devoption/issues/new/choose)
-before changing code or documentation. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[the changelog](CHANGELOG.md), [release instructions](docs/releases.md), and
-[security reporting guidance](SECURITY.md).
+before changing code or documentation.
+
+- [Contribution guide](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [Release instructions](docs/releases.md)
+- [Security reporting guidance](SECURITY.md)
 
 DevOption is licensed under the [MIT License](LICENSE), copyright 2026 DevOption
-Labs LLC. You can [sponsor DevOption on GitHub](https://github.com/sponsors/devoption).
+Labs LLC.
+
+[Sponsor DevOption on GitHub](https://github.com/sponsors/devoption).
