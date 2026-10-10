@@ -18,7 +18,7 @@ cargo run --locked --offline -- serve
 1. If source or assets changed, stop and restart the server, then refresh the page.
    The HTML, CSS, and SVG are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   Use the app's default Nord theme; there is currently no theme setting.
+   Use the app's fixed Nord theme; Appearance currently only displays its name.
 3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
    outline, open menu, or developer overlay in the capture.
 4. Capture the browser content viewport as JPEG, excluding browser/desktop chrome.
