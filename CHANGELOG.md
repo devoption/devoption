@@ -17,3 +17,10 @@ Entries describe implemented changes, not the roadmap.
   metadata, and changelog changes; manual release validation that extracts dated,
   version-matched notes without publishing
   ([#1](https://github.com/devoption/devoption/issues/1)).
+
+### Changed
+
+- Put the README's contribution links in a list and separate its sponsorship link
+  for easier reading; document the owner-authorized PR-and-CI protection now
+  enabled on `main`
+  ([#2](https://github.com/devoption/devoption/issues/2)).

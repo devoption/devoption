@@ -45,6 +45,6 @@ PR code only on GitHub-hosted runners with no repository secrets. Do not add
 `pull_request_target` execution of contributor code, self-hosted runners for
 untrusted PRs, or privileged publication jobs to ordinary PR checks.
 
-Repository protections and private reporting require separate owner approval.
-See [the maintainer checklist](docs/maintainers.md); written policy and CI do not
-by themselves prevent someone with push access from bypassing review.
+`main` requires PRs and passing CI, including for administrators, with no required
+approval count. See [the maintainer checklist](docs/maintainers.md) for the verified
+settings and remaining owner decisions, including private security reporting.
