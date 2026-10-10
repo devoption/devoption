@@ -1,7 +1,8 @@
 # Page screenshots
 
 These images show the real local app, including its current empty placeholders.
-Keep one image per main page at a stable filename; Git records earlier versions.
+Keep one default-mode image per main page at a stable filename; Git records earlier
+versions. `appearance-light.jpg` additionally shows the working Appearance control.
 
 | Page | Local URL | File |
 | --- | --- | --- |
@@ -16,15 +17,21 @@ cargo run --locked --offline -- serve
 ```
 
 1. If source or assets changed, stop and restart the server, then refresh the page.
-   The HTML, CSS, and SVG are compiled into the executable.
+   The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   Use the app's fixed Nord theme; Appearance currently only displays its name.
+   In the profile popup's Appearance section, choose **Dark** for the main-page
+   captures. The browser remembers this selection.
 3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
    outline, open menu, or developer overlay in the capture.
 4. Capture the browser content viewport as JPEG, excluding browser/desktop chrome.
    Replace the corresponding file above. Do not include private data or use a mockup.
 5. Inspect the saved images for readable text, complete content, and the correct
    active navigation link. Check their embeds in the root README before committing.
+
+For `appearance-light.jpg`, open Projects, select **Light** in Appearance, and
+leave the popup expanded with the save confirmation visible. Capture the same
+viewport, then return to **Dark**. Refresh this image when the control or light
+palette changes. Never capture unrelated browser or profile data.
 
 The initial images were captured with Codex's browser screenshot tool at these
 dimensions. Use an available browser capture tool with the same settings; this

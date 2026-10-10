@@ -31,6 +31,11 @@ jobs:
       - run: cargo test --workspace --locked --offline
       - run: cargo build --workspace --locked --offline
       - run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22.22.3'
+          package-manager-cache: false
+      - run: node --test scripts/test_appearance.cjs
       - run: git diff --exit-code
 
   contribution:

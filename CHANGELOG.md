@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A Dark/Light selector inside Appearance, defaulting to Nord dark-purple and
+  saving the choice in browser-local storage, with safe invalid/blocked-storage
+  fallbacks and a readable light palette. Added dependency-free script/contrast
+  tests to CI and an actual light-mode screenshot; recaptured all default pages
+  ([#29](https://github.com/devoption/devoption/issues/29)).
 - An empty Projects page at `/projects` in the shared navigation, with active-page
   state, request tests, and updated screenshots of all three main pages
   ([#12](https://github.com/devoption/devoption/issues/12)).

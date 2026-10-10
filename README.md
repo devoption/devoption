@@ -12,8 +12,8 @@ project management, runtime cluster, or published release yet.
 
 ## Screenshots
 
-These are the current local Home, Projects, and About pages. All are empty
-placeholders; the screenshots show the shared sidebar, header, and theme only.
+These are the current local Home, Projects, and About pages in the default dark
+mode. All are empty placeholders; the screenshots show the shared shell.
 
 **Home (`/`)**
 
@@ -26,6 +26,10 @@ placeholders; the screenshots show the shared sidebar, header, and theme only.
 **About (`/about`)**
 
 ![DevOption About page with About selected and “No about content yet.”](docs/screenshots/about.jpg)
+
+**Appearance (light mode)**
+
+![The Appearance section with Light selected, the Nord-purple theme, and browser-local save confirmation](docs/screenshots/appearance-light.jpg)
 
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
@@ -75,11 +79,20 @@ All three pages are clearly empty placeholders; there are no project controls
 or data yet.
 
 The sidebar uses the approved DevOption SVG. Its `dev` lettering follows the
-primary purple color in the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/).
+primary purple color in the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/);
+light mode uses a darker purple for contrast.
 Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
-popup; its **Appearance** section shows the current theme. Account features and
-theme switching are not implemented. The popup uses native HTML popover support
+popup. Open **Appearance**, then choose **Dark** or **Light** under **Mode**.
+Dark is the default. The choice is saved only in this browser for this address
+and port; it applies when navigating or reloading. Other open tabs pick it up
+when reloaded. Missing or invalid saved choices use dark mode. If browser storage
+is blocked or full, the page stays usable and Appearance explains any read/save
+failure; an unsaved change lasts only for the current page. JavaScript is required
+to switch modes; without it, the pages still work in dark mode.
+
+Account features, additional palettes, and automatic system mode are not
+implemented. The popup uses native HTML popover support
 in modern browsers; Escape or a click outside closes it. On narrow screens,
 navigation moves above the content.
 
@@ -125,6 +138,17 @@ packages. To check it too:
 python3 -m unittest discover -s scripts -p 'test_*.py'
 ```
 
+Appearance checks use Node.js **22.22.3** (the version pinned in CI), with no npm
+packages or installation step beyond [Node.js](https://nodejs.org/en/download).
+Node is only needed for these tests, not for building or running DevOption:
+
+```sh
+node --test scripts/test_appearance.cjs
+```
+
+These tests run the shipped browser script with storage faults and check palette
+contrast. Real browser checks cover the native controls, focus, and layout.
+
 ## Where this is going
 
 DevOption's own code will stay in **one monorepo**, split into Rust modules and
@@ -132,7 +156,7 @@ crates when real boundaries justify them. There are two crates now:
 
 - `crates/devoption-cli` owns the command line and HTTP routes/server. It builds
   the single `devoption` executable.
-- `crates/devoption-ui` owns shared HTML rendering and the CSS/SVG assets. It is
+- `crates/devoption-ui` owns shared HTML rendering and the CSS/SVG/JavaScript assets. It is
   a library with no external dependencies; the server wraps its HTML in responses.
 
 Both compile into the same executable. No factory/runtime services, business

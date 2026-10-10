@@ -122,6 +122,16 @@ fn pages_share_layout_and_have_working_navigation() {
         assert!(popup.contains("id=\"profile-title\""));
         assert!(popup.contains("Account features are not available yet."));
         assert!(popup.contains("<summary>Appearance</summary>"));
+        assert!(popup.contains("for=\"appearance-mode\""));
+        assert!(
+            popup
+                .contains("id=\"appearance-mode\" aria-describedby=\"appearance-status\" disabled")
+        );
+        assert!(popup.contains("<option value=\"dark\">Dark</option>"));
+        assert!(popup.contains("<option value=\"light\">Light</option>"));
+        assert!(popup.contains("id=\"appearance-status\" role=\"status\""));
+        assert!(before.contains("<script>"));
+        assert!(before.find("</script>").unwrap() < before.find("</head>").unwrap());
         assert!(popup.contains("Nord purple"));
         assert!(!before.contains("Nord purple"));
         assert!(!after.contains("Nord purple"));
