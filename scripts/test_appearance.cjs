@@ -8,17 +8,24 @@ const assets = join(__dirname, "../crates/devoption-ui/assets");
 const script = readFileSync(join(assets, "appearance.js"), "utf8");
 const key = "devoption.appearance";
 const accentKey = "devoption.accent";
+const themeKey = "devoption.theme";
 const css = readFileSync(join(assets, "theme.css"), "utf8");
-const blocks = Object.fromEntries([...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)].map((match) => [
+const blocks = Object.fromEntries([...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]+)\}/g)].map((match) => [
   match[1].trim(), Object.fromEntries([...match[2].matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map((color) => color.slice(1))),
 ]));
-function paletteFor(mode, accent) {
+function paletteFor(mode, accent, theme = "nord") {
   const light = ':root[data-appearance="light"]';
+  const themeSelector = `:root[data-theme="${theme}"]`;
+  const themeLight = `${themeSelector}[data-appearance="light"]`;
   return {
     ...blocks[":root"],
     ...(mode === "light" ? blocks[light] : {}),
     ...blocks[`:root[data-accent="${accent}"]`],
     ...(mode === "light" ? blocks[`${light}[data-accent="${accent}"]`] : {}),
+    ...blocks[themeSelector],
+    ...blocks[`${themeSelector}[data-accent="${accent}"]`],
+    ...(mode === "light" ? blocks[themeLight] : {}),
+    ...(mode === "light" ? blocks[`${themeLight}[data-accent="${accent}"]`] : {}),
   };
 }
 function colorValue(palette, name) {
@@ -32,7 +39,8 @@ function colorValue(palette, name) {
 function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = true, paletteOverride = {}) {
   const choice = Object.assign(new EventTarget(), { value: "dark", disabled: true });
   const accent = Object.assign(new EventTarget(), { value: "purple", disabled: true });
-  const name = { textContent: "Nord purple" };
+  const theme = Object.assign(new EventTarget(), { value: "nord", disabled: true });
+  const themeNote = { hidden: true };
   const status = { textContent: "Enable JavaScript to change appearance." };
   const primary = Object.assign(new EventTarget(), { value: "#b48ead", disabled: true });
   const reset = Object.assign(new EventTarget(), { disabled: true });
@@ -49,13 +57,13 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
     },
     getElementById: (id) => hasControls ? ({
       "appearance-mode": choice, "appearance-accent": accent,
-      "appearance-name": name, "appearance-status": status,
+      "appearance-theme": theme, "appearance-theme-note": themeNote, "appearance-status": status,
       "appearance-primary": primary, "appearance-reset": reset,
       "appearance-contrast": warning, "appearance-hex": hex,
     })[id] : null,
   });
   const computedColor = (name) => colorValue({
-    ...paletteFor(document.documentElement.dataset.appearance, document.documentElement.dataset.accent),
+    ...paletteFor(document.documentElement.dataset.appearance, document.documentElement.dataset.accent, document.documentElement.dataset.theme),
     ...paletteOverride,
     ...Object.fromEntries([...inline].map(([key, value]) => [key.replace("--color-", ""), value])),
   }, name);
@@ -86,7 +94,7 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
     root: document.documentElement,
     choice,
     accent,
-    name,
+    theme, themeNote,
     status,
     writes,
     primary, reset, warning, hex, inline, computedColor,
@@ -111,6 +119,10 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
       accent.value = value;
       accent.dispatchEvent(new Event("change"));
     },
+    chooseTheme(value) {
+      theme.value = value;
+      theme.dispatchEvent(new Event("change"));
+    },
   };
 }
 
@@ -126,7 +138,9 @@ test("a fresh browser starts dark-purple without writing preferences", () => {
   assert.equal(current.choice.value, "dark");
   assert.equal(current.accent.disabled, false);
   assert.equal(current.accent.value, "purple");
-  assert.equal(current.name.textContent, "Nord purple");
+  assert.equal(current.theme.value, "nord");
+  assert.equal(current.theme.disabled, false);
+  assert.equal(current.themeNote.hidden, true);
   assert.equal(saved.size, 0);
 });
 
@@ -161,7 +175,6 @@ test("history restores Appearance controls and feedback without adding listeners
   assert.equal(current.choice.value, "system");
   assert.equal(current.accent.value, "green");
   assert.equal(current.root.dataset.appearance, "light");
-  assert.equal(current.name.textContent, "Nord green");
   assert.equal(current.writes.length, 0);
   current.restore();
   current.chooseAccent("blue");
@@ -193,7 +206,6 @@ test("all six combinations persist independently and apply before content is rea
       assert.equal(current.root.dataset.accent, accent);
       assert.equal(current.root.dataset.appearance, mode);
       assert.equal(saved.get(accentKey), accent);
-      assert.equal(current.name.textContent, `Nord ${accent}`);
       assert.equal(current.status.textContent, "Accent saved in this browser.");
       const reloaded = page(saved);
       assert.equal(reloaded.root.dataset.appearance, mode);
@@ -201,7 +213,6 @@ test("all six combinations persist independently and apply before content is rea
       reloaded.ready();
       assert.equal(reloaded.choice.value, mode);
       assert.equal(reloaded.accent.value, accent);
-      assert.equal(reloaded.name.textContent, `Nord ${accent}`);
     }
   }
   assert.equal(saved.get("unrelated"), "preserve me");
@@ -229,7 +240,6 @@ test("unknown or malformed values fall back without discarding the other valid c
     assert.equal(invalidAccent.choice.value, "light");
     assert.equal(invalidAccent.root.dataset.accent, "purple");
     assert.equal(invalidAccent.accent.value, "purple");
-    assert.equal(invalidAccent.name.textContent, "Nord purple");
   }
 });
 
@@ -245,7 +255,6 @@ test("unavailable storage does not prevent rendering or page-local switching", (
     assert.match(current.status.textContent, /page only.*could not save/);
     current.chooseAccent("blue");
     assert.equal(current.root.dataset.accent, "blue");
-    assert.equal(current.name.textContent, "Nord blue");
     assert.match(current.status.textContent, /Accent changed for this page only.*could not save/);
     const reloaded = page(new Map(), faults);
     assert.equal(reloaded.root.dataset.appearance, "dark");
@@ -274,7 +283,6 @@ test("a failed write keeps the current page usable and preserves the previous ch
   current.chooseAccent("blue");
   assert.equal(current.accent.value, "blue");
   assert.equal(current.root.dataset.accent, "blue");
-  assert.equal(current.name.textContent, "Nord blue");
   assert.match(current.status.textContent, /could not save/);
   assert.equal(page(saved).root.dataset.appearance, "light");
   assert.equal(page(saved).root.dataset.accent, "green");
@@ -294,7 +302,6 @@ test("saved System resolves either device scheme before rendering and keeps ever
       assert.equal(current.root.dataset.appearance, deviceDark ? "light" : "dark");
       assert.equal(current.choice.value, "system");
       assert.equal(current.root.dataset.accent, accent);
-      assert.equal(current.name.textContent, `Nord ${accent}`);
       assert.equal(saved.get(key), "system");
       assert.equal(current.writes.length, 0);
     }
@@ -359,7 +366,7 @@ test("unavailable storage still allows page-local System mode without changing t
   }
 });
 
-test("text and interactive accents retain contrast across all six combinations", () => {
+test("both themes retain text and interactive contrast in every mode and preset", () => {
   const luminance = (hex) => hex.slice(1).match(/../g).map((byte) => {
     const channel = parseInt(byte, 16) / 255;
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -368,15 +375,19 @@ test("text and interactive accents retain contrast across all six combinations",
     const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
     return (values[0] + 0.05) / (values[1] + 0.05);
   };
-  for (const mode of ["dark", "light"]) {
-    for (const accent of ["purple", "blue", "green"]) {
-      const palette = paletteFor(mode, accent);
-      for (const surface of ["background", "sidebar", "surface", "selected"]) {
-        for (const text of ["text", "muted"]) {
-          assert.ok(contrast(palette[text], palette[surface]) >= 4.5, `${text} on ${surface}`);
-        }
-        for (const role of ["primary", "focus"]) {
-          assert.ok(contrast(colorValue(palette, role), palette[surface]) >= 3, `${role} on ${surface}`);
+  for (const theme of ["nord", "dracula"]) {
+    for (const mode of ["dark", "light"]) {
+      for (const accent of ["purple", "blue", "green", "custom"]) {
+        const palette = paletteFor(mode, accent, theme);
+        for (const surface of ["background", "sidebar", "surface", "selected"]) {
+          const context = `${theme} ${mode} ${accent} on ${surface}`;
+          for (const text of ["text", "muted"]) {
+            assert.ok(contrast(palette[text], palette[surface]) >= 4.5, `${text}: ${context}`);
+          }
+          // Arbitrary custom primaries have no contrast guarantee; focus still must.
+          for (const role of accent === "custom" ? ["focus"] : ["primary", "focus"]) {
+            assert.ok(contrast(colorValue(palette, role), palette[surface]) >= 3, `${role}: ${context}`);
+          }
         }
       }
     }
@@ -393,7 +404,6 @@ test("custom colors persist atomically and apply before rendering on every route
   assert.equal(current.accent.value, "custom");
   assert.equal(current.primary.value, "#12abef");
   assert.equal(current.hex.textContent, "#12abef");
-  assert.equal(current.name.textContent, "Custom primary");
   assert.equal(saved.get(accentKey), "#12abef");
   assert.deepEqual(current.writes, [[accentKey, "#12abef"]]);
   for (const hasControls of [true, false]) {
@@ -531,4 +541,121 @@ test("contrast uses known sRGB ratios, the weakest surface, and an unrounded 3:1
     current.ready();
     assert.match(current.warning.textContent, new RegExp(`Low contrast: 1.00:1 on ${surface}`));
   }
+});
+
+test("missing or invalid themes preserve legacy preferences without migration writes", () => {
+  for (const theme of [null, "", "Dracula", "unknown", "dracula\n", "#282a36"]) {
+    for (const mode of ["dark", "light", "system"]) {
+      for (const accent of ["purple", "blue", "green", "#abcdef"]) {
+        const saved = new Map([[key, mode], [accentKey, accent]]);
+        if (theme !== null) saved.set(themeKey, theme);
+        const before = new Map(saved);
+        const current = page(saved);
+        assert.equal(current.root.dataset.theme, "nord");
+        current.ready();
+        assert.equal(current.theme.value, "nord");
+        assert.equal(current.choice.value, mode);
+        assert.equal(current.accent.value, accent.startsWith("#") ? "custom" : accent);
+        assert.deepEqual(saved, before);
+        assert.equal(current.writes.length, 0);
+      }
+    }
+  }
+});
+
+test("theme switching persists independently, preserves accents, and reset keeps theme and mode", () => {
+  const presets = {
+    nord: { dark: ["#b48ead", "#81a1c1", "#a3be8c"], light: ["#7e5a79", "#4b6f93", "#4f7044"] },
+    dracula: { dark: ["#bd93f9", "#8be9fd", "#50fa7b"], light: ["#7043a0", "#176e87", "#247237"] },
+  };
+  for (const mode of ["dark", "light", "system"]) {
+    for (const deviceDark of [true, false]) {
+      for (const accent of ["purple", "blue", "green", "#abcdef"]) {
+        const saved = new Map([[key, mode], [accentKey, accent]]);
+        const current = page(saved, {}, deviceDark);
+        current.ready();
+        for (const theme of ["dracula", "nord", "dracula"]) {
+          current.chooseTheme(theme);
+          const resolved = mode === "system" ? (deviceDark ? "dark" : "light") : mode;
+          const expected = accent.startsWith("#") ? accent : presets[theme][resolved][["purple", "blue", "green"].indexOf(accent)];
+          assert.equal(current.primary.value, expected);
+          assert.equal(current.choice.value, mode);
+          assert.equal(saved.get(accentKey), accent);
+          assert.equal(saved.get(key), mode);
+          assert.equal(saved.get(themeKey), theme);
+          assert.ok(current.writes.every(([key]) => key === themeKey));
+          const reloaded = page(saved, {}, deviceDark);
+          assert.equal(reloaded.root.dataset.theme, theme);
+          reloaded.ready();
+          assert.equal(reloaded.primary.value, expected);
+        }
+        current.resetAccent();
+        assert.equal(saved.get(themeKey), "dracula");
+        assert.equal(current.choice.value, mode);
+        assert.equal(current.accent.value, "purple");
+        assert.equal(current.inline.size, 0);
+      }
+    }
+  }
+});
+
+test("theme storage faults are isolated and history refreshes pages with or without controls", () => {
+  const saved = new Map([[key, "system"], [accentKey, "#abcdef"], [themeKey, "dracula"]]);
+  const unreadable = page(saved, { read: themeKey });
+  unreadable.ready();
+  assert.equal(unreadable.theme.value, "nord");
+  assert.equal(unreadable.choice.value, "system");
+  assert.equal(unreadable.primary.value, "#abcdef");
+  assert.match(unreadable.status.textContent, /could not be read/);
+  for (const faults of [{ write: themeKey }, { access: true }]) {
+    const current = page(saved, faults);
+    current.ready();
+    current.chooseTheme("nord");
+    assert.equal(current.theme.value, "nord");
+    assert.equal(saved.get(themeKey), "dracula");
+    assert.match(current.status.textContent, /Theme changed for this page only/);
+  }
+  for (const hasControls of [true, false]) {
+    const current = page(saved, {}, false, hasControls);
+    assert.equal(current.root.dataset.theme, "dracula");
+    current.ready();
+    saved.set(themeKey, "nord");
+    current.restore();
+    assert.equal(current.root.dataset.theme, "nord");
+    saved.set(themeKey, "dracula");
+    current.restore();
+    current.changeDevice(true);
+    assert.equal(current.root.dataset.appearance, "dark");
+    assert.equal(current.computedColor("background"), "#282a36");
+    assert.equal(current.computedColor("primary"), "#abcdef");
+    assert.equal(current.writes.length, 0);
+    if (hasControls) assert.equal(current.theme.value, "dracula");
+  }
+});
+
+test("theme and System changes recalculate custom contrast and identify adapted Dracula light", () => {
+  const current = page(new Map([[key, "system"], [accentKey, "#282a36"]]), {}, true);
+  current.ready();
+  const nordWarning = current.warning.textContent;
+  current.chooseTheme("dracula");
+  assert.match(current.warning.textContent, /Low contrast: 1.00:1 on background in dark mode/);
+  assert.notEqual(current.warning.textContent, nordWarning);
+  assert.equal(current.themeNote.hidden, true);
+  current.changeDevice(false);
+  assert.equal(current.primary.value, "#282a36");
+  assert.match(current.warning.textContent, /^Lowest accent contrast:.*light mode/);
+  assert.equal(current.themeNote.hidden, false);
+  assert.equal(current.computedColor("focus"), "#7043a0");
+  current.chooseColor("#f8f8f2");
+  assert.match(current.warning.textContent, /Low contrast: 1.00:1 on background in light mode/);
+  current.chooseTheme("nord");
+  assert.equal(current.themeNote.hidden, true);
+  assert.equal(current.primary.value, "#f8f8f2");
+  assert.notEqual(current.warning.textContent.includes("1.00:1"), true);
+  current.chooseTheme("dracula");
+  current.choose("dark");
+  current.changeDevice(false);
+  assert.equal(current.root.dataset.appearance, "dark");
+  assert.equal(current.themeNote.hidden, true);
+  assert.equal(current.computedColor("focus"), "#bd93f9");
 });

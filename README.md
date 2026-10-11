@@ -40,6 +40,14 @@ placeholders; Appearance contains the working browser-local preferences.
 
 ![The Appearance page with a custom primary matching the dark background and a measured 1:1 contrast warning](docs/screenshots/appearance-custom.jpg)
 
+**Dracula (Dark)**
+
+![Appearance with Dracula, Dark, and Purple selected](docs/screenshots/appearance-dracula.jpg)
+
+**Dracula (adapted Light, following System)**
+
+![Appearance with Dracula, System, and Purple selected, showing DevOption's light adaptation](docs/screenshots/appearance-dracula-light.jpg)
+
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
 ## Try it locally
@@ -88,13 +96,20 @@ All three pages are clearly empty placeholders; there are no project controls
 or data yet.
 
 The sidebar uses the approved DevOption SVG. Its `dev` lettering follows the
-selected primary accent from the basic [Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/);
-light mode uses darker counterparts for contrast.
+selected primary accent. The built-in themes adapt the
+[Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/) and
+[Dracula palette](https://draculatheme.com/contribute) to this UI.
+Dracula's Blue preset uses its cyan accent. Light modes use darker accents for
+contrast; **Dracula light is a DevOption adaptation**, identified on the page.
 Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
 popup with an **Appearance** link. Follow it to `/settings/appearance`, then choose
-**Dark**, **Light**, or **System** under **Mode**, and **Purple**, **Blue**, or
-**Green** under **Accent**. Dark and Purple are the defaults. Use **Primary color**
+**Nord** or **Dracula** under **Theme**, **Dark**, **Light**, or **System** under
+**Mode**, and **Purple**, **Blue**, or **Green** under **Accent**. Nord, Dark, and
+Purple are the defaults. Switching themes preserves your mode and accent choice:
+presets resolve to that theme's colors, while a custom primary stays exactly as
+chosen. **Reset to Purple** changes only the accent, keeping theme and mode.
+Use **Primary color**
 to choose a custom opaque six-digit hex color with your browser's native picker;
 the selected hex value appears beside it. Choosing a color selects **Custom**
 automatically. Choosing Custom from the accent list starts with the current color.
@@ -105,8 +120,8 @@ while the page is open. It keeps your chosen accent. Explicit Dark and Light cho
 stay fixed when the device preference changes. Custom colors stay exactly as
 chosen across modes; presets use their corresponding light/dark colors.
 For a custom color, Appearance calculates the lowest contrast against the current
-page, sidebar, surface, and selected backgrounds. It updates when the mode or
-device preference changes and warns below 3:1. The ratio is rounded down to two
+page, sidebar, surface, and selected backgrounds. It updates when the theme, mode,
+or device preference changes and warns below 3:1. The ratio is rounded down to two
 decimal places. This checks accent/background contrast only; it does not guarantee
 that every custom color is accessible. Warning text, control borders, and keyboard
 focus indicators use the built-in palette independently of the custom color.
@@ -115,14 +130,16 @@ when navigating, reloading, or returning with Back/Forward. Other open tabs pick
 it up when reloaded. Missing or invalid values use that setting's default without
 resetting the other choice. The accent is saved as one preset name or validated
 hex value, so a failed save cannot leave a partially saved custom choice.
-Existing saved mode choices are preserved. If browser storage
+Existing saved mode and accent choices are preserved. Theme is stored separately
+as `devoption.theme`; older preferences need no migration and use Nord until you
+choose another theme. If browser storage
 is blocked or full, the page stays usable and Appearance explains any read/save
 failure; an unsaved change lasts only for the current page. JavaScript is required
-to change either setting; without it, the pages still work in dark mode with Purple.
+to change preferences; without it, the pages still work in Nord dark with Purple.
 
 The current theme preview and controls appear only on the Appearance page.
 Use the shared navigation or your browser's Back button to return to other pages.
-Account features and additional palettes are not implemented. The popup uses
+Account features and themes beyond Nord and Dracula are not implemented. The popup uses
 native HTML popover support in modern browsers; Escape or a click outside closes
 it. On narrow screens, navigation moves above the content.
 
@@ -176,9 +193,10 @@ Node is only needed for these tests, not for building or running DevOption:
 node --test scripts/test_appearance.cjs
 ```
 
-These tests run the shipped browser script with storage faults and check preset
-contrast, custom color validation, persistence/history, reset, mode changes, and
-known contrast ratios around the 3:1 warning threshold. Real browser checks cover
+These tests run the shipped browser script with storage faults and check both
+themes' preset contrast, legacy preferences, invalid themes/colors,
+persistence/history, reset, theme/mode/System changes, and known contrast ratios
+around the 3:1 warning threshold. Real browser checks cover
 the native controls, focus, and layout.
 
 ## Where this is going

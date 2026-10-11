@@ -11,7 +11,15 @@ const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
 const APPEARANCE_CONTROLS: &str = r##"
       <section class="appearance" aria-label="Appearance preferences">
-        <p class="theme-preview"><span class="theme-swatch" aria-hidden="true"></span><span><span id="appearance-name">Nord purple</span><small>Current theme</small></span></p>
+        <div class="theme-preview">
+          <span class="theme-swatch" aria-hidden="true"></span>
+          <label for="appearance-theme">Theme</label>
+          <select id="appearance-theme" aria-describedby="appearance-status" disabled>
+            <option value="nord">Nord</option>
+            <option value="dracula">Dracula</option>
+          </select>
+        </div>
+        <p id="appearance-theme-note" hidden>Dracula light is a DevOption adaptation.</p>
         <div class="mode-choice">
           <label for="appearance-mode">Mode</label>
           <select id="appearance-mode" aria-describedby="appearance-status" disabled>

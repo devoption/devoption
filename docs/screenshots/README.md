@@ -4,6 +4,8 @@ These images show the real local app, including its current empty placeholders.
 Keep one default-mode image per main page at a stable filename; Git records earlier
 versions. `appearance-light.jpg` additionally shows Appearance following a light
 device preference. `appearance-custom.jpg` shows a custom primary and its warning.
+`appearance-dracula.jpg` and `appearance-dracula-light.jpg` show Dracula in Dark
+and the adapted Light mode.
 
 | Page | Local URL | File |
 | --- | --- | --- |
@@ -21,7 +23,7 @@ cargo run --locked --offline -- serve
 1. If source or assets changed, stop and restart the server, then refresh the page.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   Follow the profile popup's **Appearance** link. Choose **Dark** and **Purple** for
+   Follow the profile popup's **Appearance** link. Choose **Nord**, **Dark**, and **Purple** for
    the main-page captures. The browser remembers these choices.
 3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
    outline, open menu, or developer overlay in the capture.
@@ -31,17 +33,23 @@ cargo run --locked --offline -- serve
    active navigation link. Check their embeds in the root README before committing.
 
 For `appearance-light.jpg`, open `/settings/appearance` and use browser developer
-tools to emulate a light device color scheme. Select **System** and **Blue**,
+tools to emulate a light device color scheme. Select **Nord**, **System**, and **Blue**,
 with the save confirmation visible and the profile popup closed. Capture the
-same viewport, then clear device emulation and return to **Dark** and **Purple**.
+same viewport, then clear device emulation and return to **Nord**, **Dark**, and **Purple**.
 Refresh this image when the controls or light palette changes. Never capture
 unrelated browser or profile data.
 
 For `appearance-custom.jpg`, use **1120 × 700 pixels** to include the warning,
-choose **Dark**, and set **Primary color** to `#2e3440` (the page background).
+choose **Nord** and **Dark**, and set **Primary color** to `#2e3440` (the page background).
 Capture the measured 1:1 warning with the save confirmation visible and no open
 picker or focus outline. Return to **Dark** and **Purple** and clear temporary
 viewport/device overrides after validation.
+
+For `appearance-dracula.jpg`, use **1120 × 520 pixels** and select **Dracula**,
+**Dark**, and **Purple**. For `appearance-dracula-light.jpg`, emulate a light
+device preference and select **Dracula**, **System**, and **Purple**, including
+the light-adaptation note. Capture both with the save confirmation visible.
+Return to **Nord**, **Dark**, and **Purple** and clear temporary overrides.
 
 The initial images were captured with Codex's browser screenshot tool at these
 dimensions. Use an available browser capture tool with the same settings; this

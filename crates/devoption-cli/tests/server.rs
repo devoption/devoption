@@ -137,26 +137,28 @@ fn pages_share_layout_and_have_working_navigation() {
         )));
         assert!(!popup.contains("<select"));
         assert!(!popup.contains("<input"));
-        assert!(!popup.contains("Current theme"));
+        assert!(!popup.contains("theme-preview"));
         assert!(body.find("</script>").unwrap() < body.find("</head>").unwrap());
         let main = body.split_once("<main id=\"main-content\"").unwrap().1;
-        assert_eq!(body.contains("Current theme"), appearance_page);
+        assert_eq!(main.contains("class=\"theme-preview\""), appearance_page);
         assert_eq!(body.contains("<select"), appearance_page);
         assert_eq!(body.contains("type=\"color\""), appearance_page);
         if appearance_page {
             assert!(main.contains("aria-label=\"Appearance preferences\""));
-            assert!(main.contains("id=\"appearance-name\">Nord purple</span>"));
+            assert!(main.contains("id=\"appearance-theme-note\" hidden"));
             assert!(main.contains("id=\"appearance-status\" role=\"status\""));
             assert!(main.contains("<label for=\"appearance-primary\">Primary color</label>"));
             assert!(main.contains("id=\"appearance-primary\" type=\"color\""));
             assert!(main.contains("id=\"appearance-reset\" type=\"button\""));
-            for setting in ["mode", "accent"] {
+            for setting in ["theme", "mode", "accent"] {
                 assert!(main.contains(&format!("<label for=\"appearance-{setting}\">")));
                 assert!(main.contains(&format!(
                     "id=\"appearance-{setting}\" aria-describedby=\"appearance-status\" disabled"
                 )));
             }
             for (value, label) in [
+                ("nord", "Nord"),
+                ("dracula", "Dracula"),
                 ("dark", "Dark"),
                 ("light", "Light"),
                 ("system", "System"),
