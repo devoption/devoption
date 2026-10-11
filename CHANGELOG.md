@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Single-use pre-authentication CSRF challenges in the server crate, with a
+  separate Secure, HttpOnly, SameSite=Strict cookie and explicit synchronizer
+  header. Storage holds at most 16 pending pairs for five minutes; consumption
+  is atomic and precedes fixture password processing. Host/Origin guards are
+  shared without changing production authorization. Enrollment authorization
+  and production setup/sign-in endpoints remain unfinished
+  ([#77](https://github.com/devoption/devoption/issues/77)).
 - Browser cookie transport now connects the HTTP mutation guard to session-bound
   CSRF validation. Fixture-only activation/logout helpers issue and clear a
   host-only Secure, HttpOnly, SameSite=Strict cookie; mixed or ambiguous credentials

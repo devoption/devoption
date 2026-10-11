@@ -77,22 +77,11 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
 }
 
 fn protect(app: Router, port: u16, session: SharedSession) -> Router {
-    app.layer(middleware::from_fn(
+    let app = app.layer(middleware::from_fn(
         move |mut request: Request, next: Next| {
             let session = Arc::clone(&session);
             async move {
-                let Some(host) = validated_host(&request, port) else {
-                    return StatusCode::BAD_REQUEST.into_response();
-                };
-                // RFC 9110 safe methods; extensions require Origin and a session.
-                // Public preview reads remain unauthenticated and must never mutate.
-                if !matches!(
-                    *request.method(),
-                    Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
-                ) {
-                    if !same_origin(&request, host, port) {
-                        return StatusCode::FORBIDDEN.into_response();
-                    }
+                if !safe_method(request.method()) {
                     let Some(identity) = authenticated_identity(request.headers(), &session) else {
                         return (
                             StatusCode::UNAUTHORIZED,
@@ -107,7 +96,34 @@ fn protect(app: Router, port: u16, session: SharedSession) -> Router {
                 next.run(request).await
             }
         },
+    ));
+    // The outer guard always runs before session validation or the handler.
+    protect_origin(app, port)
+}
+
+// Also shared by fixture pre-authentication routes, which cannot require an
+// authenticated session. They must enforce their own CSRF/enrollment boundary.
+fn protect_origin(app: Router, port: u16) -> Router {
+    app.layer(middleware::from_fn(
+        move |request: Request, next: Next| async move {
+            let Some(host) = validated_host(&request, port) else {
+                return StatusCode::BAD_REQUEST.into_response();
+            };
+            if !safe_method(request.method()) && !same_origin(&request, host, port) {
+                return StatusCode::FORBIDDEN.into_response();
+            }
+            next.run(request).await
+        },
     ))
+}
+
+fn safe_method(method: &Method) -> bool {
+    // RFC 9110 safe methods; extensions require Origin and a session.
+    // Public preview reads remain unauthenticated and must never mutate.
+    matches!(
+        *method,
+        Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
+    )
 }
 
 fn authenticated_identity(headers: &HeaderMap, session: &SharedSession) -> Option<IdentityId> {

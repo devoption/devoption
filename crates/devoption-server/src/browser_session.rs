@@ -28,7 +28,7 @@ use crate::{
 
 pub const CSRF_HEADER: &str = "x-csrf-token";
 const COOKIE_NAME: &str = "__Host-devoption_session";
-const COOKIE_ATTRIBUTES: &str = "Path=/; Secure; HttpOnly; SameSite=Strict";
+pub(crate) const COOKIE_ATTRIBUTES: &str = "Path=/; Secure; HttpOnly; SameSite=Strict";
 const MAX_COOKIE_BYTES: usize = 4096;
 
 /// Activate first, then release the session cookie and separate CSRF response header.
@@ -74,11 +74,11 @@ pub fn logout(headers: &HeaderMap, slot: &SessionSlot) -> Response {
     response
 }
 
-fn empty(status: StatusCode) -> Response {
+pub(crate) fn empty(status: StatusCode) -> Response {
     (status, [(CACHE_CONTROL, "no-store")]).into_response()
 }
 
-fn sensitive(value: String) -> HeaderValue {
+pub(crate) fn sensitive(value: String) -> HeaderValue {
     // Every caller supplies fixed ASCII attributes and/or hex-encoded bytes.
     let mut value = HeaderValue::from_str(&value).expect("fixed cookie/hex header is valid");
     value.set_sensitive(true);
@@ -86,6 +86,13 @@ fn sensitive(value: String) -> HeaderValue {
 }
 
 fn credentials(headers: &HeaderMap) -> Option<([u8; TOKEN_BYTES], [u8; CSRF_TOKEN_BYTES])> {
+    named_credentials(headers, COOKIE_NAME)
+}
+
+pub(crate) fn named_credentials(
+    headers: &HeaderMap,
+    cookie_name: &str,
+) -> Option<([u8; TOKEN_BYTES], [u8; CSRF_TOKEN_BYTES])> {
     if headers.contains_key(AUTHORIZATION) {
         return None;
     }
@@ -99,7 +106,7 @@ fn credentials(headers: &HeaderMap) -> Option<([u8; TOKEN_BYTES], [u8; CSRF_TOKE
         if name.is_empty() || !name.bytes().all(cookie_name_byte) || !cookie_value(value) {
             return None;
         }
-        if name == COOKIE_NAME {
+        if name == cookie_name {
             if session.is_some() {
                 return None;
             }
@@ -152,7 +159,7 @@ fn hex(byte: u8) -> Option<u8> {
     }
 }
 
-fn encode(bytes: &[u8]) -> String {
+pub(crate) fn encode(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 

@@ -17,4 +17,6 @@ pub mod owner_auth;
 pub mod owner_store;
 pub mod password;
 pub mod password_form;
+#[cfg(unix)]
+pub mod preauth_csrf;
 pub mod session;

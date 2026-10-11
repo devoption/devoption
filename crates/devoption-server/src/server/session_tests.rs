@@ -9,6 +9,8 @@ use tower::ServiceExt;
 
 #[cfg(unix)]
 mod browser;
+#[cfg(unix)]
+mod preauth;
 
 // Predictable fixtures are installed only in this test router, never the server.
 const FIXTURE: [u8; TOKEN_BYTES] = [0xab; TOKEN_BYTES];
