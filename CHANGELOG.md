@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A password hashing and verification component for future browser owner setup
+  and sign-in, using Argon2id with bounded inputs and an explicit cost profile.
+  Only fixture tests use it; no accounts, persistent credentials, setup UI, or
+  sign-in endpoints exist yet. Browser sessions and CSRF protection remain open
+  under [#15](https://github.com/devoption/devoption/issues/15)
+  ([#53](https://github.com/devoption/devoption/issues/53)).
 - Session validation for unsafe HTTP requests after Host and Origin checks. One
   Bearer Authorization header must encode the session token as 64 hex characters;
   missing or invalid authorization returns an empty, non-cacheable 401 challenge.
