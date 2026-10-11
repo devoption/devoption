@@ -203,7 +203,28 @@ fn symlinks_and_nonregular_entries_do_not_bypass_the_store() {
     DirBuilder::new().mode(0o700).create(&private).unwrap();
     let alias = root.path().join("alias");
     symlink(&private, &alias).unwrap();
-    assert!(OwnerStore::open(&alias).is_err());
+    for suffix in ["alias", "alias/", "alias/.", "alias//./", "alias/././"] {
+        assert!(
+            OwnerStore::open(&root.path().join(suffix)).is_err(),
+            "accepted symlink path: {suffix}"
+        );
+    }
+    for suffix in [
+        "private",
+        "private/",
+        "private/.",
+        "private//./",
+        "private/././",
+    ] {
+        assert!(
+            OwnerStore::open(&root.path().join(suffix))
+                .unwrap()
+                .load()
+                .unwrap()
+                .is_none(),
+            "unexpected record at real directory path: {suffix}"
+        );
+    }
     let store = OwnerStore::open(&private).unwrap();
     let target = root.path().join("untouched");
     write_fixture(&target, b"unrelated fixture");
@@ -222,6 +243,42 @@ fn symlinks_and_nonregular_entries_do_not_bypass_the_store() {
         store.create(IDENTITY, fixture_hash()),
         Err(StoreError::AlreadyExists)
     ));
+}
+
+#[test]
+fn parent_components_keep_filesystem_resolution() {
+    let root = private_directory();
+    let private = root.path().join("private");
+    let child = private.join("child");
+    DirBuilder::new().mode(0o700).create(&private).unwrap();
+    DirBuilder::new().mode(0o700).create(&child).unwrap();
+    OwnerStore::open(&private)
+        .unwrap()
+        .create(IDENTITY, fixture_hash())
+        .unwrap();
+    symlink(&child, root.path().join("alias")).unwrap();
+
+    // `alias/..` names the target's parent, not the alias's lexical parent.
+    for suffix in [
+        "alias/..",
+        "alias/../",
+        "alias/../.",
+        "alias/../child/..//./",
+    ] {
+        let record = OwnerStore::open(&root.path().join(suffix))
+            .unwrap()
+            .load()
+            .unwrap()
+            .unwrap();
+        assert_eq!(record.identity(), IDENTITY, "wrong directory: {suffix}");
+    }
+    assert!(
+        OwnerStore::open(root.path())
+            .unwrap()
+            .load()
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]

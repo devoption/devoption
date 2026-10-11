@@ -100,8 +100,10 @@ pub struct OwnerStore {
 
 impl OwnerStore {
     pub fn open(path: &Path) -> Result<Self, StoreError> {
+        // Trim trailing separators and `.` so NOFOLLOW checks the directory name.
+        // This lexical view preserves `..` and does not resolve symlinks.
         let directory = File::from(open(
-            path,
+            path.components().as_path(),
             OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
             Mode::empty(),
         )?);

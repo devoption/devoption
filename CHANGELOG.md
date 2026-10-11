@@ -10,7 +10,8 @@ Entries describe implemented changes, not the roadmap.
 - Create-once owner record storage for the Linux MVP and macOS development,
   preserving a stable identity and password hash across restarts. It requires a
   private directory, rejects unsafe/corrupt records, and publishes without replacing
-  an existing owner. Only temporary fixture tests use it; the preview still has no
+  an existing owner. Directory symlinks are rejected even with trailing separators
+  or dot components. Only temporary fixture tests use it; the preview still has no
   owner setup or sign-in flow ([#57](https://github.com/devoption/devoption/issues/57)).
 - Sessions now bind a server-assigned identity to their token and return it only
   on successful authentication. The HTTP guard passes that identity to protected
