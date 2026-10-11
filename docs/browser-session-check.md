@@ -54,10 +54,11 @@ cargo test -p devoption-cli --test server --locked --offline authentication
 ```
 
 Pre-sessions grant no identity or enrollment permission. At most 16 pairs are
-pending, each for five minutes; full capacity fails closed until a pair is consumed
-or expires. Every admitted submission consumes its pair even if the password/form
-is invalid. The client must request another challenge to retry. Consumed cookies
-are inert and the next challenge replaces them. Existing-owner HTTP routes require
+pending, each for five minutes; full capacity returns 503 with a `Retry-After` of
+1–300 seconds, rounded up to the earliest pending expiry. A pair consumed before
+that time frees capacity sooner. Every admitted submission consumes its pair even
+if the password/form is invalid. The client must request another challenge to retry.
+Consumed cookies are inert and the next challenge replaces them. Existing-owner HTTP routes require
 an explicitly selected store with a valid owner at startup. Browser forms, CSRF
 recovery after page reload, and explicit enrollment authorization remain required.
 The CLI tests above create only temporary fixture stores and exercise real HTTP

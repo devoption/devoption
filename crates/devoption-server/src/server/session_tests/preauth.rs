@@ -58,6 +58,31 @@ fn challenge(app: &Router) -> HeaderMap {
 }
 
 #[test]
+fn challenge_capacity_returns_a_bounded_retry_hint_and_recovers_after_consumption() {
+    let (_directory, app) = fixture();
+    let issued: Vec<_> = (0..16).map(|_| challenge(&app)).collect();
+    let (status, headers) = send(&app, build("/auth/challenge", None, ""));
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(headers[CACHE_CONTROL], "no-store");
+    assert!(!headers.contains_key("set-cookie"));
+    assert!(!headers.contains_key(browser_session::CSRF_HEADER));
+    let retry = headers
+        .get("retry-after")
+        .expect("challenge capacity must provide a retry hint")
+        .to_str()
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+    assert!((1..=300).contains(&retry));
+    // Capacity rejection must preserve live pairs. Consumption frees one slot.
+    assert_eq!(
+        send(&app, build("/auth/sign-in", Some(&issued[0]), PASSWORD)).0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(!challenge(&app).contains_key("retry-after"));
+}
+
+#[test]
 fn host_origin_and_post_guard_both_challenge_and_submission_before_work() {
     let (_directory, app) = fixture();
     let valid = challenge(&app);

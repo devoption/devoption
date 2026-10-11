@@ -19,7 +19,10 @@ use std::{
 };
 
 use axum::{
-    http::{HeaderMap, StatusCode, header::SET_COOKIE},
+    http::{
+        HeaderMap, StatusCode,
+        header::{RETRY_AFTER, SET_COOKIE},
+    },
     response::Response,
 };
 use subtle::ConstantTimeEq;
@@ -51,6 +54,8 @@ impl PreAuthCsrf {
     /// Return a distinct HttpOnly cookie and an explicit CSRF response header.
     /// Full storage, entropy failure, or a poisoned lock returns an empty,
     /// non-cacheable 503 without credentials or evicting a live challenge.
+    /// Only full storage includes a retry delay, rounded up to the earliest
+    /// pending expiry and bounded to 1–300 seconds. Consumption may free it sooner.
     pub fn issue(&self) -> Response {
         self.issue_using(Instant::now, getrandom::fill)
     }
@@ -67,7 +72,20 @@ impl PreAuthCsrf {
         let now = now();
         pending.retain(|challenge| now < challenge.expires_at);
         if pending.len() == MAX_PENDING {
-            return empty(StatusCode::SERVICE_UNAVAILABLE);
+            // Consumption uses swap_remove, so the earliest expiry need not be first.
+            let earliest = pending
+                .iter()
+                .map(|challenge| challenge.expires_at)
+                .min()
+                .expect("full challenge storage is nonempty");
+            let remaining = earliest.saturating_duration_since(now);
+            let seconds = remaining
+                .as_secs()
+                .saturating_add(u64::from(remaining.subsec_nanos() != 0))
+                .clamp(1, LIFETIME.as_secs());
+            let mut response = empty(StatusCode::SERVICE_UNAVAILABLE);
+            response.headers_mut().insert(RETRY_AFTER, seconds.into());
+            return response;
         }
         let Some(expires_at) = now.checked_add(LIFETIME) else {
             return empty(StatusCode::SERVICE_UNAVAILABLE);

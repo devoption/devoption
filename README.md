@@ -50,7 +50,9 @@ routes enforce Host/Origin and return empty, non-cacheable responses. Password
 failures return 401, invalid pre-session pairs 403, and admission limits 429/503
 with bounded retry hints. Storage/internal failures return 503 without details.
 
-Pre-sessions last five minutes with at most 16 pending pairs. Each submission needs
+Pre-sessions last five minutes with at most 16 pending pairs. Full capacity returns
+503 with `Retry-After` rounded up to the earliest expiry (1–300 seconds); consuming
+a challenge may free capacity sooner. Each submission needs
 a fresh challenge, including retries after a failed password or invalid form.
 Sign-in is limited to one worker and five admitted attempts per minute. One active
 session is retained in memory for at most an hour; another sign-in replaces it,
