@@ -148,6 +148,7 @@ dependencies = [
  "argon2",
  "axum",
  "devoption-ui",
+ "getrandom",
  "rustix",
  "subtle",
  "tempfile",

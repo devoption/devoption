@@ -3,6 +3,8 @@
 
 pub mod identity;
 #[cfg(unix)]
+pub mod owner_auth;
+#[cfg(unix)]
 pub mod owner_store;
 pub mod password;
 pub mod session;
