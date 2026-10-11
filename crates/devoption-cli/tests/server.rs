@@ -1,5 +1,5 @@
 use std::{
-    io::{BufRead, BufReader, Read, Write},
+    io::{self, BufRead, BufReader, Read, Write},
     net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
     process::{Child, Command, Stdio},
     sync::mpsc,
@@ -49,18 +49,75 @@ fn start() -> (Server, SocketAddr) {
     (server, address)
 }
 
-fn request(address: SocketAddr, request: &str) -> String {
+fn send_request(address: SocketAddr, request: &str) -> TcpStream {
     let mut stream = TcpStream::connect_timeout(&address, TIMEOUT).unwrap();
     stream.set_read_timeout(Some(TIMEOUT)).unwrap();
     stream.set_write_timeout(Some(TIMEOUT)).unwrap();
     stream.write_all(request.as_bytes()).unwrap();
+    stream
+}
+
+fn read_response(reader: &mut impl Read) -> io::Result<String> {
+    let mut response = String::new();
+    reader.read_to_string(&mut response)?;
+    Ok(response)
+}
+
+fn request(address: SocketAddr, request: &str) -> String {
+    read_response(&mut send_request(address, request)).unwrap()
+}
+
+fn assert_parser_rejection(address: SocketAddr, message: &str) {
+    let mut stream = send_request(address, message);
     let mut response = String::new();
     if let Err(error) = stream.read_to_string(&mut response) {
-        // A parser rejection can reset TCP after returning its response. Keep
-        // the bytes received; status/body assertions still reject missing data.
-        assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
+        // Only malformed requests rejected by the HTTP parser may reset TCP.
+        assert_eq!(error.kind(), io::ErrorKind::ConnectionReset);
     }
-    response
+    let (headers, body) = response.split_once("\r\n\r\n").expect("complete headers");
+    assert!(matches!(
+        headers.lines().next(),
+        Some("HTTP/1.0 400 Bad Request" | "HTTP/1.1 400 Bad Request")
+    ));
+    let fields: Vec<_> = headers
+        .lines()
+        .skip(1)
+        .map(|line| line.split_once(':').expect("valid response header"))
+        .collect();
+    let lengths: Vec<_> = fields
+        .iter()
+        .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+        .map(|(_, value)| value.trim())
+        .collect();
+    assert_eq!(lengths, ["0"], "complete empty response framing");
+    assert!(
+        !fields
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("transfer-encoding"))
+    );
+    assert_eq!(body, "");
+}
+
+#[test]
+fn normal_response_reads_fail_on_reset_after_partial_success() {
+    struct Reset;
+    impl Read for Reset {
+        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+            Err(io::ErrorKind::ConnectionReset.into())
+        }
+    }
+    // Deterministically model the partial responses that could pass status/title
+    // assertions, without platform-specific TCP reset setup or extra dependencies.
+    for partial in [
+        "HTTP/1.1 200 OK\r\n",
+        "HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n<title>Home · DevOption</title>",
+    ] {
+        let mut reader = partial.as_bytes().chain(Reset);
+        assert_eq!(
+            read_response(&mut reader).unwrap_err().kind(),
+            io::ErrorKind::ConnectionReset
+        );
+    }
 }
 
 #[test]
@@ -203,8 +260,7 @@ fn errors_do_not_stop_the_server() {
         assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
         assert!(post.contains("allow: GET,HEAD"));
     }
-    let malformed = request(address, "GET / INVALID\r\n\r\n");
-    assert!(malformed.starts_with("HTTP/1.1 400 Bad Request"));
+    assert_parser_rejection(address, "GET / INVALID\r\n\r\n");
     let healthy = request(
         address,
         &format!("GET / HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
@@ -263,7 +319,6 @@ fn missing_duplicate_and_deceptive_hosts_are_rejected() {
         format!("Host: {address}\r\nHost: {address}\r\n"),
         format!("Host: {address}\r\nhOsT: attacker.invalid:{port}\r\n"),
         format!("Host: attacker.invalid:{port}\r\nHost: {address}\r\n"),
-        format!("Host : {address}\r\n"),
         format!("Forwarded: host={address}\r\nX-Forwarded-Host: {address}\r\n"),
         format!(
             "Host: attacker.invalid:{port}\r\nForwarded: host={address}\r\nX-Forwarded-Host: {address}\r\n"
@@ -304,6 +359,10 @@ fn missing_duplicate_and_deceptive_hosts_are_rejected() {
     }
     // The application's explicit-Host policy also applies to HTTP/1.0.
     for version in ["HTTP/1.0", "HTTP/1.1"] {
+        assert_parser_rejection(
+            address,
+            &format!("GET / {version}\r\nHost : {address}\r\nConnection: close\r\n\r\n"),
+        );
         for fields in &headers {
             assert_bad_request(
                 address,
