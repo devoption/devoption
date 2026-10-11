@@ -7,6 +7,9 @@ use std::{
 };
 use tower::ServiceExt;
 
+#[cfg(unix)]
+mod browser;
+
 // Predictable fixtures are installed only in this test router, never the server.
 const FIXTURE: [u8; TOKEN_BYTES] = [0xab; TOKEN_BYTES];
 const IDENTITY: IdentityId = IdentityId::from_bytes([1; 16]);

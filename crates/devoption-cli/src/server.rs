@@ -5,7 +5,7 @@ use axum::{
     extract::Request,
     http::{
         HeaderMap, Method, StatusCode,
-        header::{AUTHORIZATION, CACHE_CONTROL, HOST, ORIGIN, WWW_AUTHENTICATE},
+        header::{AUTHORIZATION, CACHE_CONTROL, COOKIE, HOST, ORIGIN, WWW_AUTHENTICATE},
     },
     middleware::{self, Next},
     response::{Html, IntoResponse},
@@ -108,6 +108,14 @@ fn protect(app: Router, port: u16, session: SharedSession) -> Router {
 }
 
 fn authenticated_identity(headers: &HeaderMap, session: &SharedSession) -> Option<IdentityId> {
+    // Browser requests never downgrade to bearer validation, even on malformed
+    // cookies or CSRF. Explicit bearer fixtures remain separate from this path.
+    if headers.contains_key(COOKIE) || headers.contains_key("x-csrf-token") {
+        #[cfg(unix)]
+        return devoption_cli::browser_session::authenticate(headers, session);
+        #[cfg(not(unix))]
+        return None;
+    }
     let candidate = bearer_token(headers);
     session.authenticate(candidate.as_ref().map(|token| token.as_slice()))
 }

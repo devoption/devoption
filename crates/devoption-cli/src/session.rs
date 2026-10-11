@@ -4,8 +4,8 @@
 //! service can issue a fresh cryptographically random token after password verification.
 //! The shared [`slot`] retains one active session for the HTTP request guard.
 //! Issued sessions also retain a separate synchronizer CSRF token. Browser mutation
-//! validation requires both tokens from the same live session. Cookie transport,
-//! pre-authentication CSRF, and enrollment authorization remain separate work.
+//! validation requires both tokens from the same live session. Cookie transport is
+//! separate; pre-authentication CSRF and enrollment authorization remain unfinished.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
 //! The HTTP guard accepts fixture tokens on unsafe requests, but browser issuance
