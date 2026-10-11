@@ -1,12 +1,12 @@
 //! In-memory validation of one opaque session token, independent of HTTP.
 //!
-//! This core neither generates tokens nor authenticates their owner. A future
-//! issuer must supply fresh, cryptographically random tokens after authorized
-//! bootstrap and retain this object as the authoritative validation state.
+//! This core neither generates tokens nor authenticates their owner. The owner-auth
+//! service can issue a fresh cryptographically random token after password verification.
+//! Its caller must retain this object as the authoritative validation state.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
-//! The HTTP guard accepts these tokens on unsafe requests, but issuance and
-//! complete CSRF protection remain separate work under #15.
+//! The HTTP guard accepts fixture tokens on unsafe requests, but browser issuance
+//! endpoints and complete CSRF protection remain separate work under #15.
 
 use std::{
     error::Error,

@@ -2,9 +2,10 @@
 //!
 //! Only temporary fixtures call these operations today. The [`service`] wrapper
 //! isolates blocking work and shares an attempt limit. Before HTTP integration,
-//! callers must authorize setup and enforce enrollment policy. No directory selection,
-//! session issuance, permission grant, password reset, or provider integration is
-//! performed here. Passwords and stored hashes must never enter responses or logs.
+//! callers must authorize setup and enforce enrollment policy. The service can issue
+//! sessions after verification; these synchronous primitives only return identities.
+//! No directory selection, permission grant, password reset, or provider integration
+//! is performed here. Passwords and stored hashes must never enter responses or logs.
 
 use std::{error::Error, fmt};
 

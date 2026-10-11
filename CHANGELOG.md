@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Bounded owner sign-in can now issue a fresh internal session credential only
+  after verifying the persisted password. It returns an identity-bound validator
+  with a one-hour absolute lifetime alongside the credential, shares existing
+  attempt limits, and returns no grant on authentication or randomness failure.
+  Only temporary fixtures use it; server session retention, cookie/CSRF transport,
+  and browser endpoints remain unfinished
+  ([#63](https://github.com/devoption/devoption/issues/63)).
 - A shared async owner-authentication service limits setup/sign-in to one worker
   at a time and five admitted attempts per rolling minute. Hashing and storage run
   off the runtime thread; cancellation retains the worker slot until work finishes
