@@ -1,10 +1,10 @@
 //! Identity references, independent of authentication methods and permissions.
 
-/// An opaque, stable reference assigned by a future account store.
+/// An opaque, stable reference assigned by owner setup and persisted by its store.
 ///
-/// The store must assign unique IDs and persist them independently of passwords,
-/// session tokens, usernames, or external-provider identifiers. Constructing an
-/// ID does not create an account, authenticate it, or grant any permission.
+/// Owner setup generates IDs independently of passwords, session tokens, usernames,
+/// or external-provider identifiers; storage preserves them across restarts.
+/// Constructing an ID does not create an account, authenticate it, or grant permission.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct IdentityId([u8; 16]);
 

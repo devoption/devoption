@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Owner setup and password sign-in now connect the password verifier to durable
+  owner storage. Setup generates its identity and salt internally, cannot replace
+  an existing owner, and fails closed on storage or randomness errors. Sign-in
+  returns only the persisted identity after verification; it grants no session or
+  permissions. Only temporary fixtures use these operations; browser setup/sign-in
+  remains unfinished ([#59](https://github.com/devoption/devoption/issues/59)).
 - Create-once owner record storage for the Linux MVP and macOS development,
   preserving a stable identity and password hash across restarts. It requires a
   private directory, rejects unsafe/corrupt records, and publishes without replacing

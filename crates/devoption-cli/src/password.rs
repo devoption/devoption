@@ -1,10 +1,10 @@
 //! Password hashing and verification for future browser owner setup/sign-in.
 //!
 //! No identity, permissions, sessions, persistence, or salt generation lives here.
-//! A future setup service must generate a fresh random salt internally for each
-//! password; users must never supply salts or session keys. Only test fixtures
-//! call this component today. Password policy, blocking-work isolation and rate
-//! limits must be added before exposing it through HTTP. Memory erasure is not
+//! Owner setup generates a fresh random salt internally for each password; users
+//! never supply salts or session keys. Only temporary test fixtures exercise the
+//! setup/sign-in components today. Password policy, blocking-work isolation, and
+//! rate limits must be added before exposing it through HTTP. Memory erasure is not
 //! guaranteed, and callers must treat returned records as sensitive storage data.
 
 use std::{error::Error, fmt};
@@ -17,7 +17,7 @@ use argon2::{
 /// Input resource limit in UTF-8 bytes, without truncation or normalization.
 /// This is not an enrollment password-strength policy.
 pub const MAX_PASSWORD_BYTES: usize = 1024;
-/// Required salt length. Randomness and uniqueness are the future issuer's job.
+/// Required salt length. Owner setup supplies fresh OS randomness.
 pub const SALT_BYTES: usize = 16;
 const MAX_RECORD_BYTES: usize = 128;
 const HASH_BYTES: usize = 32;
@@ -46,9 +46,9 @@ impl Error for HashError {}
 
 /// Produce an Argon2id v19 PHC record using an internally supplied salt.
 ///
-/// No account or access grant is created. The eventual setup service must supply
-/// a fresh cryptographically random salt, enforce enrollment policy, and store
-/// only this record, never the plaintext password.
+/// This primitive creates no account or access grant. Callers must supply a fresh
+/// cryptographically random salt, enforce enrollment policy, and store only this
+/// record, never the plaintext password.
 pub fn hash_password(password: &str, salt: &[u8; SALT_BYTES]) -> Result<String, HashError> {
     if !valid_length(password) {
         return Err(HashError::InvalidLength);
@@ -76,7 +76,7 @@ pub fn verify_password(password: &str, record: &str) -> bool {
         .is_ok()
 }
 
-fn valid_length(password: &str) -> bool {
+pub(crate) fn valid_length(password: &str) -> bool {
     !password.is_empty() && password.len() <= MAX_PASSWORD_BYTES
 }
 
