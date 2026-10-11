@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Local HTTP authority validation: requests need exactly one `Host` naming
+  `127.0.0.1` or case-insensitive `localhost` at the actual bound port, including
+  HTTP/1.0 requests. Omitted ports mean 80. Absolute HTTP targets must match;
+  invalid, duplicate, nonlocal, or conflicting authorities receive an empty 400
+  response. Proxy headers are ignored. Added real HTTP rejection and compatibility
+  tests. This is not authentication or CSRF protection; the remaining safeguards
+  in [#15](https://github.com/devoption/devoption/issues/15) are still needed
+  ([#24](https://github.com/devoption/devoption/issues/24)).
 - Tokyo Night in the existing Appearance selector, using upstream Tokyo Night
   and Tokyo Night Light colors adapted to this UI. Nord remains the default;
   mode, preset/custom accent, and reset behavior are preserved. Extended contrast,
