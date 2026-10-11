@@ -1,8 +1,4 @@
-use std::{
-    io,
-    net::Ipv4Addr,
-    sync::{Arc, Mutex},
-};
+use std::{io, net::Ipv4Addr, sync::Arc};
 
 use axum::{
     Router,
@@ -17,12 +13,12 @@ use axum::{
 };
 use devoption_cli::{
     identity::IdentityId,
-    session::{Session, TOKEN_BYTES},
+    session::{TOKEN_BYTES, slot::SessionSlot},
 };
 use devoption_ui::Page;
 use tokio::{net::TcpListener, runtime::Builder};
 
-type SharedSession = Arc<Mutex<Option<Session>>>;
+type SharedSession = Arc<SessionSlot>;
 
 #[cfg(test)]
 mod session_tests;
@@ -53,7 +49,7 @@ pub fn run(port: u16) -> io::Result<()> {
                     get(|| async { Html(devoption_ui::render(Page::Appearance)) }),
                 );
             // No production issuance or bootstrap yet: unsafe requests fail closed.
-            let app = protect(app, address.port(), Arc::new(Mutex::new(None)));
+            let app = protect(app, address.port(), Arc::new(SessionSlot::default()));
             axum::serve(listener, app).await
         })
 }
@@ -94,14 +90,7 @@ fn protect(app: Router, port: u16, session: SharedSession) -> Router {
 
 fn authenticated_identity(headers: &HeaderMap, session: &SharedSession) -> Option<IdentityId> {
     let candidate = bearer_token(headers);
-    let Ok(mut session) = session.lock() else {
-        // A poisoned validator cannot establish authorization. Never hold the
-        // synchronous lock across an await or into the downstream handler.
-        return None;
-    };
-    session
-        .as_mut()
-        .and_then(|session| session.authenticate(candidate.as_ref().map(|token| token.as_slice())))
+    session.authenticate(candidate.as_ref().map(|token| token.as_slice()))
 }
 
 fn bearer_token(headers: &HeaderMap) -> Option<[u8; TOKEN_BYTES]> {

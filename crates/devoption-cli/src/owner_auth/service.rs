@@ -7,7 +7,7 @@
 //!
 //! Only temporary fixtures use this service today. HTTP integration still needs
 //! enrollment authorization/policy, bounded request bodies, data-directory setup,
-//! authoritative session retention, cookies, and CSRF handling. This grants no permissions.
+//! cookie/CSRF-protected activation endpoints. This grants no permissions.
 
 use std::{
     collections::VecDeque,
@@ -23,25 +23,35 @@ use crate::{
     identity::IdentityId,
     owner_auth::{self, SetupError},
     owner_store::{OwnerStore, StoreError},
-    session::{MAX_LIFETIME, Session, TOKEN_BYTES},
+    session::{
+        MAX_LIFETIME, Session, TOKEN_BYTES,
+        slot::{ActivationError, SessionSlot},
+    },
 };
 
 const MAX_ATTEMPTS: usize = 5;
 const ATTEMPT_WINDOW: Duration = Duration::from_secs(60);
 
 /// A fresh session paired with its credential; intentionally neither Debug nor Clone.
-/// No credential is persisted, printed, or installed in HTTP state by this grant.
+/// Issuance alone does not persist, print, or activate the credential.
 pub struct IssuedSession {
     session: Session,
     token: [u8; TOKEN_BYTES],
 }
 
 impl IssuedSession {
-    /// Retain the validator as authoritative server state and deliver the credential
-    /// through the future browser cookie transport. Never log or display the token.
-    /// Keeping multiple validators alive requires an explicit session lifecycle policy.
+    /// Access the underlying pair. Prefer [`Self::activate`] for a shared server slot.
+    /// Never log or display the token; browser cookie transport remains separate.
     pub fn into_parts(self) -> (Session, [u8; TOKEN_BYTES]) {
         (self.session, self.token)
+    }
+
+    /// Consume this grant into the authoritative slot before returning its credential.
+    /// Replaces the previous session only if this grant is still valid; never renews it.
+    pub fn activate(self, slot: &SessionSlot) -> Result<[u8; TOKEN_BYTES], ActivationError> {
+        let (session, token) = self.into_parts();
+        slot.activate(session, &token)?;
+        Ok(token)
     }
 }
 

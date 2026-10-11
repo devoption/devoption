@@ -1,6 +1,6 @@
 use super::*;
 use axum::{Extension, body::Body, http::HeaderValue, routing::post};
-use devoption_cli::session::MAX_LIFETIME;
+use devoption_cli::session::{MAX_LIFETIME, Session};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -20,9 +20,18 @@ fn fixture() -> (Router, SharedSession, Arc<AtomicUsize>) {
 }
 
 fn fixture_for(identity: IdentityId) -> (Router, SharedSession, Arc<AtomicUsize>) {
-    let session = Arc::new(Mutex::new(Some(
-        Session::new(identity, FIXTURE, MAX_LIFETIME).unwrap(),
-    )));
+    let session = Arc::new(SessionSlot::default());
+    session
+        .activate(
+            Session::new(identity, FIXTURE, MAX_LIFETIME).unwrap(),
+            &FIXTURE,
+        )
+        .unwrap();
+    let (app, calls) = router_for(identity, Arc::clone(&session));
+    (app, session, calls)
+}
+
+fn router_for(identity: IdentityId, session: SharedSession) -> (Router, Arc<AtomicUsize>) {
     let calls = Arc::new(AtomicUsize::new(0));
     let handler_calls = Arc::clone(&calls);
     let app = Router::new().route(
@@ -35,7 +44,7 @@ fn fixture_for(identity: IdentityId) -> (Router, SharedSession, Arc<AtomicUsize>
             },
         ),
     );
-    (protect(app, 3000, Arc::clone(&session)), session, calls)
+    (protect(app, 3000, session), calls)
 }
 
 fn request() -> Request {
@@ -198,7 +207,7 @@ fn valid_credentials_do_not_bypass_host_or_origin_validation() {
 }
 
 #[test]
-fn each_request_observes_revocation_expiry_and_absent_session_state() {
+fn each_request_observes_logout_expiry_and_absent_session_state() {
     let (app, session, calls) = fixture();
     let authenticated = || {
         let mut request = request();
@@ -208,37 +217,109 @@ fn each_request_observes_revocation_expiry_and_absent_session_state() {
         request
     };
     assert_eq!(response(&app, authenticated()).0, StatusCode::NO_CONTENT);
-    session.lock().unwrap().as_mut().unwrap().revoke();
+    assert!(session.logout(Some(&FIXTURE)));
     assert_unauthorized(&app, authenticated());
 
-    *session.lock().unwrap() =
-        Some(Session::new(IDENTITY, FIXTURE, Duration::from_nanos(1)).unwrap());
+    session
+        .activate(
+            Session::new(IDENTITY, FIXTURE, Duration::from_secs(1)).unwrap(),
+            &FIXTURE,
+        )
+        .unwrap();
     // The core's exact deadline tests use a controlled clock. Here a short wait
     // exercises real-clock expiration through the HTTP middleware as well.
-    std::thread::sleep(Duration::from_millis(1));
+    std::thread::sleep(Duration::from_secs(1));
     assert_unauthorized(&app, authenticated());
-    *session.lock().unwrap() = None;
+    assert!(!session.logout(Some(&FIXTURE)));
     assert_unauthorized(&app, authenticated());
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
 #[test]
-fn poisoned_session_state_fails_closed() {
+fn rotation_rejects_old_http_credentials_and_stale_logout() {
     let (app, session, calls) = fixture();
-    assert!(
-        std::thread::spawn(move || {
-            let _guard = session.lock().unwrap();
-            panic!("simulate a failed state update");
-        })
-        .join()
-        .is_err()
-    );
-    let mut request = request();
-    request
-        .headers_mut()
+    let replacement = [0xcd; TOKEN_BYTES];
+    session
+        .activate(
+            Session::new(IDENTITY, replacement, MAX_LIFETIME).unwrap(),
+            &replacement,
+        )
+        .unwrap();
+    let mut old = request();
+    old.headers_mut()
         .insert(AUTHORIZATION, credential().parse().unwrap());
-    assert_unauthorized(&app, request);
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_unauthorized(&app, old);
+    assert!(!session.logout(Some(&FIXTURE)));
+    let mut current = request();
+    current.headers_mut().insert(
+        AUTHORIZATION,
+        format!("Bearer {}", "cd".repeat(TOKEN_BYTES))
+            .parse()
+            .unwrap(),
+    );
+    assert_eq!(response(&app, current).0, StatusCode::NO_CONTENT);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(unix)]
+#[test]
+fn issued_owner_grants_activate_rotate_and_log_out_through_the_http_guard() {
+    use devoption_cli::{owner_auth::service::OwnerAuthService, owner_store::OwnerStore};
+    use std::os::unix::fs::PermissionsExt;
+
+    let directory = tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let auth = OwnerAuthService::new(OwnerStore::open(directory.path()).unwrap());
+    let runtime = Builder::new_current_thread().build().unwrap();
+    let password = "HTTP session activation fixture only";
+    let identity = runtime.block_on(auth.setup(password.into())).unwrap();
+    let slot = Arc::new(SessionSlot::default());
+    let (app, calls) = router_for(identity, Arc::clone(&slot));
+    let authenticated = |token: &[u8]| {
+        let mut request = request();
+        let encoded: String = token.iter().map(|byte| format!("{byte:02x}")).collect();
+        request
+            .headers_mut()
+            .insert(AUTHORIZATION, format!("Bearer {encoded}").parse().unwrap());
+        request
+    };
+    let first = runtime
+        .block_on(auth.sign_in(password.into()))
+        .unwrap()
+        .unwrap()
+        .activate(&slot)
+        .unwrap();
+    assert_eq!(
+        response(&app, authenticated(&first)).0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(
+        runtime
+            .block_on(auth.sign_in("wrong fixture".into()))
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        response(&app, authenticated(&first)).0,
+        StatusCode::NO_CONTENT
+    );
+    let second = runtime
+        .block_on(auth.sign_in(password.into()))
+        .unwrap()
+        .unwrap()
+        .activate(&slot)
+        .unwrap();
+    assert_unauthorized(&app, authenticated(&first));
+    assert!(!slot.logout(Some(&first)));
+    assert_eq!(
+        response(&app, authenticated(&second)).0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(slot.logout(Some(&second)));
+    assert_unauthorized(&app, authenticated(&second));
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
 }
 
 #[test]
