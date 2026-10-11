@@ -25,8 +25,9 @@ Open [127.0.0.1:3000](http://127.0.0.1:3000/). Use the profile menu to open
 Appearance settings. Press **Ctrl+C** in the terminal to stop the server.
 Run `cargo run --locked --offline -- --help` for command options.
 
-This is a local development preview: it binds to `127.0.0.1` and has no
-authentication or TLS. Do not expose it as a public service.
+This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
+at its listening port. It has no authentication or TLS; Host validation is not
+CSRF protection. Do not expose it as a public service.
 
 ## Screenshots
 

@@ -55,7 +55,11 @@ fn request(address: SocketAddr, request: &str) -> String {
     stream.set_write_timeout(Some(TIMEOUT)).unwrap();
     stream.write_all(request.as_bytes()).unwrap();
     let mut response = String::new();
-    stream.read_to_string(&mut response).unwrap();
+    if let Err(error) = stream.read_to_string(&mut response) {
+        // A parser rejection can reset TCP after returning its response. Keep
+        // the bytes received; status/body assertions still reject missing data.
+        assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
+    }
     response
 }
 
@@ -78,7 +82,7 @@ fn pages_share_layout_and_have_working_navigation() {
     ] {
         let get = request(
             address,
-            &format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"),
+            &format!("GET {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
         );
         let (headers, body) = get.split_once("\r\n\r\n").unwrap();
         assert!(headers.starts_with("HTTP/1.1 200 OK"));
@@ -174,7 +178,7 @@ fn pages_share_layout_and_have_working_navigation() {
 
         let head = request(
             address,
-            &format!("HEAD {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"),
+            &format!("HEAD {path} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
         );
         assert!(head.starts_with("HTTP/1.1 200 OK"));
         assert_eq!(head.split_once("\r\n\r\n").unwrap().1, "");
@@ -186,14 +190,14 @@ fn errors_do_not_stop_the_server() {
     let (_server, address) = start();
     let missing = request(
         address,
-        "GET /missing HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        &format!("GET /missing HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
     );
     assert!(missing.starts_with("HTTP/1.1 404 Not Found"));
     for path in ["/", "/projects", "/about", "/settings/appearance"] {
         let post = request(
             address,
             &format!(
-                "POST {path} HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                "POST {path} HTTP/1.1\r\nHost: {address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             ),
         );
         assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
@@ -203,9 +207,201 @@ fn errors_do_not_stop_the_server() {
     assert!(malformed.starts_with("HTTP/1.1 400 Bad Request"));
     let healthy = request(
         address,
-        "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        &format!("GET / HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
     );
     assert!(healthy.starts_with("HTTP/1.1 200 OK"));
+}
+
+#[test]
+fn local_authorities_work_in_http_10_and_11() {
+    let (_server, address) = start();
+    let port = address.port();
+    for version in ["HTTP/1.0", "HTTP/1.1"] {
+        for host in [
+            format!("127.0.0.1:{port}"),
+            format!("localhost:{port}"),
+            format!("LoCaLhOsT:{port}"),
+            format!("localhost:0{port}"),
+            format!("\tlocalhost:{port}\t"),
+        ] {
+            let response = request(
+                address,
+                &format!(
+                    "GET /?next=http://elsewhere.invalid/ {version}\r\nhOsT: {host}\r\n\
+                     Forwarded: host=elsewhere.invalid\r\nX-Forwarded-Host: elsewhere.invalid\r\n\
+                     Connection: close\r\n\r\n"
+                ),
+            );
+            assert!(response.starts_with(&format!("{version} 200 OK")), "{host}");
+            assert!(response.contains("<title>Home · DevOption</title>"));
+        }
+    }
+}
+
+fn assert_bad_request(address: SocketAddr, message: &str) {
+    let response = request(address, message);
+    assert_eq!(
+        response.split_whitespace().nth(1),
+        Some("400"),
+        "{message:?}"
+    );
+    assert_eq!(
+        response.split_once("\r\n\r\n").unwrap().1,
+        "",
+        "{message:?}"
+    );
+}
+
+#[test]
+fn missing_duplicate_and_deceptive_hosts_are_rejected() {
+    let (_server, address) = start();
+    let port = address.port();
+    let mut headers = vec![
+        String::new(),
+        "Host:\r\n".into(),
+        "Host: \t\r\n".into(),
+        format!("Host: {address}\r\nHost: {address}\r\n"),
+        format!("Host: {address}\r\nhOsT: attacker.invalid:{port}\r\n"),
+        format!("Host: attacker.invalid:{port}\r\nHost: {address}\r\n"),
+        format!("Host : {address}\r\n"),
+        format!("Forwarded: host={address}\r\nX-Forwarded-Host: {address}\r\n"),
+        format!(
+            "Host: attacker.invalid:{port}\r\nForwarded: host={address}\r\nX-Forwarded-Host: {address}\r\n"
+        ),
+    ];
+    for host in [
+        "localhost".into(),
+        "127.0.0.1".into(),
+        "localhost:0".into(),
+        "localhost:80".into(),
+        "localhost:65536".into(),
+        "localhost:".into(),
+        format!("localhost:+{port}"),
+        format!("localhost:-{port}"),
+        format!("localhost:{port}x"),
+        format!("localhost: {port}"),
+        format!("localhost:{port}:80"),
+        format!("localhost:{port}, {address}"),
+        format!("localhost.attacker.invalid:{port}"),
+        format!("localhost.:{port}"),
+        format!("127.0.0.1.attacker.invalid:{port}"),
+        format!("127.1:{port}"),
+        format!("127.0.0.2:{port}"),
+        format!("2130706433:{port}"),
+        format!("[::1]:{port}"),
+        format!("[::ffff:127.0.0.1]:{port}"),
+        format!("%6cocalhost:{port}"),
+        format!("user@localhost:{port}"),
+        format!("localhost:{port}@attacker.invalid"),
+        format!("http://localhost:{port}"),
+        format!("localhost:{port}/"),
+        format!("localhost:{port}?x"),
+        format!("localhost:{port}#x"),
+        format!("local\thost:{port}"),
+        format!("lócálhost:{port}"),
+    ] {
+        headers.push(format!("Host: {host}\r\n"));
+    }
+    // The application's explicit-Host policy also applies to HTTP/1.0.
+    for version in ["HTTP/1.0", "HTTP/1.1"] {
+        for fields in &headers {
+            assert_bad_request(
+                address,
+                &format!("GET / {version}\r\n{fields}Connection: close\r\n\r\n"),
+            );
+        }
+    }
+    // The guard must cover route misses and unsupported methods too.
+    for (method, path) in [("GET", "/missing"), ("POST", "/projects"), ("HEAD", "/")] {
+        assert_bad_request(
+            address,
+            &format!(
+                "{method} {path} HTTP/1.1\r\nHost: attacker.invalid:{port}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            ),
+        );
+    }
+}
+
+#[test]
+fn absolute_targets_must_match_the_allowed_host_and_port() {
+    let (_server, address) = start();
+    let port = address.port();
+    for version in ["HTTP/1.0", "HTTP/1.1"] {
+        for (authority, host) in [
+            (address.to_string(), address.to_string()),
+            (format!("LOCALHOST:{port}"), format!("localhost:{port}")),
+            (format!("localhost:0{port}"), format!("localhost:{port}")),
+        ] {
+            for (method, path, status) in [
+                ("GET", "", "200"),
+                ("GET", "/projects?tab=all", "200"),
+                ("HEAD", "/about", "200"),
+                ("GET", "/missing", "404"),
+                ("POST", "/", "405"),
+            ] {
+                let response = request(
+                    address,
+                    &format!(
+                        "{method} http://{authority}{path} {version}\r\nHost: {host}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    ),
+                );
+                assert_eq!(response.split_whitespace().nth(1), Some(status));
+                if method == "HEAD" {
+                    assert_eq!(response.split_once("\r\n\r\n").unwrap().1, "");
+                }
+            }
+        }
+    }
+    for target in [
+        format!("http://attacker.invalid:{port}/"),
+        format!("http://localhost.attacker.invalid:{port}/"),
+        format!("http://localhost:{port}/"), // Different allowed alias, conflicting Host.
+        "http://127.0.0.1/".into(),
+        "http://127.0.0.1:0/".into(),
+        "http://127.0.0.1:/".into(),
+        format!("http://user@{address}/"),
+        format!("http://{address}@attacker.invalid/"),
+        format!("https://{address}/"),
+        format!("ftp://{address}/"),
+        format!("//{address}/"),
+        address.to_string(),
+        "*".into(),
+    ] {
+        assert_bad_request(
+            address,
+            &format!("GET {target} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
+        );
+    }
+    // A safe target cannot repair an absent, foreign, or duplicated Host.
+    for host in [
+        String::new(),
+        "Host: attacker.invalid\r\n".into(),
+        format!("Host: {address}\r\nHost: {address}\r\n"),
+    ] {
+        assert_bad_request(
+            address,
+            &format!("GET http://{address}/ HTTP/1.1\r\n{host}Connection: close\r\n\r\n"),
+        );
+    }
+    assert_bad_request(
+        address,
+        &format!("CONNECT {address} HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
+    );
+}
+
+#[test]
+fn authority_is_checked_for_each_request_on_a_connection() {
+    let (_server, address) = start();
+    let response = request(
+        address,
+        &format!(
+            "GET / HTTP/1.1\r\nHost: {address}\r\n\r\n\
+         GET / HTTP/1.1\r\nHost: attacker.invalid\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert_eq!(response.matches("HTTP/1.1 400 Bad Request").count(), 1);
+    assert_eq!(response.matches("<!doctype html>").count(), 1);
 }
 
 #[test]
