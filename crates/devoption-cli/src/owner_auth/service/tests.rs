@@ -92,7 +92,184 @@ fn setup_and_sign_in_share_the_limit_including_successes_and_failures() {
             clone.authenticate(PASSWORD.into()).await,
             Err(ServiceError::RateLimited { retry_after }) if !retry_after.is_zero() && retry_after <= ATTEMPT_WINDOW
         ));
+        assert!(matches!(
+            clone.sign_in(PASSWORD.into()).await,
+            Err(ServiceError::RateLimited { .. })
+        ));
         assert_eq!(service.state.store.load().unwrap().unwrap().identity(), identity);
+    });
+}
+
+#[test]
+fn public_sign_in_issues_a_revocable_session_for_the_persisted_identity() {
+    let (directory, service) = fixture();
+    runtime().block_on(async {
+        let identity = service.setup(PASSWORD.into()).await.unwrap();
+        let original = fs::read(directory.path().join("owner.bin")).unwrap();
+        assert!(
+            service
+                .sign_in("wrong fixture".into())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let issued = service.sign_in(PASSWORD.into()).await.unwrap().unwrap();
+        let (mut session, token) = issued.into_parts();
+        let mut wrong = token;
+        wrong[0] ^= 1;
+        assert_eq!(session.authenticate(None), None);
+        assert_eq!(session.authenticate(Some(&wrong)), None);
+        assert_eq!(session.authenticate(Some(&token)), Some(identity));
+        session.revoke();
+        assert_eq!(session.authenticate(Some(&token)), None);
+        assert_eq!(service.state.attempts.lock().unwrap().len(), 3);
+        assert_eq!(
+            fs::read(directory.path().join("owner.bin")).unwrap(),
+            original
+        );
+    });
+}
+
+#[test]
+fn rejected_sign_in_never_requests_session_entropy() {
+    let (directory, service) = fixture();
+    let store = &service.state.store;
+    assert!(
+        sign_in_with_entropy(store, PASSWORD, |_| panic!(
+            "absent owner requested entropy"
+        ))
+        .unwrap()
+        .is_none()
+    );
+    owner_auth::setup(store, PASSWORD).unwrap();
+    for wrong in [
+        "wrong fixture".to_owned(),
+        String::new(),
+        "x".repeat(crate::password::MAX_PASSWORD_BYTES + 1),
+    ] {
+        assert!(
+            sign_in_with_entropy(store, &wrong, |_| panic!(
+                "rejected password requested entropy"
+            ))
+            .unwrap()
+            .is_none()
+        );
+    }
+    let record = directory.path().join("owner.bin");
+    fs::write(&record, b"corrupt fixture").unwrap();
+    assert!(matches!(
+        sign_in_with_entropy(store, PASSWORD, |_| panic!(
+            "corrupt store requested entropy"
+        )),
+        Err(ServiceError::Store(StoreError::InvalidRecord))
+    ));
+    assert_eq!(fs::read(record).unwrap(), b"corrupt fixture");
+}
+
+#[test]
+fn each_sign_in_requests_a_new_independent_session_credential() {
+    let (_directory, service) = fixture();
+    let store = &service.state.store;
+    let identity = owner_auth::setup(store, PASSWORD).unwrap();
+    let mut calls = 0;
+    let mut sessions = Vec::new();
+    for value in [0x35, 0xa7] {
+        let issued = sign_in_with_entropy(store, PASSWORD, |bytes| {
+            calls += 1;
+            assert_eq!(bytes.len(), TOKEN_BYTES);
+            bytes.fill(value);
+            Ok(())
+        })
+        .unwrap()
+        .unwrap();
+        let (session, token) = issued.into_parts();
+        assert_eq!(token, [value; TOKEN_BYTES]);
+        sessions.push((session, token));
+    }
+    assert_eq!(calls, 2);
+    let [(mut first, first_token), (mut second, second_token)]: [_; 2] =
+        sessions.try_into().ok().unwrap();
+    assert_eq!(first.authenticate(Some(&first_token)), Some(identity));
+    assert_eq!(second.authenticate(Some(&second_token)), Some(identity));
+    assert_eq!(first.authenticate(Some(&second_token)), None);
+    assert_eq!(second.authenticate(Some(&first_token)), None);
+}
+
+#[test]
+fn session_entropy_failure_does_not_return_a_grant_or_change_the_owner() {
+    let (directory, service) = fixture();
+    let store = &service.state.store;
+    let identity = owner_auth::setup(store, PASSWORD).unwrap();
+    let original = fs::read(directory.path().join("owner.bin")).unwrap();
+    assert!(matches!(
+        sign_in_with_entropy(store, PASSWORD, |bytes| {
+            bytes[..8].fill(0x5a); // Partial entropy must never become a credential.
+            Err(ServiceError::Unavailable)
+        }),
+        Err(ServiceError::Unavailable)
+    ));
+    assert_eq!(
+        fs::read(directory.path().join("owner.bin")).unwrap(),
+        original
+    );
+    assert_eq!(
+        owner_auth::authenticate(store, PASSWORD).unwrap(),
+        Some(identity)
+    );
+}
+
+#[test]
+fn cancelled_sign_in_discards_the_undelivered_grant_and_keeps_its_attempt() {
+    struct ObservedGrant {
+        _grant: IssuedSession,
+        dropped: Option<oneshot::Sender<()>>,
+    }
+    impl Drop for ObservedGrant {
+        fn drop(&mut self) {
+            let _ = self.dropped.take().unwrap().send(());
+        }
+    }
+    let (directory, service) = fixture();
+    owner_auth::setup(&service.state.store, PASSWORD).unwrap();
+    let original = fs::read(directory.path().join("owner.bin")).unwrap();
+    runtime().block_on(async {
+        let (started, worker_started) = oneshot::channel();
+        let (release, worker_release) = mpsc::channel();
+        let (dropped, grant_dropped) = oneshot::channel();
+        let clone = service.clone();
+        let caller = tokio::spawn(async move {
+            clone
+                .run(move |store| {
+                    started.send(()).unwrap();
+                    worker_release
+                        .recv_timeout(Duration::from_secs(10))
+                        .unwrap();
+                    let grant = sign_in_with_entropy(store, PASSWORD, |bytes| {
+                        bytes.fill(0x5a);
+                        Ok(())
+                    })?
+                    .unwrap();
+                    Ok(ObservedGrant {
+                        _grant: grant,
+                        dropped: Some(dropped),
+                    })
+                })
+                .await
+        });
+        worker_started.await.unwrap();
+        caller.abort();
+        assert!(matches!(caller.await, Err(error) if error.is_cancelled()));
+        assert!(matches!(
+            service.sign_in(PASSWORD.into()).await,
+            Err(ServiceError::Busy)
+        ));
+        release.send(()).unwrap();
+        grant_dropped.await.unwrap();
+        assert_eq!(service.state.attempts.lock().unwrap().len(), 1);
+        assert_eq!(
+            fs::read(directory.path().join("owner.bin")).unwrap(),
+            original
+        );
     });
 }
 

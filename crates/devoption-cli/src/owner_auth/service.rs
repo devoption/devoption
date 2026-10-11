@@ -7,7 +7,7 @@
 //!
 //! Only temporary fixtures use this service today. HTTP integration still needs
 //! enrollment authorization/policy, bounded request bodies, data-directory setup,
-//! browser sessions/cookies, and CSRF handling. This adds no permission grants.
+//! authoritative session retention, cookies, and CSRF handling. This grants no permissions.
 
 use std::{
     collections::VecDeque,
@@ -23,10 +23,27 @@ use crate::{
     identity::IdentityId,
     owner_auth::{self, SetupError},
     owner_store::{OwnerStore, StoreError},
+    session::{MAX_LIFETIME, Session, TOKEN_BYTES},
 };
 
 const MAX_ATTEMPTS: usize = 5;
 const ATTEMPT_WINDOW: Duration = Duration::from_secs(60);
+
+/// A fresh session paired with its credential; intentionally neither Debug nor Clone.
+/// No credential is persisted, printed, or installed in HTTP state by this grant.
+pub struct IssuedSession {
+    session: Session,
+    token: [u8; TOKEN_BYTES],
+}
+
+impl IssuedSession {
+    /// Retain the validator as authoritative server state and deliver the credential
+    /// through the future browser cookie transport. Never log or display the token.
+    /// Keeping multiple validators alive requires an explicit session lifecycle policy.
+    pub fn into_parts(self) -> (Session, [u8; TOKEN_BYTES]) {
+        (self.session, self.token)
+    }
+}
 
 /// Failures contain no password, salt, hash, or worker panic details.
 #[derive(Debug)]
@@ -105,6 +122,17 @@ impl OwnerAuthService {
         .await
     }
 
+    /// Verify the password, then issue a fresh session with a one-hour absolute lifetime.
+    /// The caller supplies no identity, token, or lifetime. HTTP transport is separate.
+    pub async fn sign_in(&self, password: String) -> Result<Option<IssuedSession>, ServiceError> {
+        self.run(move |store| {
+            sign_in_with_entropy(store, &password, |bytes| {
+                getrandom::fill(bytes).map_err(|_| ServiceError::Unavailable)
+            })
+        })
+        .await
+    }
+
     async fn run<T: Send + 'static>(
         &self,
         operation: impl FnOnce(&OwnerStore) -> Result<T, ServiceError> + Send + 'static,
@@ -148,6 +176,22 @@ impl OwnerAuthService {
         attempts.push_back(now);
         Ok(permit)
     }
+}
+
+fn sign_in_with_entropy(
+    store: &OwnerStore,
+    password: &str,
+    fill: impl FnOnce(&mut [u8]) -> Result<(), ServiceError>,
+) -> Result<Option<IssuedSession>, ServiceError> {
+    let Some(identity) = owner_auth::authenticate(store, password).map_err(ServiceError::Store)?
+    else {
+        return Ok(None);
+    };
+    let mut token = [0; TOKEN_BYTES];
+    fill(&mut token)?;
+    let session =
+        Session::new(identity, token, MAX_LIFETIME).map_err(|_| ServiceError::Unavailable)?;
+    Ok(Some(IssuedSession { session, token }))
 }
 
 #[cfg(test)]
