@@ -1,18 +1,28 @@
-use std::{io, net::Ipv4Addr};
+use std::{
+    io,
+    net::Ipv4Addr,
+    sync::{Arc, Mutex},
+};
 
 use axum::{
     Router,
     extract::Request,
     http::{
-        Method, StatusCode,
-        header::{HOST, ORIGIN},
+        HeaderMap, Method, StatusCode,
+        header::{AUTHORIZATION, CACHE_CONTROL, HOST, ORIGIN, WWW_AUTHENTICATE},
     },
     middleware::{self, Next},
     response::{Html, IntoResponse},
     routing::get,
 };
+use devoption_cli::session::{Session, TOKEN_BYTES};
 use devoption_ui::Page;
 use tokio::{net::TcpListener, runtime::Builder};
+
+type SharedSession = Arc<Mutex<Option<Session>>>;
+
+#[cfg(test)]
+mod session_tests;
 
 pub fn run(port: u16) -> io::Result<()> {
     Builder::new_current_thread()
@@ -38,25 +48,80 @@ pub fn run(port: u16) -> io::Result<()> {
                 .route(
                     "/settings/appearance",
                     get(|| async { Html(devoption_ui::render(Page::Appearance)) }),
-                )
-                .layer(middleware::from_fn(
-                    move |request: Request, next: Next| async move {
-                        let Some(host) = validated_host(&request, address.port()) else {
-                            return StatusCode::BAD_REQUEST.into_response();
-                        };
-                        // RFC 9110 safe methods; extensions require Origin by default.
-                        if !matches!(
-                            *request.method(),
-                            Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
-                        ) && !same_origin(&request, host, address.port())
-                        {
-                            return StatusCode::FORBIDDEN.into_response();
-                        }
-                        next.run(request).await
-                    },
-                ));
+                );
+            // No production issuance or bootstrap yet: unsafe requests fail closed.
+            let app = protect(app, address.port(), Arc::new(Mutex::new(None)));
             axum::serve(listener, app).await
         })
+}
+
+fn protect(app: Router, port: u16, session: SharedSession) -> Router {
+    app.layer(middleware::from_fn(move |request: Request, next: Next| {
+        let session = Arc::clone(&session);
+        async move {
+            let Some(host) = validated_host(&request, port) else {
+                return StatusCode::BAD_REQUEST.into_response();
+            };
+            // RFC 9110 safe methods; extensions require Origin and a session.
+            // Public preview reads remain unauthenticated and must never mutate.
+            if !matches!(
+                *request.method(),
+                Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
+            ) {
+                if !same_origin(&request, host, port) {
+                    return StatusCode::FORBIDDEN.into_response();
+                }
+                if !authorized(request.headers(), &session) {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        [(WWW_AUTHENTICATE, "Bearer"), (CACHE_CONTROL, "no-store")],
+                    )
+                        .into_response();
+                }
+            }
+            next.run(request).await
+        }
+    }))
+}
+
+fn authorized(headers: &HeaderMap, session: &SharedSession) -> bool {
+    let candidate = bearer_token(headers);
+    let Ok(mut session) = session.lock() else {
+        // A poisoned validator cannot establish authorization. Never hold the
+        // synchronous lock across an await or into the downstream handler.
+        return false;
+    };
+    session
+        .as_mut()
+        .is_some_and(|session| session.validate(candidate.as_ref().map(|token| token.as_slice())))
+}
+
+fn bearer_token(headers: &HeaderMap) -> Option<[u8; TOKEN_BYTES]> {
+    let mut values = headers.get_all(AUTHORIZATION).iter();
+    let value = values.next()?.to_str().ok()?;
+    if values.next().is_some() {
+        return None;
+    }
+    let (scheme, value) = value.split_once(' ')?;
+    // HTTP auth schemes are case-insensitive and permit one or more SP bytes.
+    let value = value.trim_start_matches(' ');
+    if !scheme.eq_ignore_ascii_case("Bearer") || value.len() != TOKEN_BYTES * 2 {
+        return None;
+    }
+    let mut token = [0; TOKEN_BYTES];
+    for (output, pair) in token.iter_mut().zip(value.as_bytes().as_chunks::<2>().0) {
+        *output = (hex_digit(pair[0])? << 4) | hex_digit(pair[1])?;
+    }
+    Some(token)
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
 }
 
 fn validated_host(request: &Request, port: u16) -> Option<&'static str> {

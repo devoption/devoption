@@ -5,7 +5,8 @@
 //! bootstrap and retain this object as the authoritative validation state.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
-//! HTTP transport, issuance, and CSRF protection remain separate work under #15.
+//! The HTTP guard accepts these tokens on unsafe requests, but issuance and
+//! complete CSRF protection remain separate work under #15.
 
 use std::{
     error::Error,
