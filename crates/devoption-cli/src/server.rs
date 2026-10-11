@@ -15,7 +15,10 @@ use axum::{
     response::{Html, IntoResponse},
     routing::get,
 };
-use devoption_cli::session::{Session, TOKEN_BYTES};
+use devoption_cli::{
+    identity::IdentityId,
+    session::{Session, TOKEN_BYTES},
+};
 use devoption_ui::Page;
 use tokio::{net::TcpListener, runtime::Builder};
 
@@ -56,44 +59,49 @@ pub fn run(port: u16) -> io::Result<()> {
 }
 
 fn protect(app: Router, port: u16, session: SharedSession) -> Router {
-    app.layer(middleware::from_fn(move |request: Request, next: Next| {
-        let session = Arc::clone(&session);
-        async move {
-            let Some(host) = validated_host(&request, port) else {
-                return StatusCode::BAD_REQUEST.into_response();
-            };
-            // RFC 9110 safe methods; extensions require Origin and a session.
-            // Public preview reads remain unauthenticated and must never mutate.
-            if !matches!(
-                *request.method(),
-                Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
-            ) {
-                if !same_origin(&request, host, port) {
-                    return StatusCode::FORBIDDEN.into_response();
+    app.layer(middleware::from_fn(
+        move |mut request: Request, next: Next| {
+            let session = Arc::clone(&session);
+            async move {
+                let Some(host) = validated_host(&request, port) else {
+                    return StatusCode::BAD_REQUEST.into_response();
+                };
+                // RFC 9110 safe methods; extensions require Origin and a session.
+                // Public preview reads remain unauthenticated and must never mutate.
+                if !matches!(
+                    *request.method(),
+                    Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
+                ) {
+                    if !same_origin(&request, host, port) {
+                        return StatusCode::FORBIDDEN.into_response();
+                    }
+                    let Some(identity) = authenticated_identity(request.headers(), &session) else {
+                        return (
+                            StatusCode::UNAUTHORIZED,
+                            [(WWW_AUTHENTICATE, "Bearer"), (CACHE_CONTROL, "no-store")],
+                        )
+                            .into_response();
+                    };
+                    // Downstream permission checks must use this server-owned ID,
+                    // never a username/role asserted in headers, the URL, or a body.
+                    request.extensions_mut().insert(identity);
                 }
-                if !authorized(request.headers(), &session) {
-                    return (
-                        StatusCode::UNAUTHORIZED,
-                        [(WWW_AUTHENTICATE, "Bearer"), (CACHE_CONTROL, "no-store")],
-                    )
-                        .into_response();
-                }
+                next.run(request).await
             }
-            next.run(request).await
-        }
-    }))
+        },
+    ))
 }
 
-fn authorized(headers: &HeaderMap, session: &SharedSession) -> bool {
+fn authenticated_identity(headers: &HeaderMap, session: &SharedSession) -> Option<IdentityId> {
     let candidate = bearer_token(headers);
     let Ok(mut session) = session.lock() else {
         // A poisoned validator cannot establish authorization. Never hold the
         // synchronous lock across an await or into the downstream handler.
-        return false;
+        return None;
     };
     session
         .as_mut()
-        .is_some_and(|session| session.validate(candidate.as_ref().map(|token| token.as_slice())))
+        .and_then(|session| session.authenticate(candidate.as_ref().map(|token| token.as_slice())))
 }
 
 fn bearer_token(headers: &HeaderMap) -> Option<[u8; TOKEN_BYTES]> {

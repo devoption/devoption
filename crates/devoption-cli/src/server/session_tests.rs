@@ -1,5 +1,5 @@
 use super::*;
-use axum::{body::Body, http::HeaderValue, routing::post};
+use axum::{Extension, body::Body, http::HeaderValue, routing::post};
 use devoption_cli::session::MAX_LIFETIME;
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
@@ -9,23 +9,31 @@ use tower::ServiceExt;
 
 // Predictable fixtures are installed only in this test router, never the server.
 const FIXTURE: [u8; TOKEN_BYTES] = [0xab; TOKEN_BYTES];
+const IDENTITY: IdentityId = IdentityId::from_bytes([1; 16]);
 
 fn credential() -> String {
     format!("Bearer {}", "ab".repeat(TOKEN_BYTES))
 }
 
 fn fixture() -> (Router, SharedSession, Arc<AtomicUsize>) {
+    fixture_for(IDENTITY)
+}
+
+fn fixture_for(identity: IdentityId) -> (Router, SharedSession, Arc<AtomicUsize>) {
     let session = Arc::new(Mutex::new(Some(
-        Session::new(FIXTURE, MAX_LIFETIME).unwrap(),
+        Session::new(identity, FIXTURE, MAX_LIFETIME).unwrap(),
     )));
     let calls = Arc::new(AtomicUsize::new(0));
     let handler_calls = Arc::clone(&calls);
     let app = Router::new().route(
         "/probe",
-        post(move || async move {
-            handler_calls.fetch_add(1, Ordering::SeqCst);
-            StatusCode::NO_CONTENT
-        }),
+        post(
+            move |Extension(authenticated): Extension<IdentityId>| async move {
+                assert_eq!(authenticated, identity);
+                handler_calls.fetch_add(1, Ordering::SeqCst);
+                StatusCode::NO_CONTENT
+            },
+        ),
     );
     (protect(app, 3000, Arc::clone(&session)), session, calls)
 }
@@ -203,7 +211,8 @@ fn each_request_observes_revocation_expiry_and_absent_session_state() {
     session.lock().unwrap().as_mut().unwrap().revoke();
     assert_unauthorized(&app, authenticated());
 
-    *session.lock().unwrap() = Some(Session::new(FIXTURE, Duration::from_nanos(1)).unwrap());
+    *session.lock().unwrap() =
+        Some(Session::new(IDENTITY, FIXTURE, Duration::from_nanos(1)).unwrap());
     // The core's exact deadline tests use a controlled clock. Here a short wait
     // exercises real-clock expiration through the HTTP middleware as well.
     std::thread::sleep(Duration::from_millis(1));
@@ -230,4 +239,41 @@ fn poisoned_session_state_fails_closed() {
         .insert(AUTHORIZATION, credential().parse().unwrap());
     assert_unauthorized(&app, request);
     assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn protected_handlers_receive_only_the_session_bound_identity() {
+    for identity in [IDENTITY, IdentityId::from_bytes([2; 16])] {
+        let (app, _, calls) = fixture_for(identity);
+        let mut authenticated = request();
+        *authenticated.uri_mut() = "/probe?identity=forged&role=owner".parse().unwrap();
+        for name in [
+            "x-forwarded-user",
+            "x-auth-request-user",
+            "x-identity-id",
+            "x-role",
+        ] {
+            authenticated
+                .headers_mut()
+                .insert(name, "forged".parse().unwrap());
+        }
+        authenticated
+            .headers_mut()
+            .insert(AUTHORIZATION, credential().parse().unwrap());
+        *authenticated.body_mut() = Body::from("identity=forged&role=owner");
+        // Even earlier request decoration cannot override the validated session.
+        authenticated
+            .extensions_mut()
+            .insert(IdentityId::from_bytes([0xff; 16]));
+        assert_eq!(response(&app, authenticated).0, StatusCode::NO_CONTENT);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+        let mut forged = request();
+        forged
+            .headers_mut()
+            .insert("x-forwarded-user", "owner".parse().unwrap());
+        forged.extensions_mut().insert(identity);
+        assert_unauthorized(&app, forged);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 }
