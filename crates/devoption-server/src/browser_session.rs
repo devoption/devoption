@@ -1,4 +1,4 @@
-//! Cookie transport for the loopback browser session; issuance routes remain closed.
+//! Cookie transport for the loopback browser session.
 //!
 //! HTTP callers must first validate Host and Origin. Browser mutations require an
 //! explicitly submitted CSRF header as well as the HttpOnly session cookie. This
@@ -7,7 +7,7 @@
 //! Secure cookies require browser support for secure loopback contexts; never
 //! remove Secure to accommodate a browser. There is no TLS here. Cookies are not
 //! isolated by port, so other services on the same host remain in the trust boundary.
-//! Only fixture routers activate or log out browser sessions today.
+//! Existing-owner HTTP sign-in and sign-out use this adapter.
 
 use axum::{
     http::{

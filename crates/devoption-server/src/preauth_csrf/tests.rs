@@ -111,6 +111,7 @@ fn absolute_expiry_reclaims_capacity_without_evicting_live_challenges() {
     let full = store.issue_using(|| now, |_| panic!("capacity checked before entropy"));
     assert_eq!(full.status(), StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(full.headers()[CACHE_CONTROL], "no-store");
+    assert_eq!(full.headers()[RETRY_AFTER], "300");
     assert!(!full.headers().contains_key(SET_COOKIE));
     assert!(!full.headers().contains_key(CSRF_HEADER));
     let expiry = now + LIFETIME;
@@ -121,6 +122,44 @@ fn absolute_expiry_reclaims_capacity_without_evicting_live_challenges() {
     assert_eq!(store.pending.lock().unwrap().len(), 2);
     assert!(store.consume_using(&later, || expiry));
     assert!(store.consume_using(&fresh, || expiry));
+}
+
+#[test]
+fn capacity_retry_uses_the_earliest_live_expiry_after_swap_removal() {
+    let store = PreAuthCsrf::default();
+    let now = Instant::now();
+    let issued: Vec<_> = (0..MAX_PENDING)
+        .map(|index| {
+            request(&issue_at(
+                &store,
+                now + Duration::from_secs(index as u64 * 10),
+                (index * 2) as u8,
+            ))
+        })
+        .collect();
+    let latest_issue = now + Duration::from_secs(150);
+    assert!(store.consume_using(&issued[0], || latest_issue));
+    assert_eq!(
+        issue_at(&store, latest_issue, 100).status(),
+        StatusCode::NO_CONTENT
+    );
+    // swap_remove moved the last challenge to the front. The earliest remaining
+    // challenge still expires at now + 310 seconds, independently of Vec order.
+    for (elapsed, expected) in [
+        (Duration::from_secs(150), "160"),
+        (Duration::from_millis(308_500), "2"),
+        (Duration::from_secs(310) - Duration::from_nanos(1), "1"),
+    ] {
+        let full = store.issue_using(
+            || now + elapsed,
+            |_| panic!("capacity checked before entropy"),
+        );
+        assert_eq!(full.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(full.headers()[RETRY_AFTER], expected);
+    }
+    let recovered = issue_at(&store, now + Duration::from_secs(310), 102);
+    assert_eq!(recovered.status(), StatusCode::NO_CONTENT);
+    assert!(!recovered.headers().contains_key(RETRY_AFTER));
 }
 
 #[test]
@@ -140,6 +179,7 @@ fn entropy_failure_at_either_draw_and_lock_poison_fail_closed() {
         });
         assert_eq!(calls, fail_at);
         assert_eq!(failed.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert!(!failed.headers().contains_key(RETRY_AFTER));
         assert!(!failed.headers().contains_key(SET_COOKIE));
         assert!(!failed.headers().contains_key(CSRF_HEADER));
         assert_eq!(store.pending.lock().unwrap().len(), 1);
@@ -153,7 +193,9 @@ fn entropy_failure_at_either_draw_and_lock_poison_fail_closed() {
         .join()
         .is_err()
     );
-    assert_eq!(store.issue().status(), StatusCode::SERVICE_UNAVAILABLE);
+    let poisoned = store.issue();
+    assert_eq!(poisoned.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert!(!poisoned.headers().contains_key(RETRY_AFTER));
     assert!(!store.consume(&valid));
 }
 

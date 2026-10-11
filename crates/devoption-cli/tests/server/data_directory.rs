@@ -14,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn fixture() -> (tempfile::TempDir, PathBuf) {
+pub(super) fn fixture() -> (tempfile::TempDir, PathBuf) {
     let temporary = tempfile::Builder::new()
         .permissions(fs::Permissions::from_mode(0o700))
         .tempdir()

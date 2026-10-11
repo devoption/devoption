@@ -1,52 +1,12 @@
 use super::*;
-use crate::{browser_session, password_form::PasswordForm, preauth_csrf::PreAuthCsrf};
-use axum::extract::FromRequest;
+use crate::browser_session;
 use browser::{PASSWORD, owner};
 
-fn fixture() -> (tempfile::TempDir, Router, Arc<AtomicUsize>) {
+fn fixture() -> (tempfile::TempDir, Router) {
     let (directory, auth, identity) = owner();
     let slot = Arc::new(SessionSlot::default());
-    let preauth = Arc::new(PreAuthCsrf::default());
-    let issue = Arc::clone(&preauth);
-    let submissions = Arc::new(AtomicUsize::new(0));
-    let count = Arc::clone(&submissions);
     let (protected, _) = router_for(identity, Arc::clone(&slot));
-    let routes = Router::new()
-        .route(
-            "/fixture/challenge",
-            post(move || {
-                let issue = Arc::clone(&issue);
-                async move { issue.issue() }
-            }),
-        )
-        .route(
-            "/fixture/sign-in",
-            post(move |request: Request| {
-                let preauth = Arc::clone(&preauth);
-                let slot = Arc::clone(&slot);
-                let auth = auth.clone();
-                let count = Arc::clone(&count);
-                async move {
-                    if !preauth.consume(request.headers()) {
-                        return browser_session::empty(StatusCode::FORBIDDEN);
-                    }
-                    count.fetch_add(1, Ordering::SeqCst);
-                    let form = match PasswordForm::from_request(request, &()).await {
-                        Ok(form) => form,
-                        Err(error) => return error.into_response(),
-                    };
-                    match auth.sign_in(form.into_password()).await.unwrap() {
-                        Some(grant) => browser_session::activate(grant, &slot).unwrap(),
-                        None => browser_session::empty(StatusCode::UNAUTHORIZED),
-                    }
-                }
-            }),
-        );
-    (
-        directory,
-        protect_origin(routes, 3000).merge(protected),
-        submissions,
-    )
+    (directory, auth::routes(auth, 3000, slot).merge(protected))
 }
 
 fn build(path: &str, issued: Option<&HeaderMap>, password: &str) -> Request {
@@ -92,16 +52,41 @@ fn send(app: &Router, request: Request) -> (StatusCode, HeaderMap) {
 }
 
 fn challenge(app: &Router) -> HeaderMap {
-    let (status, headers) = send(app, build("/fixture/challenge", None, ""));
+    let (status, headers) = send(app, build("/auth/challenge", None, ""));
     assert_eq!(status, StatusCode::NO_CONTENT);
     headers
 }
 
 #[test]
+fn challenge_capacity_returns_a_bounded_retry_hint_and_recovers_after_consumption() {
+    let (_directory, app) = fixture();
+    let issued: Vec<_> = (0..16).map(|_| challenge(&app)).collect();
+    let (status, headers) = send(&app, build("/auth/challenge", None, ""));
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(headers[CACHE_CONTROL], "no-store");
+    assert!(!headers.contains_key("set-cookie"));
+    assert!(!headers.contains_key(browser_session::CSRF_HEADER));
+    let retry = headers
+        .get("retry-after")
+        .expect("challenge capacity must provide a retry hint")
+        .to_str()
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+    assert!((1..=300).contains(&retry));
+    // Capacity rejection must preserve live pairs. Consumption frees one slot.
+    assert_eq!(
+        send(&app, build("/auth/sign-in", Some(&issued[0]), PASSWORD)).0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(!challenge(&app).contains_key("retry-after"));
+}
+
+#[test]
 fn host_origin_and_post_guard_both_challenge_and_submission_before_work() {
-    let (_directory, app, submissions) = fixture();
+    let (_directory, app) = fixture();
     let valid = challenge(&app);
-    for path in ["/fixture/challenge", "/fixture/sign-in"] {
+    for path in ["/auth/challenge", "/auth/sign-in", "/auth/sign-out"] {
         for (header, value, expected) in [
             (HOST, "attacker.invalid", StatusCode::BAD_REQUEST),
             (ORIGIN, "http://attacker.invalid", StatusCode::FORBIDDEN),
@@ -113,6 +98,7 @@ fn host_origin_and_post_guard_both_challenge_and_submission_before_work() {
             request.headers_mut().insert(header, value.parse().unwrap());
             let (status, headers) = send(&app, request);
             assert_eq!(status, expected);
+            assert_eq!(headers[CACHE_CONTROL], "no-store");
             assert!(!headers.contains_key("set-cookie"));
         }
         for name in [HOST, ORIGIN] {
@@ -135,17 +121,15 @@ fn host_origin_and_post_guard_both_challenge_and_submission_before_work() {
             assert!(!headers.contains_key("set-cookie"));
         }
     }
-    assert_eq!(submissions.load(Ordering::SeqCst), 0);
     assert_eq!(
-        send(&app, build("/fixture/sign-in", Some(&valid), PASSWORD)).0,
+        send(&app, build("/auth/sign-in", Some(&valid), PASSWORD)).0,
         StatusCode::NO_CONTENT
     );
-    assert_eq!(submissions.load(Ordering::SeqCst), 1);
 }
 
 #[test]
 fn sign_in_consumes_before_forms_and_issues_a_fresh_authenticated_session() {
-    let (directory, app, submissions) = fixture();
+    let (directory, app) = fixture();
     let original = std::fs::read(directory.path().join("owner.bin")).unwrap();
     let first = challenge(&app);
     // A pre-session is neither an authenticated session nor an identity grant.
@@ -153,7 +137,7 @@ fn sign_in_consumes_before_forms_and_issues_a_fresh_authenticated_session() {
         send(&app, build("/probe", Some(&first), "")).0,
         StatusCode::UNAUTHORIZED
     );
-    let mut invalid_csrf = build("/fixture/sign-in", Some(&first), PASSWORD);
+    let mut invalid_csrf = build("/auth/sign-in", Some(&first), PASSWORD);
     invalid_csrf
         .headers_mut()
         .remove(browser_session::CSRF_HEADER);
@@ -163,28 +147,27 @@ fn sign_in_consumes_before_forms_and_issues_a_fresh_authenticated_session() {
     let (status, headers) = send(&app, invalid_csrf);
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert_eq!(headers[CACHE_CONTROL], "no-store");
-    assert_eq!(submissions.load(Ordering::SeqCst), 0);
     // Form failure still consumes the challenge before any password verification.
-    let mut malformed = build("/fixture/sign-in", Some(&first), PASSWORD);
+    let mut malformed = build("/auth/sign-in", Some(&first), PASSWORD);
     *malformed.body_mut() = Body::from("password=%GG");
     assert_eq!(send(&app, malformed).0, StatusCode::BAD_REQUEST);
     assert_eq!(
-        send(&app, build("/fixture/sign-in", Some(&first), PASSWORD)).0,
+        send(&app, build("/auth/sign-in", Some(&first), PASSWORD)).0,
         StatusCode::FORBIDDEN
     );
     let second = challenge(&app);
     let (status, headers) = send(
         &app,
-        build("/fixture/sign-in", Some(&second), "wrong fixture password"),
+        build("/auth/sign-in", Some(&second), "wrong fixture password"),
     );
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(!headers.contains_key("set-cookie"));
     assert_eq!(
-        send(&app, build("/fixture/sign-in", Some(&second), PASSWORD)).0,
+        send(&app, build("/auth/sign-in", Some(&second), PASSWORD)).0,
         StatusCode::FORBIDDEN
     );
     let third = challenge(&app);
-    let (status, authenticated) = send(&app, build("/fixture/sign-in", Some(&third), PASSWORD));
+    let (status, authenticated) = send(&app, build("/auth/sign-in", Some(&third), PASSWORD));
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert_ne!(
         third[browser_session::CSRF_HEADER],
@@ -207,15 +190,11 @@ fn sign_in_consumes_before_forms_and_issues_a_fresh_authenticated_session() {
         auth_cookie.split_once('=').unwrap().1
     );
     assert_eq!(
-        send(&app, build("/fixture/sign-in", Some(&third), PASSWORD)).0,
+        send(&app, build("/auth/sign-in", Some(&third), PASSWORD)).0,
         StatusCode::FORBIDDEN
     );
     assert_eq!(
-        send(
-            &app,
-            build("/fixture/sign-in", Some(&authenticated), PASSWORD)
-        )
-        .0,
+        send(&app, build("/auth/sign-in", Some(&authenticated), PASSWORD)).0,
         StatusCode::FORBIDDEN
     );
     let mut probe = build("/probe", Some(&authenticated), "");
@@ -231,7 +210,6 @@ fn sign_in_consumes_before_forms_and_issues_a_fresh_authenticated_session() {
         third[browser_session::CSRF_HEADER].clone(),
     );
     assert_eq!(send(&app, wrong_csrf).0, StatusCode::UNAUTHORIZED);
-    assert_eq!(submissions.load(Ordering::SeqCst), 3);
     assert_eq!(
         std::fs::read(directory.path().join("owner.bin")).unwrap(),
         original

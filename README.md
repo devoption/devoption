@@ -29,18 +29,37 @@ On Unix, `serve --data-dir /absolute/private/directory` optionally validates an
 existing owner-data directory before listening. It must belong to the current OS
 user, have no group/other permission bits, and use a path with no symlink components
 or `..`. Invalid owner records stop startup. This option retains the opened
-directory but creates no directories or accounts, changes no permissions, and does
-not enable browser setup or sign-in. Without it, the preview selects no data path.
+directory but creates no directories or accounts and changes no permissions.
+When a valid owner already exists at startup, it enables the HTTP sign-in and
+sign-out routes described below. A missing owner leaves them closed; first-owner
+setup and browser forms are not implemented. Without this option, the preview
+selects no data path.
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
-at its listening port. Unsafe requests require a matching Origin and a session;
-they are denied because session setup is not implemented yet. Preview pages remain
-public. There is no TLS or complete CSRF protection. Do not expose it publicly.
+at its listening port. Unsafe requests require a matching Origin and a session,
+apart from the protected authentication routes. Without a configured owner, all
+unsafe requests remain denied. Preview pages remain public. There is no TLS or
+complete browser authentication flow. Do not expose it publicly.
 
-Server fixtures cover cookie sessions and single-use CSRF challenges before
-password sign-in. Pre-authentication challenges are held only in memory, expire
-after five minutes, and are limited to 16 pending pairs. These components do not
-enable browser authentication or authorize first-owner enrollment yet.
+For an existing owner, `POST /auth/challenge` issues an HttpOnly pre-session cookie
+and a separate `X-CSRF-Token` header. `POST /auth/sign-in` requires that matching
+pair and one URL-encoded `password` field; it consumes the challenge before reading
+the form and issues a fresh session cookie and CSRF header only after verification.
+`POST /auth/sign-out` requires the current session cookie/header pair. All three
+routes enforce Host/Origin and return empty, non-cacheable responses. Password
+failures return 401, invalid pre-session pairs 403, and admission limits 429/503
+with bounded retry hints. Storage/internal failures return 503 without details.
+
+Pre-sessions last five minutes with at most 16 pending pairs. Full capacity returns
+503 with `Retry-After` rounded up to the earliest expiry (1–300 seconds); consuming
+a challenge may free capacity sooner. Each submission needs
+a fresh challenge, including retries after a failed password or invalid form.
+Sign-in is limited to one worker and five admitted attempts per minute. One active
+session is retained in memory for at most an hour; another sign-in replaces it,
+and restarting loses it. Tokens must not enter URLs, logs, or browser-local storage.
+First-owner enrollment authorization/policy, browser forms, and recovery of the
+CSRF token after a page reload remain unfinished. Temporary stores are used for
+tests; there is no supported account provisioning flow yet.
 
 ## Screenshots
 

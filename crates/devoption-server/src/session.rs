@@ -5,12 +5,12 @@
 //! The shared [`slot`] retains one active session for the HTTP request guard.
 //! Issued sessions also retain a separate synchronizer CSRF token. Browser mutation
 //! validation requires both tokens from the same live session. Cookie transport is
-//! separate; pre-authentication CSRF is fixture-tested in its own adapter, while
-//! enrollment authorization and production browser endpoints remain unfinished.
+//! separate; existing-owner HTTP sign-in uses a pre-authentication CSRF adapter,
+//! while enrollment authorization and browser forms remain unfinished.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
-//! The HTTP guard accepts fixture tokens on unsafe requests, but browser issuance
-//! endpoints and complete CSRF protection remain separate work under #15.
+//! The HTTP guard checks the active session on unsafe requests. The complete
+//! browser setup/sign-in flow remains separate work under #15.
 
 use std::{
     error::Error,
@@ -58,7 +58,7 @@ impl Session {
     ///
     /// The caller must authenticate the identity before issuing its session, and
     /// is responsible for token entropy. No permissions are implied by the ID.
-    /// No production caller provisions sessions in the current preview.
+    /// Explicit construction supports fixtures; browser sign-in uses the issuer.
     /// This constructor does not bind CSRF; browser sessions come from the issuer.
     pub fn new(
         identity: IdentityId,

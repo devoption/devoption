@@ -48,6 +48,9 @@ fn start_command(command: &mut Command) -> (Server, SocketAddr) {
 }
 
 #[cfg(unix)]
+#[path = "server/authentication.rs"]
+mod authentication;
+#[cfg(unix)]
 #[path = "server/data_directory.rs"]
 mod data_directory;
 

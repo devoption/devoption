@@ -5,10 +5,9 @@
 //! rolling minute, including successes and failures. Busy requests are rejected
 //! immediately. Limits are in memory: a new service or process starts fresh.
 //!
-//! Only temporary fixtures use this service today. HTTP integration still needs
-//! enrollment authorization/policy and browser activation endpoints. Cookie
-//! transport and pre-authentication CSRF are separate fixture-tested adapters.
-//! This grants no permissions.
+//! Existing-owner HTTP sign-in uses this service with cookie transport and
+//! pre-authentication CSRF adapters. Enrollment authorization/policy and browser
+//! forms remain unfinished. This grants no permissions.
 
 use std::{
     collections::VecDeque,

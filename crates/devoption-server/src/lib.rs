@@ -1,8 +1,8 @@
 //! Local HTTP service and its authentication, session, and owner-storage components.
 //!
 //! The CLI starts the service through [`run`]; this crate owns HTTP/runtime behavior
-//! and uses devoption-ui for rendering. The preview cannot issue owner sessions yet;
-//! only test fixtures provision them.
+//! and uses devoption-ui for rendering. Existing-owner HTTP sign-in is available
+//! with explicitly configured storage; enrollment and browser forms remain closed.
 
 mod server;
 

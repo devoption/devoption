@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Existing-owner HTTP challenge, sign-in, and sign-out routes in the server crate,
+  enabled only when explicit data-directory startup validation finds an owner.
+  They enforce Host/Origin, consume pre-authentication CSRF before password input,
+  share bounded authentication work and the active session, and return fixed
+  non-cacheable failures. Full challenge capacity includes a bounded `Retry-After`
+  based on the earliest pending expiry. Temporary CLI/HTTP fixtures cover real
+  routing, rotation, logout, attempt limits, and store failures. First-owner
+  enrollment and browser forms remain unavailable ([#79](https://github.com/devoption/devoption/issues/79)).
 - Single-use pre-authentication CSRF challenges in the server crate, with a
   separate Secure, HttpOnly, SameSite=Strict cookie and explicit synchronizer
   header. Storage holds at most 16 pending pairs for five minutes; consumption
