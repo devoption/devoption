@@ -13,4 +13,9 @@ impl IdentityId {
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
+
+    /// Serialize this stable reference without deriving it from credentials.
+    pub const fn to_bytes(self) -> [u8; 16] {
+        self.0
+    }
 }

@@ -86,7 +86,7 @@ fn hasher() -> Argon2<'static> {
     Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
 }
 
-fn supported_record(record: &str) -> Option<PasswordHash> {
+pub(crate) fn supported_record(record: &str) -> Option<PasswordHash> {
     if record.len() > MAX_RECORD_BYTES {
         return None;
     }

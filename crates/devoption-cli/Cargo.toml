@@ -18,6 +18,12 @@ tokio = { version = "=1.53.2", default-features = false, features = ["net", "rt"
 [dev-dependencies]
 tower = { version = "=0.5.3", default-features = false, features = ["util"] }
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
+
+[target.'cfg(unix)'.dev-dependencies]
+tempfile = "=3.27.0"
+
 [[bin]]
 name = "devoption"
 path = "src/main.rs"
