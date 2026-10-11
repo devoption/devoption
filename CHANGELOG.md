@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A shared async owner-authentication service limits setup/sign-in to one worker
+  at a time and five admitted attempts per rolling minute. Hashing and storage run
+  off the runtime thread; cancellation retains the worker slot until work finishes
+  and cannot undo setup publication. Only temporary fixtures use it; HTTP enrollment,
+  browser sessions, and CSRF handling remain unfinished
+  ([#61](https://github.com/devoption/devoption/issues/61)).
 - Owner setup and password sign-in now connect the password verifier to durable
   owner storage. Setup generates its identity and salt internally, cannot replace
   an existing owner, and fails closed on storage or randomness errors. Sign-in
