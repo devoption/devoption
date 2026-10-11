@@ -34,7 +34,21 @@ Chrome 153.0.8010.48 passed this check on macOS for both loopback hostnames duri
 #73 validation. Other browsers have not been verified; this is not a compatibility
 claim for all browsers.
 This verifies a transport adapter, not a complete sign-in/enrollment flow.
-Pre-authentication CSRF and explicit enrollment authorization remain required.
+The manual activation route does not exercise pre-authentication CSRF. A separate
+automated fixture now tests a single-use pre-session cookie/header pair before
+password parsing and sign-in, including replay rejection and fresh authenticated
+credentials. Run it with:
+
+```sh
+cargo test -p devoption-server --lib --locked --offline preauth
+```
+
+Pre-sessions grant no identity or enrollment permission. At most 16 pairs are
+pending, each for five minutes; full capacity fails closed until a pair is consumed
+or expires. Every admitted submission consumes its pair even if the password/form
+is invalid. The client must request another challenge to retry. Consumed cookies
+are inert and the next challenge replaces them. Production route/UI wiring and
+explicit enrollment authorization remain required.
 
 There is no TLS in this loopback preview. Cookies are not isolated by port, so
 other services on the same host remain inside the trust boundary. Host/Origin
@@ -44,3 +58,5 @@ browser cookie retention does not renew it.
 
 References: [cookie attributes and prefixes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie),
 [synchronizer CSRF tokens](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern).
+The separate pre-session follows the
+[login CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#possible-csrf-vulnerabilities-in-login-forms).

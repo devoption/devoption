@@ -6,9 +6,9 @@
 //! immediately. Limits are in memory: a new service or process starts fresh.
 //!
 //! Only temporary fixtures use this service today. HTTP integration still needs
-//! enrollment authorization/policy, pre-authentication CSRF, and browser activation
-//! endpoints. Cookie transport is a separate fixture-tested adapter. This grants
-//! no permissions.
+//! enrollment authorization/policy and browser activation endpoints. Cookie
+//! transport and pre-authentication CSRF are separate fixture-tested adapters.
+//! This grants no permissions.
 
 use std::{
     collections::VecDeque,

@@ -37,6 +37,11 @@ at its listening port. Unsafe requests require a matching Origin and a session;
 they are denied because session setup is not implemented yet. Preview pages remain
 public. There is no TLS or complete CSRF protection. Do not expose it publicly.
 
+Server fixtures cover cookie sessions and single-use CSRF challenges before
+password sign-in. Pre-authentication challenges are held only in memory, expire
+after five minutes, and are limited to 16 pending pairs. These components do not
+enable browser authentication or authorize first-owner enrollment yet.
+
 ## Screenshots
 
 **Home**

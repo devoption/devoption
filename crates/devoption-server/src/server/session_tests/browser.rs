@@ -2,9 +2,9 @@ use super::*;
 use crate::{browser_session, owner_auth::service::OwnerAuthService, owner_store::OwnerStore};
 use std::os::unix::fs::PermissionsExt;
 
-const PASSWORD: &str = "browser transport fixture only";
+pub(super) const PASSWORD: &str = "browser transport fixture only";
 
-fn owner() -> (tempfile::TempDir, OwnerAuthService, IdentityId) {
+pub(super) fn owner() -> (tempfile::TempDir, OwnerAuthService, IdentityId) {
     let directory = tempfile::Builder::new()
         .permissions(std::fs::Permissions::from_mode(0o700))
         .tempdir()
