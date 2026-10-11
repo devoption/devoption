@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 devoption-ui = { path = "../devoption-ui" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio"] }
+subtle = { version = "=2.6.1", default-features = false }
 tokio = { version = "=1.53.2", default-features = false, features = ["net", "rt"] }
 
 [[bin]]
