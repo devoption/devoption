@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Session validation for unsafe HTTP requests after Host and Origin checks. One
+  Bearer Authorization header must encode the session token as 64 hex characters;
+  missing or invalid authorization returns an empty, non-cacheable 401 challenge.
+  The preview starts without a session and cannot provision one, so all unsafe
+  requests remain denied. Tests exercise fixture acceptance and revocation through
+  the router. Bootstrap, complete CSRF protection, and project writes remain open
+  under [#15](https://github.com/devoption/devoption/issues/15)
+  ([#51](https://github.com/devoption/devoption/issues/51)).
 - An HTTP-independent session validation core in the existing CLI package, with
   constant-time comparison of 32-byte opaque tokens, a positive lifetime capped
   at one hour, absolute monotonic expiry, and explicit revocation. Deterministic

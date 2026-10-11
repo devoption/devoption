@@ -26,9 +26,9 @@ Appearance settings. Press **Ctrl+C** in the terminal to stop the server.
 Run `cargo run --locked --offline -- --help` for command options.
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
-at its listening port. Unsafe requests require a matching Origin. There is no
-authentication or TLS, and the Origin check is not complete CSRF protection.
-Do not expose it as a public service.
+at its listening port. Unsafe requests require a matching Origin and a session;
+they are denied because session setup is not implemented yet. Preview pages remain
+public. There is no TLS or complete CSRF protection. Do not expose it publicly.
 
 ## Screenshots
 

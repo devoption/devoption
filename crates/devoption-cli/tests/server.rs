@@ -257,8 +257,8 @@ fn errors_do_not_stop_the_server() {
                 "POST {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             ),
         );
-        assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
-        assert!(post.contains("allow: GET,HEAD"));
+        assert!(post.starts_with("HTTP/1.1 401 Unauthorized"));
+        assert!(post.contains("www-authenticate: Bearer"));
     }
     assert_parser_rejection(address, "GET / INVALID\r\n\r\n");
     let healthy = request(
@@ -396,7 +396,7 @@ fn absolute_targets_must_match_the_allowed_host_and_port() {
                 ("GET", "/projects?tab=all", "200"),
                 ("HEAD", "/about", "200"),
                 ("GET", "/missing", "404"),
-                ("POST", "/", "405"),
+                ("POST", "/", "401"),
             ] {
                 let response = request(
                     address,
@@ -472,7 +472,7 @@ fn unsafe_and_extension_methods_require_origin_before_routing() {
             for method in ["POST", "PUT", "PATCH", "DELETE", "CUSTOM", "QUERY", "post"] {
                 for (origin, status) in [
                     (String::new(), "403"),
-                    (format!("Origin: HTTP://{host}\r\n"), "405"),
+                    (format!("Origin: HTTP://{host}\r\n"), "401"),
                 ] {
                     let response = request(
                         address,
@@ -492,7 +492,7 @@ fn unsafe_and_extension_methods_require_origin_before_routing() {
     }
     for (origin, status) in [
         ("", "403"),
-        (&format!("Origin: http://{address}\r\n"), "404"),
+        (&format!("Origin: http://{address}\r\n"), "401"),
     ] {
         let response = request(
             address,
@@ -577,7 +577,7 @@ fn malformed_and_cross_origins_cannot_submit_simple_forms() {
                     "POST /projects {version}\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Type: {content_type}\r\nContent-Length: 3\r\nConnection: close\r\n\r\nx=1"
                 ),
             );
-            assert_eq!(response.split_whitespace().nth(1), Some("405"));
+            assert_eq!(response.split_whitespace().nth(1), Some("401"));
         }
     }
     let response = request(
@@ -587,6 +587,37 @@ fn malformed_and_cross_origins_cannot_submit_simple_forms() {
         ),
     );
     assert_eq!(response.split_whitespace().nth(1), Some("403"));
+}
+
+#[test]
+fn unprovisioned_server_denies_credentials_without_echoing_them() {
+    let (_server, address) = start();
+    let fixture = "ab".repeat(32);
+    for version in ["HTTP/1.0", "HTTP/1.1"] {
+        for path in ["/", "/projects", "/missing"] {
+            for authorization in [
+                String::new(),
+                format!("Authorization: Bearer {fixture}\r\n"),
+                format!("Authorization: Bearer {fixture}\r\naUtHoRiZaTiOn: Bearer {fixture}\r\n"),
+                format!("Authorization: Bearer {fixture}, Bearer {fixture}\r\n"),
+            ] {
+                let response = request(
+                    address,
+                    &format!(
+                        "POST {path} {version}\r\nHost: {address}\r\nOrigin: http://{address}\r\n{authorization}Content-Length: 0\r\nConnection: close\r\n\r\n"
+                    ),
+                );
+                let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+                assert!(headers.starts_with(&format!("{version} 401 Unauthorized")));
+                assert!(headers.contains("www-authenticate: Bearer\r\n"));
+                assert!(headers.contains("cache-control: no-store\r\n"));
+                assert!(!headers.contains("set-cookie:"));
+                assert!(!headers.contains("access-control-allow-origin:"));
+                assert!(!response.contains(&fixture));
+                assert_eq!(body, "");
+            }
+        }
+    }
 }
 
 #[test]
@@ -627,7 +658,7 @@ fn origin_checks_cover_absolute_targets_and_each_request() {
             format!("http://{address}/"),
             address.to_string(),
             format!("http://{address}"),
-            "405",
+            "401",
         ),
         (
             format!("http://{address}/"),
@@ -662,7 +693,7 @@ fn origin_checks_cover_absolute_targets_and_each_request() {
             "POST / HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Length: 0\r\n\r\nPOST / HTTP/1.1\r\nHost: {address}\r\nOrigin: null\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
         ),
     );
-    assert!(response.starts_with("HTTP/1.1 405 Method Not Allowed"));
+    assert!(response.starts_with("HTTP/1.1 401 Unauthorized"));
     assert_eq!(response.matches("HTTP/1.1 403 Forbidden").count(), 1);
 }
 
