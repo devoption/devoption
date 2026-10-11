@@ -9,7 +9,7 @@ pub enum Page {
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
-const APPEARANCE_CONTROLS: &str = r#"
+const APPEARANCE_CONTROLS: &str = r##"
       <section class="appearance" aria-label="Appearance preferences">
         <p class="theme-preview"><span class="theme-swatch" aria-hidden="true"></span><span><span id="appearance-name">Nord purple</span><small>Current theme</small></span></p>
         <div class="mode-choice">
@@ -26,10 +26,20 @@ const APPEARANCE_CONTROLS: &str = r#"
             <option value="purple">Purple</option>
             <option value="blue">Blue</option>
             <option value="green">Green</option>
+            <option value="custom">Custom</option>
           </select>
         </div>
+        <div class="mode-choice">
+          <label for="appearance-primary">Primary color</label>
+          <span class="primary-choice">
+            <output id="appearance-hex" for="appearance-primary">#b48ead</output>
+            <input id="appearance-primary" type="color" value="#b48ead" aria-describedby="appearance-contrast appearance-status" disabled>
+          </span>
+        </div>
+        <p id="appearance-contrast" role="status" hidden></p>
+        <button id="appearance-reset" type="button" aria-describedby="appearance-status" disabled>Reset to Purple</button>
         <p id="appearance-status" role="status">Enable JavaScript to change appearance.</p>
-      </section>"#;
+      </section>"##;
 
 /// Render a complete HTML document independently of the HTTP server.
 pub fn render(page: Page) -> String {

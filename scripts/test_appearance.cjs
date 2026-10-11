@@ -8,27 +8,61 @@ const assets = join(__dirname, "../crates/devoption-ui/assets");
 const script = readFileSync(join(assets, "appearance.js"), "utf8");
 const key = "devoption.appearance";
 const accentKey = "devoption.accent";
+const css = readFileSync(join(assets, "theme.css"), "utf8");
+const blocks = Object.fromEntries([...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)].map((match) => [
+  match[1].trim(), Object.fromEntries([...match[2].matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map((color) => color.slice(1))),
+]));
+function paletteFor(mode, accent) {
+  const light = ':root[data-appearance="light"]';
+  return {
+    ...blocks[":root"],
+    ...(mode === "light" ? blocks[light] : {}),
+    ...blocks[`:root[data-accent="${accent}"]`],
+    ...(mode === "light" ? blocks[`${light}[data-accent="${accent}"]`] : {}),
+  };
+}
+function colorValue(palette, name) {
+  const value = palette[name];
+  const reference = /^var\(--color-([\w-]+)\)$/.exec(value);
+  return reference ? colorValue(palette, reference[1]) : value;
+}
 
 // Run the shipped script against storage faults and a minimal event-driven DOM.
 // Real browser checks cover native select/popover behavior and rendered layout.
-function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = true) {
+function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = true, paletteOverride = {}) {
   const choice = Object.assign(new EventTarget(), { value: "dark", disabled: true });
   const accent = Object.assign(new EventTarget(), { value: "purple", disabled: true });
   const name = { textContent: "Nord purple" };
   const status = { textContent: "Enable JavaScript to change appearance." };
+  const primary = Object.assign(new EventTarget(), { value: "#b48ead", disabled: true });
+  const reset = Object.assign(new EventTarget(), { disabled: true });
+  const warning = { textContent: "", hidden: true };
+  const hex = { textContent: "#b48ead" };
   const deviceScheme = Object.assign(new EventTarget(), { matches: deviceDark });
   const writes = [];
   const window = new EventTarget();
+  const inline = new Map();
   const document = Object.assign(new EventTarget(), {
-    documentElement: { dataset: {} },
+    documentElement: {
+      dataset: {},
+      style: { setProperty: (name, value) => inline.set(name, value), removeProperty: (name) => inline.delete(name) },
+    },
     getElementById: (id) => hasControls ? ({
       "appearance-mode": choice, "appearance-accent": accent,
       "appearance-name": name, "appearance-status": status,
+      "appearance-primary": primary, "appearance-reset": reset,
+      "appearance-contrast": warning, "appearance-hex": hex,
     })[id] : null,
   });
+  const computedColor = (name) => colorValue({
+    ...paletteFor(document.documentElement.dataset.appearance, document.documentElement.dataset.accent),
+    ...paletteOverride,
+    ...Object.fromEntries([...inline].map(([key, value]) => [key.replace("--color-", ""), value])),
+  }, name);
   runInNewContext(script, {
     document,
     window,
+    getComputedStyle: () => ({ getPropertyValue: (name) => computedColor(name.replace("--color-", "")) }),
     matchMedia(query) {
       assert.equal(query, "(prefers-color-scheme: dark)");
       return deviceScheme;
@@ -55,6 +89,12 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
     name,
     status,
     writes,
+    primary, reset, warning, hex, inline, computedColor,
+    chooseColor(value) {
+      primary.value = value;
+      primary.dispatchEvent(new Event("change"));
+    },
+    resetAccent: () => reset.dispatchEvent(new Event("click")),
     restore() {
       window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
     },
@@ -320,10 +360,6 @@ test("unavailable storage still allows page-local System mode without changing t
 });
 
 test("text and interactive accents retain contrast across all six combinations", () => {
-  const css = readFileSync(join(assets, "theme.css"), "utf8");
-  const colors = (block) => Object.fromEntries(
-    [...block.matchAll(/--color-([\w-]+):\s*(#[\da-f]{6});/g)].map((match) => match.slice(1)),
-  );
   const luminance = (hex) => hex.slice(1).match(/../g).map((byte) => {
     const channel = parseInt(byte, 16) / 255;
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -332,30 +368,167 @@ test("text and interactive accents retain contrast across all six combinations",
     const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
     return (values[0] + 0.05) / (values[1] + 0.05);
   };
-  const blocks = Object.fromEntries(
-    [...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)].map((match) => [match[1].trim(), colors(match[2])]),
-  );
   for (const mode of ["dark", "light"]) {
     for (const accent of ["purple", "blue", "green"]) {
-      const modeSelector = ':root[data-appearance="light"]';
-      const accentSelector = `:root[data-accent="${accent}"]`;
-      const combinedSelector = `${modeSelector}[data-accent="${accent}"]`;
-      const palette = {
-        ...blocks[":root"],
-        ...(mode === "light" ? blocks[modeSelector] : {}),
-        ...(accent !== "purple" ? blocks[accentSelector] : {}),
-        ...(mode === "light" && accent !== "purple" ? blocks[combinedSelector] : {}),
-      };
-      if (accent !== "purple") {
-        assert.ok(blocks[accentSelector]);
-        assert.ok(blocks[combinedSelector]);
-      }
+      const palette = paletteFor(mode, accent);
       for (const surface of ["background", "sidebar", "surface", "selected"]) {
         for (const text of ["text", "muted"]) {
           assert.ok(contrast(palette[text], palette[surface]) >= 4.5, `${text} on ${surface}`);
         }
-        assert.ok(contrast(palette.primary, palette[surface]) >= 3, `accent on ${surface}`);
+        for (const role of ["primary", "focus"]) {
+          assert.ok(contrast(colorValue(palette, role), palette[surface]) >= 3, `${role} on ${surface}`);
+        }
       }
     }
+  }
+});
+
+test("custom colors persist atomically and apply before rendering on every route", () => {
+  const saved = new Map([[key, "system"]]);
+  const current = page(saved);
+  current.ready();
+  assert.equal(current.primary.disabled, false);
+  assert.equal(current.reset.disabled, false);
+  current.chooseColor("#12ABef");
+  assert.equal(current.accent.value, "custom");
+  assert.equal(current.primary.value, "#12abef");
+  assert.equal(current.hex.textContent, "#12abef");
+  assert.equal(current.name.textContent, "Custom primary");
+  assert.equal(saved.get(accentKey), "#12abef");
+  assert.deepEqual(current.writes, [[accentKey, "#12abef"]]);
+  for (const hasControls of [true, false]) {
+    const reloaded = page(saved, {}, true, hasControls);
+    assert.equal(reloaded.inline.get("--color-primary"), "#12abef");
+    assert.equal(reloaded.root.dataset.accent, "custom");
+    reloaded.ready();
+    assert.equal(reloaded.root.dataset.appearance, "dark");
+    saved.set(accentKey, "blue");
+    reloaded.restore();
+    assert.equal(reloaded.inline.size, 0);
+    saved.set(accentKey, "#12abef");
+    reloaded.restore();
+    assert.equal(reloaded.inline.get("--color-primary"), "#12abef");
+  }
+});
+
+test("invalid stored colors fall back independently and invalid picker values do not save", () => {
+  for (const value of ["custom", "#abc", "#12345678", "#gggggg", " #ffffff", "#ffffff ", "#ffffff\n", "#ffffff\r", "#ffffff\u2028", "red", "rgb(0,0,0)", "url(x)", "#000000;display:none"]) {
+    const saved = new Map([[key, "light"], [accentKey, value]]);
+    const current = page(saved);
+    assert.equal(current.inline.size, 0);
+    current.ready();
+    assert.equal(current.choice.value, "light");
+    assert.equal(current.accent.value, "purple");
+    assert.equal(current.warning.hidden, true);
+    current.chooseColor(value);
+    assert.equal(current.inline.size, 0);
+    assert.equal(current.writes.length, 0);
+    assert.match(current.status.textContent, /six-digit hex/);
+    assert.equal(saved.get(accentKey), value);
+  }
+});
+
+test("custom colors survive mode changes and System updates the measured warning", () => {
+  const saved = new Map([[key, "system"], [accentKey, "#ffffff"]]);
+  const current = page(saved, {}, true);
+  current.ready();
+  assert.match(current.warning.textContent, /^Lowest accent contrast:.*dark mode/);
+  current.changeDevice(false);
+  assert.match(current.warning.textContent, /^Low contrast:.*light mode/);
+  assert.equal(current.primary.value, "#ffffff");
+  assert.equal(current.writes.length, 0);
+  for (const mode of ["dark", "light"]) {
+    current.choose(mode);
+    current.changeDevice(mode === "light");
+    assert.equal(current.root.dataset.appearance, mode);
+    assert.equal(current.primary.value, "#ffffff");
+    assert.equal(current.computedColor("focus"), mode === "dark" ? "#b48ead" : "#7e5a79");
+    const reloaded = page(saved);
+    reloaded.ready();
+    assert.equal(reloaded.primary.value, "#ffffff");
+    assert.equal(reloaded.choice.value, mode);
+  }
+});
+
+test("presets and Reset to Purple remove the override and preserve the current mode", () => {
+  for (const mode of ["light", "dark", "system"]) {
+    const saved = new Map([[key, mode], [accentKey, "#abcdef"]]);
+    const current = page(saved);
+    current.ready();
+    for (const preset of ["purple", "blue", "green"]) {
+      current.chooseAccent(preset);
+      assert.equal(current.inline.size, 0);
+      assert.equal(current.warning.hidden, true);
+      assert.equal(current.warning.textContent, "");
+      assert.equal(saved.get(accentKey), preset);
+      const before = current.primary.value;
+      current.chooseAccent("custom");
+      assert.equal(current.inline.get("--color-primary"), before);
+      assert.equal(saved.get(accentKey), before);
+    }
+    current.resetAccent();
+    assert.equal(current.inline.size, 0);
+    assert.equal(current.accent.value, "purple");
+    assert.equal(current.choice.value, mode);
+    assert.equal(saved.get(key), mode);
+    const reloaded = page(saved);
+    reloaded.ready();
+    assert.equal(reloaded.accent.value, "purple");
+    assert.equal(reloaded.primary.value, mode === "dark" ? "#b48ead" : "#7e5a79");
+  }
+});
+
+test("custom save and reset failures leave prior storage intact and explain page-local changes", () => {
+  const saved = new Map([[key, "light"], [accentKey, "green"]]);
+  const faults = { write: accentKey };
+  const current = page(saved, faults);
+  current.ready();
+  current.chooseColor("#abcdef");
+  assert.equal(current.primary.value, "#abcdef");
+  assert.equal(current.choice.value, "light");
+  assert.equal(saved.get(accentKey), "green");
+  assert.match(current.status.textContent, /page only.*could not save/);
+  faults.write = false;
+  current.chooseColor("#123456");
+  faults.write = accentKey;
+  current.resetAccent();
+  assert.equal(current.accent.value, "purple");
+  assert.equal(current.inline.size, 0);
+  assert.equal(saved.get(accentKey), "#123456");
+  assert.match(current.status.textContent, /page only.*could not save/);
+  const reloaded = page(saved, { read: accentKey });
+  reloaded.ready();
+  assert.equal(reloaded.accent.value, "purple");
+  assert.equal(reloaded.choice.value, "light");
+  assert.match(reloaded.status.textContent, /could not be read/);
+  const blocked = page(saved, { access: true });
+  blocked.ready();
+  blocked.chooseColor("#ffffff");
+  assert.equal(blocked.primary.value, "#ffffff");
+  assert.match(blocked.status.textContent, /page only.*could not save/);
+});
+
+test("contrast uses known sRGB ratios, the weakest surface, and an unrounded 3:1 threshold", () => {
+  for (const [foreground, background, ratio, low] of [
+    ["#ffffff", "#000000", "21.00", false],
+    ["#000000", "#ffffff", "21.00", false],
+    ["#ffffff", "#ffffff", "1.00", true],
+    ["#ff0000", "#000000", "5.25", false],
+    ["#0a0a0a", "#000000", "1.06", true],
+    ["#949494", "#ffffff", "3.03", false],
+    ["#959595", "#ffffff", "2.99", true],
+  ]) {
+    const palette = Object.fromEntries(["background", "sidebar", "surface", "selected"].map((name) => [name, background]));
+    const current = page(new Map([[accentKey, foreground]]), {}, false, true, palette);
+    current.ready();
+    assert.ok(current.warning.textContent.includes(`${ratio}:1`), current.warning.textContent);
+    assert.equal(current.warning.textContent.startsWith("Low contrast:"), low);
+    assert.match(current.warning.textContent, /checks accents?(\/background contrast)? only/);
+    assert.equal(current.warning.hidden, false);
+  }
+  for (const surface of ["background", "sidebar", "surface", "selected"]) {
+    const current = page(new Map([[accentKey, "#ffffff"]]), {}, false, true, { [surface]: "#ffffff" });
+    current.ready();
+    assert.match(current.warning.textContent, new RegExp(`Low contrast: 1.00:1 on ${surface}`));
   }
 });
