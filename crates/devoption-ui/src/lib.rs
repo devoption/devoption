@@ -17,6 +17,7 @@ const APPEARANCE_CONTROLS: &str = r##"
           <select id="appearance-theme" aria-describedby="appearance-status" disabled>
             <option value="nord">Nord</option>
             <option value="dracula">Dracula</option>
+            <option value="tokyo-night">Tokyo Night</option>
           </select>
         </div>
         <p id="appearance-theme-note" hidden>Dracula light is a DevOption adaptation.</p>

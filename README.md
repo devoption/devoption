@@ -48,6 +48,14 @@ placeholders; Appearance contains the working browser-local preferences.
 
 ![Appearance with Dracula, System, and Purple selected, showing DevOption's light adaptation](docs/screenshots/appearance-dracula-light.jpg)
 
+**Tokyo Night (Dark)**
+
+![Appearance with Tokyo Night, Dark, and Purple selected](docs/screenshots/appearance-tokyo-night.jpg)
+
+**Tokyo Night (Light, following System)**
+
+![Appearance with Tokyo Night, System, and Purple selected, using the Tokyo Night Light palette](docs/screenshots/appearance-tokyo-night-light.jpg)
+
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
 ## Try it locally
@@ -97,14 +105,17 @@ or data yet.
 
 The sidebar uses the approved DevOption SVG. Its `dev` lettering follows the
 selected primary accent. The built-in themes adapt the
-[Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/) and
-[Dracula palette](https://draculatheme.com/contribute) to this UI.
+[Nord palette](https://www.nordtheme.com/docs/colors-and-palettes/),
+[Dracula palette](https://draculatheme.com/contribute), and
+[Tokyo Night / Tokyo Night Light palettes](https://github.com/tokyo-night/tokyo-night-vscode-theme#color-palette)
+to this UI. Tokyo Night uses upstream dark/light backgrounds and purple/blue/green
+accents, mapped to DevOption's semantic roles; this is not an official theme port.
 Dracula's Blue preset uses its cyan accent. Light modes use darker accents for
 contrast; **Dracula light is a DevOption adaptation**, identified on the page.
 Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
 popup with an **Appearance** link. Follow it to `/settings/appearance`, then choose
-**Nord** or **Dracula** under **Theme**, **Dark**, **Light**, or **System** under
+**Nord**, **Dracula**, or **Tokyo Night** under **Theme**, **Dark**, **Light**, or **System** under
 **Mode**, and **Purple**, **Blue**, or **Green** under **Accent**. Nord, Dark, and
 Purple are the defaults. Switching themes preserves your mode and accent choice:
 presets resolve to that theme's colors, while a custom primary stays exactly as
@@ -139,7 +150,7 @@ to change preferences; without it, the pages still work in Nord dark with Purple
 
 The current theme preview and controls appear only on the Appearance page.
 Use the shared navigation or your browser's Back button to return to other pages.
-Account features and themes beyond Nord and Dracula are not implemented. The popup uses
+Account features and other themes are not implemented. The popup uses
 native HTML popover support in modern browsers; Escape or a click outside closes
 it. On narrow screens, navigation moves above the content.
 

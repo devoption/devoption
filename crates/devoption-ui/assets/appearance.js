@@ -3,7 +3,7 @@
   const settings = [
     { id: "appearance-mode", key: "devoption.appearance", attribute: "appearance", label: "Mode", values: ["dark", "light", "system"] },
     { id: "appearance-accent", key: "devoption.accent", attribute: "accent", label: "Accent", values: ["purple", "blue", "green"] },
-    { id: "appearance-theme", key: "devoption.theme", attribute: "theme", label: "Theme", values: ["nord", "dracula"] },
+    { id: "appearance-theme", key: "devoption.theme", attribute: "theme", label: "Theme", values: ["nord", "dracula", "tokyo-night"] },
   ];
   const [, accent, theme] = settings;
   const normalize = (setting, value) => {

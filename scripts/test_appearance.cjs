@@ -366,7 +366,7 @@ test("unavailable storage still allows page-local System mode without changing t
   }
 });
 
-test("both themes retain text and interactive contrast in every mode and preset", () => {
+test("all themes retain text and interactive contrast in every mode and preset", () => {
   const luminance = (hex) => hex.slice(1).match(/../g).map((byte) => {
     const channel = parseInt(byte, 16) / 255;
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
@@ -375,7 +375,7 @@ test("both themes retain text and interactive contrast in every mode and preset"
     const values = [luminance(first), luminance(second)].sort((a, b) => b - a);
     return (values[0] + 0.05) / (values[1] + 0.05);
   };
-  for (const theme of ["nord", "dracula"]) {
+  for (const theme of ["nord", "dracula", "tokyo-night"]) {
     for (const mode of ["dark", "light"]) {
       for (const accent of ["purple", "blue", "green", "custom"]) {
         const palette = paletteFor(mode, accent, theme);
@@ -544,7 +544,7 @@ test("contrast uses known sRGB ratios, the weakest surface, and an unrounded 3:1
 });
 
 test("missing or invalid themes preserve legacy preferences without migration writes", () => {
-  for (const theme of [null, "", "Dracula", "unknown", "dracula\n", "#282a36"]) {
+  for (const theme of [null, "", "Dracula", "unknown", "dracula\n", "#282a36", "Tokyo Night", "tokyo-night\n", "tokyo-night-light", "tokyo-night-storm"]) {
     for (const mode of ["dark", "light", "system"]) {
       for (const accent of ["purple", "blue", "green", "#abcdef"]) {
         const saved = new Map([[key, mode], [accentKey, accent]]);
@@ -567,6 +567,7 @@ test("theme switching persists independently, preserves accents, and reset keeps
   const presets = {
     nord: { dark: ["#b48ead", "#81a1c1", "#a3be8c"], light: ["#7e5a79", "#4b6f93", "#4f7044"] },
     dracula: { dark: ["#bd93f9", "#8be9fd", "#50fa7b"], light: ["#7043a0", "#176e87", "#247237"] },
+    "tokyo-night": { dark: ["#bb9af7", "#7aa2f7", "#9ece6a"], light: ["#5a3e8e", "#2959aa", "#385f0d"] },
   };
   for (const mode of ["dark", "light", "system"]) {
     for (const deviceDark of [true, false]) {
@@ -574,7 +575,7 @@ test("theme switching persists independently, preserves accents, and reset keeps
         const saved = new Map([[key, mode], [accentKey, accent]]);
         const current = page(saved, {}, deviceDark);
         current.ready();
-        for (const theme of ["dracula", "nord", "dracula"]) {
+        for (const theme of ["dracula", "tokyo-night", "nord", "tokyo-night"]) {
           current.chooseTheme(theme);
           const resolved = mode === "system" ? (deviceDark ? "dark" : "light") : mode;
           const expected = accent.startsWith("#") ? accent : presets[theme][resolved][["purple", "blue", "green"].indexOf(accent)];
@@ -590,7 +591,7 @@ test("theme switching persists independently, preserves accents, and reset keeps
           assert.equal(reloaded.primary.value, expected);
         }
         current.resetAccent();
-        assert.equal(saved.get(themeKey), "dracula");
+        assert.equal(saved.get(themeKey), "tokyo-night");
         assert.equal(current.choice.value, mode);
         assert.equal(current.accent.value, "purple");
         assert.equal(current.inline.size, 0);
@@ -600,36 +601,38 @@ test("theme switching persists independently, preserves accents, and reset keeps
 });
 
 test("theme storage faults are isolated and history refreshes pages with or without controls", () => {
-  const saved = new Map([[key, "system"], [accentKey, "#abcdef"], [themeKey, "dracula"]]);
-  const unreadable = page(saved, { read: themeKey });
-  unreadable.ready();
-  assert.equal(unreadable.theme.value, "nord");
-  assert.equal(unreadable.choice.value, "system");
-  assert.equal(unreadable.primary.value, "#abcdef");
-  assert.match(unreadable.status.textContent, /could not be read/);
-  for (const faults of [{ write: themeKey }, { access: true }]) {
-    const current = page(saved, faults);
-    current.ready();
-    current.chooseTheme("nord");
-    assert.equal(current.theme.value, "nord");
-    assert.equal(saved.get(themeKey), "dracula");
-    assert.match(current.status.textContent, /Theme changed for this page only/);
-  }
-  for (const hasControls of [true, false]) {
-    const current = page(saved, {}, false, hasControls);
-    assert.equal(current.root.dataset.theme, "dracula");
-    current.ready();
-    saved.set(themeKey, "nord");
-    current.restore();
-    assert.equal(current.root.dataset.theme, "nord");
-    saved.set(themeKey, "dracula");
-    current.restore();
-    current.changeDevice(true);
-    assert.equal(current.root.dataset.appearance, "dark");
-    assert.equal(current.computedColor("background"), "#282a36");
-    assert.equal(current.computedColor("primary"), "#abcdef");
-    assert.equal(current.writes.length, 0);
-    if (hasControls) assert.equal(current.theme.value, "dracula");
+  for (const [theme, background] of [["dracula", "#282a36"], ["tokyo-night", "#1a1b26"]]) {
+    const saved = new Map([[key, "system"], [accentKey, "#abcdef"], [themeKey, theme]]);
+    const unreadable = page(saved, { read: themeKey });
+    unreadable.ready();
+    assert.equal(unreadable.theme.value, "nord");
+    assert.equal(unreadable.choice.value, "system");
+    assert.equal(unreadable.primary.value, "#abcdef");
+    assert.match(unreadable.status.textContent, /could not be read/);
+    for (const faults of [{ write: themeKey }, { access: true }]) {
+      const current = page(saved, faults);
+      current.ready();
+      current.chooseTheme("nord");
+      assert.equal(current.theme.value, "nord");
+      assert.equal(saved.get(themeKey), theme);
+      assert.match(current.status.textContent, /Theme changed for this page only/);
+    }
+    for (const hasControls of [true, false]) {
+      const current = page(saved, {}, false, hasControls);
+      assert.equal(current.root.dataset.theme, theme);
+      current.ready();
+      saved.set(themeKey, "nord");
+      current.restore();
+      assert.equal(current.root.dataset.theme, "nord");
+      saved.set(themeKey, theme);
+      current.restore();
+      current.changeDevice(true);
+      assert.equal(current.root.dataset.appearance, "dark");
+      assert.equal(current.computedColor("background"), background);
+      assert.equal(current.computedColor("primary"), "#abcdef");
+      assert.equal(current.writes.length, 0);
+      if (hasControls) assert.equal(current.theme.value, theme);
+    }
   }
 });
 
@@ -658,4 +661,30 @@ test("theme and System changes recalculate custom contrast and identify adapted 
   assert.equal(current.root.dataset.appearance, "dark");
   assert.equal(current.themeNote.hidden, true);
   assert.equal(current.computedColor("focus"), "#bd93f9");
+});
+
+test("Tokyo Night custom contrast follows System while reset restores its purple", () => {
+  const saved = new Map([[key, "system"], [accentKey, "#1a1b26"], [themeKey, "tokyo-night"]]);
+  const current = page(saved, {}, true);
+  current.ready();
+  assert.match(current.warning.textContent, /Low contrast: 1.00:1 on background in dark mode/);
+  current.changeDevice(false);
+  assert.equal(current.primary.value, "#1a1b26");
+  assert.match(current.warning.textContent, /^Lowest accent contrast:.*light mode/);
+  assert.equal(current.themeNote.hidden, true);
+  assert.equal(current.computedColor("focus"), "#5a3e8e");
+  current.chooseColor("#e6e7ed");
+  assert.match(current.warning.textContent, /Low contrast: 1.00:1 on background in light mode/);
+  current.chooseTheme("dracula");
+  assert.equal(current.themeNote.hidden, false);
+  current.chooseTheme("tokyo-night");
+  assert.equal(current.primary.value, "#e6e7ed");
+  assert.equal(current.themeNote.hidden, true);
+  current.resetAccent();
+  assert.equal(current.primary.value, "#5a3e8e");
+  assert.equal(saved.get(themeKey), "tokyo-night");
+  assert.equal(saved.get(key), "system");
+  assert.equal(current.warning.hidden, true);
+  current.changeDevice(true);
+  assert.equal(current.primary.value, "#bb9af7");
 });

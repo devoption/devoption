@@ -95,6 +95,43 @@
   --color-selected: #d8eada;
 }
 
+/* Upstream Tokyo Night and Tokyo Night Light, adapted to semantic UI roles.
+   https://github.com/tokyo-night/tokyo-night-vscode-theme#color-palette */
+:root[data-theme="tokyo-night"] {
+  --color-background: #1a1b26;
+  --color-sidebar: #16161e;
+  --color-surface: #1c1d29;
+  --color-text: #c0caf5;
+  --color-muted: #a9b1d6;
+  --color-preset: #bb9af7;
+  --color-border: #292e42;
+  --color-selected: #202330;
+  --color-shadow: #0003;
+}
+:root[data-theme="tokyo-night"][data-accent="blue"] {
+  --color-preset: #7aa2f7;
+}
+:root[data-theme="tokyo-night"][data-accent="green"] {
+  --color-preset: #9ece6a;
+}
+:root[data-theme="tokyo-night"][data-appearance="light"] {
+  --color-background: #e6e7ed;
+  --color-sidebar: #d6d8df;
+  --color-surface: #dcdee3;
+  --color-text: #343b58;
+  --color-muted: #40434f;
+  --color-preset: #5a3e8e;
+  --color-border: #c1c2c7;
+  --color-selected: #e1e2e8;
+  --color-shadow: #343b5826;
+}
+:root[data-theme="tokyo-night"][data-appearance="light"][data-accent="blue"] {
+  --color-preset: #2959aa;
+}
+:root[data-theme="tokyo-night"][data-appearance="light"][data-accent="green"] {
+  --color-preset: #385f0d;
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0;
