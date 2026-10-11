@@ -254,7 +254,7 @@ fn errors_do_not_stop_the_server() {
         let post = request(
             address,
             &format!(
-                "POST {path} HTTP/1.1\r\nHost: {address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                "POST {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             ),
         );
         assert!(post.starts_with("HTTP/1.1 405 Method Not Allowed"));
@@ -401,7 +401,7 @@ fn absolute_targets_must_match_the_allowed_host_and_port() {
                 let response = request(
                     address,
                     &format!(
-                        "{method} http://{authority}{path} {version}\r\nHost: {host}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        "{method} http://{authority}{path} {version}\r\nHost: {host}\r\nOrigin: http://{host}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                     ),
                 );
                 assert_eq!(response.split_whitespace().nth(1), Some(status));
@@ -461,6 +461,209 @@ fn authority_is_checked_for_each_request_on_a_connection() {
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert_eq!(response.matches("HTTP/1.1 400 Bad Request").count(), 1);
     assert_eq!(response.matches("<!doctype html>").count(), 1);
+}
+
+#[test]
+fn unsafe_and_extension_methods_require_origin_before_routing() {
+    let (_server, address) = start();
+    let port = address.port();
+    for version in ["HTTP/1.0", "HTTP/1.1"] {
+        for host in [address.to_string(), format!("LoCaLhOsT:0{port}")] {
+            for method in ["POST", "PUT", "PATCH", "DELETE", "CUSTOM", "QUERY", "post"] {
+                for (origin, status) in [
+                    (String::new(), "403"),
+                    (format!("Origin: HTTP://{host}\r\n"), "405"),
+                ] {
+                    let response = request(
+                        address,
+                        &format!(
+                            "{method} / {version}\r\nHost: {host}\r\n{origin}Content-Length: 0\r\nConnection: close\r\n\r\n"
+                        ),
+                    );
+                    assert_eq!(
+                        response.split_whitespace().nth(1),
+                        Some(status),
+                        "{method} {host}"
+                    );
+                    assert_eq!(response.split_once("\r\n\r\n").unwrap().1, "");
+                }
+            }
+        }
+    }
+    for (origin, status) in [
+        ("", "403"),
+        (&format!("Origin: http://{address}\r\n"), "404"),
+    ] {
+        let response = request(
+            address,
+            &format!(
+                "POST /missing HTTP/1.1\r\nHost: {address}\r\n{origin}Content-Length: 0\r\nConnection: close\r\n\r\n"
+            ),
+        );
+        assert_eq!(response.split_whitespace().nth(1), Some(status));
+    }
+}
+
+#[test]
+fn malformed_and_cross_origins_cannot_submit_simple_forms() {
+    let (_server, address) = start();
+    let port = address.port();
+    let mut fields = vec![
+        String::new(),
+        format!("Origin: http://{address}\r\nOrigin: http://{address}\r\n"),
+        format!("Origin: http://{address}\r\noRiGiN: http://attacker.invalid\r\n"),
+        format!("Origin: http://attacker.invalid\r\nOrigin: http://{address}\r\n"),
+        format!(
+            "Referer: http://{address}/\r\nSec-Fetch-Site: same-origin\r\nForwarded: host={address}\r\nX-Forwarded-Host: {address}\r\nX-Forwarded-Proto: http\r\n"
+        ),
+    ];
+    for origin in [
+        "".into(),
+        "null".into(),
+        "NULL".into(),
+        format!("http://localhost:{port}"), // A different origin from the IP Host.
+        "http://127.0.0.1".into(),
+        "http://127.0.0.1:0".into(),
+        "http://127.0.0.1:65536".into(),
+        format!("http://127.0.0.1:+{port}"),
+        format!("https://{address}"),
+        format!("ftp://{address}"),
+        format!("//{address}"),
+        format!("http://{address}/"),
+        format!("http://{address}?x"),
+        format!("http://{address}#x"),
+        format!("http://user@{address}"),
+        format!("http://{address}@attacker.invalid"),
+        format!("http://127.0.0.1.attacker.invalid:{port}"),
+        format!("http://127.0.0.1.:{port}"),
+        format!("http://%31%32%37.0.0.1:{port}"),
+        format!("http://[::1]:{port}"),
+        format!("http://127.1:{port}"),
+        format!("http://lócálhost:{port}"),
+        format!("http://{address}, http://{address}"),
+        format!("http://{address} http://{address}"),
+        format!("http://{address}\\attacker.invalid"),
+    ] {
+        fields.push(format!("Origin: {origin}\r\n"));
+    }
+    for version in ["HTTP/1.0", "HTTP/1.1"] {
+        for content_type in [
+            "application/x-www-form-urlencoded",
+            "multipart/form-data; boundary=x",
+            "text/plain",
+        ] {
+            for origin in &fields {
+                let response = request(
+                    address,
+                    &format!(
+                        "POST /projects {version}\r\nHost: {address}\r\n{origin}Content-Type: {content_type}\r\nContent-Length: 3\r\nConnection: close\r\n\r\nx=1"
+                    ),
+                );
+                assert_eq!(
+                    response.split_whitespace().nth(1),
+                    Some("403"),
+                    "{origin:?}"
+                );
+                assert_eq!(response.split_once("\r\n\r\n").unwrap().1, "");
+                assert!(
+                    !response
+                        .to_ascii_lowercase()
+                        .contains("access-control-allow-origin")
+                );
+            }
+            let response = request(
+                address,
+                &format!(
+                    "POST /projects {version}\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Type: {content_type}\r\nContent-Length: 3\r\nConnection: close\r\n\r\nx=1"
+                ),
+            );
+            assert_eq!(response.split_whitespace().nth(1), Some("405"));
+        }
+    }
+    let response = request(
+        address,
+        &format!(
+            "POST / HTTP/1.1\r\nHost: localhost:{port}\r\nOrigin: http://{address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert_eq!(response.split_whitespace().nth(1), Some("403"));
+}
+
+#[test]
+fn safe_methods_keep_existing_navigation_and_do_not_enable_cors() {
+    let (_server, address) = start();
+    for (method, status) in [
+        ("GET", "200"),
+        ("HEAD", "200"),
+        ("OPTIONS", "405"),
+        ("TRACE", "405"),
+    ] {
+        for origin in [
+            "",
+            "Origin: null\r\n",
+            "Origin: http://attacker.invalid\r\n",
+        ] {
+            let response = request(
+                address,
+                &format!(
+                    "{method} / HTTP/1.1\r\nHost: {address}\r\n{origin}Connection: close\r\n\r\n"
+                ),
+            );
+            assert_eq!(response.split_whitespace().nth(1), Some(status));
+            assert!(
+                !response
+                    .to_ascii_lowercase()
+                    .contains("access-control-allow-origin")
+            );
+        }
+    }
+}
+
+#[test]
+fn origin_checks_cover_absolute_targets_and_each_request() {
+    let (_server, address) = start();
+    for (target, host, origin, status) in [
+        (
+            format!("http://{address}/"),
+            address.to_string(),
+            format!("http://{address}"),
+            "405",
+        ),
+        (
+            format!("http://{address}/"),
+            address.to_string(),
+            "http://attacker.invalid".into(),
+            "403",
+        ),
+        (
+            "http://attacker.invalid/".into(),
+            address.to_string(),
+            format!("http://{address}"),
+            "400",
+        ),
+        (
+            "/".into(),
+            "attacker.invalid".into(),
+            format!("http://{address}"),
+            "400",
+        ),
+    ] {
+        let response = request(
+            address,
+            &format!(
+                "POST {target} HTTP/1.1\r\nHost: {host}\r\nOrigin: {origin}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            ),
+        );
+        assert_eq!(response.split_whitespace().nth(1), Some(status));
+    }
+    let response = request(
+        address,
+        &format!(
+            "POST / HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Length: 0\r\n\r\nPOST / HTTP/1.1\r\nHost: {address}\r\nOrigin: null\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        ),
+    );
+    assert!(response.starts_with("HTTP/1.1 405 Method Not Allowed"));
+    assert_eq!(response.matches("HTTP/1.1 403 Forbidden").count(), 1);
 }
 
 #[test]
