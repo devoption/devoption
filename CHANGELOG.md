@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A locally armed enrollment authorization core, bound to one owner service/store.
+  It exchanges a single-use launch credential for an independent browser pair,
+  enforces one five-minute deadline and create-once enrollment, and retains bounded
+  secret-free audit evidence including completion after caller cancellation.
+  Only temporary fixtures use it; browser handoff, setup command/routes/forms,
+  enrollment password policy, and durable audit remain unfinished
+  ([#81](https://github.com/devoption/devoption/issues/81)).
 - Existing-owner HTTP challenge, sign-in, and sign-out routes in the server crate,
   enabled only when explicit data-directory startup validation finds an owner.
   They enforce Host/Origin, consume pre-authentication CSRF before password input,

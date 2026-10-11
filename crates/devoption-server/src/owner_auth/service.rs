@@ -32,6 +32,8 @@ use crate::{
 const MAX_ATTEMPTS: usize = 5;
 const ATTEMPT_WINDOW: Duration = Duration::from_secs(60);
 
+pub mod enrollment;
+
 /// A fresh session with its two credentials; intentionally neither Debug nor Clone.
 /// Issuance alone does not persist, print, or activate either credential.
 pub struct IssuedSession {
