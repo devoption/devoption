@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A custom primary color picker on Appearance, saved as one browser-local hex
+  value and applied to shared accents and the logo's `dev` lettering. Presets and
+  Reset to Purple clear the override while preserving mode. A measured contrast
+  warning follows the current palette; controls and focus retain built-in colors.
+  Tests cover invalid colors, storage faults, history, reset, and contrast limits;
+  refreshed page screenshots include custom-color evidence
+  ([#37](https://github.com/devoption/devoption/issues/37)).
 - A System mode in Appearance that follows live device color-scheme changes
   while preserving the selected accent. Explicit choices and the dark-purple
   default stay unchanged; tests cover saved System, device changes, and storage

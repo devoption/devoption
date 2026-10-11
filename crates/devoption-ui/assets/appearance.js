@@ -1,77 +1,132 @@
 (() => {
+  const isColor = (value) => typeof value === "string" && value.length === 7 && /^#[\da-f]{6}$/i.test(value);
   const settings = [
     { id: "appearance-mode", key: "devoption.appearance", attribute: "appearance", label: "Mode", values: ["dark", "light", "system"] },
     { id: "appearance-accent", key: "devoption.accent", attribute: "accent", label: "Accent", values: ["purple", "blue", "green"] },
   ];
+  const normalize = (setting, value) => {
+    if (setting.attribute === "accent" && isColor(value)) return value.toLowerCase();
+    return setting.values.includes(value) ? value : setting.values[0];
+  };
   let storageReadable = true;
   const readSettings = () => {
     storageReadable = true;
     for (const setting of settings) {
-      let value = setting.values[0];
+      setting.value = setting.values[0];
       try {
-        const saved = localStorage.getItem(setting.key);
-        if (setting.values.includes(saved)) value = saved;
+        setting.value = normalize(setting, localStorage.getItem(setting.key));
       } catch {
         storageReadable = false;
       }
-      setting.value = value;
     }
   };
-  // Apply each saved choice independently, before body rendering on every page.
+  // Apply saved choices before rendering; accent is one preset name or hex color.
   readSettings();
+  const root = document.documentElement;
   const deviceScheme = matchMedia("(prefers-color-scheme: dark)");
+  let syncControls = () => {};
+  let showStorageStatus = () => {};
   const apply = () => {
     for (const setting of settings) {
-      const value = setting.attribute === "appearance" && setting.value === "system"
-        ? (deviceScheme.matches ? "dark" : "light")
-        : setting.value;
-      document.documentElement.dataset[setting.attribute] = value;
+      let value = setting.value;
+      if (setting.attribute === "appearance" && value === "system") {
+        value = deviceScheme.matches ? "dark" : "light";
+      }
+      root.dataset[setting.attribute] = isColor(value) ? "custom" : value;
     }
+    if (isColor(settings[1].value)) {
+      root.style.setProperty("--color-primary", settings[1].value);
+    } else {
+      root.style.removeProperty("--color-primary");
+    }
+    syncControls();
   };
   apply();
   deviceScheme.addEventListener("change", apply);
-  let syncControls = () => {};
   // A history-restored document may predate a preference change on another page.
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) {
       readSettings();
       apply();
-      syncControls();
+      showStorageStatus();
     }
   });
+
+  // WCAG relative luminance for opaque sRGB colors, not an accessibility audit.
+  const luminance = (hex) => hex.slice(1).match(/../g).map((byte) => {
+    const channel = parseInt(byte, 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const contrast = (first, second) => {
+    const a = luminance(first);
+    const b = luminance(second);
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  };
   document.addEventListener("DOMContentLoaded", () => {
     const status = document.getElementById("appearance-status");
     if (!status) return; // Only the Appearance page has controls.
-    const updateName = () => {
-      document.getElementById("appearance-name").textContent = `Nord ${document.documentElement.dataset.accent}`;
-    };
+    const primary = document.getElementById("appearance-primary");
+    const reset = document.getElementById("appearance-reset");
+    const warning = document.getElementById("appearance-contrast");
     syncControls = () => {
-      updateName();
+      const custom = isColor(settings[1].value);
       for (const setting of settings) {
-        document.getElementById(setting.id).value = setting.value;
+        document.getElementById(setting.id).value = isColor(setting.value) ? "custom" : setting.value;
       }
+      const palette = getComputedStyle(root);
+      const color = (name) => palette.getPropertyValue(`--color-${name}`).trim();
+      primary.value = color("primary");
+      document.getElementById("appearance-hex").textContent = primary.value;
+      document.getElementById("appearance-name").textContent = custom
+        ? "Custom primary" : `Nord ${settings[1].value}`;
+      warning.hidden = !custom;
+      if (custom) {
+        const lowest = ["background", "sidebar", "surface", "selected"]
+          .map((name) => ({ name, ratio: contrast(primary.value, color(name)) }))
+          .reduce((a, b) => a.ratio < b.ratio ? a : b);
+        // Compare the unrounded ratio; round down for consistent warning text.
+        const ratio = (Math.floor(lowest.ratio * 100) / 100).toFixed(2);
+        warning.textContent = lowest.ratio < 3
+          ? `Low contrast: ${ratio}:1 on ${lowest.name} in ${root.dataset.appearance} mode. Aim for 3:1 for accents; choose another color or a preset. This checks accents only.`
+          : `Lowest accent contrast: ${ratio}:1 in ${root.dataset.appearance} mode. This checks accent/background contrast only.`;
+      } else {
+        warning.textContent = "";
+      }
+    };
+    showStorageStatus = () => {
       status.textContent = storageReadable
         ? "Changes are saved only in this browser."
         : "Some saved choices could not be read. Defaults are in use for those choices.";
     };
     syncControls();
-
+    showStorageStatus();
+    const change = (setting, value) => {
+      setting.value = normalize(setting, value);
+      apply();
+      try {
+        localStorage.setItem(setting.key, setting.value);
+        status.textContent = `${setting.label} saved in this browser.`;
+      } catch {
+        status.textContent = `${setting.label} changed for this page only. Your browser could not save it.`;
+      }
+    };
     for (const setting of settings) {
       const choice = document.getElementById(setting.id);
       choice.disabled = false;
       choice.addEventListener("change", () => {
-        const value = setting.values.includes(choice.value) ? choice.value : setting.values[0];
-        choice.value = value;
-        setting.value = value;
-        apply();
-        updateName();
-        try {
-          localStorage.setItem(setting.key, value);
-          status.textContent = `${setting.label} saved in this browser.`;
-        } catch {
-          status.textContent = `${setting.label} changed for this page only. Your browser could not save it.`;
-        }
+        change(setting, choice.value === "custom" ? primary.value : choice.value);
       });
     }
+    primary.disabled = false;
+    reset.disabled = false;
+    primary.addEventListener("change", () => {
+      if (!isColor(primary.value)) {
+        syncControls();
+        status.textContent = "Choose a six-digit hex color, such as #b48ead.";
+        return;
+      }
+      change(settings[1], primary.value);
+    });
+    reset.addEventListener("click", () => change(settings[1], "purple"));
   });
 })();

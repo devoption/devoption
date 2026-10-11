@@ -3,7 +3,7 @@
 These images show the real local app, including its current empty placeholders.
 Keep one default-mode image per main page at a stable filename; Git records earlier
 versions. `appearance-light.jpg` additionally shows Appearance following a light
-device preference.
+device preference. `appearance-custom.jpg` shows a custom primary and its warning.
 
 | Page | Local URL | File |
 | --- | --- | --- |
@@ -36,6 +36,12 @@ with the save confirmation visible and the profile popup closed. Capture the
 same viewport, then clear device emulation and return to **Dark** and **Purple**.
 Refresh this image when the controls or light palette changes. Never capture
 unrelated browser or profile data.
+
+For `appearance-custom.jpg`, use **1120 × 700 pixels** to include the warning,
+choose **Dark**, and set **Primary color** to `#2e3440` (the page background).
+Capture the measured 1:1 warning with the save confirmation visible and no open
+picker or focus outline. Return to **Dark** and **Purple** and clear temporary
+viewport/device overrides after validation.
 
 The initial images were captured with Codex's browser screenshot tool at these
 dimensions. Use an available browser capture tool with the same settings; this

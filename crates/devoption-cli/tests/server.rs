@@ -136,15 +136,20 @@ fn pages_share_layout_and_have_working_navigation() {
             "href=\"/settings/appearance\"{current}>Appearance</a>"
         )));
         assert!(!popup.contains("<select"));
+        assert!(!popup.contains("<input"));
         assert!(!popup.contains("Current theme"));
         assert!(body.find("</script>").unwrap() < body.find("</head>").unwrap());
         let main = body.split_once("<main id=\"main-content\"").unwrap().1;
         assert_eq!(body.contains("Current theme"), appearance_page);
         assert_eq!(body.contains("<select"), appearance_page);
+        assert_eq!(body.contains("type=\"color\""), appearance_page);
         if appearance_page {
             assert!(main.contains("aria-label=\"Appearance preferences\""));
             assert!(main.contains("id=\"appearance-name\">Nord purple</span>"));
             assert!(main.contains("id=\"appearance-status\" role=\"status\""));
+            assert!(main.contains("<label for=\"appearance-primary\">Primary color</label>"));
+            assert!(main.contains("id=\"appearance-primary\" type=\"color\""));
+            assert!(main.contains("id=\"appearance-reset\" type=\"button\""));
             for setting in ["mode", "accent"] {
                 assert!(main.contains(&format!("<label for=\"appearance-{setting}\">")));
                 assert!(main.contains(&format!(
@@ -158,6 +163,7 @@ fn pages_share_layout_and_have_working_navigation() {
                 ("purple", "Purple"),
                 ("blue", "Blue"),
                 ("green", "Green"),
+                ("custom", "Custom"),
             ] {
                 assert!(main.contains(&format!("<option value=\"{value}\">{label}</option>")));
             }

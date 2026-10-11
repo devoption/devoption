@@ -13,8 +13,8 @@ project management, runtime cluster, or published release yet.
 
 ## Screenshots
 
-These are the current local Home, Projects, and About pages in the default dark
-mode. All are empty placeholders; the screenshots show the shared shell.
+These are the current local pages. Home, Projects, and About are empty
+placeholders; Appearance contains the working browser-local preferences.
 
 **Home (`/`)**
 
@@ -35,6 +35,10 @@ mode. All are empty placeholders; the screenshots show the shared shell.
 **Appearance (System following a light device preference, blue accent)**
 
 ![The Appearance page with System and Blue selected, following an emulated light device preference](docs/screenshots/appearance-light.jpg)
+
+**Appearance (custom primary with a low-contrast warning)**
+
+![The Appearance page with a custom primary matching the dark background and a measured 1:1 contrast warning](docs/screenshots/appearance-custom.jpg)
 
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
@@ -90,14 +94,27 @@ Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
 popup with an **Appearance** link. Follow it to `/settings/appearance`, then choose
 **Dark**, **Light**, or **System** under **Mode**, and **Purple**, **Blue**, or
-**Green** under **Accent**. Dark and Purple are the defaults.
+**Green** under **Accent**. Dark and Purple are the defaults. Use **Primary color**
+to choose a custom opaque six-digit hex color with your browser's native picker;
+the selected hex value appears beside it. Choosing a color selects **Custom**
+automatically. Choosing Custom from the accent list starts with the current color.
+Select any preset, or **Reset to Purple**, to remove the custom override without
+changing your mode.
 System follows the device color scheme reported by your browser, including changes
 while the page is open. It keeps your chosen accent. Explicit Dark and Light choices
-stay fixed when the device preference changes.
+stay fixed when the device preference changes. Custom colors stay exactly as
+chosen across modes; presets use their corresponding light/dark colors.
+For a custom color, Appearance calculates the lowest contrast against the current
+page, sidebar, surface, and selected backgrounds. It updates when the mode or
+device preference changes and warns below 3:1. The ratio is rounded down to two
+decimal places. This checks accent/background contrast only; it does not guarantee
+that every custom color is accessible. Warning text, control borders, and keyboard
+focus indicators use the built-in palette independently of the custom color.
 Each choice is saved only in this browser for this address and port; it applies
 when navigating, reloading, or returning with Back/Forward. Other open tabs pick
 it up when reloaded. Missing or invalid values use that setting's default without
-resetting the other choice.
+resetting the other choice. The accent is saved as one preset name or validated
+hex value, so a failed save cannot leave a partially saved custom choice.
 Existing saved mode choices are preserved. If browser storage
 is blocked or full, the page stays usable and Appearance explains any read/save
 failure; an unsaved change lasts only for the current page. JavaScript is required
@@ -159,8 +176,10 @@ Node is only needed for these tests, not for building or running DevOption:
 node --test scripts/test_appearance.cjs
 ```
 
-These tests run the shipped browser script with storage faults and check palette
-contrast. Real browser checks cover the native controls, focus, and layout.
+These tests run the shipped browser script with storage faults and check preset
+contrast, custom color validation, persistence/history, reset, mode changes, and
+known contrast ratios around the 3:1 warning threshold. Real browser checks cover
+the native controls, focus, and layout.
 
 ## Where this is going
 
