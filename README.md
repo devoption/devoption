@@ -60,6 +60,20 @@ public. There is no TLS or complete CSRF protection. Do not expose it publicly.
 Start with an [issue](https://github.com/devoption/devoption/issues/new/choose)
 and read the [contribution guide](CONTRIBUTING.md).
 
+The Rust workspace has three crates, with dependencies flowing
+`devoption-cli` → `devoption-server` → `devoption-ui`:
+
+| Crate | Responsibility |
+| --- | --- |
+| `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
+| `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
+| `devoption-ui` | HTML rendering and browser assets |
+
+Server APIs live under `devoption_server`; the CLI is a binary without a library
+facade. Auth and storage remain server modules until an independent consumer or
+domain boundary warrants another crate. Executable integration tests stay with
+the CLI; server unit tests and fixtures stay with the server.
+
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:
 

@@ -1,6 +1,6 @@
 use super::*;
+use crate::session::{MAX_LIFETIME, Session};
 use axum::{Extension, body::Body, http::HeaderValue, routing::post};
-use devoption_cli::session::{MAX_LIFETIME, Session};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -267,7 +267,7 @@ fn rotation_rejects_old_http_credentials_and_stale_logout() {
 #[cfg(unix)]
 #[test]
 fn issued_owner_grants_activate_rotate_and_log_out_through_the_http_guard() {
-    use devoption_cli::{owner_auth::service::OwnerAuthService, owner_store::OwnerStore};
+    use crate::{owner_auth::service::OwnerAuthService, owner_store::OwnerStore};
     use std::os::unix::fs::PermissionsExt;
 
     let directory = tempfile::Builder::new()

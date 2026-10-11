@@ -1,5 +1,5 @@
 use super::*;
-use devoption_cli::{
+use devoption_server::{
     identity::IdentityId,
     owner_store::OwnerStore,
     password::{SALT_BYTES, hash_password},
