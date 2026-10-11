@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Issued owner sessions now bind a separate random synchronizer CSRF token.
+  Browser validation and logout require the matching live token pair in the
+  shared session slot; rotation and expiry invalidate both. This is fixture-tested
+  core support; cookie transport, pre-authentication CSRF, enrollment authorization,
+  and browser endpoints remain unfinished
+  ([#71](https://github.com/devoption/devoption/issues/71)).
 - Optional Unix `serve --data-dir` configuration now validates an existing private
   absolute directory and any owner record before listening, rejects symlink path
   components and parent traversal, and retains the opened directory without

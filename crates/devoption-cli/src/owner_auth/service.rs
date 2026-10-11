@@ -6,8 +6,8 @@
 //! immediately. Limits are in memory: a new service or process starts fresh.
 //!
 //! Only temporary fixtures use this service today. HTTP integration still needs
-//! enrollment authorization/policy, bounded request bodies, data-directory setup,
-//! cookie/CSRF-protected activation endpoints. This grants no permissions.
+//! enrollment authorization/policy, cookie transport, pre-authentication CSRF, and
+//! browser activation endpoints. This grants no permissions.
 
 use std::{
     collections::VecDeque,
@@ -24,7 +24,7 @@ use crate::{
     owner_auth::{self, SetupError},
     owner_store::{OwnerStore, StoreError},
     session::{
-        MAX_LIFETIME, Session, TOKEN_BYTES,
+        CSRF_TOKEN_BYTES, MAX_LIFETIME, Session, TOKEN_BYTES,
         slot::{ActivationError, SessionSlot},
     },
 };
@@ -32,26 +32,60 @@ use crate::{
 const MAX_ATTEMPTS: usize = 5;
 const ATTEMPT_WINDOW: Duration = Duration::from_secs(60);
 
-/// A fresh session paired with its credential; intentionally neither Debug nor Clone.
-/// Issuance alone does not persist, print, or activate the credential.
+/// A fresh session with its two credentials; intentionally neither Debug nor Clone.
+/// Issuance alone does not persist, print, or activate either credential.
 pub struct IssuedSession {
     session: Session,
     token: [u8; TOKEN_BYTES],
+    csrf_token: [u8; CSRF_TOKEN_BYTES],
+}
+
+/// Credentials released only after successful activation; neither Debug nor Clone.
+/// Future transport must keep the session credential in an HttpOnly cookie and
+/// send the separate CSRF token in a protected response, then require it explicitly
+/// on mutations. Never place either token in logs, URLs, or browser-local storage.
+pub struct BrowserCredentials {
+    session_token: [u8; TOKEN_BYTES],
+    csrf_token: [u8; CSRF_TOKEN_BYTES],
+}
+
+impl BrowserCredentials {
+    pub fn session_token(&self) -> &[u8; TOKEN_BYTES] {
+        &self.session_token
+    }
+
+    pub fn csrf_token(&self) -> &[u8; CSRF_TOKEN_BYTES] {
+        &self.csrf_token
+    }
 }
 
 impl IssuedSession {
-    /// Access the underlying pair. Prefer [`Self::activate`] for a shared server slot.
-    /// Never log or display the token; browser cookie transport remains separate.
+    /// Access the session and bearer credential without returning its CSRF token.
+    /// Prefer [`Self::activate_browser`] for browser transport. Never log credentials.
     pub fn into_parts(self) -> (Session, [u8; TOKEN_BYTES]) {
         (self.session, self.token)
     }
 
     /// Consume this grant into the authoritative slot before returning its credential.
     /// Replaces the previous session only if this grant is still valid; never renews it.
+    /// Browser callers must use `activate_browser` to retain the separate CSRF token.
     pub fn activate(self, slot: &SessionSlot) -> Result<[u8; TOKEN_BYTES], ActivationError> {
         let (session, token) = self.into_parts();
         slot.activate(session, &token)?;
         Ok(token)
+    }
+
+    /// Activate the grant before releasing its session and synchronizer CSRF tokens.
+    /// HTTP enrollment/sign-in protection and cookie transport are not implemented.
+    pub fn activate_browser(
+        self,
+        slot: &SessionSlot,
+    ) -> Result<BrowserCredentials, ActivationError> {
+        slot.activate(self.session, &self.token)?;
+        Ok(BrowserCredentials {
+            session_token: self.token,
+            csrf_token: self.csrf_token,
+        })
     }
 }
 
@@ -132,7 +166,8 @@ impl OwnerAuthService {
         .await
     }
 
-    /// Verify the password, then issue a fresh session with a one-hour absolute lifetime.
+    /// Verify the password, then issue independent session and CSRF credentials
+    /// bound to one session with a one-hour absolute lifetime.
     /// The caller supplies no identity, token, or lifetime. HTTP transport is separate.
     pub async fn sign_in(&self, password: String) -> Result<Option<IssuedSession>, ServiceError> {
         self.run(move |store| {
@@ -191,7 +226,7 @@ impl OwnerAuthService {
 fn sign_in_with_entropy(
     store: &OwnerStore,
     password: &str,
-    fill: impl FnOnce(&mut [u8]) -> Result<(), ServiceError>,
+    mut fill: impl FnMut(&mut [u8]) -> Result<(), ServiceError>,
 ) -> Result<Option<IssuedSession>, ServiceError> {
     let Some(identity) = owner_auth::authenticate(store, password).map_err(ServiceError::Store)?
     else {
@@ -199,9 +234,16 @@ fn sign_in_with_entropy(
     };
     let mut token = [0; TOKEN_BYTES];
     fill(&mut token)?;
-    let session =
-        Session::new(identity, token, MAX_LIFETIME).map_err(|_| ServiceError::Unavailable)?;
-    Ok(Some(IssuedSession { session, token }))
+    let mut csrf_token = [0; CSRF_TOKEN_BYTES];
+    fill(&mut csrf_token)?;
+    let session = Session::new(identity, token, MAX_LIFETIME)
+        .map_err(|_| ServiceError::Unavailable)?
+        .with_csrf(csrf_token);
+    Ok(Some(IssuedSession {
+        session,
+        token,
+        csrf_token,
+    }))
 }
 
 #[cfg(test)]
