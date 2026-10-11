@@ -10,9 +10,129 @@ const FIRST: [u8; TOKEN_BYTES] = [0x11; TOKEN_BYTES];
 const SECOND: [u8; TOKEN_BYTES] = [0x22; TOKEN_BYTES];
 const FIRST_ID: IdentityId = IdentityId::from_bytes([1; 16]);
 const SECOND_ID: IdentityId = IdentityId::from_bytes([2; 16]);
+const FIRST_CSRF: [u8; TOKEN_BYTES] = [0x33; TOKEN_BYTES];
+const SECOND_CSRF: [u8; TOKEN_BYTES] = [0x44; TOKEN_BYTES];
 
 fn session(identity: IdentityId, token: [u8; TOKEN_BYTES], now: Instant) -> Session {
     Session::new_at(identity, token, MAX_LIFETIME, now).unwrap()
+}
+
+#[test]
+fn browser_rotation_and_logout_require_the_matching_pair_in_shared_state() {
+    let slot = Arc::new(SessionSlot::default());
+    let shared = Arc::clone(&slot);
+    let other = SessionSlot::default();
+    let now = Instant::now();
+    assert_eq!(
+        slot.authenticate_browser(Some(&FIRST), Some(&FIRST_CSRF)),
+        None
+    );
+    slot.activate(session(FIRST_ID, FIRST, now).with_csrf(FIRST_CSRF), &FIRST)
+        .unwrap();
+    assert_eq!(
+        shared.authenticate_browser(Some(&FIRST), Some(&FIRST_CSRF)),
+        Some(FIRST_ID)
+    );
+    assert_eq!(
+        other.authenticate_browser(Some(&FIRST), Some(&FIRST_CSRF)),
+        None
+    );
+    slot.activate(
+        session(SECOND_ID, SECOND, now).with_csrf(SECOND_CSRF),
+        &SECOND,
+    )
+    .unwrap();
+    for (token, csrf) in [
+        (Some(&FIRST[..]), Some(&FIRST_CSRF[..])),
+        (Some(&FIRST[..]), Some(&SECOND_CSRF[..])),
+        (Some(&SECOND[..]), Some(&FIRST_CSRF[..])),
+        (Some(&SECOND[..]), None),
+        (None, Some(&SECOND_CSRF[..])),
+        (Some(&SECOND[..]), Some(&SECOND_CSRF[..31])),
+    ] {
+        assert_eq!(shared.authenticate_browser(token, csrf), None);
+        assert!(!shared.logout_browser(token, csrf));
+        assert_eq!(
+            slot.authenticate_browser(Some(&SECOND), Some(&SECOND_CSRF)),
+            Some(SECOND_ID)
+        );
+    }
+    assert!(shared.logout_browser(Some(&SECOND), Some(&SECOND_CSRF)));
+    assert_eq!(
+        slot.authenticate_browser(Some(&SECOND), Some(&SECOND_CSRF)),
+        None
+    );
+    assert_eq!(slot.authenticate(Some(&SECOND)), None);
+    assert!(!slot.logout_browser(Some(&SECOND), Some(&SECOND_CSRF)));
+}
+
+#[test]
+fn browser_validation_observes_the_original_deadline_after_locking() {
+    let slot = SessionSlot::default();
+    let now = Instant::now();
+    let deadline = now + MAX_LIFETIME;
+    let activation = deadline - Duration::from_secs(10);
+    slot.activate_with_clock(
+        session(FIRST_ID, FIRST, now).with_csrf(FIRST_CSRF),
+        &FIRST,
+        || activation,
+    )
+    .unwrap();
+    assert_eq!(
+        slot.browser_with_clock(Some(&FIRST), Some(&FIRST_CSRF), false, || {
+            assert!(
+                slot.active.try_lock().is_err(),
+                "clock must be observed while holding the session lock"
+            );
+            deadline - Duration::from_nanos(1)
+        }),
+        Some(FIRST_ID)
+    );
+    assert_eq!(
+        slot.browser_with_clock(Some(&FIRST), Some(&FIRST_CSRF), true, || deadline),
+        None
+    );
+    assert_eq!(
+        slot.browser_with_clock(Some(&FIRST), Some(&FIRST_CSRF), false, || activation),
+        None
+    );
+}
+
+#[test]
+fn racing_browser_logout_cannot_remove_a_replacement_pair() {
+    let slot = Arc::new(SessionSlot::default());
+    slot.activate(
+        session(FIRST_ID, FIRST, Instant::now()).with_csrf(FIRST_CSRF),
+        &FIRST,
+    )
+    .unwrap();
+    let barrier = Arc::new(Barrier::new(2));
+    let replacement_slot = Arc::clone(&slot);
+    let replacement_barrier = Arc::clone(&barrier);
+    let replacement = thread::spawn(move || {
+        replacement_barrier.wait();
+        replacement_slot
+            .activate(
+                session(SECOND_ID, SECOND, Instant::now()).with_csrf(SECOND_CSRF),
+                &SECOND,
+            )
+            .unwrap();
+    });
+    let logout_slot = Arc::clone(&slot);
+    let logout = thread::spawn(move || {
+        barrier.wait();
+        logout_slot.logout_browser(Some(&FIRST), Some(&FIRST_CSRF))
+    });
+    replacement.join().unwrap();
+    logout.join().unwrap();
+    assert_eq!(
+        slot.authenticate_browser(Some(&SECOND), Some(&SECOND_CSRF)),
+        Some(SECOND_ID)
+    );
+    assert_eq!(
+        slot.authenticate_browser(Some(&SECOND), Some(&FIRST_CSRF)),
+        None
+    );
 }
 
 #[test]
@@ -132,8 +252,11 @@ fn racing_stale_logout_cannot_remove_the_replacement() {
 #[test]
 fn poisoned_state_rejects_activation_authentication_and_logout() {
     let slot = Arc::new(SessionSlot::default());
-    slot.activate(session(FIRST_ID, FIRST, Instant::now()), &FIRST)
-        .unwrap();
+    slot.activate(
+        session(FIRST_ID, FIRST, Instant::now()).with_csrf(FIRST_CSRF),
+        &FIRST,
+    )
+    .unwrap();
     let clone = Arc::clone(&slot);
     assert!(
         thread::spawn(move || {
@@ -150,4 +273,9 @@ fn poisoned_state_rejects_activation_authentication_and_logout() {
     assert_eq!(slot.authenticate(Some(&FIRST)), None);
     assert_eq!(slot.authenticate(Some(&SECOND)), None);
     assert!(!slot.logout(Some(&FIRST)));
+    assert_eq!(
+        slot.authenticate_browser(Some(&FIRST), Some(&FIRST_CSRF)),
+        None
+    );
+    assert!(!slot.logout_browser(Some(&FIRST), Some(&FIRST_CSRF)));
 }

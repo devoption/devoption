@@ -61,6 +61,7 @@ impl SessionSlot {
     }
 
     /// Validate only the current live session; absent or poisoned state fails closed.
+    /// This does not validate CSRF; browser mutations must use `authenticate_browser`.
     pub fn authenticate(&self, candidate: Option<&[u8]>) -> Option<IdentityId> {
         self.authenticate_with_clock(candidate, Instant::now)
     }
@@ -77,8 +78,44 @@ impl SessionSlot {
             .authenticate_at(candidate, now())
     }
 
+    /// Validate both browser credentials against one current session under one lock.
+    /// The CSRF token must come from an explicit request field/header, not a cookie.
+    /// Cookie transport and Host/Origin validation remain the HTTP caller's duty.
+    pub fn authenticate_browser(
+        &self,
+        candidate: Option<&[u8]>,
+        csrf: Option<&[u8]>,
+    ) -> Option<IdentityId> {
+        self.browser_with_clock(candidate, csrf, false, Instant::now)
+    }
+
+    /// Remove only the live session identified by the matching browser token pair.
+    /// Missing, mismatched, or stale CSRF tokens cannot revoke a replacement session.
+    pub fn logout_browser(&self, candidate: Option<&[u8]>, csrf: Option<&[u8]>) -> bool {
+        self.browser_with_clock(candidate, csrf, true, Instant::now)
+            .is_some()
+    }
+
+    fn browser_with_clock(
+        &self,
+        candidate: Option<&[u8]>,
+        csrf: Option<&[u8]>,
+        logout: bool,
+        now: impl FnOnce() -> Instant,
+    ) -> Option<IdentityId> {
+        let mut active = self.active.lock().ok()?;
+        let identity = active
+            .as_mut()?
+            .authenticate_browser_at(candidate, csrf, now())?;
+        if logout {
+            *active = None;
+        }
+        Some(identity)
+    }
+
     /// Remove the session only when this request presents its current live token.
     /// A stale logout cannot revoke a replacement session. Poisoned state returns false.
+    /// For bearer-authorized callers; cookie-authenticated logout must use `logout_browser`.
     pub fn logout(&self, candidate: Option<&[u8]>) -> bool {
         self.logout_with_clock(candidate, Instant::now)
     }

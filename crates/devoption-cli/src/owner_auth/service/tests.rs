@@ -190,26 +190,38 @@ fn rejected_sign_in_never_requests_session_entropy() {
 }
 
 #[test]
-fn each_sign_in_requests_a_new_independent_session_credential() {
+fn each_sign_in_requests_independent_session_and_csrf_credentials() {
     let (_directory, service) = fixture();
     let store = &service.state.store;
     let identity = owner_auth::setup(store, PASSWORD).unwrap();
     let mut calls = 0;
     let mut sessions = Vec::new();
     for value in [0x35, 0xa7] {
+        let mut draws = 0;
         let issued = sign_in_with_entropy(store, PASSWORD, |bytes| {
             calls += 1;
+            draws += 1;
             assert_eq!(bytes.len(), TOKEN_BYTES);
-            bytes.fill(value);
+            bytes.fill(if draws == 1 { value } else { value ^ 0xff });
             Ok(())
         })
         .unwrap()
         .unwrap();
-        let (session, token) = issued.into_parts();
+        assert_eq!(issued.csrf_token, [value ^ 0xff; CSRF_TOKEN_BYTES]);
+        let csrf = issued.csrf_token;
+        let (mut session, token) = issued.into_parts();
         assert_eq!(token, [value; TOKEN_BYTES]);
+        assert_eq!(
+            session.authenticate_browser(Some(&token), Some(&csrf)),
+            Some(identity)
+        );
+        assert_eq!(
+            session.authenticate_browser(Some(&token), Some(&token)),
+            None
+        );
         sessions.push((session, token));
     }
-    assert_eq!(calls, 2);
+    assert_eq!(calls, 4);
     let [(mut first, first_token), (mut second, second_token)]: [_; 2] =
         sessions.try_into().ok().unwrap();
     assert_eq!(first.authenticate(Some(&first_token)), Some(identity));
@@ -219,18 +231,28 @@ fn each_sign_in_requests_a_new_independent_session_credential() {
 }
 
 #[test]
-fn session_entropy_failure_does_not_return_a_grant_or_change_the_owner() {
+fn either_token_entropy_failure_does_not_return_a_grant_or_change_the_owner() {
     let (directory, service) = fixture();
     let store = &service.state.store;
     let identity = owner_auth::setup(store, PASSWORD).unwrap();
     let original = fs::read(directory.path().join("owner.bin")).unwrap();
-    assert!(matches!(
-        sign_in_with_entropy(store, PASSWORD, |bytes| {
-            bytes[..8].fill(0x5a); // Partial entropy must never become a credential.
+    for fail_on in [1, 2] {
+        let mut calls = 0;
+        assert!(matches!(
+            sign_in_with_entropy(store, PASSWORD, |bytes| {
+                calls += 1;
+                if calls == fail_on {
+                    bytes[..8].fill(0x5a); // Partial entropy must never become a credential.
+                    Err(ServiceError::Unavailable)
+                } else {
+                    bytes.fill(0x35);
+                    Ok(())
+                }
+            }),
             Err(ServiceError::Unavailable)
-        }),
-        Err(ServiceError::Unavailable)
-    ));
+        ));
+        assert_eq!(calls, fail_on);
+    }
     assert_eq!(
         fs::read(directory.path().join("owner.bin")).unwrap(),
         original
@@ -239,6 +261,83 @@ fn session_entropy_failure_does_not_return_a_grant_or_change_the_owner() {
         owner_auth::authenticate(store, PASSWORD).unwrap(),
         Some(identity)
     );
+}
+
+#[test]
+fn browser_grants_activate_rotate_and_logout_with_fixture_owner_data_only() {
+    let (directory, service) = fixture();
+    runtime().block_on(async {
+        let identity = service.setup(PASSWORD.into()).await.unwrap();
+        let original = fs::read(directory.path().join("owner.bin")).unwrap();
+        let slot = SessionSlot::default();
+        let first = service
+            .sign_in(PASSWORD.into())
+            .await
+            .unwrap()
+            .unwrap()
+            .activate_browser(&slot)
+            .unwrap();
+        assert_ne!(first.session_token(), first.csrf_token());
+        assert_eq!(
+            slot.authenticate_browser(Some(first.session_token()), Some(first.csrf_token())),
+            Some(identity)
+        );
+        assert!(
+            service
+                .sign_in("wrong fixture".into())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            slot.authenticate_browser(Some(first.session_token()), Some(first.csrf_token())),
+            Some(identity)
+        );
+        let second = service
+            .sign_in(PASSWORD.into())
+            .await
+            .unwrap()
+            .unwrap()
+            .activate_browser(&slot)
+            .unwrap();
+        assert_ne!(first.session_token(), second.session_token());
+        assert_ne!(first.csrf_token(), second.csrf_token());
+        assert_ne!(second.session_token(), second.csrf_token());
+        assert_eq!(
+            slot.authenticate_browser(Some(first.session_token()), Some(first.csrf_token())),
+            None
+        );
+        assert_eq!(
+            slot.authenticate_browser(Some(second.session_token()), Some(first.csrf_token())),
+            None
+        );
+        assert_eq!(
+            slot.authenticate_browser(Some(first.session_token()), Some(second.csrf_token())),
+            None
+        );
+        let mut invalid = service.sign_in(PASSWORD.into()).await.unwrap().unwrap();
+        invalid.session.revoke();
+        assert!(matches!(
+            invalid.activate_browser(&slot),
+            Err(ActivationError::InvalidSession)
+        ));
+        assert_eq!(
+            slot.authenticate_browser(Some(second.session_token()), Some(second.csrf_token())),
+            Some(identity)
+        );
+        assert!(!slot.logout_browser(Some(first.session_token()), Some(first.csrf_token())));
+        assert!(slot.logout_browser(Some(second.session_token()), Some(second.csrf_token())));
+        assert_eq!(
+            slot.authenticate_browser(Some(second.session_token()), Some(second.csrf_token())),
+            None
+        );
+        assert_eq!(service.state.attempts.lock().unwrap().len(), 5);
+        assert_eq!(
+            fs::read(directory.path().join("owner.bin")).unwrap(),
+            original
+        );
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    });
 }
 
 #[test]

@@ -3,6 +3,9 @@
 //! This core neither generates tokens nor authenticates their owner. The owner-auth
 //! service can issue a fresh cryptographically random token after password verification.
 //! The shared [`slot`] retains one active session for the HTTP request guard.
+//! Issued sessions also retain a separate synchronizer CSRF token. Browser mutation
+//! validation requires both tokens from the same live session. Cookie transport,
+//! pre-authentication CSRF, and enrollment authorization remain separate work.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
 //! The HTTP guard accepts fixture tokens on unsafe requests, but browser issuance
@@ -23,6 +26,9 @@ pub mod slot;
 /// Required raw token length; this module does not choose a wire encoding.
 pub const TOKEN_BYTES: usize = 32;
 
+/// Required raw synchronizer-token length, independent of the session credential.
+pub const CSRF_TOKEN_BYTES: usize = 32;
+
 /// Hard ceiling for a session's absolute lifetime, with no sliding renewal.
 pub const MAX_LIFETIME: Duration = Duration::from_secs(60 * 60);
 
@@ -42,6 +48,7 @@ impl Error for InvalidLifetime {}
 pub struct Session {
     identity: IdentityId,
     token: Option<[u8; TOKEN_BYTES]>,
+    csrf_token: Option<[u8; CSRF_TOKEN_BYTES]>,
     expires_at: Instant,
 }
 
@@ -51,6 +58,7 @@ impl Session {
     /// The caller must authenticate the identity before issuing its session, and
     /// is responsible for token entropy. No permissions are implied by the ID.
     /// No production caller provisions sessions in the current preview.
+    /// This constructor does not bind CSRF; browser sessions come from the issuer.
     pub fn new(
         identity: IdentityId,
         token: [u8; TOKEN_BYTES],
@@ -72,8 +80,16 @@ impl Session {
         Ok(Self {
             identity,
             token: Some(token),
+            csrf_token: None,
             expires_at,
         })
+    }
+
+    /// Only the issuer binds independently generated entropy before activation.
+    #[cfg(any(unix, test))]
+    pub(crate) fn with_csrf(mut self, token: [u8; CSRF_TOKEN_BYTES]) -> Self {
+        self.csrf_token = Some(token);
+        self
     }
 
     /// Return the bound identity only for a valid, live token, without renewal.
@@ -81,6 +97,7 @@ impl Session {
     /// Equal-length token contents are compared using `subtle::ConstantTimeEq`.
     /// Length and session lifecycle state are not secret. An observed expiry is
     /// latched as revocation, and candidates never create or reactivate sessions.
+    /// This does not validate CSRF; browser mutations must use `authenticate_browser`.
     pub fn authenticate(&mut self, candidate: Option<&[u8]>) -> Option<IdentityId> {
         self.authenticate_at(candidate, Instant::now())
     }
@@ -95,9 +112,33 @@ impl Session {
         bool::from(token.as_slice().ct_eq(candidate)).then_some(self.identity)
     }
 
+    /// Validate a browser mutation's session credential and explicitly submitted
+    /// CSRF token together. Sessions made without a CSRF token fail closed here.
+    /// This does not replace Host/Origin checks or authorize first-owner enrollment.
+    pub fn authenticate_browser(
+        &mut self,
+        candidate: Option<&[u8]>,
+        csrf: Option<&[u8]>,
+    ) -> Option<IdentityId> {
+        self.authenticate_browser_at(candidate, csrf, Instant::now())
+    }
+
+    fn authenticate_browser_at(
+        &mut self,
+        candidate: Option<&[u8]>,
+        csrf: Option<&[u8]>,
+        now: Instant,
+    ) -> Option<IdentityId> {
+        // Observe the absolute deadline even when either candidate is absent.
+        let identity = self.authenticate_at(candidate, now)?;
+        let expected = self.csrf_token.as_ref()?;
+        bool::from(expected.as_slice().ct_eq(csrf?)).then_some(identity)
+    }
+
     /// Permanently invalidate this object. Repeated revocation is harmless.
     pub fn revoke(&mut self) {
         self.token = None;
+        self.csrf_token = None;
     }
 }
 
@@ -108,6 +149,100 @@ mod tests {
     // Deliberately predictable test data, never a production credential.
     const FIXTURE: [u8; TOKEN_BYTES] = [0x5a; TOKEN_BYTES];
     const IDENTITY: IdentityId = IdentityId::from_bytes([1; 16]);
+    const CSRF: [u8; CSRF_TOKEN_BYTES] = [0xa7; CSRF_TOKEN_BYTES];
+
+    #[test]
+    fn browser_validation_requires_a_bound_pair_and_rejects_every_mismatched_byte() {
+        let now = Instant::now();
+        let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now).unwrap();
+        assert_eq!(
+            session.authenticate_browser(Some(&FIXTURE), Some(&CSRF)),
+            None
+        );
+        let mut session = session.with_csrf(CSRF);
+        for invalid in [
+            None,
+            Some(&[][..]),
+            Some(&CSRF[..31]),
+            Some(&[0xa7; 33][..]),
+        ] {
+            assert_eq!(
+                session.authenticate_browser_at(Some(&FIXTURE), invalid, now),
+                None
+            );
+            assert_eq!(
+                session.authenticate_browser_at(invalid, Some(&CSRF), now),
+                None
+            );
+        }
+        for index in 0..TOKEN_BYTES {
+            let mut wrong_session = FIXTURE;
+            wrong_session[index] ^= 1;
+            let mut wrong_csrf = CSRF;
+            wrong_csrf[index] ^= 1;
+            assert_eq!(
+                session.authenticate_browser_at(Some(&wrong_session), Some(&CSRF), now),
+                None
+            );
+            assert_eq!(
+                session.authenticate_browser_at(Some(&FIXTURE), Some(&wrong_csrf), now),
+                None
+            );
+        }
+        assert_eq!(
+            session.authenticate_browser_at(Some(&CSRF), Some(&FIXTURE), now),
+            None
+        );
+        assert_eq!(
+            session.authenticate_browser(Some(&FIXTURE), Some(&CSRF)),
+            Some(IDENTITY)
+        );
+    }
+
+    #[test]
+    fn browser_expiry_and_revocation_drop_both_tokens_without_renewal() {
+        let now = Instant::now();
+        for expired_request in [
+            (Some(&FIXTURE[..]), Some(&CSRF[..])),
+            (Some(&FIXTURE[..]), None),
+            (None, Some(&CSRF[..])),
+        ] {
+            let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now)
+                .unwrap()
+                .with_csrf(CSRF);
+            assert_eq!(
+                session.authenticate_browser_at(
+                    Some(&FIXTURE),
+                    Some(&CSRF),
+                    now + MAX_LIFETIME - Duration::from_nanos(1)
+                ),
+                Some(IDENTITY)
+            );
+            assert_eq!(
+                session.authenticate_browser_at(
+                    expired_request.0,
+                    expired_request.1,
+                    now + MAX_LIFETIME
+                ),
+                None
+            );
+            assert!(session.token.is_none());
+            assert!(session.csrf_token.is_none());
+            assert_eq!(
+                session.authenticate_browser_at(Some(&FIXTURE), Some(&CSRF), now),
+                None
+            );
+        }
+        let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now)
+            .unwrap()
+            .with_csrf(CSRF);
+        session.revoke();
+        assert!(session.csrf_token.is_none());
+        assert_eq!(
+            session.authenticate_browser(Some(&FIXTURE), Some(&CSRF)),
+            None
+        );
+    }
 
     #[test]
     fn rejects_missing_wrong_length_and_every_single_byte_mismatch() {
