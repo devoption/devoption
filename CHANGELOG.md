@@ -7,6 +7,15 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Same-origin validation before routing for methods other than GET, HEAD, OPTIONS,
+  and TRACE. Exactly one HTTP Origin must match the validated request host and
+  bound port; the two local aliases remain distinct origins. Missing, null,
+  duplicate, malformed, or different origins receive empty 403 responses without
+  Referer/proxy-header fallbacks or CORS permissions. Added adversarial HTTP tests;
+  no write endpoints or session authorization are implemented. This is not a
+  complete CSRF solution; [#15](https://github.com/devoption/devoption/issues/15)
+  still gates mutations and execution
+  ([#47](https://github.com/devoption/devoption/issues/47)).
 - Local HTTP authority validation: requests need exactly one `Host` naming
   `127.0.0.1` or case-insensitive `localhost` at the actual bound port, including
   HTTP/1.0 requests. Omitted ports mean 80. Absolute HTTP targets must match;

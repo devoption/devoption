@@ -3,7 +3,10 @@ use std::{io, net::Ipv4Addr};
 use axum::{
     Router,
     extract::Request,
-    http::{StatusCode, header::HOST},
+    http::{
+        Method, StatusCode,
+        header::{HOST, ORIGIN},
+    },
     middleware::{self, Next},
     response::{Html, IntoResponse},
     routing::get,
@@ -38,42 +41,63 @@ pub fn run(port: u16) -> io::Result<()> {
                 )
                 .layer(middleware::from_fn(
                     move |request: Request, next: Next| async move {
-                        if valid_authority(&request, address.port()) {
-                            next.run(request).await
-                        } else {
-                            StatusCode::BAD_REQUEST.into_response()
+                        let Some(host) = validated_host(&request, address.port()) else {
+                            return StatusCode::BAD_REQUEST.into_response();
+                        };
+                        // RFC 9110 safe methods; extensions require Origin by default.
+                        if !matches!(
+                            *request.method(),
+                            Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE
+                        ) && !same_origin(&request, host, address.port())
+                        {
+                            return StatusCode::FORBIDDEN.into_response();
                         }
+                        next.run(request).await
                     },
                 ));
             axum::serve(listener, app).await
         })
 }
 
-fn valid_authority(request: &Request, port: u16) -> bool {
+fn validated_host(request: &Request, port: u16) -> Option<&'static str> {
     // Require one explicit Host even for HTTP/1.0; never infer it from proxy headers.
     let mut hosts = request.headers().get_all(HOST).iter();
-    let Some(host) = hosts
+    let host = hosts
         .next()
         .and_then(|value| value.to_str().ok())
-        .and_then(|value| local_host(value, port))
-    else {
-        return false;
-    };
+        .and_then(|value| local_host(value, port))?;
     if hosts.next().is_some() {
-        return false;
+        return None;
     }
 
     // RFC 9112 §3.2: absolute-form carries its own authority. Validate both,
     // rejecting conflicting authorities rather than letting Host mask the target.
     let uri = request.uri();
-    match (uri.scheme_str(), uri.authority()) {
+    let valid = match (uri.scheme_str(), uri.authority()) {
         (Some(scheme), Some(authority)) => {
             scheme.eq_ignore_ascii_case("http")
                 && local_host(authority.as_str(), port) == Some(host)
         }
         (None, None) => uri.path().starts_with('/') && !uri.path().starts_with("//"),
         _ => false,
+    };
+    valid.then_some(host)
+}
+
+fn same_origin(request: &Request, host: &str, port: u16) -> bool {
+    let mut origins = request.headers().get_all(ORIGIN).iter();
+    let Some(origin) = origins.next().and_then(|value| value.to_str().ok()) else {
+        return false;
+    };
+    if origins.next().is_some() {
+        return false;
     }
+    // An Origin has only scheme and authority, never URL paths or userinfo.
+    // Do not infer a missing Origin from Referer, proxy headers, or Fetch Metadata.
+    let Some((scheme, authority)) = origin.split_once("://") else {
+        return false;
+    };
+    scheme.eq_ignore_ascii_case("http") && local_host(authority, port) == Some(host)
 }
 
 fn local_host(authority: &str, bound_port: u16) -> Option<&'static str> {
@@ -124,7 +148,35 @@ mod tests {
                 .header(HOST, host)
                 .body(Body::empty())
                 .unwrap();
-            assert_eq!(valid_authority(&request, port), allowed, "{target} {host}");
+            assert_eq!(
+                validated_host(&request, port).is_some(),
+                allowed,
+                "{target} {host}"
+            );
+        }
+    }
+
+    #[test]
+    fn origin_default_port_and_host_aliases_are_compared_as_origins() {
+        for (origin, host, port, allowed) in [
+            ("http://localhost", "localhost:80", 80, true),
+            ("HTTP://LOCALHOST:080", "localhost", 80, true),
+            ("http://127.0.0.1:80", "127.0.0.1", 80, true),
+            ("http://localhost", "localhost:3000", 3000, false),
+            ("http://localhost:", "localhost:80", 80, false),
+            ("http://localhost/", "localhost:80", 80, false),
+            ("https://localhost:80", "localhost:80", 80, false),
+            ("http://127.0.0.1", "localhost:80", 80, false),
+        ] {
+            let request = Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header(HOST, host)
+                .header(ORIGIN, origin)
+                .body(Body::empty())
+                .unwrap();
+            let host = validated_host(&request, port).unwrap();
+            assert_eq!(same_origin(&request, host, port), allowed, "{origin}");
         }
     }
 }
