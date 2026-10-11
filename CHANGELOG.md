@@ -71,6 +71,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Simplified the README to an early-stage overview, quickstart, four main-page
+  screenshots, contributor checks, and project links. Removed the theme gallery
+  and implementation catalog while retaining the tracked screenshots and capture
+  policy ([#44](https://github.com/devoption/devoption/issues/44)).
 - Moved existing Appearance controls to `/settings/appearance`, with a compact
   link in the profile popup and the same saved preferences. Preferences also
   refresh when browser history restores a page. Added route/history tests and
