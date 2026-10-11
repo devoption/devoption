@@ -3,8 +3,8 @@
 //! No identity, permissions, sessions, persistence, or salt generation lives here.
 //! Owner setup generates a fresh random salt internally for each password; users
 //! never supply salts or session keys. Only temporary test fixtures exercise the
-//! setup/sign-in components today. Password policy, blocking-work isolation, and
-//! rate limits must be added before exposing it through HTTP. Memory erasure is not
+//! setup/sign-in components today. HTTP integration must use the bounded owner-auth
+//! service and enforce enrollment policy. Memory erasure is not
 //! guaranteed, and callers must treat returned records as sensitive storage data.
 
 use std::{error::Error, fmt};

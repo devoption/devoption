@@ -1,8 +1,8 @@
 //! First-owner setup and password authentication against the durable owner store.
 //!
-//! Only temporary fixtures call these synchronous operations today. Before HTTP
-//! integration, callers must authorize setup, enforce enrollment policy, isolate
-//! blocking hashing/storage work, and rate-limit attempts. No directory selection,
+//! Only temporary fixtures call these operations today. The [`service`] wrapper
+//! isolates blocking work and shares an attempt limit. Before HTTP integration,
+//! callers must authorize setup and enforce enrollment policy. No directory selection,
 //! session issuance, permission grant, password reset, or provider integration is
 //! performed here. Passwords and stored hashes must never enter responses or logs.
 
@@ -13,6 +13,8 @@ use crate::{
     owner_store::{OwnerStore, StoreError},
     password::{self, HashError, SALT_BYTES},
 };
+
+pub mod service;
 
 /// Setup failures contain no password, salt, or password hash.
 #[derive(Debug)]
