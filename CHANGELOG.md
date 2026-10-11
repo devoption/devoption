@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- One authoritative session slot now connects issued grants to the HTTP validator.
+  Activation atomically installs a valid grant without renewing its deadline;
+  invalid grants preserve the current session, and logout requires its current
+  live credential. Fixtures cover rotation, races, expiry, and sign-in through
+  HTTP validation. The preview starts with an empty slot; browser authentication,
+  cookie transport, and CSRF integration remain unfinished
+  ([#65](https://github.com/devoption/devoption/issues/65)).
 - Bounded owner sign-in can now issue a fresh internal session credential only
   after verifying the persisted password. It returns an identity-bound validator
   with a one-hour absolute lifetime alongside the credential, shares existing

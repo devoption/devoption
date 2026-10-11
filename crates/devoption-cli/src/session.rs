@@ -2,7 +2,7 @@
 //!
 //! This core neither generates tokens nor authenticates their owner. The owner-auth
 //! service can issue a fresh cryptographically random token after password verification.
-//! Its caller must retain this object as the authoritative validation state.
+//! The shared [`slot`] retains one active session for the HTTP request guard.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
 //! The HTTP guard accepts fixture tokens on unsafe requests, but browser issuance
@@ -17,6 +17,8 @@ use std::{
 use subtle::ConstantTimeEq;
 
 use crate::identity::IdentityId;
+
+pub mod slot;
 
 /// Required raw token length; this module does not choose a wire encoding.
 pub const TOKEN_BYTES: usize = 32;

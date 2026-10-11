@@ -131,6 +131,29 @@ fn public_sign_in_issues_a_revocable_session_for_the_persisted_identity() {
 }
 
 #[test]
+fn invalid_grant_returns_no_credential_and_preserves_the_active_session() {
+    let (_directory, service) = fixture();
+    runtime().block_on(async {
+        let identity = service.setup(PASSWORD.into()).await.unwrap();
+        let slot = SessionSlot::default();
+        let first = service
+            .sign_in(PASSWORD.into())
+            .await
+            .unwrap()
+            .unwrap()
+            .activate(&slot)
+            .unwrap();
+        let mut invalid = service.sign_in(PASSWORD.into()).await.unwrap().unwrap();
+        invalid.session.revoke();
+        assert_eq!(
+            invalid.activate(&slot),
+            Err(ActivationError::InvalidSession)
+        );
+        assert_eq!(slot.authenticate(Some(&first)), Some(identity));
+    });
+}
+
+#[test]
 fn rejected_sign_in_never_requests_session_entropy() {
     let (directory, service) = fixture();
     let store = &service.state.store;
