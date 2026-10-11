@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Sessions now bind a server-assigned identity to their token and return it only
+  on successful authentication. The HTTP guard passes that identity to protected
+  handlers independently of client-supplied identity/role fields. Fixture tests
+  cover distinct identities and invalid, expired, and revoked sessions. This adds
+  no accounts, permission grants, sign-in UI, or external identity integration
+  ([#55](https://github.com/devoption/devoption/issues/55)).
 - A password hashing and verification component for future browser owner setup
   and sign-in, using Argon2id with bounded inputs and an explicit cost profile.
   Only fixture tests use it; no accounts, persistent credentials, setup UI, or

@@ -16,6 +16,8 @@ use std::{
 
 use subtle::ConstantTimeEq;
 
+use crate::identity::IdentityId;
+
 /// Required raw token length; this module does not choose a wire encoding.
 pub const TOKEN_BYTES: usize = 32;
 
@@ -36,6 +38,7 @@ impl Error for InvalidLifetime {}
 
 /// One non-cloneable, expiring session. Tokens are deliberately not printable.
 pub struct Session {
+    identity: IdentityId,
     token: Option<[u8; TOKEN_BYTES]>,
     expires_at: Instant,
 }
@@ -43,13 +46,19 @@ pub struct Session {
 impl Session {
     /// Retain an already-issued token for a bounded lifetime starting now.
     ///
-    /// The caller is responsible for token entropy and authorized issuance.
+    /// The caller must authenticate the identity before issuing its session, and
+    /// is responsible for token entropy. No permissions are implied by the ID.
     /// No production caller provisions sessions in the current preview.
-    pub fn new(token: [u8; TOKEN_BYTES], lifetime: Duration) -> Result<Self, InvalidLifetime> {
-        Self::new_at(token, lifetime, Instant::now())
+    pub fn new(
+        identity: IdentityId,
+        token: [u8; TOKEN_BYTES],
+        lifetime: Duration,
+    ) -> Result<Self, InvalidLifetime> {
+        Self::new_at(identity, token, lifetime, Instant::now())
     }
 
     fn new_at(
+        identity: IdentityId,
         token: [u8; TOKEN_BYTES],
         lifetime: Duration,
         now: Instant,
@@ -59,28 +68,29 @@ impl Session {
         }
         let expires_at = now.checked_add(lifetime).ok_or(InvalidLifetime)?;
         Ok(Self {
+            identity,
             token: Some(token),
             expires_at,
         })
     }
 
-    /// Reject missing, incorrect, expired, or revoked tokens without renewal.
+    /// Return the bound identity only for a valid, live token, without renewal.
     ///
     /// Equal-length token contents are compared using `subtle::ConstantTimeEq`.
     /// Length and session lifecycle state are not secret. An observed expiry is
     /// latched as revocation, and candidates never create or reactivate sessions.
-    pub fn validate(&mut self, candidate: Option<&[u8]>) -> bool {
-        self.validate_at(candidate, Instant::now())
+    pub fn authenticate(&mut self, candidate: Option<&[u8]>) -> Option<IdentityId> {
+        self.authenticate_at(candidate, Instant::now())
     }
 
-    fn validate_at(&mut self, candidate: Option<&[u8]>, now: Instant) -> bool {
+    fn authenticate_at(&mut self, candidate: Option<&[u8]>, now: Instant) -> Option<IdentityId> {
         if now >= self.expires_at {
             self.revoke();
         }
         let (Some(token), Some(candidate)) = (&self.token, candidate) else {
-            return false;
+            return None;
         };
-        bool::from(token.as_slice().ct_eq(candidate))
+        bool::from(token.as_slice().ct_eq(candidate)).then_some(self.identity)
     }
 
     /// Permanently invalidate this object. Repeated revocation is harmless.
@@ -95,54 +105,64 @@ mod tests {
 
     // Deliberately predictable test data, never a production credential.
     const FIXTURE: [u8; TOKEN_BYTES] = [0x5a; TOKEN_BYTES];
+    const IDENTITY: IdentityId = IdentityId::from_bytes([1; 16]);
 
     #[test]
     fn rejects_missing_wrong_length_and_every_single_byte_mismatch() {
         let now = Instant::now();
-        let mut session = Session::new_at(FIXTURE, MAX_LIFETIME, now).unwrap();
-        assert!(!session.validate_at(None, now));
+        let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now).unwrap();
+        assert_eq!(session.authenticate_at(None, now), None);
         for candidate in [&[][..], &FIXTURE[..31], &[0x5a; TOKEN_BYTES + 1]] {
-            assert!(!session.validate_at(Some(candidate), now));
+            assert_eq!(session.authenticate_at(Some(candidate), now), None);
         }
         for index in 0..TOKEN_BYTES {
             let mut candidate = FIXTURE;
             candidate[index] ^= 1;
-            assert!(!session.validate_at(Some(&candidate), now));
+            assert_eq!(session.authenticate_at(Some(&candidate), now), None);
         }
-        assert!(session.validate_at(Some(&FIXTURE), now));
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), Some(IDENTITY));
     }
 
     #[test]
     fn expiry_is_absolute_and_rejects_at_the_deadline() {
         let now = Instant::now();
-        let mut session = Session::new_at(FIXTURE, MAX_LIFETIME, now).unwrap();
+        let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now).unwrap();
         let deadline = now + MAX_LIFETIME;
-        assert!(session.validate_at(Some(&FIXTURE), now));
-        assert!(session.validate_at(Some(&FIXTURE), deadline - Duration::from_nanos(1)));
-        assert!(!session.validate_at(Some(&FIXTURE), deadline));
-        assert!(!session.validate_at(Some(&FIXTURE), deadline + MAX_LIFETIME));
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), Some(IDENTITY));
+        assert_eq!(
+            session.authenticate_at(Some(&FIXTURE), deadline - Duration::from_nanos(1)),
+            Some(IDENTITY)
+        );
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), deadline), None);
+        assert_eq!(
+            session.authenticate_at(Some(&FIXTURE), deadline + MAX_LIFETIME),
+            None
+        );
         // Even a clock anomaly cannot revive an observed expired session.
-        assert!(!session.validate_at(Some(&FIXTURE), now));
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), None);
     }
 
     #[test]
     fn a_missing_candidate_still_observes_expiry() {
         let now = Instant::now();
-        let mut session = Session::new_at(FIXTURE, MAX_LIFETIME, now).unwrap();
-        assert!(!session.validate_at(None, now + MAX_LIFETIME));
-        assert!(!session.validate_at(Some(&FIXTURE), now));
+        let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now).unwrap();
+        assert_eq!(session.authenticate_at(None, now + MAX_LIFETIME), None);
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), None);
     }
 
     #[test]
     fn revocation_is_permanent_and_idempotent() {
         let now = Instant::now();
-        let mut session = Session::new_at(FIXTURE, MAX_LIFETIME, now).unwrap();
-        assert!(session.validate_at(Some(&FIXTURE), now));
+        let mut session = Session::new_at(IDENTITY, FIXTURE, MAX_LIFETIME, now).unwrap();
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), Some(IDENTITY));
         session.revoke();
-        assert!(!session.validate_at(Some(&FIXTURE), now));
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), None);
         session.revoke();
-        assert!(!session.validate_at(Some(&FIXTURE), now));
-        assert!(!session.validate_at(Some(&FIXTURE), now + MAX_LIFETIME));
+        assert_eq!(session.authenticate_at(Some(&FIXTURE), now), None);
+        assert_eq!(
+            session.authenticate_at(Some(&FIXTURE), now + MAX_LIFETIME),
+            None
+        );
     }
 
     #[test]
@@ -154,22 +174,37 @@ mod tests {
             Duration::MAX,
         ] {
             assert!(matches!(
-                Session::new_at(FIXTURE, invalid, now),
+                Session::new_at(IDENTITY, FIXTURE, invalid, now),
                 Err(InvalidLifetime)
             ));
         }
         for valid in [Duration::from_nanos(1), MAX_LIFETIME] {
-            let mut session = Session::new_at(FIXTURE, valid, now).unwrap();
-            assert!(session.validate_at(Some(&FIXTURE), now));
-            assert!(!session.validate_at(Some(&FIXTURE), now + valid));
+            let mut session = Session::new_at(IDENTITY, FIXTURE, valid, now).unwrap();
+            assert_eq!(session.authenticate_at(Some(&FIXTURE), now), Some(IDENTITY));
+            assert_eq!(session.authenticate_at(Some(&FIXTURE), now + valid), None);
         }
     }
 
     #[test]
     fn public_api_validates_and_revokes_a_fixture() {
-        let mut session = Session::new(FIXTURE, MAX_LIFETIME).unwrap();
-        assert!(session.validate(Some(&FIXTURE)));
+        let mut session = Session::new(IDENTITY, FIXTURE, MAX_LIFETIME).unwrap();
+        assert_eq!(session.authenticate(Some(&FIXTURE)), Some(IDENTITY));
         session.revoke();
-        assert!(!session.validate(Some(&FIXTURE)));
+        assert_eq!(session.authenticate(Some(&FIXTURE)), None);
+    }
+
+    #[test]
+    fn different_sessions_return_only_their_bound_identities() {
+        let other_id = IdentityId::from_bytes([2; 16]);
+        let other_token = [0xa5; TOKEN_BYTES];
+        let mut first = Session::new(IDENTITY, FIXTURE, MAX_LIFETIME).unwrap();
+        let mut second = Session::new(other_id, other_token, MAX_LIFETIME).unwrap();
+        assert_eq!(first.authenticate(Some(&other_token)), None);
+        assert_eq!(second.authenticate(Some(&FIXTURE)), None);
+        assert_eq!(first.authenticate(Some(&FIXTURE)), Some(IDENTITY));
+        assert_eq!(second.authenticate(Some(&other_token)), Some(other_id));
+        first.revoke();
+        assert_eq!(first.authenticate(Some(&FIXTURE)), None);
+        assert_eq!(second.authenticate(Some(&other_token)), Some(other_id));
     }
 }
