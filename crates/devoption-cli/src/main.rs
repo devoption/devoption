@@ -1,7 +1,5 @@
 use std::{env, ffi::OsString, path::PathBuf, process::ExitCode};
 
-mod server;
-
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
@@ -39,7 +37,7 @@ fn main() -> ExitCode {
     };
 
     if let Some((port, data_directory)) = options {
-        if let Err(error) = server::run(port, data_directory.as_deref()) {
+        if let Err(error) = devoption_server::run(port, data_directory.as_deref()) {
             eprintln!("error: could not serve on 127.0.0.1:{port}: {error}");
             return ExitCode::FAILURE;
         }

@@ -1,5 +1,9 @@
 use std::{io, net::Ipv4Addr, path::Path, sync::Arc};
 
+use crate::{
+    identity::IdentityId,
+    session::{TOKEN_BYTES, slot::SessionSlot},
+};
 use axum::{
     Router,
     extract::Request,
@@ -11,10 +15,6 @@ use axum::{
     response::{Html, IntoResponse},
     routing::get,
 };
-use devoption_cli::{
-    identity::IdentityId,
-    session::{TOKEN_BYTES, slot::SessionSlot},
-};
 use devoption_ui::Page;
 use tokio::{net::TcpListener, runtime::Builder};
 
@@ -23,6 +23,9 @@ type SharedSession = Arc<SessionSlot>;
 #[cfg(test)]
 mod session_tests;
 
+/// Run the loopback service from synchronous startup code, owning its Tokio runtime.
+/// Validate optional existing storage before binding and announce the address on stdout.
+/// Return startup or server I/O errors; no owner session is provisioned here.
 pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain its descriptor through block_on so later integration can use the
@@ -30,9 +33,9 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
     #[cfg(unix)]
     let _owner_store = data_directory
         .map(|path| {
-            let store = devoption_cli::owner_store::OwnerStore::open_absolute(path)?;
+            let store = crate::owner_store::OwnerStore::open_absolute(path)?;
             store.load()?;
-            Ok::<_, devoption_cli::owner_store::StoreError>(store)
+            Ok::<_, crate::owner_store::StoreError>(store)
         })
         .transpose()
         .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?;
@@ -112,7 +115,7 @@ fn authenticated_identity(headers: &HeaderMap, session: &SharedSession) -> Optio
     // cookies or CSRF. Explicit bearer fixtures remain separate from this path.
     if headers.contains_key(COOKIE) || headers.contains_key("x-csrf-token") {
         #[cfg(unix)]
-        return devoption_cli::browser_session::authenticate(headers, session);
+        return crate::browser_session::authenticate(headers, session);
         #[cfg(not(unix))]
         return None;
     }

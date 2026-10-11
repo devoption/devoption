@@ -171,6 +171,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Extracted implemented HTTP/runtime, authentication, session, and owner-storage
+  responsibilities into `devoption-server`. The CLI now handles arguments and
+  service startup, with dependencies flowing CLI → server → UI. Existing behavior,
+  commands, and tests are retained; no authentication feature was added
+  ([#75](https://github.com/devoption/devoption/issues/75)).
 - Simplified the README to an early-stage overview, quickstart, four main-page
   screenshots, contributor checks, and project links. Removed the theme gallery
   and implementation catalog while retaining the tracked screenshots and capture

@@ -1,7 +1,5 @@
 use super::*;
-use devoption_cli::{
-    browser_session, owner_auth::service::OwnerAuthService, owner_store::OwnerStore,
-};
+use crate::{browser_session, owner_auth::service::OwnerAuthService, owner_store::OwnerStore};
 use std::os::unix::fs::PermissionsExt;
 
 const PASSWORD: &str = "browser transport fixture only";

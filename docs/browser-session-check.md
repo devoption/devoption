@@ -8,7 +8,7 @@ The fixture's activation route is test scaffolding, not a product sign-in route.
 Run from the repository root:
 
 ```sh
-cargo test --bin devoption --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
+cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
 Open the printed URL in a fresh browser profile/context. The fixture stops after
