@@ -19,13 +19,11 @@ impl Drop for Server {
 }
 
 fn start() -> (Server, SocketAddr) {
-    let mut server = Server(
-        Command::new(env!("CARGO_BIN_EXE_devoption"))
-            .args(["serve", "--port", "0"])
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap(),
-    );
+    start_command(Command::new(env!("CARGO_BIN_EXE_devoption")).args(["serve", "--port", "0"]))
+}
+
+fn start_command(command: &mut Command) -> (Server, SocketAddr) {
+    let mut server = Server(command.stdout(Stdio::piped()).spawn().unwrap());
     let stdout = server.0.stdout.take().unwrap();
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
@@ -48,6 +46,10 @@ fn start() -> (Server, SocketAddr) {
     assert_ne!(address.port(), 0);
     (server, address)
 }
+
+#[cfg(unix)]
+#[path = "server/data_directory.rs"]
+mod data_directory;
 
 fn send_request(address: SocketAddr, request: &str) -> TcpStream {
     let mut stream = TcpStream::connect_timeout(&address, TIMEOUT).unwrap();

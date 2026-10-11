@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Optional Unix `serve --data-dir` configuration now validates an existing private
+  absolute directory and any owner record before listening, rejects symlink path
+  components and parent traversal, and retains the opened directory without
+  creating or changing data. Browser enrollment and sign-in remain unfinished
+  ([#69](https://github.com/devoption/devoption/issues/69)).
 - A password-form extractor now rejects ambiguous or malformed input before
   authentication, preserves exact decoded UTF-8 bytes, and bounds encoded bodies
   to 4 KiB with a five-second read deadline. Errors are empty and non-cacheable.
