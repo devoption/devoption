@@ -159,6 +159,7 @@ fn pages_share_layout_and_have_working_navigation() {
             for (value, label) in [
                 ("nord", "Nord"),
                 ("dracula", "Dracula"),
+                ("tokyo-night", "Tokyo Night"),
                 ("dark", "Dark"),
                 ("light", "Light"),
                 ("system", "System"),

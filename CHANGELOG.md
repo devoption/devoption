@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Tokyo Night in the existing Appearance selector, using upstream Tokyo Night
+  and Tokyo Night Light colors adapted to this UI. Nord remains the default;
+  mode, preset/custom accent, and reset behavior are preserved. Extended contrast,
+  persistence, invalid-theme, storage, and System tests, refreshed page captures,
+  and added dark/light Tokyo Night screenshots
+  ([#42](https://github.com/devoption/devoption/issues/42)).
 - Nord and Dracula theme selection in Appearance, saved independently of mode
   and accent. Theme changes preserve preset names or exact custom colors; both
   themes support Light/Dark/System, with Dracula light identified as a DevOption

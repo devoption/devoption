@@ -6,6 +6,8 @@ versions. `appearance-light.jpg` additionally shows Appearance following a light
 device preference. `appearance-custom.jpg` shows a custom primary and its warning.
 `appearance-dracula.jpg` and `appearance-dracula-light.jpg` show Dracula in Dark
 and the adapted Light mode.
+`appearance-tokyo-night.jpg` and `appearance-tokyo-night-light.jpg` show Tokyo
+Night in Dark and Light modes.
 
 | Page | Local URL | File |
 | --- | --- | --- |
@@ -50,6 +52,11 @@ For `appearance-dracula.jpg`, use **1120 × 520 pixels** and select **Dracula**,
 device preference and select **Dracula**, **System**, and **Purple**, including
 the light-adaptation note. Capture both with the save confirmation visible.
 Return to **Nord**, **Dark**, and **Purple** and clear temporary overrides.
+
+For `appearance-tokyo-night.jpg` and `appearance-tokyo-night-light.jpg`, follow
+the same Dark and System/light procedure with **Tokyo Night** and **Purple**.
+Use **1120 × 520 pixels**, with the save confirmation visible. Return to **Nord**,
+**Dark**, and **Purple** and clear temporary overrides.
 
 The initial images were captured with Codex's browser screenshot tool at these
 dimensions. Use an available browser capture tool with the same settings; this
