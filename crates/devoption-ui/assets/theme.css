@@ -55,6 +55,46 @@
   --color-selected: #dce6de;
 }
 
+/* Dracula's public dark palette, adapted to these semantic UI roles.
+   https://draculatheme.com/contribute — Blue uses the cyan accent. */
+:root[data-theme="dracula"] {
+  --color-background: #282a36;
+  --color-sidebar: #21222c;
+  --color-surface: #343746;
+  --color-text: #f8f8f2;
+  --color-muted: #d7d8e0;
+  --color-preset: #bd93f9;
+  --color-border: #44475a;
+  --color-selected: #44475a;
+  --color-shadow: #0003;
+}
+:root[data-theme="dracula"][data-accent="blue"] {
+  --color-preset: #8be9fd;
+}
+:root[data-theme="dracula"][data-accent="green"] {
+  --color-preset: #50fa7b;
+}
+/* DevOption's light adaptation, not an official Dracula light palette. */
+:root[data-theme="dracula"][data-appearance="light"] {
+  --color-background: #f8f8f2;
+  --color-sidebar: #f0f0f5;
+  --color-surface: #e8e7ef;
+  --color-text: #282a36;
+  --color-muted: #44475a;
+  --color-preset: #7043a0;
+  --color-border: #c5c2d2;
+  --color-selected: #e1d7ee;
+  --color-shadow: #282a3626;
+}
+:root[data-theme="dracula"][data-appearance="light"][data-accent="blue"] {
+  --color-preset: #176e87;
+  --color-selected: #d5e8ee;
+}
+:root[data-theme="dracula"][data-appearance="light"][data-accent="green"] {
+  --color-preset: #247237;
+  --color-selected: #d8eada;
+}
+
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -153,10 +193,11 @@ main > p { font-size: 1.125rem; max-width: 42rem; }
 .profile-link[aria-current] { font-weight: 600; }
 .appearance { max-width: 28rem; margin-top: var(--space-4); padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--space-3); background: var(--color-surface); }
 .theme-preview { display: flex; align-items: center; gap: var(--space-3); }
-.theme-preview small { display: block; font-size: 0.75rem; color: var(--color-muted); }
+.theme-preview select { margin-left: auto; }
+#appearance-theme-note { margin-top: var(--space-2); font-size: 0.75rem; }
 .theme-swatch { width: 2rem; height: 2rem; border-radius: var(--space-2); border: 1px solid var(--color-primary); background: linear-gradient(135deg, var(--color-background) 60%, var(--color-primary) 60%); }
-.mode-choice { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }
-.mode-choice select, #appearance-primary, #appearance-reset { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-focus); border-radius: var(--space-1); background: var(--color-background); }
+.mode-choice { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-3); }
+.appearance select, #appearance-primary, #appearance-reset { padding: var(--space-1) var(--space-2); border: 1px solid var(--color-focus); border-radius: var(--space-1); background: var(--color-background); }
 .primary-choice { display: flex; align-items: center; gap: var(--space-2); }
 #appearance-hex { font-size: var(--text-small); }
 #appearance-primary { width: 2.75rem; height: 2.25rem; padding: var(--space-1); }

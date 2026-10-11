@@ -3,7 +3,9 @@
   const settings = [
     { id: "appearance-mode", key: "devoption.appearance", attribute: "appearance", label: "Mode", values: ["dark", "light", "system"] },
     { id: "appearance-accent", key: "devoption.accent", attribute: "accent", label: "Accent", values: ["purple", "blue", "green"] },
+    { id: "appearance-theme", key: "devoption.theme", attribute: "theme", label: "Theme", values: ["nord", "dracula"] },
   ];
+  const [, accent, theme] = settings;
   const normalize = (setting, value) => {
     if (setting.attribute === "accent" && isColor(value)) return value.toLowerCase();
     return setting.values.includes(value) ? value : setting.values[0];
@@ -34,8 +36,8 @@
       }
       root.dataset[setting.attribute] = isColor(value) ? "custom" : value;
     }
-    if (isColor(settings[1].value)) {
-      root.style.setProperty("--color-primary", settings[1].value);
+    if (isColor(accent.value)) {
+      root.style.setProperty("--color-primary", accent.value);
     } else {
       root.style.removeProperty("--color-primary");
     }
@@ -69,7 +71,7 @@
     const reset = document.getElementById("appearance-reset");
     const warning = document.getElementById("appearance-contrast");
     syncControls = () => {
-      const custom = isColor(settings[1].value);
+      const custom = isColor(accent.value);
       for (const setting of settings) {
         document.getElementById(setting.id).value = isColor(setting.value) ? "custom" : setting.value;
       }
@@ -77,8 +79,8 @@
       const color = (name) => palette.getPropertyValue(`--color-${name}`).trim();
       primary.value = color("primary");
       document.getElementById("appearance-hex").textContent = primary.value;
-      document.getElementById("appearance-name").textContent = custom
-        ? "Custom primary" : `Nord ${settings[1].value}`;
+      document.getElementById("appearance-theme-note").hidden =
+        theme.value !== "dracula" || root.dataset.appearance !== "light";
       warning.hidden = !custom;
       if (custom) {
         const lowest = ["background", "sidebar", "surface", "selected"]
@@ -125,8 +127,8 @@
         status.textContent = "Choose a six-digit hex color, such as #b48ead.";
         return;
       }
-      change(settings[1], primary.value);
+      change(accent, primary.value);
     });
-    reset.addEventListener("click", () => change(settings[1], "purple"));
+    reset.addEventListener("click", () => change(accent, "purple"));
   });
 })();
