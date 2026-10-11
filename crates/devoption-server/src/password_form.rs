@@ -5,8 +5,8 @@
 //! Invalid escapes/UTF-8 are rejected rather than repaired; password bytes are not
 //! normalized or truncated. This is input validation, not enrollment strength policy.
 //!
-//! Only fixture routers use this extractor. Real routes must still enforce
-//! Host/Origin, enrollment, CSRF, authentication, and shared admission controls.
+//! Existing-owner HTTP sign-in uses this extractor after Host/Origin and CSRF
+//! checks, before shared authentication admission. Enrollment remains closed.
 //! This bounds one body, not total server connections or memory. Requires a Tokio
 //! runtime with its time driver enabled. Passwords must not enter responses or logs.
 

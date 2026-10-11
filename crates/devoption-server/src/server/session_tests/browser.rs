@@ -147,8 +147,8 @@ fn cookie_credentials_cannot_bypass_host_origin_rotation_or_logout() {
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
-/// Isolated, three-minute fixture for the documented manual browser transport check.
-/// Its activation route uses a fixed fixture password, not the product sign-in flow.
+/// Isolated, three-minute fixture for the documented browser transport check.
+/// It seeds only temporary storage; all auth routes are the production handlers.
 #[test]
 #[ignore = "manual browser fixture; see docs/browser-session-check.md"]
 fn manual_cookie_browser_fixture() {
@@ -157,24 +157,13 @@ fn manual_cookie_browser_fixture() {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let slot = Arc::new(SessionSlot::default());
-        let logout_slot = Arc::clone(&slot);
         let protected = protect(Router::new()
+            .route("/", get(|| async { Html("<!doctype html><title>Cookie fixture</title><p>Temporary cookie transport fixture.</p>") }))
             .route("/probe", post(move |Extension(id): Extension<IdentityId>| async move {
                 assert_eq!(id, identity);
                 StatusCode::NO_CONTENT
-            }))
-            .route("/logout", post(move |headers: HeaderMap| async move { browser_session::logout(&headers, &logout_slot) })), port, Arc::clone(&slot));
-        let app = protected
-            .route("/", get(|| async { Html("<!doctype html><title>Cookie fixture</title><p>Temporary cookie transport fixture.</p>") }))
-            .route("/fixture/activate", post(move |request: Request| {
-                let auth = auth.clone();
-                let slot = Arc::clone(&slot);
-                async move {
-                    let Some(host) = validated_host(&request, port) else { return StatusCode::BAD_REQUEST.into_response() };
-                    if !same_origin(&request, host, port) { return StatusCode::FORBIDDEN.into_response() }
-                    browser_session::activate(auth.sign_in(PASSWORD.into()).await.unwrap().unwrap(), &slot).unwrap()
-                }
-            }));
+            })), port, Arc::clone(&slot));
+        let app = auth::routes(auth, port, slot).merge(protected);
         println!("Cookie fixture: http://127.0.0.1:{port}/ (expires after 180 seconds)");
         axum::serve(listener, app).with_graceful_shutdown(async { tokio::time::sleep(Duration::from_secs(180)).await }).await.unwrap();
     });

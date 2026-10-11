@@ -1,8 +1,8 @@
 //! First-owner setup and password authentication against the durable owner store.
 //!
-//! Only temporary fixtures call these operations today. The [`service`] wrapper
-//! isolates blocking work and shares an attempt limit. Before HTTP integration,
-//! callers must authorize setup and enforce enrollment policy. The service can issue
+//! The [`service`] wrapper isolates blocking work and shares an attempt limit for
+//! existing-owner HTTP sign-in. Setup is still fixture-only: its callers must
+//! independently authorize enrollment and enforce password policy. The service can issue
 //! sessions after verification; these synchronous primitives only return identities.
 //! No directory selection, permission grant, password reset, or provider integration
 //! is performed here. Passwords and stored hashes must never enter responses or logs.

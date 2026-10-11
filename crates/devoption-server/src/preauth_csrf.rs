@@ -3,7 +3,7 @@
 //! Callers must validate Host/Origin before issuance or consumption, require POST,
 //! and consume before reading a password body or starting authentication work.
 //! A challenge grants no identity, session, or permission to enroll an owner.
-//! Only fixture routes use this adapter; production authentication remains closed.
+//! Existing-owner HTTP sign-in uses this adapter; enrollment remains closed.
 //!
 //! Keep one shared instance per server. Challenges expire without renewal, and
 //! successful consumption destroys server state even if later password work fails

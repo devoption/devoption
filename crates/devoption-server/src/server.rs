@@ -20,22 +20,27 @@ use tokio::{net::TcpListener, runtime::Builder};
 
 type SharedSession = Arc<SessionSlot>;
 
+#[cfg(unix)]
+mod auth;
 #[cfg(test)]
 mod session_tests;
 
 /// Run the loopback service from synchronous startup code, owning its Tokio runtime.
 /// Validate optional existing storage before binding and announce the address on stdout.
-/// Return startup or server I/O errors; no owner session is provisioned here.
+/// Return startup or server I/O errors; no session is issued at startup.
 pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
-    // Retain its descriptor through block_on so later integration can use the
-    // same anchor. Selecting storage grants no enrollment or HTTP permissions.
+    // Retain the same descriptor through the service. Selecting storage grants
+    // no enrollment permission; only an already-present owner can sign in.
     #[cfg(unix)]
-    let _owner_store = data_directory
+    let owner_auth = data_directory
         .map(|path| {
             let store = crate::owner_store::OwnerStore::open_absolute(path)?;
-            store.load()?;
-            Ok::<_, crate::owner_store::StoreError>(store)
+            let configured = store.load()?.is_some();
+            Ok::<_, crate::owner_store::StoreError>((
+                crate::owner_auth::service::OwnerAuthService::new(store),
+                configured,
+            ))
         })
         .transpose()
         .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?;
@@ -70,8 +75,18 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
                     "/settings/appearance",
                     get(|| async { Html(devoption_ui::render(Page::Appearance)) }),
                 );
-            // No production issuance or bootstrap yet: unsafe requests fail closed.
-            let app = protect(app, address.port(), Arc::new(SessionSlot::default()));
+            let session = Arc::new(SessionSlot::default());
+            let app = protect(app, address.port(), Arc::clone(&session));
+            #[cfg(unix)]
+            let app = match &owner_auth {
+                Some((auth, true)) => {
+                    // Merge the protected router last so its guarded fallback
+                    // still handles unknown paths, including absent setup routes.
+                    auth::routes(auth.clone(), address.port(), session).merge(app)
+                }
+                // Unconfigured storage never opens first-visitor enrollment.
+                _ => app,
+            };
             axum::serve(listener, app).await
         })
 }
@@ -101,7 +116,7 @@ fn protect(app: Router, port: u16, session: SharedSession) -> Router {
     protect_origin(app, port)
 }
 
-// Also shared by fixture pre-authentication routes, which cannot require an
+// Also shared by pre-authentication routes, which cannot require an
 // authenticated session. They must enforce their own CSRF/enrollment boundary.
 fn protect_origin(app: Router, port: u16) -> Router {
     app.layer(middleware::from_fn(
