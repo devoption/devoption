@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A password-form extractor now rejects ambiguous or malformed input before
+  authentication, preserves exact decoded UTF-8 bytes, and bounds encoded bodies
+  to 4 KiB with a five-second read deadline. Errors are empty and non-cacheable.
+  Only fixture routes use it; enrollment, cookie/CSRF protection, and browser
+  authentication endpoints remain unfinished
+  ([#67](https://github.com/devoption/devoption/issues/67)).
 - One authoritative session slot now connects issued grants to the HTTP validator.
   Activation atomically installs a valid grant without renewing its deadline;
   invalid grants preserve the current session, and logout requires its current

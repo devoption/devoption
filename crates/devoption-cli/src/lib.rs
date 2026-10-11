@@ -7,4 +7,5 @@ pub mod owner_auth;
 #[cfg(unix)]
 pub mod owner_store;
 pub mod password;
+pub mod password_form;
 pub mod session;

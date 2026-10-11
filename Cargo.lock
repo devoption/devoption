@@ -149,6 +149,8 @@ dependencies = [
  "axum",
  "devoption-ui",
  "getrandom",
+ "http-body",
+ "http-body-util",
  "rustix",
  "subtle",
  "tempfile",
