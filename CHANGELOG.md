@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- An HTTP-independent session validation core in the existing CLI package, with
+  constant-time comparison of 32-byte opaque tokens, a positive lifetime capped
+  at one hour, absolute monotonic expiry, and explicit revocation. Deterministic
+  tests cover invalid tokens and lifecycle boundaries. Only test fixtures create
+  sessions; the preview does not issue or accept them. HTTP integration, authorized
+  bootstrap, and CSRF protection remain open under
+  [#15](https://github.com/devoption/devoption/issues/15)
+  ([#49](https://github.com/devoption/devoption/issues/49)).
 - Same-origin validation before routing for methods other than GET, HEAD, OPTIONS,
   and TRACE. Exactly one HTTP Origin must match the validated request host and
   bound port; the two local aliases remain distinct origins. Missing, null,
