@@ -25,6 +25,13 @@ Open [127.0.0.1:3000](http://127.0.0.1:3000/). Use the profile menu to open
 Appearance settings. Press **Ctrl+C** in the terminal to stop the server.
 Run `cargo run --locked --offline -- --help` for command options.
 
+On Unix, `serve --data-dir /absolute/private/directory` optionally validates an
+existing owner-data directory before listening. It must belong to the current OS
+user, have no group/other permission bits, and use a path with no symlink components
+or `..`. Invalid owner records stop startup. This option retains the opened
+directory but creates no directories or accounts, changes no permissions, and does
+not enable browser setup or sign-in. Without it, the preview selects no data path.
+
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
 at its listening port. Unsafe requests require a matching Origin and a session;
 they are denied because session setup is not implemented yet. Preview pages remain

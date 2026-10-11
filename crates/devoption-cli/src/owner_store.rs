@@ -1,10 +1,12 @@
 //! Create-once owner storage for the Linux MVP and macOS development preview.
 //!
 //! Callers supply an existing private directory and an already-hashed password.
-//! The running preview does not use this store. No identity/salt generation,
+//! The preview can validate and retain this store when explicitly configured.
+//! No identity/salt generation,
 //! authentication, permission grants, reset, or migration is performed here.
 //! The directory's final component and record cannot be symlinks; operations stay
 //! anchored to the opened directory. This is not a boundary against its OS owner.
+//! The CLI's absolute-path opener also rejects symlinks in ancestor components.
 //! Interrupted writes may leave private temporary files, which are never loaded.
 
 use std::{
@@ -13,7 +15,7 @@ use std::{
     fs::{File, Metadata},
     io::{self, Read, Write},
     os::unix::fs::MetadataExt,
-    path::Path,
+    path::{Component, Path},
     sync::atomic::{AtomicU64, Ordering},
 };
 
@@ -55,6 +57,7 @@ impl OwnerRecord {
 pub enum StoreError {
     Io(io::Error),
     UnsafeDirectory,
+    UnsafePath,
     InvalidRecord,
     UnsupportedVersion,
     AlreadyExists,
@@ -65,6 +68,7 @@ impl fmt::Display for StoreError {
         f.write_str(match self {
             Self::Io(_) => "owner store I/O failed",
             Self::UnsafeDirectory => "owner directory must be private and owned by this OS user",
+            Self::UnsafePath => "data directory requires an absolute path without parent traversal",
             Self::InvalidRecord => "owner record is invalid or not private",
             Self::UnsupportedVersion => "owner record version is unsupported",
             Self::AlreadyExists => "owner record already exists; setup cannot replace it",
@@ -99,6 +103,32 @@ pub struct OwnerStore {
 }
 
 impl OwnerStore {
+    /// Open an explicit server data path without following any symlink component.
+    /// Each directory is opened relative to the preceding descriptor, starting at
+    /// the filesystem root. No canonicalization, creation, or permission repair.
+    /// Ancestors need not be private; the final directory must pass our ownership
+    /// and mode checks. This does not isolate the service from its OS owner or
+    /// implement ACL policy. Renaming an ancestor cannot redirect the opened store.
+    pub fn open_absolute(path: &Path) -> Result<Self, StoreError> {
+        if !path.is_absolute()
+            || path
+                .components()
+                .any(|part| matches!(part, Component::ParentDir | Component::Prefix(_)))
+        {
+            return Err(StoreError::UnsafePath);
+        }
+        let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+        let mut directory = File::from(open("/", flags, Mode::empty())?);
+        for part in path.components() {
+            if let Component::Normal(name) = part {
+                directory = File::from(openat(&directory, name, flags, Mode::empty())?);
+            }
+        }
+        let store = Self { directory };
+        store.check_directory()?;
+        Ok(store)
+    }
+
     pub fn open(path: &Path) -> Result<Self, StoreError> {
         // Trim trailing separators and `.` so NOFOLLOW checks the directory name.
         // This lexical view preserves `..` and does not resolve symlinks.

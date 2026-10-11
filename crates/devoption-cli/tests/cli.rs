@@ -11,6 +11,8 @@ fn help_explains_the_actual_scope() {
         assert!(output.stderr.is_empty());
         let text = String::from_utf8(output.stdout).unwrap();
         assert!(text.contains("Usage: devoption"));
+        assert!(text.contains("--data-dir ABSOLUTE_PATH"));
+        assert!(text.contains("No directories or accounts are created"));
         assert!(text.contains("services are not implemented"));
     }
 }
@@ -43,6 +45,12 @@ fn invalid_commands_fail_without_success_output() {
         vec!["serve", "--port", "-1"],
         vec!["serve", "--host", "0.0.0.0"],
         vec!["serve", "--port", "0", "extra"],
+        vec!["serve", "--port", "0", "--port", "0"],
+        vec!["serve", "--data-dir"],
+        vec!["serve", "--data-dir", ""],
+        vec!["serve", "--data-dir", "relative"],
+        vec!["serve", "--data-dir", "--port", "0"],
+        vec!["serve", "--data-dir", "/unused", "--data-dir", "/unused"],
     ] {
         let output = Command::new(env!("CARGO_BIN_EXE_devoption"))
             .args(args)

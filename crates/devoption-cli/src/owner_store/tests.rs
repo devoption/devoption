@@ -35,6 +35,58 @@ fn write_fixture(path: &Path, bytes: &[u8]) {
 }
 
 #[test]
+fn explicit_absolute_paths_reject_traversal_and_every_symlink_component() {
+    let temporary = private_directory();
+    let root = temporary.path().canonicalize().unwrap();
+    let data = root.join("data");
+    DirBuilder::new().mode(0o700).create(&data).unwrap();
+    symlink(&data, root.join("alias")).unwrap();
+    symlink(&root, root.join("ancestor")).unwrap();
+    for path in [
+        Path::new("").to_path_buf(),
+        Path::new("relative").to_path_buf(),
+        data.join(".."),
+        root.join("alias"),
+        root.join("alias/"),
+        root.join("alias/./"),
+        root.join("ancestor/data"),
+        root.join("ancestor/./data"),
+        root.join("missing"),
+    ] {
+        assert!(OwnerStore::open_absolute(&path).is_err(), "{path:?}");
+    }
+    let mut trailing = data.as_os_str().to_os_string();
+    trailing.push("//./");
+    for path in [data.as_path(), Path::new(&trailing), &data.join(".")] {
+        assert!(
+            OwnerStore::open_absolute(path)
+                .unwrap()
+                .load()
+                .unwrap()
+                .is_none()
+        );
+    }
+    assert_eq!(fs::read_dir(&data).unwrap().count(), 0);
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 3);
+}
+
+#[test]
+fn explicit_path_keeps_its_directory_anchor_after_rename() {
+    let temporary = private_directory();
+    let root = temporary.path().canonicalize().unwrap();
+    let data = root.join("data");
+    DirBuilder::new().mode(0o700).create(&data).unwrap();
+    let store = OwnerStore::open_absolute(&data).unwrap();
+    let moved = root.join("moved");
+    fs::rename(&data, &moved).unwrap();
+    symlink(&moved, &data).unwrap();
+    assert!(OwnerStore::open_absolute(&data).is_err());
+    store.create(IDENTITY, fixture_hash()).unwrap();
+    assert_eq!(store.load().unwrap().unwrap().identity(), IDENTITY);
+    assert!(moved.join(RECORD_NAME).is_file());
+}
+
+#[test]
 fn record_survives_reopen_without_plaintext_or_session_data() {
     let directory = private_directory();
     let store = OwnerStore::open(directory.path()).unwrap();

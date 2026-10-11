@@ -1,4 +1,4 @@
-use std::{io, net::Ipv4Addr, sync::Arc};
+use std::{io, net::Ipv4Addr, path::Path, sync::Arc};
 
 use axum::{
     Router,
@@ -23,7 +23,26 @@ type SharedSession = Arc<SessionSlot>;
 #[cfg(test)]
 mod session_tests;
 
-pub fn run(port: u16) -> io::Result<()> {
+pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
+    // Validate storage before binding; only an absent record is unconfigured.
+    // Retain its descriptor through block_on so later integration can use the
+    // same anchor. Selecting storage grants no enrollment or HTTP permissions.
+    #[cfg(unix)]
+    let _owner_store = data_directory
+        .map(|path| {
+            let store = devoption_cli::owner_store::OwnerStore::open_absolute(path)?;
+            store.load()?;
+            Ok::<_, devoption_cli::owner_store::StoreError>(store)
+        })
+        .transpose()
+        .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?;
+    #[cfg(not(unix))]
+    if data_directory.is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "data-directory storage requires Unix",
+        ));
+    }
     Builder::new_current_thread()
         .enable_all()
         .build()?
