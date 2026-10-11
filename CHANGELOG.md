@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Browser cookie transport now connects the HTTP mutation guard to session-bound
+  CSRF validation. Fixture-only activation/logout helpers issue and clear a
+  host-only Secure, HttpOnly, SameSite=Strict cookie; mixed or ambiguous credentials
+  fail closed. Pre-authentication CSRF, enrollment authorization, and browser
+  endpoints remain unfinished. A [manual fixture check](docs/browser-session-check.md)
+  documents browser verification ([#73](https://github.com/devoption/devoption/issues/73)).
 - Issued owner sessions now bind a separate random synchronizer CSRF token.
   Browser validation and logout require the matching live token pair in the
   shared session slot; rotation and expiry invalidate both. This is fixture-tested

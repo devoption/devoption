@@ -6,8 +6,9 @@
 //! immediately. Limits are in memory: a new service or process starts fresh.
 //!
 //! Only temporary fixtures use this service today. HTTP integration still needs
-//! enrollment authorization/policy, cookie transport, pre-authentication CSRF, and
-//! browser activation endpoints. This grants no permissions.
+//! enrollment authorization/policy, pre-authentication CSRF, and browser activation
+//! endpoints. Cookie transport is a separate fixture-tested adapter. This grants
+//! no permissions.
 
 use std::{
     collections::VecDeque,
@@ -41,7 +42,7 @@ pub struct IssuedSession {
 }
 
 /// Credentials released only after successful activation; neither Debug nor Clone.
-/// Future transport must keep the session credential in an HttpOnly cookie and
+/// Transport must keep the session credential in an HttpOnly cookie and
 /// send the separate CSRF token in a protected response, then require it explicitly
 /// on mutations. Never place either token in logs, URLs, or browser-local storage.
 pub struct BrowserCredentials {
@@ -76,7 +77,7 @@ impl IssuedSession {
     }
 
     /// Activate the grant before releasing its session and synchronizer CSRF tokens.
-    /// HTTP enrollment/sign-in protection and cookie transport are not implemented.
+    /// HTTP enrollment/sign-in protection remains separate from the transport adapter.
     pub fn activate_browser(
         self,
         slot: &SessionSlot,
