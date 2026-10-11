@@ -3,11 +3,33 @@ pub enum Page {
     Home,
     Projects,
     About,
+    Appearance,
 }
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
+const APPEARANCE_CONTROLS: &str = r#"
+      <section class="appearance" aria-label="Appearance preferences">
+        <p class="theme-preview"><span class="theme-swatch" aria-hidden="true"></span><span><span id="appearance-name">Nord purple</span><small>Current theme</small></span></p>
+        <div class="mode-choice">
+          <label for="appearance-mode">Mode</label>
+          <select id="appearance-mode" aria-describedby="appearance-status" disabled>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">System</option>
+          </select>
+        </div>
+        <div class="mode-choice">
+          <label for="appearance-accent">Accent</label>
+          <select id="appearance-accent" aria-describedby="appearance-status" disabled>
+            <option value="purple">Purple</option>
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+          </select>
+        </div>
+        <p id="appearance-status" role="status">Enable JavaScript to change appearance.</p>
+      </section>"#;
 
 /// Render a complete HTML document independently of the HTTP server.
 pub fn render(page: Page) -> String {
@@ -20,6 +42,16 @@ pub fn render(page: Page) -> String {
             "Project management is not available yet.",
         ),
         Page::About => ("About", "/about", "No about content yet."),
+        Page::Appearance => (
+            "Appearance",
+            "/settings/appearance",
+            "Choose how DevOption looks in this browser.",
+        ),
+    };
+    let (appearance_current, content) = if path == "/settings/appearance" {
+        (" aria-current=\"page\"", APPEARANCE_CONTROLS)
+    } else {
+        ("", "")
     };
     let navigation: String = [
         ("/", "Home", "M3 10 12 3l9 7v11h-6v-7H9v7H3Z"),
@@ -68,27 +100,7 @@ pub fn render(page: Page) -> String {
       <section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">
         <h2 id=\"profile-title\">Local preview</h2>
         <p class=\"profile-note\">Account features are not available yet.</p>
-        <details class=\"appearance\">
-          <summary>Appearance</summary>
-          <p class=\"theme-preview\"><span class=\"theme-swatch\" aria-hidden=\"true\"></span><span><span id=\"appearance-name\">Nord purple</span><small>Current theme</small></span></p>
-          <div class=\"mode-choice\">
-            <label for=\"appearance-mode\">Mode</label>
-            <select id=\"appearance-mode\" aria-describedby=\"appearance-status\" disabled>
-              <option value=\"dark\">Dark</option>
-              <option value=\"light\">Light</option>
-              <option value=\"system\">System</option>
-            </select>
-          </div>
-          <div class=\"mode-choice\">
-            <label for=\"appearance-accent\">Accent</label>
-            <select id=\"appearance-accent\" aria-describedby=\"appearance-status\" disabled>
-              <option value=\"purple\">Purple</option>
-              <option value=\"blue\">Blue</option>
-              <option value=\"green\">Green</option>
-            </select>
-          </div>
-          <p id=\"appearance-status\" role=\"status\">Enable JavaScript to change appearance.</p>
-        </details>
+        <a class=\"profile-link\" href=\"/settings/appearance\"{appearance_current}>Appearance</a>
       </section>
     </div>
   </aside>
@@ -97,6 +109,7 @@ pub fn render(page: Page) -> String {
     <main id=\"main-content\" tabindex=\"-1\">
       <h1>{title}</h1>
       <p>{message}</p>
+      {content}
     </main>
   </div>
 </body>

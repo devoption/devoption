@@ -70,6 +70,11 @@ fn pages_share_layout_and_have_working_navigation() {
             "Project management is not available yet.",
         ),
         ("/about", "About", "No about content yet."),
+        (
+            "/settings/appearance",
+            "Appearance",
+            "Choose how DevOption looks in this browser.",
+        ),
     ] {
         let get = request(
             address,
@@ -115,37 +120,48 @@ fn pages_share_layout_and_have_working_navigation() {
         assert!(body.contains("<header class=\"content-header\">"));
         assert!(body.contains("In development</p>"));
         assert!(body.contains("popovertarget=\"profile-popup\" aria-label=\"Profile menu\""));
-        let (before, popup) = body
+        let (_, popup) = body
             .split_once("<section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">")
             .unwrap();
-        let (popup, after) = popup.split_once("</section>").unwrap();
+        let (popup, _) = popup.split_once("</section>").unwrap();
         assert!(popup.contains("id=\"profile-title\""));
         assert!(popup.contains("Account features are not available yet."));
-        assert!(popup.contains("<summary>Appearance</summary>"));
-        assert!(popup.contains("for=\"appearance-mode\""));
-        assert!(
-            popup
-                .contains("id=\"appearance-mode\" aria-describedby=\"appearance-status\" disabled")
-        );
-        assert!(popup.contains("<option value=\"dark\">Dark</option>"));
-        assert!(popup.contains("<option value=\"light\">Light</option>"));
-        assert!(popup.contains("<option value=\"system\">System</option>"));
-        assert!(popup.contains("<label for=\"appearance-accent\">Accent</label>"));
-        assert!(
-            popup.contains(
-                "id=\"appearance-accent\" aria-describedby=\"appearance-status\" disabled"
-            )
-        );
-        for (value, label) in [("purple", "Purple"), ("blue", "Blue"), ("green", "Green")] {
-            assert!(popup.contains(&format!("<option value=\"{value}\">{label}</option>")));
+        let appearance_page = path == "/settings/appearance";
+        let current = if appearance_page {
+            " aria-current=\"page\""
+        } else {
+            ""
+        };
+        assert!(popup.contains(&format!(
+            "href=\"/settings/appearance\"{current}>Appearance</a>"
+        )));
+        assert!(!popup.contains("<select"));
+        assert!(!popup.contains("Current theme"));
+        assert!(body.find("</script>").unwrap() < body.find("</head>").unwrap());
+        let main = body.split_once("<main id=\"main-content\"").unwrap().1;
+        assert_eq!(body.contains("Current theme"), appearance_page);
+        assert_eq!(body.contains("<select"), appearance_page);
+        if appearance_page {
+            assert!(main.contains("aria-label=\"Appearance preferences\""));
+            assert!(main.contains("id=\"appearance-name\">Nord purple</span>"));
+            assert!(main.contains("id=\"appearance-status\" role=\"status\""));
+            for setting in ["mode", "accent"] {
+                assert!(main.contains(&format!("<label for=\"appearance-{setting}\">")));
+                assert!(main.contains(&format!(
+                    "id=\"appearance-{setting}\" aria-describedby=\"appearance-status\" disabled"
+                )));
+            }
+            for (value, label) in [
+                ("dark", "Dark"),
+                ("light", "Light"),
+                ("system", "System"),
+                ("purple", "Purple"),
+                ("blue", "Blue"),
+                ("green", "Green"),
+            ] {
+                assert!(main.contains(&format!("<option value=\"{value}\">{label}</option>")));
+            }
         }
-        assert!(popup.contains("id=\"appearance-name\">Nord purple</span>"));
-        assert!(popup.contains("id=\"appearance-status\" role=\"status\""));
-        assert!(before.contains("<script>"));
-        assert!(before.find("</script>").unwrap() < before.find("</head>").unwrap());
-        assert!(popup.contains("Nord purple"));
-        assert!(!before.contains("Nord purple"));
-        assert!(!after.contains("Nord purple"));
 
         let head = request(
             address,
@@ -164,7 +180,7 @@ fn errors_do_not_stop_the_server() {
         "GET /missing HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
     );
     assert!(missing.starts_with("HTTP/1.1 404 Not Found"));
-    for path in ["/", "/projects", "/about"] {
+    for path in ["/", "/projects", "/about", "/settings/appearance"] {
         let post = request(
             address,
             &format!(

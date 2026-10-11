@@ -2,13 +2,15 @@
 
 These images show the real local app, including its current empty placeholders.
 Keep one default-mode image per main page at a stable filename; Git records earlier
-versions. `appearance-light.jpg` additionally shows the working Appearance control.
+versions. `appearance-light.jpg` additionally shows Appearance following a light
+device preference.
 
 | Page | Local URL | File |
 | --- | --- | --- |
 | Home | http://127.0.0.1:3000/ | `home.jpg` |
 | Projects | http://127.0.0.1:3000/projects | `projects.jpg` |
 | About | http://127.0.0.1:3000/about | `about.jpg` |
+| Appearance | http://127.0.0.1:3000/settings/appearance | `appearance.jpg` |
 
 From the repository root, start the app after the [normal setup](../../README.md#try-it-locally):
 
@@ -19,7 +21,7 @@ cargo run --locked --offline -- serve
 1. If source or assets changed, stop and restart the server, then refresh the page.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   In the profile popup's Appearance section, choose **Dark** and **Purple** for
+   Follow the profile popup's **Appearance** link. Choose **Dark** and **Purple** for
    the main-page captures. The browser remembers these choices.
 3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
    outline, open menu, or developer overlay in the capture.
@@ -28,9 +30,9 @@ cargo run --locked --offline -- serve
 5. Inspect the saved images for readable text, complete content, and the correct
    active navigation link. Check their embeds in the root README before committing.
 
-For `appearance-light.jpg`, open Projects and use browser developer tools to
-emulate a light device color scheme. Select **System** and **Blue** in Appearance,
-and leave the popup expanded with the save confirmation visible. Capture the
+For `appearance-light.jpg`, open `/settings/appearance` and use browser developer
+tools to emulate a light device color scheme. Select **System** and **Blue**,
+with the save confirmation visible and the profile popup closed. Capture the
 same viewport, then clear device emulation and return to **Dark** and **Purple**.
 Refresh this image when the controls or light palette changes. Never capture
 unrelated browser or profile data.
