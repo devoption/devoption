@@ -52,6 +52,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Moved existing Appearance controls to `/settings/appearance`, with a compact
+  link in the profile popup and the same saved preferences. Preferences also
+  refresh when browser history restores a page. Added route/history tests and
+  dedicated-page screenshots; recaptured the default main pages
+  ([#35](https://github.com/devoption/devoption/issues/35)).
 - Recreated the approved sidebar/header shell, with spacious content, responsive
   navigation, and a compact local-preview popup containing read-only Appearance
   information; refreshed all main-page screenshots

@@ -11,22 +11,24 @@ const accentKey = "devoption.accent";
 
 // Run the shipped script against storage faults and a minimal event-driven DOM.
 // Real browser checks cover native select/popover behavior and rendered layout.
-function page(saved = new Map(), faults = {}, deviceDark = false) {
+function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = true) {
   const choice = Object.assign(new EventTarget(), { value: "dark", disabled: true });
   const accent = Object.assign(new EventTarget(), { value: "purple", disabled: true });
   const name = { textContent: "Nord purple" };
   const status = { textContent: "Enable JavaScript to change appearance." };
   const deviceScheme = Object.assign(new EventTarget(), { matches: deviceDark });
   const writes = [];
+  const window = new EventTarget();
   const document = Object.assign(new EventTarget(), {
     documentElement: { dataset: {} },
-    getElementById: (id) => ({
+    getElementById: (id) => hasControls ? ({
       "appearance-mode": choice, "appearance-accent": accent,
       "appearance-name": name, "appearance-status": status,
-    })[id],
+    })[id] : null,
   });
   runInNewContext(script, {
     document,
+    window,
     matchMedia(query) {
       assert.equal(query, "(prefers-color-scheme: dark)");
       return deviceScheme;
@@ -53,6 +55,9 @@ function page(saved = new Map(), faults = {}, deviceDark = false) {
     name,
     status,
     writes,
+    restore() {
+      window.dispatchEvent(Object.assign(new Event("pageshow"), { persisted: true }));
+    },
     changeDevice(dark) {
       deviceScheme.matches = dark;
       deviceScheme.dispatchEvent(new Event("change"));
@@ -83,6 +88,53 @@ test("a fresh browser starts dark-purple without writing preferences", () => {
   assert.equal(current.accent.value, "purple");
   assert.equal(current.name.textContent, "Nord purple");
   assert.equal(saved.size, 0);
+});
+
+test("pages without controls still apply preferences, follow System, and restore history", () => {
+  const saved = new Map([[key, "system"], [accentKey, "blue"]]);
+  const current = page(saved, {}, false, false);
+  current.ready();
+  assert.equal(current.root.dataset.appearance, "light");
+  assert.equal(current.root.dataset.accent, "blue");
+  current.changeDevice(true);
+  assert.equal(current.root.dataset.appearance, "dark");
+  const settings = page(saved);
+  settings.ready();
+  settings.choose("light");
+  settings.chooseAccent("green");
+  current.restore();
+  assert.equal(current.root.dataset.appearance, "light");
+  assert.equal(current.root.dataset.accent, "green");
+  current.changeDevice(false);
+  current.changeDevice(true);
+  assert.equal(current.root.dataset.appearance, "light");
+  assert.equal(current.writes.length, 0);
+});
+
+test("history restores Appearance controls and feedback without adding listeners or saving", () => {
+  const saved = new Map([[key, "dark"], [accentKey, "purple"]]);
+  const current = page(saved);
+  current.ready();
+  saved.set(key, "system");
+  saved.set(accentKey, "green");
+  current.restore();
+  assert.equal(current.choice.value, "system");
+  assert.equal(current.accent.value, "green");
+  assert.equal(current.root.dataset.appearance, "light");
+  assert.equal(current.name.textContent, "Nord green");
+  assert.equal(current.writes.length, 0);
+  current.restore();
+  current.chooseAccent("blue");
+  assert.equal(current.writes.length, 1);
+
+  const faults = {};
+  const blocked = page(saved, faults);
+  blocked.ready();
+  faults.read = key;
+  blocked.restore();
+  assert.equal(blocked.choice.value, "dark");
+  assert.equal(blocked.accent.value, "blue");
+  assert.match(blocked.status.textContent, /could not be read/);
 });
 
 test("all six combinations persist independently and apply before content is ready", () => {

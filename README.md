@@ -6,8 +6,9 @@ factory: a place to manage the work of building, testing, and running software.
 **Today this repository is a small foundation, not a working software factory.**
 It contains a Rust workspace, a command-line program with a localhost-only HTTP
 server, behavioral tests, and contribution and release checks. The server shows
-empty Home, Projects, and About pages in a shared sidebar layout. It does not create
-files, provision infrastructure, or contact a service. There is no installer,
+empty Home, Projects, and About pages and browser-local Appearance settings in a
+shared sidebar layout. It does not create files, provision infrastructure, or
+contact a service. There is no installer,
 project management, runtime cluster, or published release yet.
 
 ## Screenshots
@@ -27,9 +28,13 @@ mode. All are empty placeholders; the screenshots show the shared shell.
 
 ![DevOption About page with About selected and “No about content yet.”](docs/screenshots/about.jpg)
 
+**Appearance (`/settings/appearance`)**
+
+![The dedicated Appearance page with the default Dark mode and Purple accent](docs/screenshots/appearance.jpg)
+
 **Appearance (System following a light device preference, blue accent)**
 
-![The Appearance section with System and Blue selected, following an emulated light device preference](docs/screenshots/appearance-light.jpg)
+![The Appearance page with System and Blue selected, following an emulated light device preference](docs/screenshots/appearance-light.jpg)
 
 See the [capture instructions](docs/screenshots/README.md) when updating the UI.
 
@@ -83,20 +88,23 @@ selected primary accent from the basic [Nord palette](https://www.nordtheme.com/
 light mode uses darker counterparts for contrast.
 Shared color, spacing, and typography values live in
 `crates/devoption-ui/assets/theme.css`. The profile button opens a small local-preview
-popup. Open **Appearance**, then choose **Dark**, **Light**, or **System** under
-**Mode**, and **Purple**, **Blue**, or **Green** under **Accent**. Dark and Purple
-are the defaults.
+popup with an **Appearance** link. Follow it to `/settings/appearance`, then choose
+**Dark**, **Light**, or **System** under **Mode**, and **Purple**, **Blue**, or
+**Green** under **Accent**. Dark and Purple are the defaults.
 System follows the device color scheme reported by your browser, including changes
 while the page is open. It keeps your chosen accent. Explicit Dark and Light choices
 stay fixed when the device preference changes.
 Each choice is saved only in this browser for this address and port; it applies
-when navigating or reloading. Other open tabs pick it up when reloaded. Missing
-or invalid values use that setting's default without resetting the other choice.
+when navigating, reloading, or returning with Back/Forward. Other open tabs pick
+it up when reloaded. Missing or invalid values use that setting's default without
+resetting the other choice.
 Existing saved mode choices are preserved. If browser storage
 is blocked or full, the page stays usable and Appearance explains any read/save
 failure; an unsaved change lasts only for the current page. JavaScript is required
 to change either setting; without it, the pages still work in dark mode with Purple.
 
+The current theme preview and controls appear only on the Appearance page.
+Use the shared navigation or your browser's Back button to return to other pages.
 Account features and additional palettes are not implemented. The popup uses
 native HTML popover support in modern browsers; Escape or a click outside closes
 it. On narrow screens, navigation moves above the content.

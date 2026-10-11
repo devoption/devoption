@@ -64,9 +64,9 @@ body {
   background: var(--color-background);
 }
 a { color: inherit; text-decoration: none; }
-button, summary, select { color: inherit; font: inherit; cursor: pointer; }
+button, select { color: inherit; font: inherit; cursor: pointer; }
 button { border: 0; }
-a:focus-visible, button:focus-visible, summary:focus-visible, select:focus-visible {
+a:focus-visible, button:focus-visible, select:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 4px;
 }
@@ -146,9 +146,11 @@ main > p { font-size: 1.125rem; max-width: 42rem; }
 }
 #profile-popup h2 { margin: 0 0 var(--space-1); font-size: var(--text-body); font-weight: 600; }
 .profile-note { font-size: var(--text-small); }
-.appearance { margin-top: var(--space-4); }
-.appearance summary { padding: var(--space-2) 0; }
-.theme-preview { display: flex; align-items: center; gap: var(--space-3); padding-top: var(--space-3); }
+.profile-link { display: block; margin-top: var(--space-3); padding: var(--space-2); border-radius: var(--space-1); }
+.profile-link:hover, .profile-link[aria-current] { background: var(--color-selected); }
+.profile-link[aria-current] { font-weight: 600; }
+.appearance { max-width: 28rem; margin-top: var(--space-6); padding: var(--space-6); border: 1px solid var(--color-border); border-radius: var(--space-3); background: var(--color-surface); }
+.theme-preview { display: flex; align-items: center; gap: var(--space-3); }
 .theme-preview small { display: block; font-size: 0.75rem; color: var(--color-muted); }
 .theme-swatch { width: 2rem; height: 2rem; border-radius: var(--space-2); border: 1px solid var(--color-primary); background: linear-gradient(135deg, var(--color-background) 60%, var(--color-primary) 60%); }
 .mode-choice { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-4); }

@@ -26,6 +26,10 @@ pub fn run(port: u16) -> io::Result<()> {
                 .route(
                     "/about",
                     get(|| async { Html(devoption_ui::render(Page::About)) }),
+                )
+                .route(
+                    "/settings/appearance",
+                    get(|| async { Html(devoption_ui::render(Page::Appearance)) }),
                 );
             axum::serve(listener, app).await
         })
