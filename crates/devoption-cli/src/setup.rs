@@ -29,12 +29,12 @@ pub fn run(path: &Path) -> Result<(), String> {
     terminal
         .restore()
         .map_err(|_| "could not restore terminal; setup cancelled".to_owned())?;
-    terminal
-        .check_cancelled()
-        .map_err(|error| error.to_string())?;
-    setup
-        .complete(&password, &confirmation)
-        .map_err(|error| error.to_string())?;
+    terminal.signals.complete(|| {
+        setup
+            .complete(&password, &confirmation)
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    })?;
     println!("Owner created. Start or restart serve with the same --data-dir to enable sign-in.");
     Ok(())
 }
@@ -45,6 +45,7 @@ fn input_error(message: &'static str) -> io::Error {
 
 struct Signals {
     cancelled: Arc<AtomicBool>,
+    exit_on_signal: Arc<AtomicBool>,
     registrations: Vec<SigId>,
 }
 
@@ -52,15 +53,35 @@ impl Signals {
     fn register() -> io::Result<Self> {
         let mut signals = Self {
             cancelled: Arc::new(AtomicBool::new(false)),
+            exit_on_signal: Arc::new(AtomicBool::new(false)),
             registrations: Vec::new(),
         };
         for signal in [SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGTSTP] {
+            signals
+                .registrations
+                .push(signal_hook::flag::register_conditional_shutdown(
+                    signal,
+                    128 + signal,
+                    Arc::clone(&signals.exit_on_signal),
+                )?);
             signals.registrations.push(signal_hook::flag::register(
                 signal,
                 Arc::clone(&signals.cancelled),
             )?);
         }
         Ok(signals)
+    }
+
+    /// Call only after restoring the terminal. Cancellation during completion
+    /// must stop execution, not set a flag that blocking hashing/storage ignores.
+    fn complete(&self, operation: impl FnOnce() -> Result<(), String>) -> Result<(), String> {
+        self.exit_on_signal.store(true, Ordering::SeqCst);
+        // Preserve cancellation received before switching the handlers, including
+        // the interval between the last input read and terminal restoration.
+        if self.cancelled.load(Ordering::SeqCst) {
+            return Err("setup cancelled".to_owned());
+        }
+        operation()
     }
 }
 
@@ -195,5 +216,77 @@ impl Terminal {
 impl Drop for Terminal {
     fn drop(&mut self) {
         let _ = self.restore();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{os::unix::fs::PermissionsExt, process::Command};
+
+    #[test]
+    fn completion_signal_fixture() {
+        let Ok(signal) = std::env::var("DEVOPTION_FIXTURE_COMPLETION_SIGNAL") else {
+            return;
+        };
+        let signal: i32 = signal.parse().unwrap();
+        let path = std::env::var_os("DEVOPTION_FIXTURE_OWNER_DIR").unwrap();
+        let setup = LocalSetup::open(Path::new(&path)).unwrap();
+        let signals = Signals::register().unwrap();
+        signals
+            .complete(|| {
+                // This callback is the same completion boundary as the production
+                // hashing/storage call. A swallowed signal would publish an owner.
+                signal_hook::low_level::raise(signal).unwrap();
+                setup
+                    .complete("public fixture phrase", "public fixture phrase")
+                    .unwrap();
+                Ok(())
+            })
+            .unwrap();
+        panic!("cancellation returned to owner creation");
+    }
+
+    #[test]
+    fn completion_signals_exit_before_publication_instead_of_being_swallowed() {
+        for signal in [SIGINT, SIGTERM, SIGHUP, SIGQUIT, SIGTSTP] {
+            let temporary = tempfile::tempdir().unwrap();
+            std::fs::set_permissions(temporary.path(), std::fs::Permissions::from_mode(0o700))
+                .unwrap();
+            let path = std::fs::canonicalize(temporary.path()).unwrap();
+            let output = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "setup::tests::completion_signal_fixture",
+                    "--test-threads=1",
+                ])
+                .env("DEVOPTION_FIXTURE_COMPLETION_SIGNAL", signal.to_string())
+                .env("DEVOPTION_FIXTURE_OWNER_DIR", &path)
+                .output()
+                .unwrap();
+            assert_eq!(
+                output.status.code(),
+                Some(128 + signal),
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert_eq!(std::fs::read_dir(path).unwrap().count(), 0);
+            assert!(!String::from_utf8_lossy(&output.stdout).contains("public fixture phrase"));
+        }
+    }
+
+    #[test]
+    fn cancellation_before_completion_never_runs_the_operation() {
+        let signals = Signals {
+            cancelled: Arc::new(AtomicBool::new(true)),
+            exit_on_signal: Arc::new(AtomicBool::new(false)),
+            registrations: Vec::new(),
+        };
+        assert!(
+            signals
+                .complete(|| panic!("cancelled completion ran"))
+                .is_err()
+        );
     }
 }

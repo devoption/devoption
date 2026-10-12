@@ -35,6 +35,10 @@ Plaintext exists briefly in process memory; secure memory erasure is not promise
 After confirmation, existing auth/storage code generates a random identity and
 salt, hashes the password with Argon2id, and atomically publishes one private owner
 record. It rechecks storage, so another setup attempt cannot replace the winner.
+The terminal is restored before this work. The cancellation signals listed above
+then terminate the command immediately with exit status `128 + signal number`,
+instead of setting a flag that hashing/storage would not observe. Cancellation
+already received during input or restoration prevents this work from starting.
 No session is issued. An interruption or I/O failure after publication may leave
 an owner record: inspect its state and never delete it just to retry setup. This
 command is not a password reset or recovery mechanism.

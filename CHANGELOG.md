@@ -10,6 +10,8 @@ Entries describe implemented changes, not the roadmap.
 - Explicit local/SSH first-owner setup with hidden, bounded password confirmation,
   terminal cancellation/restoration, server-owned enrollment policy, and existing
   private create-once storage. Temporary PTY fixtures cover input and failure paths.
+  After terminal restoration, cancellation signals exit immediately so blocking
+  hashing/storage cannot silently ignore them; subprocess fixtures cover this phase.
   Browser installation is deferred; sign-in forms remain unfinished
   ([#84](https://github.com/devoption/devoption/issues/84)).
 - A locally armed enrollment authorization core, bound to one owner service/store.
