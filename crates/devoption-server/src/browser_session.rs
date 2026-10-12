@@ -1,7 +1,7 @@
 //! Cookie transport for the loopback browser session.
 //!
-//! HTTP callers must first validate Host and Origin. Browser mutations require an
-//! explicitly submitted CSRF header as well as the HttpOnly session cookie. This
+//! HTTP callers must first validate Host. Browser mutations also require matching
+//! Origin and an explicitly submitted CSRF header with the HttpOnly session cookie. This
 //! does not protect pre-authentication flows or authorize first-owner enrollment.
 //!
 //! Secure cookies require browser support for secure loopback contexts; never
@@ -55,6 +55,14 @@ pub fn activate(grant: IssuedSession, slot: &SessionSlot) -> Result<Response, Ac
 pub fn authenticate(headers: &HeaderMap, slot: &SessionSlot) -> Option<IdentityId> {
     let (session, csrf) = credentials(headers)?;
     slot.authenticate_browser(Some(&session), Some(&csrf))
+}
+
+/// Authenticate a GET/HEAD page read using only the strict session cookie.
+/// The caller must validate Host and restrict this to reads; mutations still
+/// require `authenticate` with explicit CSRF. No bearer fallback or renewal.
+pub(crate) fn authenticate_read(headers: &HeaderMap, slot: &SessionSlot) -> Option<IdentityId> {
+    let token = named_session(headers, COOKIE_NAME)?;
+    slot.authenticate(Some(&token))
 }
 
 /// Recover the current session's CSRF token using only its strict session cookie.

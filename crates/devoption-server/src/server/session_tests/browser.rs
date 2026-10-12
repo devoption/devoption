@@ -162,7 +162,7 @@ fn manual_cookie_browser_fixture() {
             let port = listener.local_addr().unwrap().port();
             let slot = Arc::new(SessionSlot::default());
             let protected = protect(
-                page_routes(true).route(
+                page_routes(true, Arc::clone(&slot)).route(
                     "/probe",
                     post(move |Extension(id): Extension<IdentityId>| async move {
                         assert_eq!(id, identity);

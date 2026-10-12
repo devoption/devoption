@@ -6,11 +6,11 @@
 //! Issued sessions also retain a separate synchronizer CSRF token. Browser mutation
 //! validation requires both tokens from the same live session. Cookie transport is
 //! separate; existing-owner HTTP sign-in uses a pre-authentication CSRF adapter,
-//! while enrollment authorization and browser forms remain unfinished.
+//! while first-owner creation stays in the local/SSH CLI.
 //! Revocation affects this object; constructing another with the same token would
 //! defeat it. There is no persistence, renewal, or secure memory-erasure guarantee.
-//! The HTTP guard checks the active session on unsafe requests. The complete
-//! browser setup/sign-in flow remains separate work under #15.
+//! HTTP guards check unsafe requests and configured page reads. Cookie-only page
+//! authorization does not replace explicit CSRF validation for mutations.
 
 use std::{
     error::Error,

@@ -15,12 +15,15 @@ Open the printed URL in a fresh browser profile/context. The fixture includes th
 production pages and stops after ten minutes; rerun it if necessary. The fixture
 password is `browser transport fixture only`. It is never a real account password.
 
-For the UI check, use the profile menu to open **Sign in**. Submit an incorrect
-password, then the fixture password. Confirm fixed feedback, password clearing,
+For the UI check, open `/projects` while signed out and confirm a redirect to
+**Sign in** with no protected page content. Home, About and Appearance have the
+same guard; `/sign-in` must remain reachable without redirecting again. Submit an
+incorrect password, then the fixture password. Confirm fixed feedback, password clearing,
 and keyboard focus on the error field or successful Account heading. Reload, then
 navigate to another page: the profile should still offer **Sign out**. Check logout
-from both the Account screen and another page's profile menu. At a narrow viewport,
-check labelled input, keyboard access, visible focus and no horizontal overflow.
+from both the Account screen and another page's profile menu, then confirm that
+reloading or directly opening a protected page redirects to Sign in. At a narrow
+viewport, check labelled input, keyboard access, visible focus and no horizontal overflow.
 With JavaScript disabled, the sign-in input and button must remain disabled and
 the page must explain that JavaScript is required.
 
@@ -88,6 +91,8 @@ Consumed cookies are inert and the next challenge replaces them. Existing-owner 
 an explicitly selected store with a valid owner at startup. Browser forms use the
 same routes and recover the live CSRF token after reload or back/forward restoration.
 First-owner setup remains an explicit local/SSH CLI operation.
+Configured page reads use the same authoritative session slot with strict cookie
+parsing and no CSRF header requirement; they cannot create, rotate or renew it.
 The CLI tests above create only temporary fixture stores and exercise real HTTP
 sign-in, rotation, logout, attempt limits, and storage errors. They do not provision
 an owner in the user's preview.

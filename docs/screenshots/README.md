@@ -26,8 +26,9 @@ cargo run --locked --offline -- serve
 
 For Sign in and Account, use the [temporary browser fixture](../browser-session-check.md)
 and its printed port instead. Capture `sign-in.jpg` signed out and `account.jpg`
-after fixture sign-in. The main-page images may also use that fixture while signed
-out. Never provision a real owner just to take screenshots.
+after fixture sign-in. The main-page images show that fixture signed in, because
+configured instances now require a session to view those pages. Never provision
+a real owner just to take screenshots.
 `sign-in-check.jpg` additionally shows the real **Check account** state after
 blocking the post-sign-in session check in the browser tool, at the same viewport.
 Remove the block and verify recovery without another sign-in after capturing it.
