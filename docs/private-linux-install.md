@@ -1,8 +1,8 @@
 # Private Ubuntu source installation
 
 This guide covers the current runtime: CLI owner setup, browser sign-in, page
-access, and browser-local appearance settings. Projects, builds, artifacts and
-deployments are still placeholders. It is one step under
+access, read-only saved-project lists, and browser-local appearance settings.
+Project registration, builds, artifacts and deployments remain unimplemented. It is one step under
 [#20](https://github.com/devoption/devoption/issues/20), tracked by
 [#90](https://github.com/devoption/devoption/issues/90), not a complete software
 factory installation or a published release.
@@ -77,7 +77,8 @@ inspect the existing state; never delete a record just to retry. Read the
 [setup behavior and limits](local-enrollment.md) before creating a real owner.
 
 The data path is explicit, outside the checkout and binary directory. It remains
-the same after a rebuild. Only the owner record is persistent server state today.
+the same after a rebuild. The server reads the owner record and, when present,
+the optional [project catalog](project-catalog.md) without creating or editing it.
 Sessions and CSRF tokens are memory-only and disappear on restart; appearance
 preferences stay in that browser's local storage and are not in a server backup.
 
@@ -188,7 +189,12 @@ revision first, stop the service, retain the previous binary and commit ID, then
 replace the binary and restart. Record the new commit with it. No automatic
 upgrade or storage migration is implemented.
 
-For a backup, stop the service and copy into a new private directory. Run this on
+The owner-only backup/restore examples below apply to installations without
+`projects.bin`. They do not preserve optional catalog metadata; complete catalog
+backup/restore has not been validated by this guide. Keep any existing catalog
+and original data untouched.
+
+For an owner-only backup, stop the service and copy into a new private directory. Run this on
 the server; it leaves the original data in place and prints the backup location:
 
 ```sh

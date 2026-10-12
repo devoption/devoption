@@ -48,6 +48,19 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
             "data-directory storage requires Unix",
         ));
     }
+    #[cfg(unix)]
+    let catalog = if owner_auth
+        .as_ref()
+        .is_some_and(|(_, configured)| *configured)
+    {
+        devoption_projects::read_catalog(data_directory.expect("configured owner has a directory"))
+            .map_err(|error| io::Error::other(format!("project catalog unavailable: {error}")))?
+            .unwrap_or_default()
+    } else {
+        devoption_projects::Catalog::default()
+    };
+    #[cfg(not(unix))]
+    let catalog = devoption_projects::Catalog::default();
     Builder::new_current_thread()
         .enable_all()
         .build()?
@@ -62,7 +75,11 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
             #[cfg(not(unix))]
             let configured = false;
             let session = Arc::new(SessionSlot::default());
-            let app = page_routes(configured, Arc::clone(&session));
+            let app = page_routes(
+                configured,
+                Arc::clone(&session),
+                &project_summaries(&catalog),
+            );
             let app = protect(app, address.port(), Arc::clone(&session));
             #[cfg(unix)]
             let app = match &owner_auth {
@@ -78,7 +95,24 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
         })
 }
 
-fn page_routes(configured: bool, session: SharedSession) -> Router {
+fn project_summaries(
+    catalog: &devoption_projects::Catalog,
+) -> Vec<devoption_ui::ProjectSummary<'_>> {
+    catalog
+        .projects()
+        .iter()
+        .map(|project| devoption_ui::ProjectSummary {
+            name: project.name(),
+            repository_count: project.repositories().len(),
+        })
+        .collect()
+}
+
+fn page_routes(
+    configured: bool,
+    session: SharedSession,
+    projects: &[devoption_ui::ProjectSummary<'_>],
+) -> Router {
     let mut pages = Router::new();
     for (path, page) in [
         ("/", Page::Home),
@@ -86,13 +120,18 @@ fn page_routes(configured: bool, session: SharedSession) -> Router {
         ("/about", Page::About),
         ("/settings/appearance", Page::Appearance),
     ] {
+        // Render the validated startup snapshot once; authorization still runs
+        // for every request before any configured page content is returned.
+        let html = Arc::new(if configured && matches!(page, Page::Projects) {
+            devoption_ui::render_projects(projects)
+        } else {
+            devoption_ui::render_with_account(page, configured)
+        });
         pages = pages.route(
             path,
-            get(move || async move {
-                (
-                    [(CACHE_CONTROL, "no-store")],
-                    Html(devoption_ui::render_with_account(page, configured)),
-                )
+            get(move || {
+                let html = Arc::clone(&html);
+                async move { ([(CACHE_CONTROL, "no-store")], Html((*html).clone())) }
             }),
         );
     }

@@ -8,6 +8,9 @@ pub enum Page {
     SignIn,
 }
 
+mod projects;
+pub use projects::ProjectSummary;
+
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const AUTH: &str = include_str!("../assets/auth.js");
@@ -81,13 +84,31 @@ pub fn render(page: Page) -> String {
 
 /// Account availability is validated by server startup, not supplied by a visitor.
 pub fn render_with_account(page: Page, account_available: bool) -> String {
-    // All rendered values are static; no request data is interpolated into HTML.
+    render_page(page, account_available, None)
+}
+
+/// Render a configured owner's project snapshot using the shared page shell.
+/// The caller must authenticate the request; display names are escaped here.
+pub fn render_projects(projects: &[ProjectSummary<'_>]) -> String {
+    render_page(Page::Projects, true, Some(projects))
+}
+
+fn render_page(
+    page: Page,
+    account_available: bool,
+    projects: Option<&[ProjectSummary<'_>]>,
+) -> String {
+    // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
         Page::Home => ("Home", "/", "No home content yet."),
         Page::Projects => (
             "Projects",
             "/projects",
-            "Project management is not available yet.",
+            match projects {
+                Some([]) => "No projects yet.",
+                Some(_) => "Your saved projects.",
+                None => "Project management is not available yet.",
+            },
         ),
         Page::About => ("About", "/about", "No about content yet."),
         Page::Appearance => (
@@ -105,7 +126,10 @@ pub fn render_with_account(page: Page, account_available: bool) -> String {
             },
         ),
     };
-    let (appearance_current, content) = if path == "/settings/appearance" {
+    let project_content = projects.map(projects::content);
+    let (appearance_current, content) = if let Some(content) = project_content.as_deref() {
+        ("", content)
+    } else if path == "/settings/appearance" {
         (" aria-current=\"page\"", APPEARANCE_CONTROLS)
     } else if path == "/sign-in" {
         (

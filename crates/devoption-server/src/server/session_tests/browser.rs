@@ -198,7 +198,21 @@ fn cookie_credentials_cannot_bypass_host_origin_rotation_or_logout() {
 #[test]
 #[ignore = "manual browser fixture; see docs/browser-session-check.md"]
 fn manual_cookie_browser_fixture() {
-    let (_directory, auth, identity) = owner();
+    let (directory, auth, identity) = owner();
+    let data = directory.path().canonicalize().unwrap();
+    let mut catalog = devoption_projects::Catalog::default();
+    let project = catalog.create_project("Example application").unwrap();
+    let frontend = catalog.create_repository("Frontend fixture").unwrap();
+    let backend = catalog.create_repository("Backend fixture").unwrap();
+    catalog.associate(project, frontend).unwrap();
+    catalog.associate(project, backend).unwrap();
+    let docs = catalog.create_project("Example documentation").unwrap();
+    catalog.associate(docs, frontend).unwrap();
+    devoption_projects::CatalogStore::open_absolute(&data)
+        .unwrap()
+        .save(&catalog)
+        .unwrap();
+    let catalog = devoption_projects::read_catalog(&data).unwrap().unwrap();
     Builder::new_current_thread()
         .enable_all()
         .build()
@@ -208,7 +222,7 @@ fn manual_cookie_browser_fixture() {
             let port = listener.local_addr().unwrap().port();
             let slot = Arc::new(SessionSlot::default());
             let protected = protect(
-                page_routes(true, Arc::clone(&slot)).route(
+                page_routes(true, Arc::clone(&slot), &project_summaries(&catalog)).route(
                     "/probe",
                     post(move |Extension(id): Extension<IdentityId>| async move {
                         assert_eq!(id, identity);

@@ -205,6 +205,9 @@ main { padding: var(--space-10); }
 h1 { margin: 0 0 var(--space-3); font-size: var(--text-heading); line-height: 1.2; letter-spacing: -0.03em; }
 p { margin: 0; color: var(--color-muted); }
 main > p { font-size: 1.125rem; max-width: 42rem; }
+.project-list { display: grid; gap: var(--space-6); margin: var(--space-8) 0; padding: 0; list-style: none; }
+.project-list h2 { margin: 0 0 var(--space-2); font-size: 1.125rem; overflow-wrap: anywhere; }
+main > .project-note { margin-top: var(--space-8); font-size: var(--text-small); }
 .profile-area { margin-top: auto; padding-top: var(--space-8); }
 .profile-trigger { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-2); border-radius: var(--space-2); background: transparent; font-size: var(--text-small); text-align: left; }
 .profile-avatar { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; color: var(--color-primary); background: var(--color-selected); flex-shrink: 0; }

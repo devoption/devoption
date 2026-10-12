@@ -23,6 +23,13 @@ const RECORD: &str = "projects.bin";
 const LOCK: &str = ".projects.lock";
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
+/// Read one validated, bounded snapshot without creating files or taking a writer
+/// lock. Only an absent catalog means None. The same private directory/file rules
+/// apply as for writers; any unsafe or interrupted read fails closed.
+pub fn read_catalog(path: &Path) -> Result<Option<Catalog>, Error> {
+    load_snapshot(&open_directory(path)?)
+}
+
 /// An exclusive catalog writer anchored to an existing private directory.
 /// Opening creates only a private lock file. Drop releases the lock, not its file.
 /// Share this handle through application serialization; do not cache competing
@@ -37,21 +44,7 @@ impl CatalogStore {
     /// Final directory must belong to the current OS user with no group/other
     /// permissions. Opening neither creates directories nor repairs permissions.
     pub fn open_absolute(path: &Path) -> Result<Self, Error> {
-        if !path.is_absolute()
-            || path
-                .components()
-                .any(|part| matches!(part, Component::ParentDir | Component::Prefix(_)))
-        {
-            return Err(Error::UnsafePath);
-        }
-        let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
-        let mut directory = File::from(open("/", flags, Mode::empty())?);
-        for component in path.components() {
-            if let Component::Normal(name) = component {
-                directory = File::from(openat(&directory, name, flags, Mode::empty())?);
-            }
-        }
-        directory_valid(&directory)?;
+        let directory = open_directory(path)?;
         let lock = File::from(openat(
             &directory,
             LOCK,
@@ -77,24 +70,7 @@ impl CatalogStore {
     /// return errors. Temporary files are never loaded, even after interruption.
     pub fn load(&self) -> Result<Option<Catalog>, Error> {
         self.check()?;
-        let file = match openat(
-            &self.directory,
-            RECORD,
-            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
-            Mode::empty(),
-        ) {
-            Ok(fd) => File::from(fd),
-            Err(Errno::NOENT) => return Ok(None),
-            Err(error) => return Err(error.into()),
-        };
-        file_valid(&file)?;
-        if file.metadata()?.len() > codec::MAX_BYTES as u64 {
-            return Err(Error::InvalidCatalog);
-        }
-        let mut bytes = Vec::new();
-        file.take(codec::MAX_BYTES as u64 + 1)
-            .read_to_end(&mut bytes)?;
-        codec::decode(&bytes).map(Some)
+        load_snapshot(&self.directory)
     }
 
     /// Atomically replace a complete catalog while holding the writer lock.
@@ -160,6 +136,47 @@ impl CatalogStore {
         }
         Err(Errno::EXIST.into())
     }
+}
+
+fn open_directory(path: &Path) -> Result<File, Error> {
+    if !path.is_absolute()
+        || path
+            .components()
+            .any(|part| matches!(part, Component::ParentDir | Component::Prefix(_)))
+    {
+        return Err(Error::UnsafePath);
+    }
+    let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
+    let mut directory = File::from(open("/", flags, Mode::empty())?);
+    for component in path.components() {
+        if let Component::Normal(name) = component {
+            directory = File::from(openat(&directory, name, flags, Mode::empty())?);
+        }
+    }
+    directory_valid(&directory)?;
+    Ok(directory)
+}
+
+fn load_snapshot(directory: &File) -> Result<Option<Catalog>, Error> {
+    directory_valid(directory)?;
+    let file = match openat(
+        directory,
+        RECORD,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) {
+        Ok(fd) => File::from(fd),
+        Err(Errno::NOENT) => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    file_valid(&file)?;
+    if file.metadata()?.len() > codec::MAX_BYTES as u64 {
+        return Err(Error::InvalidCatalog);
+    }
+    let mut bytes = Vec::new();
+    file.take(codec::MAX_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    codec::decode(&bytes).map(Some)
 }
 
 fn private(metadata: &Metadata) -> bool {

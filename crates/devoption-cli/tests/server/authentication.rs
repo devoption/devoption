@@ -15,6 +15,8 @@ const PASSWORD: &str = "existing owner fixture only";
 mod installation;
 #[path = "authentication/pages.rs"]
 mod pages;
+#[path = "authentication/projects.rs"]
+mod projects;
 
 fn configured() -> (tempfile::TempDir, PathBuf) {
     let (directory, path) = data_directory::fixture();

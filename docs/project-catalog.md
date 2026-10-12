@@ -3,16 +3,33 @@
 The `devoption-projects` crate implements project/repository identity metadata,
 associations and private catalog persistence under
 [#101](https://github.com/devoption/devoption/issues/101), the first core slice of
-[#16](https://github.com/devoption/devoption/issues/16). The running service does
-not use it yet. Projects still shows its placeholder; there is no registration
-form, project HTTP mutation, repository path intake or Git invocation.
+[#16](https://github.com/devoption/devoption/issues/16). Under
+[#103](https://github.com/devoption/devoption/issues/103), configured servers read
+the catalog for the authenticated Projects list. There is no registration form,
+project HTTP mutation, repository path intake or Git invocation.
+
+## Read-only service view
+
+With an existing owner, startup calls the domain crate's `read_catalog` before
+binding the listener. This reader applies the same bounded format and private
+directory/file checks as the store, without creating files or acquiring a writer
+lock. Only an absent catalog becomes an empty list. Invalid, unsupported,
+oversized or unsafe state stops startup without reset or error-data disclosure.
+
+The server renders this validated snapshot once. Every Projects GET/HEAD still
+passes the existing session-cookie guard; anonymous requests receive the empty
+non-cacheable redirect to Sign in. Names are HTML-escaped by `devoption-ui`, and
+only names and repository counts appear. Restart loads later catalog changes;
+the running server does not watch or reread files. The unconfigured preview never
+loads catalog metadata and retains its public placeholder. No fixture projects
+are added to real storage or the persistent preview.
 
 ## Domain boundary
 
 The crate owns this cohesive domain independently of CLI, HTTP, rendering and
 authentication. It depends on existing pinned randomness and filesystem
-libraries, not `devoption-server` or `devoption-ui`. Future server handlers will
-adapt the core; the CLI remains responsible for dispatch/startup. Existing owner
+libraries, not `devoption-server` or `devoption-ui`. The server adapts catalog
+reads into UI summaries; the CLI remains responsible for dispatch/startup. Existing owner
 storage and authentication APIs have not moved or changed.
 
 `Catalog` creates distinct `ProjectId` and `RepositoryId` values using OS random

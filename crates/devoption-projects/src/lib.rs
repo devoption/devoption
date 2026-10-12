@@ -2,7 +2,8 @@
 //!
 //! Repository records are identity/display metadata, not validated Git locations.
 //! This core accepts no checkout paths, runs no commands and grants no permissions.
-//! Unix storage is explicit and private; no production adapter uses it yet.
+//! Unix storage is explicit and private. The server can read a bounded snapshot;
+//! it does not expose catalog writes or repository registration.
 
 mod model;
 pub use model::{
@@ -15,7 +16,7 @@ mod codec;
 #[cfg(unix)]
 mod store;
 #[cfg(unix)]
-pub use store::CatalogStore;
+pub use store::{CatalogStore, read_catalog};
 
 use std::{fmt, io};
 
