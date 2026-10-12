@@ -2,7 +2,8 @@
 //!
 //! The CLI starts the service through [`run`]; this crate owns HTTP/runtime behavior
 //! and uses devoption-ui for rendering. Existing-owner HTTP sign-in is available
-//! with explicitly configured storage; enrollment and browser forms remain closed.
+//! with explicitly configured storage; local/SSH setup is explicit and browser
+//! enrollment routes and sign-in forms remain closed.
 
 mod server;
 

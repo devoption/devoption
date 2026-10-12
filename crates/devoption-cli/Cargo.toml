@@ -11,6 +11,10 @@ publish.workspace = true
 [dependencies]
 devoption-server = { path = "../devoption-server" }
 
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "=1.1.5", features = ["termios", "process"] }
+signal-hook = { version = "=0.3.18", default-features = false }
+
 [target.'cfg(unix)'.dev-dependencies]
 tempfile = "=3.27.0"
 

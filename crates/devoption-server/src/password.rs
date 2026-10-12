@@ -1,10 +1,9 @@
-//! Password hashing and verification for future browser owner setup/sign-in.
+//! Password hashing and verification for local setup and owner sign-in.
 //!
 //! No identity, permissions, sessions, persistence, or salt generation lives here.
 //! Owner setup generates a fresh random salt internally for each password; users
-//! never supply salts or session keys. Only temporary test fixtures exercise the
-//! setup/sign-in components today. HTTP integration must use the bounded owner-auth
-//! service and enforce enrollment policy. Memory erasure is not
+//! never supply salts or session keys. Local setup enforces enrollment policy;
+//! HTTP sign-in uses the bounded owner-auth service. Memory erasure is not
 //! guaranteed, and callers must treat returned records as sensitive storage data.
 
 use std::{error::Error, fmt};

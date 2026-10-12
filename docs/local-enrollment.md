@@ -1,9 +1,57 @@
-# Local browser enrollment authorization
+# Local owner setup and deferred browser enrollment
 
-The selected product direction is an explicit local setup command that opens the
-browser automatically, without copied keys. This document describes the implemented
-authorization core under [#81](https://github.com/devoption/devoption/issues/81).
-There is no setup command, browser launcher, or production enrollment route yet.
+The selected installation flow is first-owner creation in the local/SSH CLI,
+followed by ordinary browser sign-in ([#84](https://github.com/devoption/devoption/issues/84)).
+This supersedes automatic browser installation under
+[#83](https://github.com/devoption/devoption/issues/83); that flow can be revisited
+later. No browser launcher or production enrollment route exists.
+
+## Implemented local/SSH setup
+
+`devoption setup --data-dir /absolute/private/directory` requires an existing
+directory owned by the current unprivileged OS user, with no group/other mode bits
+or symlinks in the path. The CLI checks storage before prompting and retains its
+directory descriptor. Missing directories, unsafe permissions, invalid records,
+and an existing owner fail closed without repairs, resets, or password prompts.
+
+The command reads and confirms a password from the foreground controlling terminal;
+stdin and stderr must also be terminals. Over SSH, request a PTY with `ssh -t`.
+There is no password argument, environment option, pipe/file-input mode, or browser
+token. The server owns the policy: at least 15 Unicode scalar values, at most 1024
+UTF-8 bytes, no control characters, and exact confirmation. No trimming,
+normalization, composition rules, or compromised-password lookup is performed.
+Choose a unique passphrase; length alone does not guarantee strength.
+
+Input has no echo and is bounded before hashing. Backspace deletes a character;
+Ctrl-U clears the entry. Ctrl-C, Ctrl-D, Ctrl-Z and Ctrl-\\ cancel. SIGINT, SIGTERM,
+SIGHUP, SIGQUIT and SIGTSTP during input also cancel. Normal success, rejection,
+and these cancellations restore terminal settings and discard queued input before
+echo resumes. SIGKILL, a process crash, or a disconnected/unusable terminal can
+prevent restoration; use `stty sane` if necessary. Wait for each prompt before
+typing. The terminal, SSH client/server, OS account, and any terminal recording
+software must be trusted; hidden echo does not protect against input recording.
+Plaintext exists briefly in process memory; secure memory erasure is not promised.
+
+After confirmation, existing auth/storage code generates a random identity and
+salt, hashes the password with Argon2id, and atomically publishes one private owner
+record. It rechecks storage, so another setup attempt cannot replace the winner.
+The terminal is restored before this work. The cancellation signals listed above
+then terminate the command immediately with exit status `128 + signal number`,
+instead of setting a flag that hashing/storage would not observe. Cancellation
+already received during input or restoration prevents this work from starting.
+No session is issued. An interruption or I/O failure after publication may leave
+an owner record: inspect its state and never delete it just to retry setup. This
+command is not a password reset or recovery mechanism.
+
+Start or restart `devoption serve --data-dir` against that same directory to enable
+the existing-owner HTTP routes. The server still binds only to loopback. Browser
+sign-in/logout forms, CSRF recovery after reload, and a supported Linux service
+installation remain separate work; setup does not install a service or configure
+SSH, TLS, networking, or permissions.
+
+The following sections describe the retained, fixture-only browser authorization
+core from [#81](https://github.com/devoption/devoption/issues/81). CLI setup does not
+arm or consume browser attempts; trusted OS access supplies its authority directly.
 
 ## Authority and trust boundary
 
@@ -66,7 +114,7 @@ can limit the evidence. Failed arming returns a fixed error before an attempt is
 returned; no persistent initiation event is promised. Durable audit export remains
 separate work.
 
-## Browser handoff still required
+## Handoff required only if browser installation is resumed
 
 This core keeps launch credentials in memory and defines no URL or wire protocol.
 The future launcher must establish that its intended browser receives the local
@@ -82,7 +130,7 @@ and [OWASP's session transport guidance](https://cheatsheetseries.owasp.org/chea
 
 HTTP integration must preserve Host/Origin checks, HttpOnly/Secure/SameSite cookies,
 explicit CSRF, bounded password input, no-cache responses, and fixed errors.
-Enrollment password strength policy, setup forms in `devoption-ui`, automatic
+Browser enrollment password policy, setup forms in `devoption-ui`, automatic
 browser launch, session issuance after setup, and audit persistence are not part
 of this core. Existing low-level setup remains an internal integration primitive;
 it must not become an unauthenticated HTTP handler.
@@ -90,5 +138,7 @@ it must not become an unauthenticated HTTP handler.
 Run the temporary-fixture checks with:
 
 ```sh
+cargo test -p devoption-server --lib --locked --offline local_setup
+cargo test -p devoption-cli --test setup --locked --offline
 cargo test -p devoption-server --lib --locked --offline enrollment
 ```

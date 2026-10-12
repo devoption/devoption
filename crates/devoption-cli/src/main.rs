@@ -1,17 +1,22 @@
 use std::{env, ffi::OsString, path::PathBuf, process::ExitCode};
 
+#[cfg(unix)]
+mod setup;
+
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
        devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH]
+       devoption setup --data-dir ABSOLUTE_PATH
 
   -h, --help     Show this help
   -V, --version  Show the development version
   serve         Start HTTP on 127.0.0.1:3000; Ctrl+C stops the process
+  setup         Create the first owner using hidden terminal prompts (Unix/local/SSH)
   --port PORT   Override the port (0 chooses a free port)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
 
-The data path must be absolute, with no symlinks or parent traversal. No directories or accounts are created; browser account setup and sign-in are not implemented.
+The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. No directories or permissions are created or changed. Serve creates no accounts; setup never replaces an owner. Browser setup and sign-in forms are not implemented.
 The local server shows Home, Projects, and About placeholders plus browser-local Appearance settings. Factory and runtime services are not implemented.";
 
 fn main() -> ExitCode {
@@ -22,6 +27,26 @@ fn main() -> ExitCode {
         [flag] if flag == "--version" || flag == "-V" => {
             println!("devoption {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
+        }
+        [command, flag, path] if command == "setup" && flag == "--data-dir" => {
+            let path = PathBuf::from(path);
+            if !path.is_absolute() {
+                eprintln!("error: data directory requires an absolute path; use --help");
+                return ExitCode::from(2);
+            }
+            #[cfg(unix)]
+            return match setup::run(&path) {
+                Ok(()) => ExitCode::SUCCESS,
+                Err(error) => {
+                    eprintln!("error: {error}");
+                    ExitCode::FAILURE
+                }
+            };
+            #[cfg(not(unix))]
+            {
+                eprintln!("error: owner setup requires Unix");
+                return ExitCode::FAILURE;
+            }
         }
         [command, options @ ..] if command == "serve" => match serve_options(options) {
             Ok(options) => Some(options),
