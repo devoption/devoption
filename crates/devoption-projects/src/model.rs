@@ -10,6 +10,12 @@ pub const MAX_NAME_BYTES: usize = 128;
 pub struct ProjectId(pub(crate) [u8; 16]);
 
 impl ProjectId {
+    /// Decode an identifier supplied by a caller; existence and authorization
+    /// must still be checked before any operation.
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
     pub const fn to_bytes(self) -> [u8; 16] {
         self.0
     }
@@ -65,6 +71,12 @@ impl Repository {
 pub struct Catalog {
     pub(crate) projects: Vec<Project>,
     pub(crate) repositories: Vec<Repository>,
+    #[cfg(unix)]
+    pub(crate) root: Option<crate::registration::RootBinding>,
+    #[cfg(unix)]
+    pub(crate) bindings: Vec<crate::registration::RepositoryBinding>,
+    #[cfg(unix)]
+    pub(crate) checkouts: Vec<crate::registration::DefaultCheckout>,
 }
 
 impl Catalog {
@@ -104,6 +116,14 @@ impl Catalog {
     }
 
     pub fn associate(&mut self, project: ProjectId, repository: RepositoryId) -> Result<(), Error> {
+        #[cfg(unix)]
+        if self
+            .bindings
+            .iter()
+            .any(|binding| binding.repository == repository)
+        {
+            return Err(Error::CheckoutRequired);
+        }
         if !self.repositories.iter().any(|r| r.id == repository) {
             return Err(Error::UnknownRepository);
         }
@@ -145,7 +165,7 @@ impl Catalog {
                 return Err(Error::InvalidCatalog);
             }
         }
-        Ok(())
+        self.validate_bindings()
     }
 }
 

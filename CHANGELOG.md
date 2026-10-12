@@ -24,6 +24,15 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- An explicit Unix `serve --repository-root` option and owner-protected backend
+  endpoint attach validated local checkouts to projects. Linked worktrees share
+  one repository identity, with a default checkout per project/repository
+  association. Locked atomic version-2 storage preserves version-1 metadata and
+  rejects conflicting roots or stale bindings. Fixture checks cover migration,
+  restart, concurrency, authorization and failure paths. Browser intake and
+  execution remain deferred; no real root is configured
+  ([#109](https://github.com/devoption/devoption/issues/109)).
+
 - A read-only Unix worktree-inspection core under an explicit trusted local root.
   Bounded metadata reads recognize a conservative ordinary/linked-worktree subset,
   reject unsafe or out-of-root paths and return distinct worktree/common-directory

@@ -28,6 +28,16 @@ mod session_tests;
 /// Validate optional existing storage before binding and announce the address on stdout.
 /// Return startup or server I/O errors; no session is issued at startup.
 pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
+    run_with_repository_root(port, data_directory, None)
+}
+
+/// Optional repository access is granted only by explicit local configuration.
+/// The browser can select a relative checkout, never the permitted root.
+pub fn run_with_repository_root(
+    port: u16,
+    data_directory: Option<&Path>,
+    repository_root: Option<&Path>,
+) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
     // no enrollment permission; only an already-present owner can sign in.
@@ -44,7 +54,7 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
         .transpose()
         .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?;
     #[cfg(not(unix))]
-    if data_directory.is_some() {
+    if data_directory.is_some() || repository_root.is_some() {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "data-directory storage requires Unix",
@@ -56,12 +66,18 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
         .is_some_and(|(_, configured)| *configured)
     {
         Some(
-            projects::Projects::open(data_directory.expect("configured owner has a directory"))
-                .map_err(|error| {
-                    io::Error::other(format!("project catalog unavailable: {error}"))
-                })?,
+            projects::Projects::open_with_root(
+                data_directory.expect("configured owner has a directory"),
+                repository_root,
+            )
+            .map_err(|error| io::Error::other(format!("project catalog unavailable: {error}")))?,
         )
     } else {
+        if repository_root.is_some() {
+            return Err(io::Error::other(
+                "repository root requires an existing configured owner",
+            ));
+        }
         None
     };
     Builder::new_current_thread()

@@ -40,6 +40,24 @@ pub struct CatalogStore {
 }
 
 impl CatalogStore {
+    /// Validate and attach one selected checkout under this writer's lock.
+    /// Shared Git common directories reuse a repository identity across projects.
+    /// This grants no execution permission and never invokes Git.
+    pub fn attach_repository(
+        &mut self,
+        project: crate::ProjectId,
+        root: &crate::worktree::PermittedRoot,
+        candidate: &Path,
+    ) -> Result<crate::RepositoryId, Error> {
+        if !root.disjoint_directory(&self.directory)? {
+            return Err(Error::RootMismatch);
+        }
+        let mut catalog = self.load()?.unwrap_or_default();
+        let repository = catalog.attach(project, root, candidate)?;
+        self.save(&catalog)?;
+        Ok(repository)
+    }
+
     /// Load, add an empty project and durably save under this writer's lock.
     /// Never reuse a caller's potentially stale snapshot for this operation.
     /// As with save, an error after rename requires inspection before retrying.

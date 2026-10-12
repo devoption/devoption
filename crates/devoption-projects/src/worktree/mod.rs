@@ -1,7 +1,8 @@
 //! Read-only, root-bounded inspection of a conservative Git worktree layout.
 //!
 //! Only a trusted local caller may select a PermittedRoot; never construct it
-//! from a browser-submitted root. This module is not connected to HTTP or CLI.
+//! from a browser-submitted root. The registration adapter receives this capability
+//! from explicit local startup configuration.
 //! Inspection is not an execution grant or proof of repository/object integrity.
 
 mod filesystem;

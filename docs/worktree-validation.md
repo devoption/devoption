@@ -2,9 +2,11 @@
 
 [#107](https://github.com/devoption/devoption/issues/107) adds a read-only Unix
 inspector in `devoption_projects::worktree`, before repository registration under
-[#16](https://github.com/devoption/devoption/issues/16). No production path is
-selected or registered. There is no HTTP route, browser path field, CLI command,
-catalog-format change or execution permission in this slice.
+[#16](https://github.com/devoption/devoption/issues/16). The inspector itself neither
+selects nor registers a production path. The separate
+[#109 registration backend](project-catalog.md#repository-attachment-backend) now
+uses this core under an explicit local root option and authenticated endpoint;
+no browser field or execution permission is enabled.
 
 ## Root authority and containment
 
@@ -12,10 +14,10 @@ A trusted local caller explicitly opens `PermittedRoot::open_absolute`, then
 calls `inspect` with one relative worktree directory. The root is an existing,
 absolute, normalized path, never `/`, a default home directory, the process's
 working directory or a value taken from an untrusted browser request. No root is
-auto-discovered. A future production adapter must obtain the owner's explicit
-local root selection independently of the candidate path, separate it from
-application data/work/artifact directories, and authorize the authenticated owner
-before calling this core. That configuration and attachment policy is not enabled.
+auto-discovered. The backend obtains the explicit local root selection independently
+of the candidate path, separates it from application data and authorizes the authenticated
+owner before calling this core. Future work/artifact directory policy and execution
+permissions remain separate prerequisites.
 
 Candidate paths cannot be absolute, empty, contain control characters, repeated
 slashes, `.` or `..` components. There is no parent-repository search or directory
@@ -90,8 +92,8 @@ public logs.
 
 These observations are neither persisted `RepositoryId` values nor content hashes.
 Inodes may be reused after deletion, filesystems may change, and copies have new
-identities. Future registration must retain the catalog's assigned stable IDs and
-revalidate its path binding; this core does not deduplicate or persist registrations.
+identities. The registration domain retains the catalog's assigned stable IDs and
+revalidates the selected path binding. This inspector itself does not persist registrations.
 
 `cargo test -p devoption-projects --locked --offline` uses temporary fixture trees
 for ordinary/linked layouts, identities, traversal and symlink rejection, root

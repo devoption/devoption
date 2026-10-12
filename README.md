@@ -5,8 +5,8 @@ a place to build, test, and run software.
 
 It currently provides Home and About placeholders, saved projects and an empty-project creation form
 for configured owners, browser-local Appearance settings, and owner sign-in/sign-out.
-Repository registration, builds, and deployments are not implemented yet. There is
-no published release.
+An optional trusted local root enables backend repository attachment; the browser
+attachment form, builds and deployments are not implemented. There is no published release.
 
 ## Try it locally
 
@@ -120,8 +120,18 @@ successful save reloads the current list without restarting the server. If a sav
 cannot be confirmed, reload the list before retrying to avoid duplicate names.
 An absent catalog shows an empty list; invalid state stops startup or fails the
 current request without resetting records. The unconfigured preview retains its
-placeholder. Repository registration, project renaming and deletion are not
-implemented. The installation guide's owner-only backup does not preserve projects.
+placeholder. Project renaming and deletion are not implemented. The installation
+guide's owner-only backup does not preserve projects.
+
+On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` to
+`serve --data-dir ABSOLUTE_PATH`. It requires an existing owner and a trusted,
+existing root separate from application data; no root is selected by default.
+The protected backend can attach a validated relative checkout to a project.
+Projects support multiple repositories, linked worktrees share a repository ID,
+and each project/repository association keeps one default checkout. This grants
+no execution permission and runs no Git commands. The browser form is deferred.
+See [root policy, endpoint and catalog compatibility](docs/project-catalog.md#repository-attachment-backend)
+before enabling it; no real repository root is configured by this change.
 
 A [local enrollment authorization core](docs/local-enrollment.md) now supports a
 locally armed, expiring, single-use browser attempt with bounded audit evidence.
@@ -175,11 +185,11 @@ Server APIs live under `devoption_server`; the CLI is a binary without a library
 facade. Authentication and owner storage remain server modules. The
 [project catalog core](docs/project-catalog.md) has its own model and storage
 tests. Its separate [worktree inspector](docs/worktree-validation.md) accepts
-bounded candidates under an explicit trusted local root, with fixture-only use
-and no production repository intake. The server validates the catalog at startup,
-then rereads it for each authenticated Projects GET/HEAD request and supplies
-current display summaries to the UI. Project creation uses the domain's locked,
-durable save operation. Executable integration tests stay with the CLI; domain
+bounded candidates under an explicit trusted local root, with opt-in backend
+attachment tested using temporary fixtures. The server validates the catalog at
+startup, then rereads it for each authenticated Projects GET/HEAD request and supplies
+current display summaries to the UI. Project creation and repository attachment
+use the domain's locked, durable save operations. Executable integration tests stay with the CLI; domain
 logic remains in the project crate.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm

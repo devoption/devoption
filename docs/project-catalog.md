@@ -8,8 +8,9 @@ associations and private catalog persistence under
 the catalog for the authenticated Projects list. Under
 [#105](https://github.com/devoption/devoption/issues/105), owners can create named
 empty projects. A separate [root-bounded worktree inspector](worktree-validation.md)
-is available to trusted local core callers under #107. Production repository path
-intake, registration and Git invocation remain unimplemented.
+is available under #107. Under [#109](https://github.com/devoption/devoption/issues/109),
+explicit trusted-root configuration enables the protected repository attachment
+backend described below. The browser form and Git invocation remain unimplemented.
 
 ## Authenticated service view and creation
 
@@ -53,8 +54,9 @@ project.
 The crate owns this cohesive domain independently of CLI, HTTP, rendering and
 authentication. It depends on existing pinned randomness and filesystem
 libraries, not `devoption-server` or `devoption-ui`. The server adapts catalog
-reads and creation into HTTP/UI behavior; the CLI remains responsible for dispatch/startup. Existing owner
-storage and authentication APIs have not moved or changed.
+reads, creation and attachment into HTTP/UI behavior; the CLI remains responsible
+for dispatch/startup. Existing owner storage and authentication APIs have not moved
+or changed.
 
 `Catalog` creates distinct `ProjectId` and `RepositoryId` values using OS random
 bytes. IDs are stored, never derived from names, credentials, paths or Git object
@@ -63,11 +65,12 @@ multiple repositories, and a repository can belong to multiple projects.
 Duplicate associations and unknown IDs are rejected. There is no one-repository
 project limit or globally unique path rule. Names need not be unique.
 
-Repository records contain an ID and display name only. Creating this metadata
-does not validate or register an actual Git checkout. No registration status,
-path, remote, credential, owner password or session is stored. This core grants
-no application permissions; a future adapter must authorize access using the
-authenticated owner before calling it.
+Repository records contain an ID and display name. Creating this metadata alone
+does not validate or register an actual Git checkout. Validated registrations add
+a separate common-directory binding and per-association default checkout. No
+remote, credential, owner password or session is stored. This core grants no
+application permissions; the HTTP adapter authorizes the authenticated owner
+before calling it.
 
 The current resource limits are 64 projects, 256 repository records and 128 UTF-8
 bytes per name. A project may reference any subset of those repositories. Names
@@ -118,15 +121,32 @@ not implemented. No network, VM or deployment configuration is involved.
 ## Version and validation
 
 The binary format begins with the eight bytes `DVPROJS\0`, then a one-byte version
-(`1`). It stores a little-endian `u16` repository count, followed by each 16-byte
-repository ID and length-prefixed UTF-8 name. Next is a `u16` project count; each
+(`1` for metadata only, `2` for registered bindings). Both versions start with a
+little-endian `u16` repository count, followed by each 16-byte repository ID and length-prefixed UTF-8 name. Next is a `u16` project count; each
 project has a 16-byte ID, length-prefixed name, `u16` association count and that
 many 16-byte repository IDs. Name lengths are also little-endian `u16` values.
+
+Version 2 appends a `u16`-length UTF-8 root path and its device/inode pair, then a
+`u16` binding count (at most 256). Each binding contains a 16-byte repository ID
+and common-directory device/inode pair. A `u16` checkout count follows (at most
+64 × 256); each checkout contains project and repository IDs, a `u16`-length
+relative UTF-8 path, working-directory identity and Git-directory identity. Each
+identity is two little-endian `u64` values. Paths are bounded to 4096 bytes and
+64 components. Validation also rejects duplicate/conflicting bindings, missing
+defaults, unbound registrations and references that do not match associations.
 
 The file limit is 512 KiB. Counts and name lengths are bounded before allocation;
 decoding rejects truncation, invalid UTF-8/names, duplicate IDs/associations,
 dangling references and trailing bytes. Unknown versions fail explicitly. No
-migration, reset or repair command is provided.
+reset, downgrade, reattachment or repair command is provided. Reads and startup
+never rewrite version 1. Metadata-only saves keep version 1; the first successful
+attachment publishes version 2 through the same lock, temporary-file, sync and
+atomic-rename path. All prior IDs, names and associations survive; legacy metadata
+is never silently matched by name to a physical repository. Once migrated, saves
+retain version 2. Older binaries reject it: rollback needs a compatible binary
+or an explicit pre-migration backup restoration, which loses subsequent changes.
+Back up the private catalog as well as owner data; never delete it to bypass an
+unsupported version.
 
 `cargo test -p devoption-projects --locked --offline` covers multiple repositories
 and projects, IDs across process restart, conflicting writers, complete atomic
@@ -135,9 +155,66 @@ formats, unsafe paths/files and directory anchoring. The normal README workspace
 checks include this crate. CLI HTTP tests additionally cover authenticated creation,
 input limits, concurrent requests, read-after-write, restart and storage failures.
 
-The worktree inspector is fixture-tested independently of catalog storage. Later
-slices must select/configure permitted roots and persist validated repository
-bindings before adding intake to the owner-authorized HTTP/UI flow. Execution
+Tests for the worktree inspector and registration backend use temporary fixture
+trees only. The browser attachment form and path/status presentation remain a later
+slice. Execution
 approval, environment/resource policy and build/artifact directories remain
 separate prerequisites under #15/#17; creating catalog metadata authorizes none
 of them.
+
+## Repository attachment backend
+
+This Unix-only option is explicit local administrator configuration:
+
+```text
+devoption serve --data-dir ABSOLUTE_PRIVATE_DATA_PATH --repository-root ABSOLUTE_TRUSTED_ROOT
+```
+
+There is no default root, environment-variable fallback, discovery, browser root
+setter or filesystem picker. An existing owner is required. Before listening,
+the server opens a root capability, enforces the [inspection policy](worktree-validation.md),
+checks actual directory ancestry so root and data cannot contain one another,
+and compares the configured path and filesystem identity with any saved root.
+Startup creates no catalog or lock. Changing a saved root fails closed. Omit the
+option to disable attachments while retaining ordinary project reads/creation;
+saved paths are not inspected merely to list projects. This change configures no
+production root and registers no real repository; tests create temporary fixtures.
+
+`POST /projects/{project_id}/repositories` accepts one relative UTF-8 path as a
+plain body (`text/plain` or `text/plain;charset=UTF-8`), limited to 4096 bytes and
+a five-second upload deadline. The project ID is exactly 32 hexadecimal digits.
+Existing cookie, CSRF, Host and Origin guards run first; any Authorization header
+is rejected. There is no browser form or project-ID discovery UI yet. The endpoint
+returns 204 only after a durable save, with `Cache-Control: no-store`. Failures
+use fixed messages: 400 invalid ID/path or rejected inspection, 404 unknown
+project, 409 duplicate association, stale/root conflict or capacity, 413 oversized
+body, 415 unsupported encoding, 408 stalled body, and 503 disabled attachment,
+busy storage or persistence failure. Messages never echo paths or stored data.
+Inspect saved state after an uncertain result; there is no automatic retry.
+
+Under the writer lock, the domain loads the latest catalog, validates the selected
+checkout with bounded reads, reuses the repository ID for its common Git directory,
+adds the association/default checkout, re-inspects that checkout and atomically
+saves. Each new repository's display name is the selected directory's final
+component and must satisfy the existing 128-byte name rule. Multiple repositories
+can belong to one project; multiple projects can share a repository, selecting
+different linked worktrees as their defaults. Associating another worktree of the
+same repository with the same project returns a duplicate conflict and never
+replaces its default. Metadata-only `associate` cannot bypass checkout validation
+for a registered repository. No Git process, hook, fetch, clone, checkout, build
+or execution approval is involved.
+
+The saved root and common-directory device/inode observations deduplicate linked
+worktrees while filesystem objects exist. They do not replace the random durable
+repository ID or prove content integrity. Reusing a saved path, working directory
+or Git directory with conflicting observations fails closed. Registration checks
+the selected checkout, not every other stored path. Deleted objects, inode reuse,
+filesystem replacement and trusted same-user races remain limitations; there is
+no implicit rebind or relocation. A future execution adapter must revalidate its
+selected checkout and obtain separate execution/resource authorization. Root and
+checkout metadata are private catalog data, not public logs.
+
+One default checkout per project/repository association does not constrain future
+parallel agents/jobs to that checkout. Separate job worktrees and project releases
+that pin an exact commit for every repository are the agreed future model; neither
+jobs nor release manifests are implemented here.
