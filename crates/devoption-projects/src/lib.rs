@@ -1,7 +1,8 @@
 //! Project/repository identity and catalog persistence, independent of HTTP and auth.
 //!
 //! Repository records are identity/display metadata, not validated Git locations.
-//! This core accepts no checkout paths, runs no commands and grants no permissions.
+//! The Unix worktree inspector accepts only paths under an explicit permitted root,
+//! runs no commands and grants no execution permissions.
 //! Unix storage is explicit and private. The server exposes authenticated project
 //! creation and catalog reads; repository registration remains unimplemented.
 
@@ -17,6 +18,9 @@ mod codec;
 mod store;
 #[cfg(unix)]
 pub use store::{CatalogStore, read_catalog};
+
+#[cfg(unix)]
+pub mod worktree;
 
 use std::{fmt, io};
 

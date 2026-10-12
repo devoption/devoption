@@ -167,14 +167,16 @@ The Rust workspace has four crates. The running service uses
 | Crate | Responsibility |
 | --- | --- |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
-| `devoption-projects` | Project/repository identities, associations, and private catalog persistence |
+| `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
 | `devoption-ui` | HTML rendering and browser assets |
 
 Server APIs live under `devoption_server`; the CLI is a binary without a library
 facade. Authentication and owner storage remain server modules. The
 [project catalog core](docs/project-catalog.md) has its own model and storage
-tests; it accepts no repository paths. The server validates the catalog at startup,
+tests. Its separate [worktree inspector](docs/worktree-validation.md) accepts
+bounded candidates under an explicit trusted local root, with fixture-only use
+and no production repository intake. The server validates the catalog at startup,
 then rereads it for each authenticated Projects GET/HEAD request and supplies
 current display summaries to the UI. Project creation uses the domain's locked,
 durable save operation. Executable integration tests stay with the CLI; domain

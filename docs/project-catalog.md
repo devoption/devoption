@@ -7,8 +7,9 @@ associations and private catalog persistence under
 [#103](https://github.com/devoption/devoption/issues/103), configured servers read
 the catalog for the authenticated Projects list. Under
 [#105](https://github.com/devoption/devoption/issues/105), owners can create named
-empty projects. Repository path intake, registration and Git invocation remain
-unimplemented.
+empty projects. A separate [root-bounded worktree inspector](worktree-validation.md)
+is available to trusted local core callers under #107. Production repository path
+intake, registration and Git invocation remain unimplemented.
 
 ## Authenticated service view and creation
 
@@ -134,8 +135,9 @@ formats, unsafe paths/files and directory anchoring. The normal README workspace
 checks include this crate. CLI HTTP tests additionally cover authenticated creation,
 input limits, concurrent requests, read-after-write, restart and storage failures.
 
-Later selected slices must define Git worktree/path validation before intake,
-then add repository intake to the owner-authorized HTTP/UI flow. Execution
+The worktree inspector is fixture-tested independently of catalog storage. Later
+slices must select/configure permitted roots and persist validated repository
+bindings before adding intake to the owner-authorized HTTP/UI flow. Execution
 approval, environment/resource policy and build/artifact directories remain
 separate prerequisites under #15/#17; creating catalog metadata authorizes none
 of them.
