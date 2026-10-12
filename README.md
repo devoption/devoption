@@ -62,6 +62,11 @@ current session again; a session lasts at most one hour and ends on server resta
 or another sign-in. JavaScript is required. Without an owner, the Sign in page
 explains that CLI setup is required. See [setup limits](docs/local-enrollment.md).
 
+For private Ubuntu source installation, see the
+[user-service and recovery guide](docs/private-linux-install.md). It includes an
+unprivileged systemd example, same-port SSH forwarding, persistent owner storage,
+and the distinction between CI fixtures and untested host lifecycle steps.
+
 ### Local HTTP authentication
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`

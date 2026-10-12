@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Private Ubuntu source-install instructions, an unprivileged systemd user-unit
+  example with an owner-record preflight, same-port SSH forwarding, and stopped
+  backup/restore guidance. Release fixtures check copied-binary startup, restored
+  authentication, lost sessions and damaged records; Ubuntu CI statically checks
+  the unit. Real systemd/SSH lifecycle validation remains pending
+  ([#90](https://github.com/devoption/devoption/issues/90)).
+
 - Session checks for configured Home, Projects, About and Appearance GET/HEAD
   reads, with fixed non-cacheable redirects to Sign in and no protected content
   on rejection. The strict browser cookie is required; page reads never renew

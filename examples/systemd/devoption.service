@@ -1,0 +1,13 @@
+[Unit]
+Description=DevOption private loopback runtime
+
+[Service]
+Type=exec
+ExecStartPre=/usr/bin/test -s "%h/.local/share/devoption/owner.bin"
+ExecStart="%h/.local/lib/devoption/devoption" serve --port 3000 --data-dir "%h/.local/share/devoption"
+Restart=on-failure
+RestartSec=5s
+UMask=0077
+
+[Install]
+WantedBy=default.target

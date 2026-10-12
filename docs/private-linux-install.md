@@ -1,0 +1,218 @@
+# Private Ubuntu source installation
+
+This guide covers the current runtime: CLI owner setup, browser sign-in, page
+access, and browser-local appearance settings. Projects, builds, artifacts and
+deployments are still placeholders. It is one step under
+[#20](https://github.com/devoption/devoption/issues/20), tracked by
+[#90](https://github.com/devoption/devoption/issues/90), not a complete software
+factory installation or a published release.
+
+The target is Ubuntu 24.04 x86_64 with an existing unprivileged login account,
+Git, Rust 1.99.0 via rustup, a C toolchain/linker, and a systemd user manager.
+For remote use, SSH access and local forwarding must already work. This guide
+does not create OS accounts, install system packages, configure SSH or enable
+lingering. An administrator must separately provision missing prerequisites.
+See the [Rust installation guide](https://www.rust-lang.org/tools/install).
+
+## Build and prepare private storage
+
+Run as the account that will run DevOption, on the target host. For a remote
+terminal, use `ssh -t user@server` with your existing SSH access. Initial Cargo
+fetching needs network access; subsequent commands use the lockfile offline.
+
+```sh
+git clone https://github.com/devoption/devoption.git
+cd devoption
+git rev-parse HEAD
+cargo fetch --locked
+cargo build --release --locked --offline
+```
+
+Record the source commit. Use a reviewed commit with passing CI; `main` can move.
+The following fresh-install block stops if its binary or data directory already
+exists. Keep existing installations and data; do not rerun setup over them.
+The home directory and all data-path components must be real directories without
+symlinks or `..`. If your home layout differs, choose an absolute real path and
+adjust both commands and the service example consistently.
+
+```sh
+(
+  set -eu
+  umask 077
+  mkdir -p "$HOME/.local/lib" "$HOME/.local/share"
+  mkdir -m 700 "$HOME/.local/lib/devoption"
+  mkdir -m 700 "$HOME/.local/share/devoption"
+  install -m 700 target/release/devoption "$HOME/.local/lib/devoption/devoption"
+  git rev-parse HEAD > "$HOME/.local/lib/devoption/source-commit.txt"
+)
+```
+
+Run setup in the terminal, then wait for `Owner created.`:
+
+```sh
+"$HOME/.local/lib/devoption/devoption" setup --data-dir "$HOME/.local/share/devoption"
+```
+
+Enter and confirm a unique passphrase of at least 15 characters. Input is hidden;
+passwords cannot be supplied in arguments, environment variables, pipes or files.
+Setup creates `owner.bin`, containing the owner identity and salted Argon2id hash,
+with mode `0600` inside the `0700` directory. Both must belong to this OS user.
+There is no password reset command. After an interrupted or uncertain setup,
+inspect the existing state; never delete a record just to retry. Read the
+[setup behavior and limits](local-enrollment.md) before creating a real owner.
+
+The data path is explicit, outside the checkout and binary directory. It remains
+the same after a rebuild. Only the owner record is persistent server state today.
+Sessions and CSRF tokens are memory-only and disappear on restart; appearance
+preferences stay in that browser's local storage and are not in a server backup.
+
+## Start the user service
+
+The [example unit](../examples/systemd/devoption.service) runs as the logged-in
+account with port `3000` and the paths above. It requires a nonempty owner file
+before launching; the runtime then validates its ownership, permissions and
+format. This avoids starting the public, unconfigured preview after a missing
+owner record. Do not remove the preflight or `--data-dir` for an owner installation.
+
+From the repository checkout, install only this user unit:
+
+```sh
+(
+  set -eu
+  mkdir -p "$HOME/.config/systemd/user"
+  test ! -e "$HOME/.config/systemd/user/devoption.service"
+  test ! -L "$HOME/.config/systemd/user/devoption.service"
+  install -m 600 examples/systemd/devoption.service "$HOME/.config/systemd/user/devoption.service"
+  systemd-analyze --user --man=no --recursive-errors=no verify "$HOME/.config/systemd/user/devoption.service"
+  systemctl --user daemon-reload
+  systemctl --user enable --now devoption.service
+)
+systemctl --user status devoption.service
+journalctl --user -u devoption.service -n 30 --no-pager
+curl -I http://127.0.0.1:3000/
+```
+
+Expect a redirect to `/sign-in` (`303`) before authentication. A successful
+`systemctl start` alone is not an HTTP readiness check. `Type=exec` checks that
+the executable starts; it does not wait for the listener. Failures restart after
+five seconds, subject to systemd's start limits. A deliberate stop stays stopped.
+See the upstream [service semantics](https://github.com/systemd/systemd/blob/v255/man/systemd.service.xml).
+
+`enable` starts the unit with this user's manager. Operation after logout or before
+the next login depends on the host's existing user-manager policy; enabling a unit
+does not enable lingering. Logout/reboot persistence has not been validated by
+this repository's fixtures. If `systemctl --user` cannot connect, stop and have
+the account/session prerequisites checked; do not substitute a root service.
+
+## Open the browser privately
+
+On the same host, open `http://127.0.0.1:3000/`. From another computer, keep this
+command running there, replacing `user@server` with your existing SSH destination:
+
+```sh
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:3000:127.0.0.1:3000 user@server
+```
+
+Then open `http://127.0.0.1:3000/` on that computer and sign in. Keep **the same
+port at both ends**: the browser's Host and Origin must match DevOption's actual
+listening port. If `3000` is busy on either computer, pick one free unprivileged
+port, change the service's `--port`, reload/restart it, and use that same port in
+both forward positions and the browser URL. Do not stop unrelated listeners.
+
+The explicit local address keeps the browser end on loopback; the server also
+binds only to loopback. Do not use wildcard bindings, expose the port, weaken
+Host/Origin checks, or add a public reverse proxy. SSH forwards the connection
+without changing its HTTP headers. See [OpenSSH forwarding](https://man.openbsd.org/ssh.1#L).
+Secure cookies have been checked with Chrome on loopback; other browsers and a
+real remote SSH browser session remain unvalidated. JavaScript is required for
+sign-in. Closing the tunnel ends access, not the server process.
+
+## Restart, backup and restore
+
+Restart with `systemctl --user restart devoption.service`, then check status,
+logs and the unauthenticated `303` response above. Sign in again afterward;
+restart invalidates all old sessions. For a binary update, build the reviewed
+revision first, stop the service, retain the previous binary and commit ID, then
+replace the binary and restart. Record the new commit with it. No automatic
+upgrade or storage migration is implemented.
+
+For a backup, stop the service and copy into a new private directory. Run this on
+the server; it leaves the original data in place and prints the backup location:
+
+```sh
+(
+  set -eu
+  umask 077
+  systemctl --user stop devoption.service
+  backup=$(mktemp -d "$HOME/devoption-backup.XXXXXXXX")
+  cp -p "$HOME/.local/share/devoption/owner.bin" "$backup/owner.bin"
+  cp -p "$HOME/.local/lib/devoption/devoption" "$backup/devoption"
+  cp -p "$HOME/.local/lib/devoption/source-commit.txt" "$backup/source-commit.txt"
+  cmp "$HOME/.local/share/devoption/owner.bin" "$backup/owner.bin"
+  printf 'Backup saved in %s\n' "$backup"
+  systemctl --user start devoption.service
+)
+```
+
+If any step fails, the block stops; check the service state before continuing.
+The owner record and its copies are sensitive password-hash material: keep them
+private and out of source control, logs and issue attachments. This local copy
+does not protect against loss of the host or disk. Off-host encrypted backups and
+their retention policy are separate operator work. Temporary interrupted-store
+files are not owner records and are not needed for this current-state backup.
+
+To check a restore, retain the original data and select a **fresh** directory.
+Replace the backup path below with the directory printed above:
+
+```sh
+(
+  set -eu
+  umask 077
+  backup=/absolute/path/to/devoption-backup.XXXXXXXX
+  systemctl --user stop devoption.service
+  mkdir -m 700 "$HOME/.local/share/devoption-restored"
+  cp -p "$backup/owner.bin" "$HOME/.local/share/devoption-restored/owner.bin"
+  cmp "$backup/owner.bin" "$HOME/.local/share/devoption-restored/owner.bin"
+  "$backup/devoption" serve --port 3000 --data-dir "$HOME/.local/share/devoption-restored"
+)
+```
+
+This foreground check uses the backed-up binary and restored data. Reopen the
+browser/tunnel and sign in with the existing password. Stop it with Ctrl+C after
+verification. Old cookies must not regain access. An invalid record or unsafe
+permissions must stop startup; do not repair it by deleting the record or running
+setup. A lost password cannot be recovered from this backup.
+
+To adopt the restore, point **both** `ExecStartPre` and `ExecStart --data-dir` in
+the user unit at the verified restored directory, and `ExecStart` at the chosen
+compatible binary. Verify the edited unit, run `systemctl --user daemon-reload`,
+then start and check it. Keep the old directory until recovery is confirmed.
+To abandon the drill, leave the unit unchanged and start it against the original
+data. Restoring on a different host/OS account and cross-version migrations have
+not been tested; do not assume copied ownership or formats will be accepted.
+
+## Validation and remaining gaps
+
+The Ubuntu 24.04 CI job runs the following unprivileged checks in temporary
+directories. Check the actual CI result for the revision you intend to install:
+
+```sh
+cargo build --release --locked --offline
+cargo test -p devoption-cli --test server --release --locked --offline installation
+python3 scripts/check_systemd_unit.py target/release/devoption
+```
+
+The release fixture copies the executable outside the checkout, signs in, stops,
+backs up and restores the owner record, signs in after restart, rejects the old
+session, checks record bytes/permissions, and rejects a damaged restore without
+listening. Existing workspace tests exercise CLI setup through temporary PTYs.
+The systemd check only verifies unit syntax/executable paths and the missing or
+empty owner preflight in a disposable home; it installs or starts no service.
+See [systemd's verifier](https://github.com/systemd/systemd/blob/v255/man/systemd-analyze.xml).
+
+These checks do not prove a clean machine can be provisioned, user-service
+start/stop/restart under a real manager, logout/reboot survival, or browser access
+through a real SSH connection. A controlled Ubuntu lifecycle drill is still
+required before calling those steps tested. Other Linux distributions and
+architectures, public hosting, full project/build/deploy flows, and disaster
+recovery for future state remain outside this guide's validated scope.
