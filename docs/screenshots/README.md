@@ -9,35 +9,46 @@ and the adapted Light mode.
 `appearance-tokyo-night.jpg` and `appearance-tokyo-night-light.jpg` show Tokyo
 Night in Dark and Light modes.
 
-| Page | Local URL | File |
-| --- | --- | --- |
-| Home | http://127.0.0.1:3000/ | `home.jpg` |
-| Projects | http://127.0.0.1:3000/projects | `projects.jpg` |
-| About | http://127.0.0.1:3000/about | `about.jpg` |
-| Appearance | http://127.0.0.1:3000/settings/appearance | `appearance.jpg` |
-| Sign in | http://127.0.0.1:3000/sign-in | `sign-in.jpg` |
-| Account (signed in) | http://127.0.0.1:3000/sign-in | `account.jpg` |
+Use each path below with the fixture's printed origin and port.
 
-From the repository root, start the app after the [normal setup](../../README.md#try-it-locally):
+| Page | Path | Capture state | File |
+| --- | --- | --- | --- |
+| Home | `/` | Signed in | `home.jpg` |
+| Projects | `/projects` | Signed in | `projects.jpg` |
+| About | `/about` | Signed in | `about.jpg` |
+| Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
+| Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
+| Account | `/sign-in` | Signed in | `account.jpg` |
+| Check account | `/sign-in` | Session verification blocked | `sign-in-check.jpg` |
+
+Use the [temporary browser fixture](../browser-session-check.md) for all captures,
+including the Appearance variants below. Start it from the repository root after
+installing the [normal prerequisites](../../README.md#try-it-locally):
 
 ```sh
-cargo run --locked --offline -- serve
+cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
-For Sign in and Account, use the [temporary browser fixture](../browser-session-check.md)
-and its printed port instead. Capture `sign-in.jpg` signed out and `account.jpg`
-after fixture sign-in. The main-page images show that fixture signed in, because
-configured instances now require a session to view those pages. Never provision
-a real owner just to take screenshots.
-`sign-in-check.jpg` additionally shows the real **Check account** state after
-blocking the post-sign-in session check in the browser tool, at the same viewport.
+The fixture creates only a temporary owner and stops after ten minutes. Use its
+printed URL, not the persistent preview on port 3000. Open `/sign-in` in a fresh
+browser context and capture `sign-in.jpg` before signing in. Then use the fixture
+password `browser transport fixture only`, reload `/sign-in` for `account.jpg`,
+and capture Home, Projects, About and all Appearance images while signed in.
+Configured pages redirect to Sign in without that session. Rerun the fixture if
+it expires; use the new printed port and sign in again. Never provision a real
+owner just to take screenshots.
+
+For `sign-in-check.jpg`, sign out, begin a new fixture sign-in, and block its
+post-sign-in session check in the browser tool. Capture the resulting **Check
+account** state at the same viewport.
 Remove the block and verify recovery without another sign-in after capturing it.
 
-1. If source or assets changed, stop and restart the server, then refresh the page.
+1. If source or assets changed, rerun the fixture command and use its new URL.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   Follow the profile popup's **Appearance** link. Choose **Nord**, **Dark**, and **Purple** for
-   the main-page captures. The browser remembers these choices.
+   A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out
+   capture. After sign-in, follow the profile popup's **Appearance** link and confirm
+   these choices for the main-page captures. The browser remembers them.
 3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
    outline, open menu, or developer overlay in the capture.
 4. Capture the browser content viewport as JPEG, excluding browser/desktop chrome.

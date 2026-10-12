@@ -12,7 +12,9 @@ Entries describe implemented changes, not the roadmap.
   on rejection. The strict browser cookie is required; page reads never renew
   sessions or weaken mutation CSRF. Sign in and the unconfigured preview stay
   public. Fixture tests cover expiry, rotation, logout, restart and loss of the
-  owner record after startup ([#88](https://github.com/devoption/devoption/issues/88)).
+  owner record after startup. Screenshot instructions use the temporary configured
+  fixture for every capture and specify each required sign-in state
+  ([#88](https://github.com/devoption/devoption/issues/88)).
 - Browser Sign in and Account screens for an existing CLI-created owner, with
   shared profile sign-out controls, labelled keyboard/mobile forms, fixed errors,
   password clearing, and memory-only CSRF tokens. Same-origin session recovery
