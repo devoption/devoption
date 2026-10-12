@@ -18,6 +18,45 @@ fn session(identity: IdentityId, token: [u8; TOKEN_BYTES], now: Instant) -> Sess
 }
 
 #[test]
+fn csrf_recovery_never_renews_or_revives_and_observes_rotation_and_logout() {
+    let slot = SessionSlot::default();
+    let now = Instant::now();
+    assert_eq!(slot.recover_browser_csrf(&FIRST), None);
+    slot.activate(session(FIRST_ID, FIRST, now), &FIRST)
+        .unwrap();
+    assert_eq!(slot.recover_browser_csrf(&FIRST), None); // bearer-only fixture
+    slot.activate(session(FIRST_ID, FIRST, now).with_csrf(FIRST_CSRF), &FIRST)
+        .unwrap();
+    assert_eq!(slot.recover_browser_csrf(&SECOND), None);
+    assert_eq!(
+        slot.recover_csrf_with_clock(&FIRST, || {
+            assert!(slot.active.try_lock().is_err());
+            now + MAX_LIFETIME - Duration::from_nanos(1)
+        }),
+        Some(FIRST_CSRF)
+    );
+    assert_eq!(
+        slot.recover_csrf_with_clock(&FIRST, || now + MAX_LIFETIME),
+        None
+    );
+    assert_eq!(slot.recover_csrf_with_clock(&FIRST, || now), None);
+    slot.activate(
+        session(SECOND_ID, SECOND, now).with_csrf(SECOND_CSRF),
+        &SECOND,
+    )
+    .unwrap();
+    assert_eq!(slot.recover_browser_csrf(&FIRST), None);
+    assert_eq!(slot.recover_browser_csrf(&SECOND), Some(SECOND_CSRF));
+    assert!(slot.logout_browser(Some(&SECOND), Some(&SECOND_CSRF)));
+    assert_eq!(slot.recover_browser_csrf(&SECOND), None);
+    let _ = std::panic::catch_unwind(|| {
+        let _lock = slot.active.lock().unwrap();
+        panic!("fixture poison");
+    });
+    assert_eq!(slot.recover_browser_csrf(&SECOND), None);
+}
+
+#[test]
 fn browser_rotation_and_logout_require_the_matching_pair_in_shared_state() {
     let slot = Arc::new(SessionSlot::default());
     let shared = Arc::clone(&slot);

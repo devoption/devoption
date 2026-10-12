@@ -89,6 +89,24 @@ impl SessionSlot {
         self.browser_with_clock(candidate, csrf, false, Instant::now)
     }
 
+    /// Read the current session's existing CSRF token, with no rotation or renewal.
+    /// Only a same-origin, cookie-authenticated recovery handler may expose it.
+    pub fn recover_browser_csrf(&self, candidate: &[u8]) -> Option<[u8; super::CSRF_TOKEN_BYTES]> {
+        self.recover_csrf_with_clock(candidate, Instant::now)
+    }
+
+    fn recover_csrf_with_clock(
+        &self,
+        candidate: &[u8],
+        now: impl FnOnce() -> Instant,
+    ) -> Option<[u8; super::CSRF_TOKEN_BYTES]> {
+        self.active
+            .lock()
+            .ok()?
+            .as_mut()?
+            .recover_csrf_at(candidate, now())
+    }
+
     /// Remove only the live session identified by the matching browser token pair.
     /// Missing, mismatched, or stale CSRF tokens cannot revoke a replacement session.
     pub fn logout_browser(&self, candidate: Option<&[u8]>, csrf: Option<&[u8]>) -> bool {

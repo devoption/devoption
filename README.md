@@ -4,8 +4,9 @@ DevOption is an open-source project working toward a self-hosted software factor
 a place to build, test, and run software.
 
 It currently provides a local web preview with Home, Projects, and About
-placeholders, plus browser-local Appearance settings. Project registration,
-builds, and deployments are not implemented yet. There is no published release.
+placeholders, browser-local Appearance settings, and owner sign-in/sign-out.
+Project registration, builds, and deployments are not implemented yet. There is
+no published release.
 
 ## Try it locally
 
@@ -55,8 +56,11 @@ do not include a password in the SSH command. No root privileges are needed.
 The command validates storage before prompting, changes no directory permissions,
 and never replaces an owner. It persists only the generated identity and salted
 Argon2id password hash. Start or restart `serve` with the same directory afterward.
-The sign-in HTTP endpoints exist; **browser sign-in/logout forms and reload-safe
-CSRF recovery are still unfinished**. See [setup limits](docs/local-enrollment.md).
+Open **Sign in** from the profile menu and enter the owner password. The Account
+screen and profile menu offer **Sign out**. Reloading or navigating checks the
+current session again; a session lasts at most one hour and ends on server restart
+or another sign-in. JavaScript is required. Without an owner, the Sign in page
+explains that CLI setup is required. See [setup limits](docs/local-enrollment.md).
 
 ### Local HTTP authentication
 
@@ -64,13 +68,15 @@ This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localho
 at its listening port. Unsafe requests require a matching Origin and a session,
 apart from the protected authentication routes. Without a configured owner, all
 unsafe requests remain denied. Preview pages remain public. There is no TLS or
-complete browser authentication flow. Do not expose it publicly.
+supported public deployment configuration. Do not expose it publicly.
 
 For an existing owner, `POST /auth/challenge` issues an HttpOnly pre-session cookie
 and a separate `X-CSRF-Token` header. `POST /auth/sign-in` requires that matching
 pair and one URL-encoded `password` field; it consumes the challenge before reading
 the form and issues a fresh session cookie and CSRF header only after verification.
-`POST /auth/sign-out` requires the current session cookie/header pair. All three
+`POST /auth/sign-out` requires the current session cookie/header pair.
+`POST /auth/session` recovers only a live session's CSRF token using its cookie
+and a matching Origin; it never issues, rotates, or extends a session. All four
 routes enforce Host/Origin and return empty, non-cacheable responses. Password
 failures return 401, invalid pre-session pairs 403, and admission limits 429/503
 with bounded retry hints. Storage/internal failures return 503 without details.
@@ -82,8 +88,12 @@ a fresh challenge, including retries after a failed password or invalid form.
 Sign-in is limited to one worker and five admitted attempts per minute. One active
 session is retained in memory for at most an hour; another sign-in replaces it,
 and restarting loses it. Tokens must not enter URLs, logs, or browser-local storage.
-Browser forms and recovery of the CSRF token after a page reload remain unfinished.
-Development checks create owners only in temporary fixture stores.
+The browser keeps CSRF tokens only in page memory and clears the password field
+on submission. A stale tab's logout is rejected without ending a newer session;
+reload that tab to check its current account. Secure-cookie support has been
+verified in Chrome on loopback, not every browser. If a session check fails, use
+**Check account** to retry recovery without submitting the password again.
+Development checks create owners only in [temporary fixture stores](docs/browser-session-check.md).
 
 A [local enrollment authorization core](docs/local-enrollment.md) now supports a
 locally armed, expiring, single-use browser attempt with bounded audit evidence.
@@ -108,6 +118,14 @@ browser installation is deferred. The preview exposes no first-owner setup route
 **Appearance**
 
 ![Appearance settings](docs/screenshots/appearance.jpg)
+
+**Sign in**
+
+![Sign in with a configured fixture owner](docs/screenshots/sign-in.jpg)
+
+**Account**
+
+![Signed-in account and sign-out controls](docs/screenshots/account.jpg)
 
 ## Contributing
 
@@ -137,7 +155,7 @@ cargo test --workspace --locked --offline
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 python3 -m unittest discover -s scripts -p 'test_*.py'
-node --test scripts/test_appearance.cjs
+node --test scripts/test_*.cjs
 ```
 
 [Changelog](CHANGELOG.md) · [Security reporting](SECURITY.md) ·

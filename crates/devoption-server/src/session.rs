@@ -136,6 +136,17 @@ impl Session {
         bool::from(expected.as_slice().ct_eq(csrf?)).then_some(identity)
     }
 
+    /// Recover the existing synchronizer token after authenticating the session.
+    /// Transport must enforce same-origin access; this never renews the deadline.
+    fn recover_csrf_at(
+        &mut self,
+        candidate: &[u8],
+        now: Instant,
+    ) -> Option<[u8; CSRF_TOKEN_BYTES]> {
+        self.authenticate_at(Some(candidate), now)?;
+        self.csrf_token
+    }
+
     /// Permanently invalidate this object. Repeated revocation is harmless.
     pub fn revoke(&mut self) {
         self.token = None;

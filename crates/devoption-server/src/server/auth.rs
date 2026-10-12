@@ -30,6 +30,7 @@ struct AuthState {
 // The startup caller mounts these only after finding a valid existing owner.
 pub(super) fn routes(auth: OwnerAuthService, port: u16, session: SharedSession) -> Router {
     let app = Router::new()
+        .route("/auth/session", post(recover_session))
         .route("/auth/challenge", post(challenge))
         .route("/auth/sign-in", post(sign_in))
         .route("/auth/sign-out", post(sign_out))
@@ -47,6 +48,12 @@ pub(super) fn routes(auth: OwnerAuthService, port: u16, session: SharedSession) 
             response
         },
     ))
+}
+
+async fn recover_session(State(state): State<AuthState>, headers: HeaderMap) -> Response {
+    // POST deliberately requires Origin through the shared outer guard even
+    // though recovery only reads existing credentials. Never add CORS here.
+    browser_session::recover(&headers, &state.session)
 }
 
 async fn challenge(State(state): State<AuthState>) -> Response {

@@ -7,6 +7,15 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Browser Sign in and Account screens for an existing CLI-created owner, with
+  shared profile sign-out controls, labelled keyboard/mobile forms, fixed errors,
+  password clearing, and memory-only CSRF tokens. Same-origin session recovery
+  handles reloads without renewing or rotating sessions. Fixture tests cover
+  cookie/Origin rejection, stale logout, request failures, and navigation races;
+  failed session checks offer an explicit account recheck without another password
+  submission, including when sign-in succeeded before verification failed.
+  Real-browser captures document the current pages. CLI-only owner creation and
+  public preview pages are unchanged ([#86](https://github.com/devoption/devoption/issues/86)).
 - Explicit local/SSH first-owner setup with hidden, bounded password confirmation,
   terminal cancellation/restoration, server-owned enrollment policy, and existing
   private create-once storage. Temporary PTY fixtures cover input and failure paths.

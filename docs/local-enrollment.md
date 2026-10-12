@@ -44,10 +44,11 @@ an owner record: inspect its state and never delete it just to retry setup. This
 command is not a password reset or recovery mechanism.
 
 Start or restart `devoption serve --data-dir` against that same directory to enable
-the existing-owner HTTP routes. The server still binds only to loopback. Browser
-sign-in/logout forms, CSRF recovery after reload, and a supported Linux service
-installation remain separate work; setup does not install a service or configure
-SSH, TLS, networking, or permissions.
+the existing-owner HTTP routes. Open **Sign in** from the profile menu; browser
+sign-in, sign-out and CSRF recovery after reload are implemented in
+[#86](https://github.com/devoption/devoption/issues/86). The server still binds
+only to loopback. A supported Linux service installation remains separate work;
+setup does not install a service or configure SSH, TLS, networking, or permissions.
 
 The following sections describe the retained, fixture-only browser authorization
 core from [#81](https://github.com/devoption/devoption/issues/81). CLI setup does not

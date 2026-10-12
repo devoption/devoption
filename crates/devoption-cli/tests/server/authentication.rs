@@ -139,6 +139,7 @@ fn no_configuration_or_owner_never_opens_sign_in_or_first_visitor_enrollment() {
             start()
         };
         for path in [
+            "/auth/session",
             "/auth/challenge",
             "/auth/sign-in",
             "/auth/sign-out",
@@ -151,6 +152,115 @@ fn no_configuration_or_owner_never_opens_sign_in_or_first_visitor_enrollment() {
         }
         assert_eq!(fs::read_dir(&empty).unwrap().count(), 0);
     }
+}
+
+#[test]
+fn recovery_requires_same_origin_cookie_and_tracks_rotation_logout_and_restart() {
+    let (_directory, data) = configured();
+    let (server, address) = start_with(&data);
+    let first = sign_in(address);
+    let cookie = first
+        .header("set-cookie")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap();
+    let recover = |method: &str, host: &str, origin: &str, credentials: &str| {
+        request(
+            address,
+            &format!(
+                "{method} /auth/session HTTP/1.1\r\nHost: {host}\r\n{origin}{credentials}Content-Length: 0\r\nConnection: close\r\n\r\n"
+            ),
+        )
+    };
+    let host = address.to_string();
+    let origin = format!("Origin: http://{address}\r\n");
+    let valid = format!("Cookie: {cookie}\r\n");
+    for _ in 0..2 {
+        let response = recover("POST", &host, &origin, &valid);
+        assert!(response.starts_with("HTTP/1.1 204"));
+        assert!(response.contains(&format!(
+            "x-csrf-token: {}",
+            first.header("x-csrf-token").unwrap()
+        )));
+        assert!(response.contains("cache-control: no-store"));
+        assert!(!response.contains("set-cookie:"));
+        assert!(!response.contains("access-control-allow-origin:"));
+        assert!(response.ends_with("\r\n\r\n"));
+    }
+    for (method, host, origin, credentials, status) in [
+        ("POST", &host[..], "", valid.clone(), 403),
+        ("POST", &host, "Origin: null\r\n", valid.clone(), 403),
+        (
+            "POST",
+            &host,
+            "Origin: https://attacker.invalid\r\n",
+            valid.clone(),
+            403,
+        ),
+        ("POST", "attacker.invalid", &origin, valid.clone(), 400),
+        ("GET", &host, &origin, valid.clone(), 405),
+        ("POST", &host, &origin, String::new(), 401),
+        ("POST", &host, &origin, format!("{valid}{valid}"), 401),
+        (
+            "POST",
+            &host,
+            &origin,
+            format!("{valid}Authorization: Bearer {}\r\n", "ab".repeat(32)),
+            401,
+        ),
+    ] {
+        let response = recover(method, host, origin, &credentials);
+        assert!(response.starts_with(&format!("HTTP/1.1 {status}")));
+        assert!(!response.contains("x-csrf-token:"));
+        assert!(!response.contains("set-cookie:"));
+    }
+    let second = sign_in(address);
+    assert!(recover("POST", &host, &origin, &valid).starts_with("HTTP/1.1 401"));
+    assert_eq!(
+        post(address, "/auth/sign-out", Some(&first), "").status,
+        401
+    );
+    assert_eq!(
+        post(address, "/auth/session", Some(&second), "").status,
+        204
+    );
+    assert_eq!(
+        post(address, "/auth/sign-out", Some(&second), "").status,
+        204
+    );
+    assert_eq!(
+        post(address, "/auth/session", Some(&second), "").status,
+        401
+    );
+    let third = sign_in(address);
+    drop(server);
+    let (_server, address) = start_with(&data);
+    assert_eq!(post(address, "/auth/session", Some(&third), "").status, 401);
+}
+
+#[test]
+fn sign_in_page_distinguishes_cli_setup_and_keeps_inputs_disabled_without_script() {
+    let (_directory, data) = configured();
+    let (_server, address) = start_with(&data);
+    let page = request(
+        address,
+        &format!("GET /sign-in HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
+    );
+    assert!(page.starts_with("HTTP/1.1 200"));
+    assert!(page.contains("cache-control: no-store"));
+    assert!(page.contains("data-owner-configured=\"true\""));
+    assert!(page.contains("<label for=\"auth-password\">Password</label>"));
+    assert!(page.contains("autocomplete=\"current-password\""));
+    assert!(page.contains("aria-describedby=\"auth-status\" disabled"));
+    let (_server, address) = start();
+    let page = request(
+        address,
+        &format!("GET /sign-in HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
+    );
+    assert!(page.contains("Owner setup is required"));
+    assert!(!page.contains("<form id=\"signin-form\""));
+    assert!(page.contains("data-owner-configured=\"false\""));
 }
 
 #[test]

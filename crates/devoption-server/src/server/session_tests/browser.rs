@@ -147,24 +147,38 @@ fn cookie_credentials_cannot_bypass_host_origin_rotation_or_logout() {
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
-/// Isolated, three-minute fixture for the documented browser transport check.
+/// Isolated, ten-minute fixture for the documented browser UI/transport check.
 /// It seeds only temporary storage; all auth routes are the production handlers.
 #[test]
 #[ignore = "manual browser fixture; see docs/browser-session-check.md"]
 fn manual_cookie_browser_fixture() {
     let (_directory, auth, identity) = owner();
-    Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let slot = Arc::new(SessionSlot::default());
-        let protected = protect(Router::new()
-            .route("/", get(|| async { Html("<!doctype html><title>Cookie fixture</title><p>Temporary cookie transport fixture.</p>") }))
-            .route("/probe", post(move |Extension(id): Extension<IdentityId>| async move {
-                assert_eq!(id, identity);
-                StatusCode::NO_CONTENT
-            })), port, Arc::clone(&slot));
-        let app = auth::routes(auth, port, slot).merge(protected);
-        println!("Cookie fixture: http://127.0.0.1:{port}/ (expires after 180 seconds)");
-        axum::serve(listener, app).with_graceful_shutdown(async { tokio::time::sleep(Duration::from_secs(180)).await }).await.unwrap();
-    });
+    Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let slot = Arc::new(SessionSlot::default());
+            let protected = protect(
+                page_routes(true).route(
+                    "/probe",
+                    post(move |Extension(id): Extension<IdentityId>| async move {
+                        assert_eq!(id, identity);
+                        StatusCode::NO_CONTENT
+                    }),
+                ),
+                port,
+                Arc::clone(&slot),
+            );
+            let app = auth::routes(auth, port, slot).merge(protected);
+            println!("Cookie fixture: http://127.0.0.1:{port}/ (expires after 600 seconds)");
+            axum::serve(listener, app)
+                .with_graceful_shutdown(async {
+                    tokio::time::sleep(Duration::from_secs(600)).await
+                })
+                .await
+                .unwrap();
+        });
 }

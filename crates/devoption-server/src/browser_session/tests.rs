@@ -10,6 +10,59 @@ fn headers(cookie: &str, csrf: &str) -> HeaderMap {
 }
 
 #[test]
+fn recovery_requires_one_valid_cookie_and_never_sets_a_cookie() {
+    use crate::session::{MAX_LIFETIME, Session};
+    let slot = SessionSlot::default();
+    let token = [0xab; TOKEN_BYTES];
+    slot.activate(
+        Session::new(
+            crate::identity::IdentityId::from_bytes([1; 16]),
+            token,
+            MAX_LIFETIME,
+        )
+        .unwrap()
+        .with_csrf([0xcd; CSRF_TOKEN_BYTES]),
+        &token,
+    )
+    .unwrap();
+    let cookie = format!("{COOKIE_NAME}={}", encode(&token));
+    let mut valid = HeaderMap::new();
+    valid.insert(COOKIE, cookie.parse().unwrap());
+    for _ in 0..2 {
+        let response = recover(&valid, &slot);
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        assert_eq!(
+            response.headers()[CSRF_HEADER],
+            "cd".repeat(CSRF_TOKEN_BYTES)
+        );
+        assert!(response.headers()[CSRF_HEADER].is_sensitive());
+        assert_eq!(response.headers()[CACHE_CONTROL], "no-store");
+        assert!(!response.headers().contains_key(SET_COOKIE));
+    }
+    let mut duplicate = valid.clone();
+    duplicate.append(COOKIE, cookie.parse().unwrap());
+    let mut bearer = valid.clone();
+    bearer.insert(
+        AUTHORIZATION,
+        format!("Bearer {}", encode(&token)).parse().unwrap(),
+    );
+    let mut wrong = valid.clone();
+    wrong.insert(COOKIE, format!("{cookie}; {cookie}").parse().unwrap());
+    for invalid in [
+        HeaderMap::new(),
+        duplicate,
+        bearer,
+        wrong,
+        headers("other=fixture", &"cd".repeat(32)),
+    ] {
+        let response = recover(&invalid, &slot);
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(!response.headers().contains_key(CSRF_HEADER));
+        assert!(!response.headers().contains_key(SET_COOKIE));
+    }
+}
+
+#[test]
 fn cookie_parser_accepts_only_one_unambiguous_session_and_explicit_csrf_header() {
     let token = "ab".repeat(TOKEN_BYTES);
     let csrf = "cd".repeat(CSRF_TOKEN_BYTES);

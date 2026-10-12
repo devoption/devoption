@@ -151,7 +151,9 @@ fn pages_share_layout_and_have_working_navigation() {
         assert!(headers.contains("content-type: text/html; charset=utf-8"));
         assert!(body.starts_with("<!doctype html>"));
         assert!(body.contains(&format!("<title>{title} · DevOption</title>")));
-        assert!(body.contains(&format!("<h1>{title}</h1>")));
+        assert!(body.contains(&format!(
+            "<h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>"
+        )));
         assert!(body.contains(message));
         assert!(body.contains("<a class=\"brand\" href=\"/\" aria-label=\"DevOption home\"><svg "));
         let navigation = body
@@ -191,7 +193,8 @@ fn pages_share_layout_and_have_working_navigation() {
             .unwrap();
         let (popup, _) = popup.split_once("</section>").unwrap();
         assert!(popup.contains("id=\"profile-title\""));
-        assert!(popup.contains("Account features are not available yet."));
+        assert!(popup.contains("Sign in to your local account."));
+        assert!(popup.contains("href=\"/sign-in\">Sign in</a>"));
         let appearance_page = path == "/settings/appearance";
         let current = if appearance_page {
             " aria-current=\"page\""
