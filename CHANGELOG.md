@@ -20,6 +20,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A dedicated `devoption-projects` crate with separate stable project/repository
+  identities, multi-repository associations and a bounded versioned private Unix
+  catalog. Exclusive writer locking and atomic snapshots preserve complete state
+  across restart; failure tests cover partial writes, invalid files and conflicts.
+  Repository records are identity/display metadata only: path intake, Git
+  validation and HTTP/UI registration remain unimplemented
+  ([#101](https://github.com/devoption/devoption/issues/101)).
+
 - Optional, explicitly approved Linux user lingering guidance and a recorded
   disposable Ubuntu rehearsal proving readiness before the first login after
   reboot, continued operation after logout, and deliberate stop behavior. The

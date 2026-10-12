@@ -152,6 +152,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "devoption-projects"
+version = "0.1.0-dev"
+dependencies = [
+ "getrandom",
+ "rustix",
+ "tempfile",
+]
+
+[[package]]
 name = "devoption-server"
 version = "0.1.0-dev"
 dependencies = [
