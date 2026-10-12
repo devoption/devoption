@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- CLI help and authentication module introductions now describe CLI-first owner
+  setup followed by the implemented browser sign-in flow, while keeping browser
+  owner setup explicitly unavailable
+  ([#98](https://github.com/devoption/devoption/issues/98)).
+
 - The HTTP mutation guard now requires the browser session cookie and explicit
   CSRF header after Host/Origin validation, rejecting Authorization credentials
   and mixed transports without advertising a Bearer challenge. Transport-neutral

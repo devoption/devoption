@@ -1,4 +1,4 @@
-//! Strict input boundary for future browser authentication routes.
+//! Strict input boundary for existing-owner browser sign-in.
 //!
 //! Accepts one URL-encoded `password` field on POST, at most 4 KiB encoded and
 //! 1–1024 UTF-8 bytes decoded. A five-second deadline covers the complete body read.

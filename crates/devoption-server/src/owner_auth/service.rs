@@ -5,9 +5,10 @@
 //! rolling minute, including successes and failures. Busy requests are rejected
 //! immediately. Limits are in memory: a new service or process starts fresh.
 //!
-//! Existing-owner HTTP sign-in uses this service with cookie transport and
-//! pre-authentication CSRF adapters. Enrollment authorization/policy and browser
-//! forms remain unfinished. This grants no permissions.
+//! Existing-owner browser sign-in uses this service with cookie transport and
+//! pre-authentication CSRF adapters. First-owner setup is available through the
+//! local/SSH CLI; the enrollment core has no production browser route.
+//! This grants no permissions.
 
 use std::{
     collections::VecDeque,

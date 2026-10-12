@@ -14,6 +14,9 @@ fn help_explains_the_actual_scope() {
         assert!(text.contains("--data-dir ABSOLUTE_PATH"));
         assert!(text.contains("devoption setup --data-dir ABSOLUTE_PATH"));
         assert!(text.contains("Serve creates no accounts; setup never replaces an owner"));
+        assert!(text.contains("After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH"));
+        assert!(text.contains("with the same directory, then sign in at /sign-in"));
+        assert!(text.contains("Browser owner setup is not available"));
         assert!(text.contains("services are not implemented"));
     }
 }
