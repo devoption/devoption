@@ -31,9 +31,34 @@ user, have no group/other permission bits, and use a path with no symlink compon
 or `..`. Invalid owner records stop startup. This option retains the opened
 directory but creates no directories or accounts and changes no permissions.
 When a valid owner already exists at startup, it enables the HTTP sign-in and
-sign-out routes described below. A missing owner leaves them closed; first-owner
-setup and browser forms are not implemented. Without this option, the preview
-selects no data path.
+sign-out routes described below. A missing owner leaves them closed. Without this
+option, the preview selects no data path.
+
+### Create the first owner locally or over SSH
+
+On Unix, run the following on the server as the unprivileged OS account that will
+run DevOption, after preparing an existing private data directory:
+
+```sh
+cargo run --locked --offline -- setup --data-dir /absolute/private/directory
+cargo run --locked --offline -- serve --data-dir /absolute/private/directory
+```
+
+`setup` asks for a password and exact confirmation with terminal echo disabled.
+Use a unique passphrase of at least 15 characters, up to 1024 UTF-8 bytes; control
+characters are rejected. Spaces and Unicode are preserved without normalization.
+This is a minimum-length policy, not a compromised-password check. Passwords are
+never accepted through command arguments, environment variables, or redirected
+input. For SSH, allocate a terminal (`ssh -t user@server`), then run setup there;
+do not include a password in the SSH command. No root privileges are needed.
+
+The command validates storage before prompting, changes no directory permissions,
+and never replaces an owner. It persists only the generated identity and salted
+Argon2id password hash. Start or restart `serve` with the same directory afterward.
+The sign-in HTTP endpoints exist; **browser sign-in/logout forms and reload-safe
+CSRF recovery are still unfinished**. See [setup limits](docs/local-enrollment.md).
+
+### Local HTTP authentication
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
 at its listening port. Unsafe requests require a matching Origin and a session,
@@ -57,15 +82,14 @@ a fresh challenge, including retries after a failed password or invalid form.
 Sign-in is limited to one worker and five admitted attempts per minute. One active
 session is retained in memory for at most an hour; another sign-in replaces it,
 and restarting loses it. Tokens must not enter URLs, logs, or browser-local storage.
-First-owner enrollment authorization/policy, browser forms, and recovery of the
-CSRF token after a page reload remain unfinished. Temporary stores are used for
-tests; there is no supported account provisioning flow yet.
+Browser forms and recovery of the CSRF token after a page reload remain unfinished.
+Development checks create owners only in temporary fixture stores.
 
 A [local enrollment authorization core](docs/local-enrollment.md) now supports a
 locally armed, expiring, single-use browser attempt with bounded audit evidence.
-Only temporary fixtures use it. The selected automatic browser flow still needs
-a secure handoff, command/HTTP/UI wiring, and enrollment password policy; the
-preview does not expose first-owner setup.
+Only temporary fixtures use this browser-attempt core. The selected initial
+installation flow is now local/SSH CLI setup followed by ordinary browser sign-in;
+browser installation is deferred. The preview exposes no first-owner setup route.
 
 ## Screenshots
 

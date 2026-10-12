@@ -12,7 +12,8 @@ fn help_explains_the_actual_scope() {
         let text = String::from_utf8(output.stdout).unwrap();
         assert!(text.contains("Usage: devoption"));
         assert!(text.contains("--data-dir ABSOLUTE_PATH"));
-        assert!(text.contains("No directories or accounts are created"));
+        assert!(text.contains("devoption setup --data-dir ABSOLUTE_PATH"));
+        assert!(text.contains("Serve creates no accounts; setup never replaces an owner"));
         assert!(text.contains("services are not implemented"));
     }
 }
@@ -37,6 +38,17 @@ fn version_matches_the_built_package() {
 fn invalid_commands_fail_without_success_output() {
     for args in [
         vec!["start"],
+        vec!["setup"],
+        vec!["setup", "--data-dir"],
+        vec!["setup", "--data-dir", "relative"],
+        vec![
+            "setup",
+            "--data-dir",
+            "/unused",
+            "--password",
+            "fixture only",
+        ],
+        vec!["setup", "--data-dir", "/unused", "--data-dir", "/unused"],
         vec!["--help", "start"],
         vec!["--version", "-V"],
         vec!["serve", "--port"],
