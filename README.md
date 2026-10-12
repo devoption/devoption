@@ -61,6 +61,12 @@ First-owner enrollment authorization/policy, browser forms, and recovery of the
 CSRF token after a page reload remain unfinished. Temporary stores are used for
 tests; there is no supported account provisioning flow yet.
 
+A [local enrollment authorization core](docs/local-enrollment.md) now supports a
+locally armed, expiring, single-use browser attempt with bounded audit evidence.
+Only temporary fixtures use it. The selected automatic browser flow still needs
+a secure handoff, command/HTTP/UI wiring, and enrollment password policy; the
+preview does not expose first-owner setup.
+
 ## Screenshots
 
 **Home**
