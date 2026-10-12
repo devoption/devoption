@@ -149,19 +149,23 @@ browser installation is deferred. The preview exposes no first-owner setup route
 Start with an [issue](https://github.com/devoption/devoption/issues/new/choose)
 and read the [contribution guide](CONTRIBUTING.md).
 
-The Rust workspace has three crates, with dependencies flowing
-`devoption-cli` → `devoption-server` → `devoption-ui`:
+The Rust workspace has four crates. The running service uses
+`devoption-cli` → `devoption-server` → `devoption-ui`; the project domain core
+is independent of those delivery layers:
 
 | Crate | Responsibility |
 | --- | --- |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
+| `devoption-projects` | Project/repository identities, associations, and private catalog persistence |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
 | `devoption-ui` | HTML rendering and browser assets |
 
 Server APIs live under `devoption_server`; the CLI is a binary without a library
-facade. Auth and storage remain server modules until an independent consumer or
-domain boundary warrants another crate. Executable integration tests stay with
-the CLI; server unit tests and fixtures stay with the server.
+facade. Authentication and owner storage remain server modules. The
+[project catalog core](docs/project-catalog.md) has its own model and storage
+tests; it accepts no repository paths and has no HTTP/UI adapter yet. Executable
+integration tests stay with the CLI. Future server adapters compose the project
+crate without moving its domain logic into the HTTP service.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:
