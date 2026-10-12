@@ -52,8 +52,17 @@ fn copied_binary_restores_a_private_backup_without_restoring_sessions() {
 
     // A damaged restore must fail before listening, without repairing the record.
     fs::write(restored.join("owner.bin"), b"damaged fixture backup").unwrap();
+    // If validation regresses, binding must fail instead of starting a server
+    // that leaves output() waiting forever. The assertion below distinguishes
+    // the expected storage rejection from that address conflict.
+    let occupied = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
     let output = Command::new(&binary)
-        .args(["serve", "--port", "0", "--data-dir"])
+        .args([
+            "serve",
+            "--port",
+            &occupied.local_addr().unwrap().port().to_string(),
+            "--data-dir",
+        ])
         .arg(&restored)
         .output()
         .unwrap();

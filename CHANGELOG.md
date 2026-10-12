@@ -11,7 +11,9 @@ Entries describe implemented changes, not the roadmap.
   example with an owner-record preflight, same-port SSH forwarding, and stopped
   backup/restore guidance. Fresh installation preflights both destination paths,
   including dangling symlinks, before creating directories. Release fixtures check
-  copied-binary startup, restored authentication, lost sessions and damaged records;
+  copied-binary startup, restored authentication, lost sessions and damaged records.
+  The damaged-record check holds an occupied port so an accepted record fails the
+  assertion instead of leaving a server running indefinitely.
   Ubuntu CI statically checks the unit. Real systemd/SSH lifecycle validation
   remains pending
   ([#90](https://github.com/devoption/devoption/issues/90)).
