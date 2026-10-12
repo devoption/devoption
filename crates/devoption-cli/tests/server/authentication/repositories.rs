@@ -366,3 +366,77 @@ fn root_configuration_requires_existing_owner_safe_disjoint_root_and_saved_bindi
     startup_rejected(&data, &different, "project catalog unavailable");
     assert_eq!(fs::read(data.join("projects.bin")).unwrap(), saved);
 }
+
+#[test]
+fn replaced_live_repository_root_returns_conflict_without_rebinding_or_writing() {
+    for registered in [false, true] {
+        let (_data, data) = configured();
+        let (_root, root) = root_fixture();
+        let (_replacement, replacement) = root_fixture();
+        let (first, second) = seed(&data);
+        let (_server, address) = start_root(&data, &root);
+        let issued = sign_in(address);
+        if registered {
+            assert_eq!(
+                status(address, &attachment(address, &issued, first, "main")),
+                204
+            );
+        }
+        let saved = fs::read(data.join("projects.bin")).unwrap();
+        let owner = fs::read(data.join("owner.bin")).unwrap();
+        // Keep the original inodes alive inside the replacement fixture. The
+        // configured path now contains another valid checkout tree.
+        fs::rename(&root, replacement.join("original-root")).unwrap();
+        fs::rename(&replacement, &root).unwrap();
+        let response = request(address, &attachment(address, &issued, second, "linked"));
+        let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+        assert!(headers.starts_with("HTTP/1.1 409"), "{headers}");
+        assert!(headers.contains("cache-control: no-store"));
+        assert_eq!(
+            body,
+            "Repository association conflicts with saved state or catalog capacity."
+        );
+        assert_eq!(fs::read(data.join("projects.bin")).unwrap(), saved);
+        assert_eq!(fs::read(data.join("owner.bin")).unwrap(), owner);
+    }
+}
+
+#[test]
+fn malformed_project_segments_use_fixed_noncacheable_errors_after_authentication() {
+    let (_data, data) = configured();
+    let (_root, root) = root_fixture();
+    let (first, _) = seed(&data);
+    let saved = fs::read(data.join("projects.bin")).unwrap();
+    fs::remove_file(data.join(".projects.lock")).unwrap();
+    let (_server, address) = start_root(&data, &root);
+    let issued = sign_in(address);
+    let raw = attachment(address, &issued, first, "main");
+    let id: String = first
+        .to_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    for segment in ["%FF", "%C3%28", "%", "%GG", "%2Fprivate-fixture", "invalid"] {
+        let malformed = raw.replacen(
+            &format!("/projects/{id}/"),
+            &format!("/projects/{segment}/"),
+            1,
+        );
+        let response = request(address, &malformed);
+        let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+        assert!(headers.starts_with("HTTP/1.1 400"), "{headers}");
+        assert!(headers.contains("cache-control: no-store"), "{headers}");
+        assert_eq!(body, "Repository checkout could not be validated.");
+        // Route extraction must not supersede the existing cookie/CSRF guard.
+        let anonymous = malformed
+            .split("\r\n")
+            .filter(|line| !line.starts_with("Cookie:"))
+            .collect::<Vec<_>>()
+            .join("\r\n");
+        let denied = request(address, &anonymous);
+        assert!(denied.starts_with("HTTP/1.1 401"));
+        assert!(denied.split_once("\r\n\r\n").unwrap().1.is_empty());
+    }
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), saved);
+    assert!(!data.join(".projects.lock").exists());
+}

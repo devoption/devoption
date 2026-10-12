@@ -2,9 +2,16 @@
 //! Host/Origin/CSRF guards. Filesystem work never runs on the async event loop.
 
 use super::*;
-use axum::{body::to_bytes, http::header::CONTENT_TYPE};
+use axum::{
+    body::to_bytes,
+    extract::{Path as RoutePath, rejection::PathRejection},
+    http::header::CONTENT_TYPE,
+};
 use devoption_projects::{Catalog, CatalogStore, Error, MAX_NAME_BYTES, read_catalog};
-use devoption_projects::{ProjectId, worktree::PermittedRoot};
+use devoption_projects::{
+    ProjectId,
+    worktree::{InspectionError, PermittedRoot},
+};
 use std::{error::Error as _, path::PathBuf, time::Duration};
 use tokio::sync::Mutex;
 
@@ -45,6 +52,7 @@ impl Projects {
         .await
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
         .map_err(|error| match error {
+            Error::Inspection(InspectionError::Changed) => StatusCode::CONFLICT,
             Error::InvalidName | Error::Inspection(_) => StatusCode::BAD_REQUEST,
             Error::UnknownProject => StatusCode::NOT_FOUND,
             Error::Capacity
@@ -98,17 +106,24 @@ pub(super) fn routes(projects: Projects) -> Router {
         .route(
             "/projects/{project}/repositories",
             axum::routing::post(
-                move |axum::extract::Path(project): axum::extract::Path<String>,
+                move |project: Result<RoutePath<String>, PathRejection>,
                       request: Request| async move {
-                    attach(attachment, &project, request).await
+                    let project = project
+                        .map(|RoutePath(project)| project)
+                        .map_err(|_| StatusCode::BAD_REQUEST);
+                    attach(attachment, project, request).await
                 },
             ),
         )
 }
 
-async fn attach(projects: Projects, project: &str, request: Request) -> axum::response::Response {
+async fn attach(
+    projects: Projects,
+    project: Result<String, StatusCode>,
+    request: Request,
+) -> axum::response::Response {
     let result = async {
-        let project = project_id(project).ok_or(StatusCode::BAD_REQUEST)?;
+        let project = project_id(&project?).ok_or(StatusCode::BAD_REQUEST)?;
         let root = projects
             .root
             .clone()

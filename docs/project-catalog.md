@@ -187,9 +187,9 @@ Existing cookie, CSRF, Host and Origin guards run first; any Authorization heade
 is rejected. There is no browser form or project-ID discovery UI yet. The endpoint
 returns 204 only after a durable save, with `Cache-Control: no-store`. Failures
 use fixed messages: 400 invalid ID/path or rejected inspection, 404 unknown
-project, 409 duplicate association, stale/root conflict or capacity, 413 oversized
-body, 415 unsupported encoding, 408 stalled body, and 503 disabled attachment,
-busy storage or persistence failure. Messages never echo paths or stored data.
+project, 409 duplicate association, stale/root conflict, observed filesystem change
+or capacity, 413 oversized body, 415 unsupported encoding, 408 stalled body, and
+503 disabled attachment, busy storage or persistence failure. Messages never echo paths or stored data.
 Inspect saved state after an uncertain result; there is no automatic retry.
 
 Under the writer lock, the domain loads the latest catalog, validates the selected

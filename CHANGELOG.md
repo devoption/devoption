@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Repository attachment now returns the documented conflict response when the
+  configured root changes while serving. Malformed project path segments use
+  fixed, non-cacheable errors after authentication; fixture regressions verify
+  that both failures preserve the catalog
+  ([#109](https://github.com/devoption/devoption/issues/109)).
+
 - The README architecture summary now distinguishes startup catalog validation
   from per-request Projects reads and locked project creation
   ([#105](https://github.com/devoption/devoption/issues/105)).
