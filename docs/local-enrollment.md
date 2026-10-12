@@ -48,9 +48,9 @@ the existing-owner HTTP routes. Open **Sign in** from the profile menu; browser
 sign-in, sign-out and CSRF recovery after reload are implemented in
 [#86](https://github.com/devoption/devoption/issues/86). The server still binds
 only to loopback. The [private Linux guide](private-linux-install.md) provides a
-user-service example and recovery fixtures, with real host lifecycle validation
-still pending. Setup does not install a service or configure SSH, TLS, networking,
-or permissions.
+user-service example and recovery fixtures, plus a
+[disposable Ubuntu lifecycle rehearsal](linux-rehearsal.md) and its limits.
+Setup does not install a service or configure SSH, TLS, networking, or permissions.
 
 The following sections describe the retained, fixture-only browser authorization
 core from [#81](https://github.com/devoption/devoption/issues/81). CLI setup does not

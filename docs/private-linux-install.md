@@ -117,9 +117,11 @@ and starts it immediately. Plain `enable` does not start the service; see
 [systemctl's enable semantics](https://github.com/systemd/systemd/blob/v255/man/systemctl.xml).
 Operation after logout or before the next login depends on the host's existing
 user-manager policy; enabling a unit does not enable lingering.
-Logout/reboot persistence has not been validated by
-this repository's fixtures. If `systemctl --user` cannot connect, stop and have
-the account/session prerequisites checked; do not substitute a root service.
+In the [Ubuntu rehearsal](linux-rehearsal.md), the service stopped after the last
+logout with `Linger=no` and started on the next login, including after reboot.
+This does not promise unattended persistence on another host. If `systemctl --user`
+cannot connect, stop and have the account/session prerequisites checked; do not
+substitute a root service.
 
 ## Open the browser privately
 
@@ -140,9 +142,10 @@ The explicit local address keeps the browser end on loopback; the server also
 binds only to loopback. Do not use wildcard bindings, expose the port, weaken
 Host/Origin checks, or add a public reverse proxy. SSH forwards the connection
 without changing its HTTP headers. See [OpenSSH forwarding](https://man.openbsd.org/ssh.1#L).
-Secure cookies have been checked with Chrome on loopback; other browsers and a
-real remote SSH browser session remain unvalidated. JavaScript is required for
-sign-in. Closing the tunnel ends access, not the server process.
+Secure cookies have been checked with Chrome on loopback, including an SSH tunnel
+to a disposable Ubuntu guest. Other browsers and public deployment remain
+unvalidated. JavaScript is required for sign-in. Closing the tunnel ends access,
+not the server process.
 
 ## Restart, backup and restore
 
@@ -227,9 +230,11 @@ The systemd check only verifies unit syntax/executable paths and the missing or
 empty owner preflight in a disposable home; it installs or starts no service.
 See [systemd's verifier](https://github.com/systemd/systemd/blob/v255/man/systemd-analyze.xml).
 
-These checks do not prove a clean machine can be provisioned, user-service
-start/stop/restart under a real manager, logout/reboot survival, or browser access
-through a real SSH connection. A controlled Ubuntu lifecycle drill is still
-required before calling those steps tested. Other Linux distributions and
-architectures, public hosting, full project/build/deploy flows, and disaster
-recovery for future state remain outside this guide's validated scope.
+CI fixtures do not by themselves validate a real user manager or SSH connection.
+A separate [Ubuntu 24.04 x86_64 guest rehearsal](linux-rehearsal.md) checked source
+installation, user-service start/restart, SSH browser access, backup/restore,
+complete logout and recovery after reboot and login. Its image, source revision,
+observed behavior, disk use and cleanup are recorded there. Other Linux
+distributions and architectures, unattended operation without a login, public
+hosting, full project/build/deploy flows, and disaster recovery for future state
+remain outside this guide's validated scope.
