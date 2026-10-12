@@ -1,4 +1,5 @@
 /target/
+/.local/vm-rehearsal/
 __pycache__/
 *.pyc
 .DS_Store

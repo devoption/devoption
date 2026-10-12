@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A recorded disposable Ubuntu 24.04 x86_64 source-install rehearsal covering
+  SSH browser authentication, the user service, private backup/restore, old-session
+  rejection, complete logout and recovery after reboot and login. VM artifacts
+  stay in one ignored repository folder with a monitored disk budget and explicit
+  stop/cleanup instructions; platform and unattended-service limits remain stated
+  ([#92](https://github.com/devoption/devoption/issues/92)).
+
 - Private Ubuntu source-install instructions, an unprivileged systemd user-unit
   example with an owner-record preflight, same-port SSH forwarding, and stopped
   backup/restore guidance. Fresh installation preflights the physical home path,

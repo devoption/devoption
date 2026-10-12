@@ -65,7 +65,7 @@ explains that CLI setup is required. See [setup limits](docs/local-enrollment.md
 For private Ubuntu source installation, see the
 [user-service and recovery guide](docs/private-linux-install.md). It includes an
 unprivileged systemd example, same-port SSH forwarding, persistent owner storage,
-and the distinction between CI fixtures and untested host lifecycle steps.
+and the scope of [CI and disposable Ubuntu VM validation](docs/linux-rehearsal.md).
 
 ### Local HTTP authentication
 
