@@ -29,9 +29,11 @@ cargo build --release --locked --offline
 ```
 
 Record the source commit. Use a reviewed commit with passing CI; `main` can move.
-The following fresh-install block checks both target paths, including dangling
-symlinks, before creating directories. It stops if either already exists. Keep
-existing installations and data; do not rerun setup over them.
+The following fresh-install block checks the physical home path, all existing
+parent directories, and both destinations before creating directories. It rejects
+symlink components, non-directory parents, and existing destinations, including
+dangling symlinks. Keep existing installations and data; do not rerun setup over
+them.
 The home directory and all data-path components must be real directories without
 symlinks or `..`. If your home layout differs, choose an absolute real path and
 adjust both commands and the service example consistently.
@@ -40,6 +42,13 @@ adjust both commands and the service example consistently.
 (
   set -eu
   umask 077
+  test "$(cd "$HOME" && pwd -P)" = "$HOME"
+  for ancestor in "$HOME/.local" "$HOME/.local/lib" "$HOME/.local/share"; do
+    test ! -L "$ancestor"
+    if [ -e "$ancestor" ]; then
+      test -d "$ancestor"
+    fi
+  done
   for destination in "$HOME/.local/lib/devoption" "$HOME/.local/share/devoption"; do
     test ! -e "$destination"
     test ! -L "$destination"
@@ -103,9 +112,12 @@ the executable starts; it does not wait for the listener. Failures restart after
 five seconds, subject to systemd's start limits. A deliberate stop stays stopped.
 See the upstream [service semantics](https://github.com/systemd/systemd/blob/v255/man/systemd.service.xml).
 
-`enable` starts the unit with this user's manager. Operation after logout or before
-the next login depends on the host's existing user-manager policy; enabling a unit
-does not enable lingering. Logout/reboot persistence has not been validated by
+`systemctl --user enable --now` enables the unit for future user-manager starts
+and starts it immediately. Plain `enable` does not start the service; see
+[systemctl's enable semantics](https://github.com/systemd/systemd/blob/v255/man/systemctl.xml).
+Operation after logout or before the next login depends on the host's existing
+user-manager policy; enabling a unit does not enable lingering.
+Logout/reboot persistence has not been validated by
 this repository's fixtures. If `systemctl --user` cannot connect, stop and have
 the account/session prerequisites checked; do not substitute a root service.
 
