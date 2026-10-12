@@ -24,6 +24,14 @@ check labelled input, keyboard access, visible focus and no horizontal overflow.
 With JavaScript disabled, the sign-in input and button must remain disabled and
 the page must explain that JavaScript is required.
 
+After sign-in returns 204, temporarily block the following `/auth/session` request
+in the browser tool. The page must show **Check account**, not a signed-out state
+or cookie-failure diagnosis. Remove the block and follow **Check account**: it must
+recover the same live session without another challenge/sign-in request. Also check
+a failed recovery on reload, an HTTP error and a response without a valid CSRF header.
+
+![Session check failure with an explicit account retry](screenshots/sign-in-check.jpg)
+
 For the transport check, use browser developer tools or an existing browser
 automation tool to make these same-origin requests. Do not print or save tokens:
 

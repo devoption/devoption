@@ -33,7 +33,7 @@ function page({ configured = true, form = true, initial = response(401) } = {}) 
     return element;
   }
   ["profile-state", "profile-note", "profile-account", "profile-status", "page-title", "page-message"].forEach(node);
-  if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-status"].forEach(node);
+  if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
   const signouts = [node("profile-logout"), ...(form ? [node("page-logout")] : [])];
   const events = node("window");
   const calls = [];
@@ -100,15 +100,17 @@ test("initial recovery gates controls and restores a live account without signin
   assert.deepEqual(current.calls.map((call) => call.url), ["/auth/session"]);
 });
 
-test("anonymous, failed and malformed recovery never report a signed-in account", async () => {
+test("only confirmed anonymous recovery enables sign-in; failed checks remain unconfirmed", async () => {
   for (const initial of [response(401), response(503), response(204, "invalid"), new Error("fixture")]) {
     const current = page({ initial });
     await tick();
-    assert.equal(current.nodes.get("signin-form").hidden, false);
-    assert.equal(current.nodes.get("auth-submit").disabled, false);
+    const unchecked = initial.status !== 401;
+    assert.equal(current.nodes.get("signin-form").hidden, unchecked);
+    assert.equal(current.nodes.get("auth-submit").disabled, unchecked);
+    assert.equal(current.nodes.get("auth-recheck").hidden, !unchecked);
     assert.equal(current.signouts[0].hidden, true);
-    assert.equal(current.nodes.get("profile-state").textContent, "Signed out");
-    if (initial.status !== 401) assert.match(current.status.textContent, /Could not/);
+    assert.equal(current.nodes.get("profile-state").textContent, unchecked ? "Check account" : "Signed out");
+    if (unchecked) assert.match(current.status.textContent, /could not be checked/);
   }
 });
 
@@ -198,6 +200,65 @@ test("a blocked Secure cookie does not produce a successful account screen", asy
   assert.match(current.status.textContent, /could not be retained/);
   assert.equal(current.nodes.get("signin-form").hidden, false);
   assert.equal(current.signouts[0].hidden, true);
+});
+
+test("failed verification after successful sign-in requires checking the account, not another password", async () => {
+  for (const failure of [new Error("fixture network failure"), response(503), response(204, "invalid")]) {
+    const current = page();
+    await tick();
+    current.queue.push(response(204, csrf), response(204, nextCsrf), failure);
+    await current.submit();
+    assert.equal(current.nodes.get("profile-state").textContent, "Check account");
+    assert.equal(current.nodes.get("auth-password").value, "");
+    assert.equal(current.nodes.get("auth-submit").disabled, true);
+    assert.equal(current.nodes.get("auth-password").disabled, true);
+    assert.equal(current.nodes.get("auth-recheck").hidden, false);
+    assert.equal(current.focused(), "auth-recheck");
+    assert.equal(current.signouts[0].hidden, true);
+    assert.match(current.status.textContent, /could not be checked.*Check account/);
+    assert.doesNotMatch(current.status.textContent, /cookies|try signing in|private/);
+    const count = current.calls.length;
+    await current.submit();
+    assert.equal(current.calls.length, count);
+
+    // A fresh page checks the retained cookie without a challenge or sign-in.
+    const reloaded = page({ initial: response(204, nextCsrf) });
+    await tick();
+    assert.equal(reloaded.nodes.get("profile-state").textContent, "Owner");
+    assert.deepEqual(reloaded.calls.map((call) => call.url), ["/auth/session"]);
+  }
+});
+
+test("a failed reload still offers only account checking until the session is confirmed", async () => {
+  for (const form of [true, false]) {
+    const current = page({ form, initial: new Error("fixture network failure") });
+    await tick();
+    assert.equal(current.nodes.get("profile-account").textContent, "Check account");
+    assert.equal(current.signouts[0].hidden, true);
+    current.queue.push(response(204, nextCsrf));
+    current.event("pageshow", { persisted: true });
+    await tick();
+    assert.equal(current.nodes.get("profile-state").textContent, "Owner");
+    assert.deepEqual(current.calls.map((call) => call.url), ["/auth/session", "/auth/session"]);
+  }
+});
+
+test("verification failure after navigation cannot overwrite the restored session", async () => {
+  const current = page();
+  await tick();
+  let finish;
+  current.queue.push(response(204, csrf), response(204, nextCsrf), new Promise((resolve) => { finish = resolve; }));
+  const work = current.submit();
+  await tick();
+  current.event("pagehide");
+  current.queue.push(response(204, nextCsrf));
+  current.event("pageshow", { persisted: true });
+  await tick();
+  finish(new Error("late fixture failure"));
+  await work;
+  assert.equal(current.nodes.get("profile-state").textContent, "Owner");
+  assert.equal(current.nodes.get("auth-recheck").hidden, true);
+  assert.equal(current.status.textContent, "");
 });
 
 test("stale logout never retries with a newer session and requires reload", async () => {

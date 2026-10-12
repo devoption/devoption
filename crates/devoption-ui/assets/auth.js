@@ -8,6 +8,7 @@
     const signedIn = byId("auth-signed-in");
     const status = byId("auth-status") || byId("profile-status");
     const signouts = Array.from(document.querySelectorAll("[data-signout]"));
+    // null: confirmed signed out; undefined: session check failed; string: verified.
     let csrf = null;
     let busy = false;
     let version = 0;
@@ -17,24 +18,33 @@
     };
     const message = (text) => { status.textContent = text; };
     const controls = () => {
-      if (password) password.disabled = busy || Boolean(csrf);
-      if (submit) submit.disabled = busy || Boolean(csrf);
+      if (password) password.disabled = busy || csrf !== null;
+      if (submit) submit.disabled = busy || csrf !== null;
       signouts.forEach((button) => { button.disabled = busy || !csrf; });
     };
     const state = (value) => {
       csrf = value;
-      if (form) form.hidden = Boolean(csrf);
+      const unchecked = csrf === undefined;
+      if (form) {
+        form.hidden = csrf !== null;
+        byId("auth-recheck").hidden = !unchecked;
+      }
       if (signedIn) signedIn.hidden = !csrf;
       signouts.forEach((button) => { button.hidden = !csrf; });
-      byId("profile-state").textContent = csrf ? "Owner" : "Signed out";
-      byId("profile-note").textContent = csrf ? "Signed in on this server." : "Sign in to your local account.";
-      byId("profile-account").textContent = csrf ? "Account" : "Sign in";
+      byId("profile-state").textContent = unchecked ? "Check account" : csrf ? "Owner" : "Signed out";
+      byId("profile-note").textContent = unchecked ? "Check your current session before signing in again." : csrf ? "Signed in on this server." : "Sign in to your local account.";
+      byId("profile-account").textContent = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
       if (form) {
-        byId("page-title").textContent = csrf ? "Account" : "Sign in";
-        byId("page-message").textContent = csrf ? "You’re signed in on this server." : "Use the owner password for this server.";
-        document.title = (csrf ? "Account" : "Sign in") + " · DevOption";
+        const title = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
+        byId("page-title").textContent = title;
+        byId("page-message").textContent = unchecked ? "Check your current session before signing in again." : csrf ? "You’re signed in on this server." : "Use the owner password for this server.";
+        document.title = title + " · DevOption";
       }
       controls();
+    };
+    const uncheckedSession = () => {
+      state(undefined);
+      message("Your session could not be checked. Use Check account to retry.");
     };
     const request = (path, options = {}) => fetch(path, {
       method: "POST", credentials: "same-origin", cache: "no-store",
@@ -66,13 +76,11 @@
           state(null);
           message("");
         } else {
-          state(null);
-          message("Could not check your session. Reload or try signing in again.");
+          uncheckedSession();
         }
       } catch {
         if (current === version) {
-          state(null);
-          message("Could not reach DevOption. Reload or try again.");
+          uncheckedSession();
         }
       } finally {
         if (current === version) { busy = false; controls(); }
@@ -86,7 +94,7 @@
     }
     if (form) form.addEventListener("submit", async function (event) {
       event.preventDefault();
-      if (busy) return;
+      if (busy || csrf !== null) return;
       let value = password.value;
       password.value = "";
       password.removeAttribute("aria-invalid");
@@ -113,18 +121,22 @@
           headers: { "content-type": "application/x-www-form-urlencoded", "x-csrf-token": token(challenge) }, body,
         });
         if (current !== version) return;
-        if (response.status === 204 && token(response)) {
+        if (response.status === 204) {
           // Confirm that the browser accepted its Secure cookie before reporting
           // success. Never weaken cookie attributes for an unsupported browser.
-          const session = await request("/auth/session");
-          if (current !== version) return;
-          if (session.status === 204 && token(session)) {
-            state(token(session));
-            message("Signed in.");
-            byId("page-title").focus();
-          } else {
-            state(null);
-            message("Sign-in could not be retained. Check that this browser accepts secure localhost cookies.");
+          try {
+            const session = await request("/auth/session");
+            if (current !== version) return;
+            if (session.status === 204 && token(session)) {
+              state(token(session));
+              message("Signed in.");
+              byId("page-title").focus();
+            } else if (session.status === 401) {
+              state(null);
+              message("Sign-in could not be retained. Check that this browser accepts secure localhost cookies.");
+            } else uncheckedSession();
+          } catch {
+            if (current === version) uncheckedSession();
           }
         } else {
           message(response.status === 401 ? "Password not recognized. Try again." : failure(response));
@@ -137,7 +149,8 @@
         if (current === version) {
           busy = false;
           controls();
-          if (!csrf) password.focus();
+          if (csrf === undefined) byId("auth-recheck").focus();
+          else if (csrf === null) password.focus();
         }
       }
     });

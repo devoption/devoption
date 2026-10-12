@@ -64,6 +64,7 @@ const SIGN_IN: &str = r#"
           <a class="action-button" href="/">Continue to Home</a>
           <button class="action-button secondary" type="button" data-signout disabled>Sign out</button>
         </div>
+        <a id="auth-recheck" class="action-button" href="/sign-in" hidden>Check account</a>
         <p id="auth-status" role="status">Enable JavaScript to sign in.</p>
       </section>"#;
 

@@ -91,8 +91,9 @@ and restarting loses it. Tokens must not enter URLs, logs, or browser-local stor
 The browser keeps CSRF tokens only in page memory and clears the password field
 on submission. A stale tab's logout is rejected without ending a newer session;
 reload that tab to check its current account. Secure-cookie support has been
-verified in Chrome on loopback, not every browser. Development checks create owners
-only in [temporary fixture stores](docs/browser-session-check.md).
+verified in Chrome on loopback, not every browser. If a session check fails, use
+**Check account** to retry recovery without submitting the password again.
+Development checks create owners only in [temporary fixture stores](docs/browser-session-check.md).
 
 A [local enrollment authorization core](docs/local-enrollment.md) now supports a
 locally armed, expiring, single-use browser attempt with bounded audit evidence.

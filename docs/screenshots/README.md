@@ -28,6 +28,9 @@ For Sign in and Account, use the [temporary browser fixture](../browser-session-
 and its printed port instead. Capture `sign-in.jpg` signed out and `account.jpg`
 after fixture sign-in. The main-page images may also use that fixture while signed
 out. Never provision a real owner just to take screenshots.
+`sign-in-check.jpg` additionally shows the real **Check account** state after
+blocking the post-sign-in session check in the browser tool, at the same viewport.
+Remove the block and verify recovery without another sign-in after capturing it.
 
 1. If source or assets changed, stop and restart the server, then refresh the page.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
