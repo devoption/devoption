@@ -51,6 +51,52 @@ fn browser_request(issued: &HeaderMap) -> Request {
 }
 
 #[test]
+fn browser_session_credentials_are_rejected_in_authorization_transport() {
+    let (_directory, auth, identity) = owner();
+    let slot = Arc::new(SessionSlot::default());
+    let issued = sign_in(&auth, &slot);
+    let (app, calls) = router_for(identity, slot);
+    let token = issued["set-cookie"]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .split_once('=')
+        .unwrap()
+        .1;
+    for values in [
+        vec![format!("Bearer {token}")],
+        vec![format!("bEaReR   {}", token.to_uppercase())],
+        vec![format!("Bearer {token}"), format!("Bearer {token}")],
+        vec![format!("Bearer {token}"), "Basic other".into()],
+        vec![String::new()],
+    ] {
+        for (cookie, csrf) in [(false, false), (true, false), (false, true), (true, true)] {
+            let mut candidate = browser_request(&issued);
+            if !cookie {
+                candidate.headers_mut().remove(COOKIE);
+            }
+            if !csrf {
+                candidate.headers_mut().remove(browser_session::CSRF_HEADER);
+            }
+            for value in &values {
+                candidate
+                    .headers_mut()
+                    .append(AUTHORIZATION, value.parse().unwrap());
+            }
+            assert_unauthorized(&app, candidate);
+        }
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        response(&app, browser_request(&issued)).0,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
 fn cookie_mutations_require_explicit_csrf_without_bearer_or_alternate_fallback() {
     let (_directory, auth, identity) = owner();
     let slot = Arc::new(SessionSlot::default());

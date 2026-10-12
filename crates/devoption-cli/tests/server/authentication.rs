@@ -345,6 +345,63 @@ fn real_sign_in_rotation_and_logout_share_the_production_session_guard() {
 }
 
 #[test]
+fn issued_browser_tokens_cannot_authorize_bearer_or_mixed_http_requests() {
+    let (_directory, data) = configured();
+    let (_server, address) = start_with(&data);
+    let issued = sign_in(address);
+    let cookie = issued
+        .header("set-cookie")
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap();
+    let token = cookie.split_once('=').unwrap().1;
+    let csrf = issued.header("x-csrf-token").unwrap();
+    let pair = format!("Cookie: {cookie}\r\nX-CSRF-Token: {csrf}\r\n");
+    let bearer = format!("Authorization: Bearer {token}\r\n");
+    for path in ["/projects", "/missing", "/auth/sign-out", "/auth/session"] {
+        for credentials in [
+            bearer.clone(),
+            format!("{pair}{bearer}"),
+            format!("{bearer}{bearer}"),
+            format!("{pair}Authorization:\r\n"),
+            format!("{pair}Cookie: {cookie}\r\n"),
+            format!("Cookie: {cookie}; {cookie}\r\nX-CSRF-Token: {csrf}\r\n"),
+        ] {
+            let response = request(
+                address,
+                &format!(
+                    "POST {path} HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\n{credentials}Content-Length: 0\r\nConnection: close\r\n\r\n"
+                ),
+            );
+            assert!(response.starts_with("HTTP/1.1 401"), "{path}");
+            assert!(response.contains("cache-control: no-store"));
+            assert!(response.ends_with("\r\n\r\n"));
+            for forbidden in [
+                "set-cookie:",
+                "x-csrf-token:",
+                "www-authenticate:",
+                token,
+                csrf,
+            ] {
+                assert!(!response.contains(forbidden));
+            }
+        }
+    }
+    // Rejected requests cannot clear or replace the valid browser session.
+    assert_eq!(post(address, "/projects", Some(&issued), "").status, 405);
+    assert_eq!(
+        post(address, "/auth/session", Some(&issued), "").status,
+        204
+    );
+    assert_eq!(
+        post(address, "/auth/sign-out", Some(&issued), "").status,
+        204
+    );
+    assert_eq!(post(address, "/projects", Some(&issued), "").status, 401);
+}
+
+#[test]
 fn repeated_password_attempts_share_the_http_admission_limit() {
     let (_directory, data) = configured();
     let (_server, address) = start_with(&data);

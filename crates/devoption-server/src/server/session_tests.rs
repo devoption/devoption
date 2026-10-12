@@ -1,6 +1,14 @@
 use super::*;
-use crate::session::{MAX_LIFETIME, Session};
-use axum::{Extension, body::Body, http::HeaderValue, routing::post};
+use crate::{
+    browser_session::{CSRF_HEADER, encode},
+    session::{CSRF_TOKEN_BYTES, MAX_LIFETIME, Session, TOKEN_BYTES},
+};
+use axum::{
+    Extension,
+    body::Body,
+    http::header::{AUTHORIZATION, COOKIE, WWW_AUTHENTICATE},
+    routing::post,
+};
 use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Duration,
@@ -16,6 +24,7 @@ mod preauth;
 
 // Predictable fixtures are installed only in this test router, never the server.
 const FIXTURE: [u8; TOKEN_BYTES] = [0xab; TOKEN_BYTES];
+const CSRF: [u8; CSRF_TOKEN_BYTES] = [0xef; CSRF_TOKEN_BYTES];
 const IDENTITY: IdentityId = IdentityId::from_bytes([1; 16]);
 
 fn credential() -> String {
@@ -30,7 +39,9 @@ fn fixture_for(identity: IdentityId) -> (Router, SharedSession, Arc<AtomicUsize>
     let session = Arc::new(SessionSlot::default());
     session
         .activate(
-            Session::new(identity, FIXTURE, MAX_LIFETIME).unwrap(),
+            Session::new(identity, FIXTURE, MAX_LIFETIME)
+                .unwrap()
+                .with_csrf(CSRF),
             &FIXTURE,
         )
         .unwrap();
@@ -64,6 +75,18 @@ fn request() -> Request {
         .unwrap()
 }
 
+fn authorize(request: &mut Request, token: &[u8], csrf: &[u8]) {
+    request.headers_mut().insert(
+        COOKIE,
+        format!("__Host-devoption_session={}", encode(token))
+            .parse()
+            .unwrap(),
+    );
+    request
+        .headers_mut()
+        .insert(CSRF_HEADER, encode(csrf).parse().unwrap());
+}
+
 fn response(app: &Router, request: Request) -> (StatusCode, HeaderMap, Vec<u8>) {
     Builder::new_current_thread()
         .build()
@@ -79,7 +102,7 @@ fn response(app: &Router, request: Request) -> (StatusCode, HeaderMap, Vec<u8>) 
 fn assert_unauthorized(app: &Router, request: Request) {
     let (status, headers, body) = response(app, request);
     assert_eq!(status, StatusCode::UNAUTHORIZED);
-    assert_eq!(headers[WWW_AUTHENTICATE], "Bearer");
+    assert!(!headers.contains_key(WWW_AUTHENTICATE));
     assert_eq!(headers[CACHE_CONTROL], "no-store");
     assert!(body.is_empty());
     assert!(!headers.contains_key("set-cookie"));
@@ -87,51 +110,28 @@ fn assert_unauthorized(app: &Router, request: Request) {
 }
 
 #[test]
-fn only_a_single_valid_bearer_header_reaches_the_handler() {
-    let (app, _, calls) = fixture();
+fn transport_neutral_sessions_do_not_enable_bearer_http_authentication() {
+    let slot = Arc::new(SessionSlot::default());
+    slot.activate(
+        Session::new(IDENTITY, FIXTURE, MAX_LIFETIME).unwrap(),
+        &FIXTURE,
+    )
+    .unwrap();
+    // Core validation stays available without making its token an HTTP credential.
+    assert_eq!(slot.authenticate(Some(&FIXTURE)), Some(IDENTITY));
+    let (app, calls) = router_for(IDENTITY, slot);
     assert_unauthorized(&app, request());
-    let valid = credential();
-    for values in [
-        vec![String::new()],
-        vec!["Bearer".into()],
-        vec!["Bearer ".into()],
-        vec![format!("Basic {}", "ab".repeat(TOKEN_BYTES))],
-        vec![format!("Bearer\t{}", "ab".repeat(TOKEN_BYTES))],
-        vec![format!("Bearer {}", "a".repeat(63))],
-        vec![format!("Bearer {}", "a".repeat(65))],
-        vec![format!("Bearer {}", "g".repeat(64))],
-        vec![format!("Bearer {}", "é".repeat(32))],
-        vec![format!("Bearer {}", "00".repeat(TOKEN_BYTES))],
-        vec![format!("{valid} ")],
-        vec![format!("{valid}, {valid}")],
-        vec![valid.clone(), valid.clone()],
-        vec![valid.clone(), "Basic x".into()],
-        vec!["Basic x".into(), valid.clone()],
+    for value in [
+        credential(),
+        format!("bEaReR   {}", "AB".repeat(TOKEN_BYTES)),
     ] {
-        let mut request = request();
-        for value in values {
-            request
-                .headers_mut()
-                .append(AUTHORIZATION, value.parse().unwrap());
-        }
-        assert_unauthorized(&app, request);
-    }
-    let mut non_ascii = request();
-    non_ascii.headers_mut().insert(
-        AUTHORIZATION,
-        HeaderValue::from_bytes(b"Bearer \xff").unwrap(),
-    );
-    assert_unauthorized(&app, non_ascii);
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
-
-    for value in [valid, format!("bEaReR   {}", "AB".repeat(TOKEN_BYTES))] {
         let mut request = request();
         request
             .headers_mut()
             .insert(AUTHORIZATION, value.parse().unwrap());
-        assert_eq!(response(&app, request).0, StatusCode::NO_CONTENT);
+        assert_unauthorized(&app, request);
     }
-    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 
 #[test]
@@ -150,16 +150,14 @@ fn route_misses_and_unsupported_methods_require_authorization_first() {
         };
         assert_unauthorized(&app, build());
         let mut request = build();
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, credential().parse().unwrap());
+        authorize(&mut request, &FIXTURE, &CSRF);
         assert_eq!(response(&app, request).0, expected);
     }
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
 
 #[test]
-fn credentials_in_urls_cookies_bodies_and_proxy_headers_are_ignored() {
+fn credentials_in_urls_unrelated_cookies_bodies_and_proxy_headers_are_ignored() {
     let (app, _, calls) = fixture();
     let token = "ab".repeat(TOKEN_BYTES);
     let mut request = request();
@@ -203,9 +201,7 @@ fn valid_credentials_do_not_bypass_host_or_origin_validation() {
         request
             .headers_mut()
             .insert(ORIGIN, origin.parse().unwrap());
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, credential().parse().unwrap());
+        authorize(&mut request, &FIXTURE, &CSRF);
         let (status, _, body) = response(&app, request);
         assert_eq!(status, expected);
         assert!(body.is_empty());
@@ -218,9 +214,7 @@ fn each_request_observes_logout_expiry_and_absent_session_state() {
     let (app, session, calls) = fixture();
     let authenticated = || {
         let mut request = request();
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, credential().parse().unwrap());
+        authorize(&mut request, &FIXTURE, &CSRF);
         request
     };
     assert_eq!(response(&app, authenticated()).0, StatusCode::NO_CONTENT);
@@ -229,7 +223,9 @@ fn each_request_observes_logout_expiry_and_absent_session_state() {
 
     session
         .activate(
-            Session::new(IDENTITY, FIXTURE, Duration::from_secs(1)).unwrap(),
+            Session::new(IDENTITY, FIXTURE, Duration::from_secs(1))
+                .unwrap()
+                .with_csrf(CSRF),
             &FIXTURE,
         )
         .unwrap();
@@ -248,22 +244,18 @@ fn rotation_rejects_old_http_credentials_and_stale_logout() {
     let replacement = [0xcd; TOKEN_BYTES];
     session
         .activate(
-            Session::new(IDENTITY, replacement, MAX_LIFETIME).unwrap(),
+            Session::new(IDENTITY, replacement, MAX_LIFETIME)
+                .unwrap()
+                .with_csrf(CSRF),
             &replacement,
         )
         .unwrap();
     let mut old = request();
-    old.headers_mut()
-        .insert(AUTHORIZATION, credential().parse().unwrap());
+    authorize(&mut old, &FIXTURE, &CSRF);
     assert_unauthorized(&app, old);
     assert!(!session.logout(Some(&FIXTURE)));
     let mut current = request();
-    current.headers_mut().insert(
-        AUTHORIZATION,
-        format!("Bearer {}", "cd".repeat(TOKEN_BYTES))
-            .parse()
-            .unwrap(),
-    );
+    authorize(&mut current, &replacement, &CSRF);
     assert_eq!(response(&app, current).0, StatusCode::NO_CONTENT);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
@@ -284,19 +276,20 @@ fn issued_owner_grants_activate_rotate_and_log_out_through_the_http_guard() {
     let identity = runtime.block_on(auth.setup(password.into())).unwrap();
     let slot = Arc::new(SessionSlot::default());
     let (app, calls) = router_for(identity, Arc::clone(&slot));
-    let authenticated = |token: &[u8]| {
+    let authenticated = |credentials: &crate::owner_auth::service::BrowserCredentials| {
         let mut request = request();
-        let encoded: String = token.iter().map(|byte| format!("{byte:02x}")).collect();
-        request
-            .headers_mut()
-            .insert(AUTHORIZATION, format!("Bearer {encoded}").parse().unwrap());
+        authorize(
+            &mut request,
+            credentials.session_token(),
+            credentials.csrf_token(),
+        );
         request
     };
     let first = runtime
         .block_on(auth.sign_in(password.into()))
         .unwrap()
         .unwrap()
-        .activate(&slot)
+        .activate_browser(&slot)
         .unwrap();
     assert_eq!(
         response(&app, authenticated(&first)).0,
@@ -316,15 +309,15 @@ fn issued_owner_grants_activate_rotate_and_log_out_through_the_http_guard() {
         .block_on(auth.sign_in(password.into()))
         .unwrap()
         .unwrap()
-        .activate(&slot)
+        .activate_browser(&slot)
         .unwrap();
     assert_unauthorized(&app, authenticated(&first));
-    assert!(!slot.logout(Some(&first)));
+    assert!(!slot.logout_browser(Some(first.session_token()), Some(first.csrf_token())));
     assert_eq!(
         response(&app, authenticated(&second)).0,
         StatusCode::NO_CONTENT
     );
-    assert!(slot.logout(Some(&second)));
+    assert!(slot.logout_browser(Some(second.session_token()), Some(second.csrf_token())));
     assert_unauthorized(&app, authenticated(&second));
     assert_eq!(calls.load(Ordering::SeqCst), 3);
 }
@@ -345,9 +338,7 @@ fn protected_handlers_receive_only_the_session_bound_identity() {
                 .headers_mut()
                 .insert(name, "forged".parse().unwrap());
         }
-        authenticated
-            .headers_mut()
-            .insert(AUTHORIZATION, credential().parse().unwrap());
+        authorize(&mut authenticated, &FIXTURE, &CSRF);
         *authenticated.body_mut() = Body::from("identity=forged&role=owner");
         // Even earlier request decoration cannot override the validated session.
         authenticated

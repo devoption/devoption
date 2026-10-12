@@ -1,15 +1,12 @@
 use std::{io, net::Ipv4Addr, path::Path, sync::Arc};
 
-use crate::{
-    identity::IdentityId,
-    session::{TOKEN_BYTES, slot::SessionSlot},
-};
+use crate::{identity::IdentityId, session::slot::SessionSlot};
 use axum::{
     Router,
     extract::Request,
     http::{
         HeaderMap, Method, StatusCode,
-        header::{AUTHORIZATION, CACHE_CONTROL, COOKIE, HOST, LOCATION, ORIGIN, WWW_AUTHENTICATE},
+        header::{CACHE_CONTROL, HOST, LOCATION, ORIGIN},
     },
     middleware::{self, Next},
     response::{Html, IntoResponse},
@@ -22,7 +19,7 @@ type SharedSession = Arc<SessionSlot>;
 
 #[cfg(unix)]
 mod auth;
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod session_tests;
 
 /// Run the loopback service from synchronous startup code, owning its Tokio runtime.
@@ -149,10 +146,7 @@ fn protect(app: Router, port: u16, session: SharedSession) -> Router {
             async move {
                 if !safe_method(request.method()) {
                     let Some(identity) = authenticated_identity(request.headers(), &session) else {
-                        return (
-                            StatusCode::UNAUTHORIZED,
-                            [(WWW_AUTHENTICATE, "Bearer"), (CACHE_CONTROL, "no-store")],
-                        )
+                        return (StatusCode::UNAUTHORIZED, [(CACHE_CONTROL, "no-store")])
                             .into_response();
                     };
                     // Downstream permission checks must use this server-owned ID,
@@ -193,43 +187,15 @@ fn safe_method(method: &Method) -> bool {
 }
 
 fn authenticated_identity(headers: &HeaderMap, session: &SharedSession) -> Option<IdentityId> {
-    // Browser requests never downgrade to bearer validation, even on malformed
-    // cookies or CSRF. Explicit bearer fixtures remain separate from this path.
-    if headers.contains_key(COOKIE) || headers.contains_key("x-csrf-token") {
-        #[cfg(unix)]
-        return crate::browser_session::authenticate(headers, session);
-        #[cfg(not(unix))]
-        return None;
-    }
-    let candidate = bearer_token(headers);
-    session.authenticate(candidate.as_ref().map(|token| token.as_slice()))
-}
-
-fn bearer_token(headers: &HeaderMap) -> Option<[u8; TOKEN_BYTES]> {
-    let mut values = headers.get_all(AUTHORIZATION).iter();
-    let value = values.next()?.to_str().ok()?;
-    if values.next().is_some() {
-        return None;
-    }
-    let (scheme, value) = value.split_once(' ')?;
-    // HTTP auth schemes are case-insensitive and permit one or more SP bytes.
-    let value = value.trim_start_matches(' ');
-    if !scheme.eq_ignore_ascii_case("Bearer") || value.len() != TOKEN_BYTES * 2 {
-        return None;
-    }
-    let mut token = [0; TOKEN_BYTES];
-    for (output, pair) in token.iter_mut().zip(value.as_bytes().as_chunks::<2>().0) {
-        *output = (hex_digit(pair[0])? << 4) | hex_digit(pair[1])?;
-    }
-    Some(token)
-}
-
-fn hex_digit(byte: u8) -> Option<u8> {
-    match byte {
-        b'0'..=b'9' => Some(byte - b'0'),
-        b'a'..=b'f' => Some(byte - b'a' + 10),
-        b'A'..=b'F' => Some(byte - b'A' + 10),
-        _ => None,
+    // The HTTP service only issues browser credentials. Keep its mutation
+    // boundary on the strict cookie/CSRF adapter, including mixed-header rejection.
+    // Future API authentication needs its own explicit transport contract.
+    #[cfg(unix)]
+    return crate::browser_session::authenticate(headers, session);
+    #[cfg(not(unix))]
+    {
+        let _ = (headers, session);
+        None
     }
 }
 
