@@ -12,6 +12,7 @@ fn help_explains_the_actual_scope() {
         let text = String::from_utf8(output.stdout).unwrap();
         assert!(text.contains("Usage: devoption"));
         assert!(text.contains("--data-dir ABSOLUTE_PATH"));
+        assert!(text.contains("--repository-root ABSOLUTE_PATH"));
         assert!(text.contains("devoption setup --data-dir ABSOLUTE_PATH"));
         assert!(text.contains("Serve creates no accounts; setup never replaces an owner"));
         assert!(text.contains("After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH"));
@@ -61,6 +62,24 @@ fn invalid_commands_fail_without_success_output() {
         vec!["serve", "--host", "0.0.0.0"],
         vec!["serve", "--port", "0", "extra"],
         vec!["serve", "--port", "0", "--port", "0"],
+        vec!["serve", "--repository-root"],
+        vec!["serve", "--repository-root", "/unused"],
+        vec![
+            "serve",
+            "--data-dir",
+            "/unused",
+            "--repository-root",
+            "relative",
+        ],
+        vec![
+            "serve",
+            "--data-dir",
+            "/unused",
+            "--repository-root",
+            "/unused",
+            "--repository-root",
+            "/unused",
+        ],
         vec!["serve", "--data-dir"],
         vec!["serve", "--data-dir", ""],
         vec!["serve", "--data-dir", "relative"],

@@ -213,7 +213,7 @@ fn malformed_or_unsupported_state_cannot_be_reset_or_overwritten() {
     store.save(&catalog).unwrap();
     let good = codec::encode(&catalog).unwrap();
     let mut unsupported = good.clone();
-    unsupported[8] = 2;
+    unsupported[8] = 255;
     for bad in [
         vec![],
         b"broken".to_vec(),
@@ -241,7 +241,7 @@ fn codec_rejects_truncation_overflow_duplicate_ids_and_dangling_associations() {
         assert!(codec::decode(&good[..end]).is_err());
     }
     let mut unsupported = good.clone();
-    unsupported[8] = 2;
+    unsupported[8] = 255;
     assert!(matches!(
         codec::decode(&unsupported),
         Err(Error::UnsupportedVersion)

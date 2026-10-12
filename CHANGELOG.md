@@ -7,6 +7,17 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Failure to re-inspect an initially valid checkout now returns a stale-checkout
+  conflict. Deterministic fixture tests cover disappearance, invalid/unsupported
+  metadata and replacement between inspections
+  ([#109](https://github.com/devoption/devoption/issues/109)).
+
+- Repository attachment now returns the documented conflict response when the
+  configured root changes while serving. Malformed project path segments use
+  fixed, non-cacheable errors after authentication; fixture regressions verify
+  that both failures preserve the catalog
+  ([#109](https://github.com/devoption/devoption/issues/109)).
+
 - The README architecture summary now distinguishes startup catalog validation
   from per-request Projects reads and locked project creation
   ([#105](https://github.com/devoption/devoption/issues/105)).
@@ -23,6 +34,15 @@ Entries describe implemented changes, not the roadmap.
   ([#96](https://github.com/devoption/devoption/issues/96)).
 
 ### Added
+
+- An explicit Unix `serve --repository-root` option and owner-protected backend
+  endpoint attach validated local checkouts to projects. Linked worktrees share
+  one repository identity, with a default checkout per project/repository
+  association. Locked atomic version-2 storage preserves version-1 metadata and
+  rejects conflicting roots or stale bindings. Fixture checks cover migration,
+  restart, concurrency, authorization and failure paths. Browser intake and
+  execution remain deferred; no real root is configured
+  ([#109](https://github.com/devoption/devoption/issues/109)).
 
 - A read-only Unix worktree-inspection core under an explicit trusted local root.
   Bounded metadata reads recognize a conservative ordinary/linked-worktree subset,

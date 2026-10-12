@@ -212,7 +212,7 @@ fn manual_cookie_browser_fixture() {
         .unwrap()
         .save(&catalog)
         .unwrap();
-    let projects = projects::Projects::open(&data).unwrap();
+    let projects = projects::Projects::open_with_root(&data, None).unwrap();
     Builder::new_current_thread()
         .enable_all()
         .build()

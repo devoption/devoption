@@ -1,6 +1,8 @@
 use crate::*;
 
 #[cfg(unix)]
+mod registration;
+#[cfg(unix)]
 mod storage;
 
 fn fixture() -> Catalog {

@@ -1,10 +1,10 @@
 //! Project/repository identity and catalog persistence, independent of HTTP and auth.
 //!
-//! Repository records are identity/display metadata, not validated Git locations.
+//! Repository metadata and validated location bindings remain separate.
 //! The Unix worktree inspector accepts only paths under an explicit permitted root,
 //! runs no commands and grants no execution permissions.
 //! Unix storage is explicit and private. The server exposes authenticated project
-//! creation and catalog reads; repository registration remains unimplemented.
+//! creation, catalog reads and opt-in validated repository attachment.
 
 mod model;
 pub use model::{
@@ -20,6 +20,8 @@ mod store;
 pub use store::{CatalogStore, read_catalog};
 
 #[cfg(unix)]
+pub mod registration;
+#[cfg(unix)]
 pub mod worktree;
 
 use std::{fmt, io};
@@ -32,6 +34,11 @@ pub enum Error {
     UnknownProject,
     UnknownRepository,
     AlreadyAssociated,
+    CheckoutRequired,
+    RootMismatch,
+    StaleCheckout,
+    #[cfg(unix)]
+    Inspection(worktree::InspectionError),
     Randomness,
     InvalidCatalog,
     UnsupportedVersion,
@@ -52,6 +59,17 @@ impl fmt::Display for Error {
             Self::UnknownProject => "project does not exist in this catalog",
             Self::UnknownRepository => "repository does not exist in this catalog",
             Self::AlreadyAssociated => "repository is already associated with this project",
+            Self::CheckoutRequired => {
+                "registered repositories require a validated default checkout"
+            }
+            Self::RootMismatch => {
+                "repository root does not match the saved catalog or overlaps application data"
+            }
+            Self::StaleCheckout => {
+                "saved repository checkout has changed; explicit reattachment is required"
+            }
+            #[cfg(unix)]
+            Self::Inspection(_) => "repository checkout could not be validated",
             Self::Randomness => "identity generation failed",
             Self::InvalidCatalog => "project catalog is invalid",
             Self::UnsupportedVersion => "project catalog version is unsupported",
@@ -78,6 +96,13 @@ impl std::error::Error for Error {
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
         Self::Io(error)
+    }
+}
+
+#[cfg(unix)]
+impl From<worktree::InspectionError> for Error {
+    fn from(error: worktree::InspectionError) -> Self {
+        Self::Inspection(error)
     }
 }
 

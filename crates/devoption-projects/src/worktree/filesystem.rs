@@ -15,8 +15,8 @@ use std::{
 /// Linked worktrees share a common-directory identity but have distinct git dirs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FilesystemIdentity {
-    device: u64,
-    inode: u64,
+    pub(crate) device: u64,
+    pub(crate) inode: u64,
 }
 
 /// An explicit trusted-local-root capability; never a default or browser input.
@@ -38,6 +38,27 @@ const ENTRY: OFlags = OFlags::RDONLY
     .union(OFlags::CLOEXEC);
 
 impl PermittedRoot {
+    pub(crate) fn binding(&self) -> Result<(String, FilesystemIdentity)> {
+        self.check_binding()?;
+        Ok((
+            self.path.to_str().ok_or(Error::InvalidPath)?.into(),
+            identity(&self.directory)?,
+        ))
+    }
+
+    /// Compare actual directory ancestry, including case aliases, without listing
+    /// contents. Both capabilities must have been explicitly opened locally.
+    pub fn is_disjoint(&self, other: &Self) -> Result<bool> {
+        self.check_binding()?;
+        other.check_binding()?;
+        self.disjoint_directory(&other.directory)
+    }
+
+    pub(crate) fn disjoint_directory(&self, other: &File) -> Result<bool> {
+        self.check_binding()?;
+        Ok(!ancestor(&self.directory, identity(other)?)?
+            && !ancestor(other, identity(&self.directory)?)?)
+    }
     pub fn open_absolute(path: &Path) -> Result<Self> {
         let directory = absolute(path)?;
         Ok(Self {
@@ -127,6 +148,28 @@ impl PermittedRoot {
         }
         Ok(result)
     }
+}
+
+fn ancestor(leaf: &File, target: FilesystemIdentity) -> Result<bool> {
+    let mut directory = leaf.try_clone().map_err(|_| Error::Unavailable)?;
+    for _ in 0..MAX_COMPONENTS {
+        let current = directory.metadata().map_err(|_| Error::Unavailable)?;
+        let current = FilesystemIdentity {
+            device: current.dev(),
+            inode: current.ino(),
+        };
+        if current == target {
+            return Ok(true);
+        }
+        let parent =
+            File::from(openat(&directory, "..", DIRECTORY, Mode::empty()).map_err(io_error)?);
+        let metadata = parent.metadata().map_err(|_| Error::Unavailable)?;
+        if metadata.dev() == current.device && metadata.ino() == current.inode {
+            return Ok(false);
+        }
+        directory = parent;
+    }
+    Err(Error::LimitExceeded)
 }
 
 fn absolute(path: &Path) -> Result<File> {

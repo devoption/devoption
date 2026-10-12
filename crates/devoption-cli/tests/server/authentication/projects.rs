@@ -151,7 +151,7 @@ fn invalid_unsupported_oversized_or_unsafe_catalogs_stop_before_binding_without_
     let path = data.join("projects.bin");
     let good = fs::read(&path).unwrap();
     let mut unsupported = good.clone();
-    unsupported[8] = 2;
+    unsupported[8] = 255;
     for bytes in [
         b"private invalid catalog".to_vec(),
         unsupported,

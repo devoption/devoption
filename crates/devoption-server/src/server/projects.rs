@@ -2,8 +2,16 @@
 //! Host/Origin/CSRF guards. Filesystem work never runs on the async event loop.
 
 use super::*;
-use axum::{body::to_bytes, http::header::CONTENT_TYPE};
+use axum::{
+    body::to_bytes,
+    extract::{Path as RoutePath, rejection::PathRejection},
+    http::header::CONTENT_TYPE,
+};
 use devoption_projects::{Catalog, CatalogStore, Error, MAX_NAME_BYTES, read_catalog};
+use devoption_projects::{
+    ProjectId,
+    worktree::{InspectionError, PermittedRoot},
+};
 use std::{error::Error as _, path::PathBuf, time::Duration};
 use tokio::sync::Mutex;
 
@@ -11,14 +19,23 @@ use tokio::sync::Mutex;
 pub(super) struct Projects {
     path: Arc<PathBuf>,
     gate: Arc<Mutex<()>>,
+    root: Option<Arc<PermittedRoot>>,
 }
 
 impl Projects {
-    pub(super) fn open(path: &Path) -> Result<Self, Error> {
-        read_catalog(path)?;
+    pub(super) fn open_with_root(path: &Path, root: Option<&Path>) -> Result<Self, Error> {
+        let catalog = read_catalog(path)?.unwrap_or_default();
+        let root = root.map(PermittedRoot::open_absolute).transpose()?;
+        if let Some(root) = &root {
+            if !root.is_disjoint(&PermittedRoot::open_absolute(path)?)? {
+                return Err(Error::RootMismatch);
+            }
+            catalog.check_repository_root(root)?;
+        }
         Ok(Self {
             path: Arc::new(path.into()),
             gate: Arc::new(Mutex::new(())),
+            root: root.map(Arc::new),
         })
     }
 
@@ -35,8 +52,13 @@ impl Projects {
         .await
         .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
         .map_err(|error| match error {
-            Error::InvalidName => StatusCode::BAD_REQUEST,
-            Error::Capacity => StatusCode::CONFLICT,
+            Error::Inspection(InspectionError::Changed) => StatusCode::CONFLICT,
+            Error::InvalidName | Error::Inspection(_) => StatusCode::BAD_REQUEST,
+            Error::UnknownProject => StatusCode::NOT_FOUND,
+            Error::Capacity
+            | Error::AlreadyAssociated
+            | Error::RootMismatch
+            | Error::StaleCheckout => StatusCode::CONFLICT,
             _ => StatusCode::SERVICE_UNAVAILABLE,
         })
     }
@@ -44,39 +66,110 @@ impl Projects {
 
 pub(super) fn routes(projects: Projects) -> Router {
     let reader = projects.clone();
-    Router::new().route(
-        "/projects",
-        get(move || async move {
-            match reader
-                .access(|path| Ok(read_catalog(path)?.unwrap_or_default()))
-                .await
-            {
-                Ok(catalog) => {
-                    ([(CACHE_CONTROL, "no-store")], Html(render(&catalog))).into_response()
-                }
-                Err(status) => (
-                    status,
-                    [(CACHE_CONTROL, "no-store")],
-                    "Projects could not be loaded. Reload to try again.",
-                )
-                    .into_response(),
-            }
-        })
-        .post(move |request: Request| async move {
-            let result = match name(request).await {
-                Ok(name) => projects
-                    .access(move |path| CatalogStore::open_absolute(path)?.create_project(&name))
+    let attachment = projects.clone();
+    Router::new()
+        .route(
+            "/projects",
+            get(move || async move {
+                match reader
+                    .access(|path| Ok(read_catalog(path)?.unwrap_or_default()))
                     .await
-                    .map(|_| StatusCode::NO_CONTENT),
-                Err(status) => Err(status),
-            };
-            (
-                result.unwrap_or_else(|status| status),
-                [(CACHE_CONTROL, "no-store")],
-            )
-                .into_response()
-        }),
-    )
+                {
+                    Ok(catalog) => {
+                        ([(CACHE_CONTROL, "no-store")], Html(render(&catalog))).into_response()
+                    }
+                    Err(status) => (
+                        status,
+                        [(CACHE_CONTROL, "no-store")],
+                        "Projects could not be loaded. Reload to try again.",
+                    )
+                        .into_response(),
+                }
+            })
+            .post(move |request: Request| async move {
+                let result = match name(request).await {
+                    Ok(name) => projects
+                        .access(move |path| {
+                            CatalogStore::open_absolute(path)?.create_project(&name)
+                        })
+                        .await
+                        .map(|_| StatusCode::NO_CONTENT),
+                    Err(status) => Err(status),
+                };
+                (
+                    result.unwrap_or_else(|status| status),
+                    [(CACHE_CONTROL, "no-store")],
+                )
+                    .into_response()
+            }),
+        )
+        .route(
+            "/projects/{project}/repositories",
+            axum::routing::post(
+                move |project: Result<RoutePath<String>, PathRejection>,
+                      request: Request| async move {
+                    let project = project
+                        .map(|RoutePath(project)| project)
+                        .map_err(|_| StatusCode::BAD_REQUEST);
+                    attach(attachment, project, request).await
+                },
+            ),
+        )
+}
+
+async fn attach(
+    projects: Projects,
+    project: Result<String, StatusCode>,
+    request: Request,
+) -> axum::response::Response {
+    let result = async {
+        let project = project_id(&project?).ok_or(StatusCode::BAD_REQUEST)?;
+        let root = projects
+            .root
+            .clone()
+            .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+        let candidate = text_body(request, 4096).await?;
+        projects
+            .access(move |path| {
+                CatalogStore::open_absolute(path)?.attach_repository(
+                    project,
+                    &root,
+                    Path::new(&candidate),
+                )
+            })
+            .await?;
+        Ok::<_, StatusCode>(())
+    }
+    .await;
+    let (status, message) = match result {
+        Ok(()) => (StatusCode::NO_CONTENT, ""),
+        Err(status) => (
+            status,
+            match status {
+                StatusCode::BAD_REQUEST => "Repository checkout could not be validated.",
+                StatusCode::NOT_FOUND => "Project does not exist.",
+                StatusCode::CONFLICT => {
+                    "Repository association conflicts with saved state or catalog capacity."
+                }
+                StatusCode::PAYLOAD_TOO_LARGE => "Repository path is too long.",
+                StatusCode::UNSUPPORTED_MEDIA_TYPE => "Use one plain UTF-8 repository path.",
+                StatusCode::REQUEST_TIMEOUT => "Repository request timed out.",
+                _ => "Repository attachment is unavailable. Inspect saved state before retrying.",
+            },
+        ),
+    };
+    (status, [(CACHE_CONTROL, "no-store")], message).into_response()
+}
+
+fn project_id(value: &str) -> Option<ProjectId> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut bytes = [0; 16];
+    for (i, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(ProjectId::from_bytes(bytes))
 }
 
 fn render(catalog: &Catalog) -> String {
@@ -93,6 +186,10 @@ fn render(catalog: &Catalog) -> String {
 
 // One plain UTF-8 name, not a map of fields, paths or client-supplied identities.
 async fn name(request: Request) -> Result<String, StatusCode> {
+    text_body(request, MAX_NAME_BYTES).await
+}
+
+async fn text_body(request: Request, limit: usize) -> Result<String, StatusCode> {
     let mut media = request.headers().get_all(CONTENT_TYPE).iter();
     let accepted = media
         .next()
@@ -104,22 +201,19 @@ async fn name(request: Request) -> Result<String, StatusCode> {
     if !accepted || media.next().is_some() || request.headers().contains_key("content-encoding") {
         return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE);
     }
-    let bytes = tokio::time::timeout(
-        Duration::from_secs(5),
-        to_bytes(request.into_body(), MAX_NAME_BYTES),
-    )
-    .await
-    .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
-    .map_err(|error| {
-        if error
-            .source()
-            .is_some_and(|source| source.is::<http_body_util::LengthLimitError>())
-        {
-            StatusCode::PAYLOAD_TOO_LARGE
-        } else {
-            StatusCode::BAD_REQUEST
-        }
-    })?;
+    let bytes = tokio::time::timeout(Duration::from_secs(5), to_bytes(request.into_body(), limit))
+        .await
+        .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
+        .map_err(|error| {
+            if error
+                .source()
+                .is_some_and(|source| source.is::<http_body_util::LengthLimitError>())
+            {
+                StatusCode::PAYLOAD_TOO_LARGE
+            } else {
+                StatusCode::BAD_REQUEST
+            }
+        })?;
     String::from_utf8(bytes.to_vec()).map_err(|_| StatusCode::BAD_REQUEST)
 }
 
@@ -132,6 +226,21 @@ mod tests {
         pin::Pin,
         task::{Context, Poll},
     };
+
+    #[test]
+    fn project_identifiers_require_exact_hex_without_numeric_signs() {
+        for invalid in [
+            "",
+            &"0".repeat(31),
+            &"0".repeat(33),
+            &"+0".repeat(16),
+            &"é".repeat(16),
+            &"gg".repeat(16),
+        ] {
+            assert!(project_id(invalid).is_none());
+        }
+        assert_eq!(project_id(&"aF".repeat(16)).unwrap().to_bytes(), [0xaf; 16]);
+    }
 
     struct PendingBody;
     impl http_body::Body for PendingBody {

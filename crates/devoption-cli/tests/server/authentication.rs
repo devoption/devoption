@@ -17,6 +17,8 @@ mod installation;
 mod pages;
 #[path = "authentication/projects.rs"]
 mod projects;
+#[path = "authentication/repositories.rs"]
+mod repositories;
 
 fn configured() -> (tempfile::TempDir, PathBuf) {
     let (directory, path) = data_directory::fixture();
