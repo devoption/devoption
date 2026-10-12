@@ -3,9 +3,9 @@
 DevOption is an open-source project working toward a self-hosted software factory:
 a place to build, test, and run software.
 
-It currently provides Home and About placeholders, a read-only saved-project list
+It currently provides Home and About placeholders, saved projects and an empty-project creation form
 for configured owners, browser-local Appearance settings, and owner sign-in/sign-out.
-Project registration, builds, and deployments are not implemented yet. There is
+Repository registration, builds, and deployments are not implemented yet. There is
 no published release.
 
 ## Try it locally
@@ -113,10 +113,15 @@ verified in Chrome on loopback, not every browser. If a session check fails, use
 Development checks create owners only in [temporary fixture stores](docs/browser-session-check.md).
 
 Projects displays saved names and repository counts from the
-[catalog snapshot](docs/project-catalog.md) loaded at startup. An absent catalog
-shows an empty list; invalid catalog state stops a configured server before it
-listens. Restart to load later catalog changes. The unconfigured preview retains
-its placeholder. There is no project editor or repository registration yet.
+[catalog](docs/project-catalog.md). Signed-in owners can create an empty project
+with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
+characters. Names need not be unique; the catalog holds up to 64 projects. A
+successful save reloads the current list without restarting the server. If a save
+cannot be confirmed, reload the list before retrying to avoid duplicate names.
+An absent catalog shows an empty list; invalid state stops startup or fails the
+current request without resetting records. The unconfigured preview retains its
+placeholder. Repository registration, project renaming and deletion are not
+implemented. The installation guide's owner-only backup does not preserve projects.
 
 A [local enrollment authorization core](docs/local-enrollment.md) now supports a
 locally armed, expiring, single-use browser attempt with bounded audit evidence.
@@ -130,7 +135,7 @@ browser installation is deferred. The preview exposes no first-owner setup route
 
 ![Home page](docs/screenshots/home.jpg)
 
-**Projects (temporary fixture data)**
+**Projects (creation form and temporary fixture data)**
 
 ![Projects page](docs/screenshots/projects.jpg)
 
@@ -169,9 +174,11 @@ The Rust workspace has four crates. The running service uses
 Server APIs live under `devoption_server`; the CLI is a binary without a library
 facade. Authentication and owner storage remain server modules. The
 [project catalog core](docs/project-catalog.md) has its own model and storage
-tests; it accepts no repository paths. The server reads a validated startup
-snapshot and supplies display summaries to the UI. Executable integration tests
-stay with the CLI; domain logic remains in the project crate.
+tests; it accepts no repository paths. The server validates the catalog at startup,
+then rereads it for each authenticated Projects GET/HEAD request and supplies
+current display summaries to the UI. Project creation uses the domain's locked,
+durable save operation. Executable integration tests stay with the CLI; domain
+logic remains in the project crate.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:

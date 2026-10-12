@@ -212,7 +212,7 @@ fn manual_cookie_browser_fixture() {
         .unwrap()
         .save(&catalog)
         .unwrap();
-    let catalog = devoption_projects::read_catalog(&data).unwrap().unwrap();
+    let projects = projects::Projects::open(&data).unwrap();
     Builder::new_current_thread()
         .enable_all()
         .build()
@@ -222,7 +222,7 @@ fn manual_cookie_browser_fixture() {
             let port = listener.local_addr().unwrap().port();
             let slot = Arc::new(SessionSlot::default());
             let protected = protect(
-                page_routes(true, Arc::clone(&slot), &project_summaries(&catalog)).route(
+                page_routes(true, Arc::clone(&slot), projects::routes(projects)).route(
                     "/probe",
                     post(move |Extension(id): Extension<IdentityId>| async move {
                         assert_eq!(id, identity);

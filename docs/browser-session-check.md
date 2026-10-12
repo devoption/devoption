@@ -18,6 +18,15 @@ The same temporary directory contains two example projects with two and one
 repository associations. Projects renders their saved metadata through the real
 page renderer and guard; this does not create or register actual Git repositories.
 
+After signing in, use the Projects form to create a new fixture name with the
+keyboard. It must appear with zero repositories immediately after the page reloads
+and remain after another reload. Check a non-ASCII name and markup characters;
+they must display as text. Invalid/oversized names must not create a row. A failed
+save must retain the name and ask you to inspect the list before retrying, without
+claiming success. Check the labelled form and submit button at a narrow viewport.
+Capture `projects.jpg` before adding extra test records to keep the two standard
+fixture rows consistent. These writes affect only the temporary fixture catalog.
+
 For the UI check, open `/projects` while signed out and confirm a redirect to
 **Sign in** with no protected page content. Home, About and Appearance have the
 same guard; `/sign-in` must remain reachable without redirecting again. Submit an

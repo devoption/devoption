@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- The README architecture summary now distinguishes startup catalog validation
+  from per-request Projects reads and locked project creation
+  ([#105](https://github.com/devoption/devoption/issues/105)).
+
 - CLI help and authentication module introductions now describe CLI-first owner
   setup followed by the implemented browser sign-in flow, while keeping browser
   owner setup explicitly unavailable
@@ -19,6 +23,15 @@ Entries describe implemented changes, not the roadmap.
   ([#96](https://github.com/devoption/devoption/issues/96)).
 
 ### Added
+
+- Signed-in owners can create named empty projects from the Projects form. Names
+  are bounded and escaped, writes use the catalog lock and atomic persistence,
+  and successful saves reload the current list without restarting the server.
+  Cookie/CSRF/Origin guards reject unauthorized or mixed-transport requests;
+  corruption, contention and write failures never report successful creation.
+  Concurrency, restart, input and browser checks cover the new flow. The screenshot
+  uses temporary fixture data; no repository paths or Git operations are added
+  ([#105](https://github.com/devoption/devoption/issues/105)).
 
 - Configured Projects pages now show saved project names and repository counts
   behind the existing session guard. A bounded domain reader loads a validated

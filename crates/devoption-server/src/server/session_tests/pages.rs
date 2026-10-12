@@ -4,7 +4,24 @@ const PATHS: [&str; 4] = ["/", "/projects", "/about", "/settings/appearance"];
 const CSRF: [u8; 32] = [0xcd; 32];
 
 fn app(configured: bool, slot: SharedSession) -> Router {
-    protect(page_routes(configured, Arc::clone(&slot), &[]), 3000, slot)
+    let projects = if configured {
+        Router::new().route(
+            "/projects",
+            get(|| async {
+                (
+                    [(CACHE_CONTROL, "no-store")],
+                    Html(devoption_ui::render_projects(&[])),
+                )
+            }),
+        )
+    } else {
+        Router::new()
+    };
+    protect(
+        page_routes(configured, Arc::clone(&slot), projects),
+        3000,
+        slot,
+    )
 }
 
 fn read(method: Method, path: &str, token: Option<&[u8]>) -> Request {

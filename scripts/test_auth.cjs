@@ -14,7 +14,7 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 // Exercise the shipped script with controlled responses and navigation races.
 // Native focus, cookies, form validation and layout are checked in a real browser.
-function page({ configured = true, form = true, initial = response(401) } = {}) {
+function page({ configured = true, form = true, projects = false, initial = response(401) } = {}) {
   const nodes = new Map();
   let focused;
   function node(id) {
@@ -34,6 +34,7 @@ function page({ configured = true, form = true, initial = response(401) } = {}) 
   }
   ["profile-state", "profile-note", "profile-account", "profile-status", "page-title", "page-message"].forEach(node);
   if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
+  if (projects) ["project-form", "project-name", "project-submit", "project-status"].forEach(node);
   const signouts = [node("profile-logout"), ...(form ? [node("page-logout")] : [])];
   const events = node("window");
   const calls = [];
@@ -75,8 +76,67 @@ function page({ configured = true, form = true, initial = response(401) } = {}) 
       return nodes.get("signin-form").emit("submit", { preventDefault() {} });
     },
     logout: () => signouts[0].emit("click"),
+    create: (value) => {
+      nodes.get("project-name").value = value;
+      return nodes.get("project-form").emit("submit", { preventDefault() {} });
+    },
   };
 }
+
+test("project creation waits for a session, validates bytes, and sends only the name with CSRF", async () => {
+  let finish;
+  const current = page({ form: false, projects: true, initial: new Promise((resolve) => { finish = resolve; }) });
+  assert.equal(current.nodes.get("project-submit").disabled, true);
+  await current.create("Blocked fixture");
+  assert.equal(current.calls.length, 1);
+  finish(response(204, csrf));
+  await tick();
+  for (const name of ["", " padded ", "line\nbreak", "é".repeat(65)]) {
+    await current.create(name);
+    assert.equal(current.calls.length, 1);
+    assert.equal(current.focused(), "project-name");
+    assert.equal(current.nodes.get("project-name").getAttribute("aria-invalid"), "true");
+  }
+  current.queue.push(response(204));
+  await current.create("工具 & <fixture>");
+  assert.equal(current.calls.at(-1).body, "工具 & <fixture>");
+  assert.equal(current.calls.at(-1).headers["x-csrf-token"], csrf);
+  assert.equal(current.calls.at(-1).headers["content-type"], "text/plain;charset=UTF-8");
+  assert.deepEqual(current.navigation, ["/projects"]);
+});
+
+test("project creation failures retain input, report uncertainty and never navigate to success", async () => {
+  for (const [failure, message] of [
+    [response(400), /Check the project name/], [response(413), /Check the project name/],
+    [response(409), /limit of 64/], [response(401), /session ended/],
+    [response(403), /could not be confirmed/], [response(503), /could not be confirmed/],
+    [new Error("private fixture error"), /could not be confirmed/],
+  ]) {
+    const current = page({ form: false, projects: true, initial: response(204, csrf) });
+    await tick();
+    current.queue.push(failure);
+    await current.create("Retained fixture");
+    assert.equal(current.nodes.get("project-name").value, "Retained fixture");
+    assert.match(current.nodes.get("project-status").textContent, message);
+    assert.deepEqual(current.navigation, []);
+    assert.equal(current.nodes.get("project-submit").disabled, failure.status === 401);
+  }
+});
+
+test("project requests cannot double-submit or navigate after pagehide", async () => {
+  const current = page({ form: false, projects: true, initial: response(204, csrf) });
+  await tick();
+  let finish;
+  current.queue.push(new Promise((resolve) => { finish = resolve; }));
+  const pending = current.create("One fixture");
+  await current.create("Second fixture");
+  assert.equal(current.calls.length, 2);
+  assert.equal(current.nodes.get("project-submit").disabled, true);
+  current.event("pagehide");
+  finish(response(204));
+  await pending;
+  assert.deepEqual(current.navigation, []);
+});
 
 test("unconfigured preview performs no authentication requests", async () => {
   const current = page({ configured: false, form: false });

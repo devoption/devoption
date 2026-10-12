@@ -1,7 +1,8 @@
 # Page screenshots
 
 These images show the real local app, including its current empty placeholders.
-Projects uses the temporary fixture's example metadata, not production records.
+Projects shows the creation form and the temporary fixture's example metadata,
+not production records.
 Keep one default-mode image per main page at a stable filename; Git records earlier
 versions. `appearance-light.jpg` additionally shows Appearance following a light
 device preference. `appearance-custom.jpg` shows a custom primary and its warning.
@@ -15,7 +16,7 @@ Use each path below with the fixture's printed origin and port.
 | Page | Path | Capture state | File |
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
-| Projects | `/projects` | Signed in, fixture projects | `projects.jpg` |
+| Projects | `/projects` | Signed in, creation form and fixture projects | `projects.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
 | Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
