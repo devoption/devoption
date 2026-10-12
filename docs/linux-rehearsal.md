@@ -109,3 +109,6 @@ still depends on the host's user-manager policy: this guest had no lingering and
 did not provide unattended service persistence after the final logout. Reboot
 recovery was checked after a new SSH login. The unimplemented project, build,
 artifact and deployment workflows remain outside this result.
+
+A later [approved lingering rehearsal](linux-unattended-rehearsal.md) checked
+startup before login in this same guest and restored `Linger=no` afterward.

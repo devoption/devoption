@@ -10,8 +10,9 @@ factory installation or a published release.
 The target is Ubuntu 24.04 x86_64 with an existing unprivileged login account,
 Git, Rust 1.99.0 via rustup, a C toolchain/linker, and a systemd user manager.
 For remote use, SSH access and local forwarding must already work. This guide
-does not create OS accounts, install system packages, configure SSH or enable
-lingering. An administrator must separately provision missing prerequisites.
+does not create OS accounts, install system packages or configure SSH. The basic
+user-service setup does not enable lingering; an optional, separately approved
+step is described below. An administrator must provision missing prerequisites.
 See the [Rust installation guide](https://www.rust-lang.org/tools/install).
 
 ## Build and prepare private storage
@@ -122,6 +123,37 @@ logout with `Linger=no` and started on the next login, including after reboot.
 This does not promise unattended persistence on another host. If `systemctl --user`
 cannot connect, stop and have the account/session prerequisites checked; do not
 substitute a root service.
+
+## Optional startup before login
+
+If unattended startup is required, first obtain approval from the account owner
+and the host administrator for account-level lingering. It starts the user's
+manager at boot and keeps it after logout, affecting all enabled user services
+for that account. It does not grant DevOption root privileges or change its
+loopback binding. See [loginctl](https://github.com/systemd/systemd/blob/v255/man/loginctl.xml).
+
+After owner setup and user-unit enablement, record the existing policy before
+applying an approved change. Run as the account that owns this installation:
+
+```sh
+account=$(id -un)
+loginctl show-user "$account" -p Linger
+sudo loginctl enable-linger "$account"
+loginctl show-user "$account" -p Linger
+```
+
+Expect `Linger=yes`. Verify the application is ready before the first login after
+reboot; an SSH login followed by a readiness check cannot establish this on its
+own. The [bounded Ubuntu rehearsal](linux-unattended-rehearsal.md) used a temporary
+unprivileged probe and compared its evidence with the first login timestamp.
+It also checked continued operation after logout and explicit stop behavior.
+
+To reverse a change whose recorded baseline was `Linger=no`, use
+`sudo loginctl disable-linger "$account"` and confirm `Linger=no`. Do not disable
+pre-existing lingering as part of another installation's cleanup. Disabling it
+does not replace `systemctl --user stop devoption.service` when an immediate
+application stop is required. The rehearsal restored its original policy and
+stopped the guest; it did not leave unattended operation enabled.
 
 ## Open the browser privately
 
@@ -234,7 +266,9 @@ CI fixtures do not by themselves validate a real user manager or SSH connection.
 A separate [Ubuntu 24.04 x86_64 guest rehearsal](linux-rehearsal.md) checked source
 installation, user-service start/restart, SSH browser access, backup/restore,
 complete logout and recovery after reboot and login. Its image, source revision,
-observed behavior, disk use and cleanup are recorded there. Other Linux
-distributions and architectures, unattended operation without a login, public
+observed behavior, disk use and cleanup are recorded there. A bounded
+[lingering follow-up](linux-unattended-rehearsal.md) separately checked startup
+before login in that same guest and restored the original policy. Other Linux
+distributions and architectures, unattended operation on other hosts, public
 hosting, full project/build/deploy flows, and disaster recovery for future state
 remain outside this guide's validated scope.
