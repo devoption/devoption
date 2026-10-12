@@ -24,6 +24,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A read-only Unix worktree-inspection core under an explicit trusted local root.
+  Bounded metadata reads recognize a conservative ordinary/linked-worktree subset,
+  reject unsafe or out-of-root paths and return distinct worktree/common-directory
+  filesystem identities. Fixture tests cover supported layouts and rejection paths.
+  No Git commands, browser intake, catalog migration or production registration
+  are enabled ([#107](https://github.com/devoption/devoption/issues/107)).
+
 - Signed-in owners can create named empty projects from the Projects form. Names
   are bounded and escaped, writes use the catalog lock and atomic persistence,
   and successful saves reload the current list without restarting the server.
