@@ -130,9 +130,7 @@ impl Catalog {
         let (path, identity) = root.binding()?;
         self.root = Some(RootBinding { path, identity });
         // No publication if the selected layout changed across preparation.
-        if root.inspect(Path::new(relative))? != observed {
-            return Err(Error::StaleCheckout);
-        }
+        revalidate_checkout(root, Path::new(relative), &observed)?;
         self.check_repository_root(root)?;
         self.validate()?;
         Ok(repository)
@@ -244,6 +242,19 @@ impl Catalog {
         }
         Ok(())
     }
+}
+
+pub(crate) fn revalidate_checkout(
+    root: &PermittedRoot,
+    candidate: &Path,
+    observed: &WorktreeObservation,
+) -> Result<(), Error> {
+    // This candidate already passed inspection. Losing its supported layout is
+    // a change during preparation, not an invalid initial request.
+    if root.inspect(candidate).map_err(|_| Error::StaleCheckout)? != *observed {
+        return Err(Error::StaleCheckout);
+    }
+    Ok(())
 }
 
 fn valid_relative(path: &str) -> Result<(), Error> {

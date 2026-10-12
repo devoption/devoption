@@ -195,8 +195,9 @@ Inspect saved state after an uncertain result; there is no automatic retry.
 Under the writer lock, the domain loads the latest catalog, validates the selected
 checkout with bounded reads, reuses the repository ID for its common Git directory,
 adds the association/default checkout, re-inspects that checkout and atomically
-saves. Each new repository's display name is the selected directory's final
-component and must satisfy the existing 128-byte name rule. Multiple repositories
+saves. If the second inspection fails or differs, attachment returns a stale-checkout
+conflict (409) without publishing the prepared catalog. Each new repository's display
+name is the selected directory's final component and must satisfy the existing 128-byte name rule. Multiple repositories
 can belong to one project; multiple projects can share a repository, selecting
 different linked worktrees as their defaults. Associating another worktree of the
 same repository with the same project returns a duplicate conflict and never

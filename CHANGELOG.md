@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Failure to re-inspect an initially valid checkout now returns a stale-checkout
+  conflict. Deterministic fixture tests cover disappearance, invalid/unsupported
+  metadata and replacement between inspections
+  ([#109](https://github.com/devoption/devoption/issues/109)).
+
 - Repository attachment now returns the documented conflict response when the
   configured root changes while serving. Malformed project path segments use
   fixed, non-cacheable errors after authentication; fixture regressions verify

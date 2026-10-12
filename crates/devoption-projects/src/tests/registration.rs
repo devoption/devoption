@@ -343,3 +343,44 @@ fn encoded_binding_capacity_and_metadata_updates_preserve_saved_registrations() 
     assert!(matches!(store.save(&saved), Err(Error::Capacity)));
     assert_eq!(f.bytes(), before);
 }
+
+#[test]
+fn changes_after_successful_inspection_are_stale_even_when_reinspection_fails() {
+    for change in [
+        "missing checkout",
+        "missing git directory",
+        "invalid metadata",
+        "unsupported metadata",
+        "replacement checkout",
+    ] {
+        let f = Fixture::new();
+        let root = f.root();
+        let candidate = Path::new("main");
+        let observed = root.inspect(candidate).unwrap();
+        crate::registration::revalidate_checkout(&root, candidate, &observed).unwrap();
+        match change {
+            "missing checkout" => fs::rename(f.root.join("main"), f.root.join("old-main")).unwrap(),
+            "missing git directory" => {
+                fs::rename(f.root.join("main/.git"), f.root.join("old-git")).unwrap()
+            }
+            "invalid metadata" => {
+                fs::write(f.root.join("main/.git/config"), "invalid fixture metadata").unwrap()
+            }
+            "unsupported metadata" => fs::write(
+                f.root.join("main/.git/config.worktree"),
+                "unsupported fixture metadata",
+            )
+            .unwrap(),
+            "replacement checkout" => {
+                fs::rename(f.root.join("main"), f.root.join("old-main")).unwrap();
+                main_tree(&f.root, "main");
+            }
+            _ => unreachable!(),
+        }
+        let result = crate::registration::revalidate_checkout(&root, candidate, &observed);
+        assert!(
+            matches!(result, Err(Error::StaleCheckout)),
+            "{change}: {result:?}"
+        );
+    }
+}
