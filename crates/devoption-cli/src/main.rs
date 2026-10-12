@@ -16,7 +16,8 @@ Usage: devoption [--help | --version]
   --port PORT   Override the port (0 chooses a free port)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
 
-The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. No directories or permissions are created or changed. Serve creates no accounts; setup never replaces an owner. Browser setup and sign-in forms are not implemented.
+The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. No directories or permissions are created or changed. Serve creates no accounts; setup never replaces an owner.
+After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH with the same directory, then sign in at /sign-in. Browser owner setup is not available.
 The local server shows Home, Projects, and About placeholders plus browser-local Appearance settings. Factory and runtime services are not implemented.";
 
 fn main() -> ExitCode {
