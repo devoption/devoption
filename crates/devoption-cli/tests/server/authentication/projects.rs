@@ -5,6 +5,9 @@ use std::{
     os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink},
 };
 
+#[path = "projects/create.rs"]
+mod create;
+
 const NAME: &str = "<script>alert('fixture')</script> & \"工具\"";
 const ESCAPED: &str =
     "&lt;script&gt;alert(&#39;fixture&#39;)&lt;/script&gt; &amp; &quot;工具&quot;";
@@ -47,7 +50,7 @@ fn page(address: SocketAddr, method: &str, issued: Option<&Reply>) -> String {
 }
 
 #[test]
-fn catalog_pages_require_a_session_escape_names_and_reload_only_after_restart() {
+fn catalog_pages_require_a_session_escape_names_and_read_fresh_snapshots() {
     let (_directory, data) = configured();
     let owner = fs::read(data.join("owner.bin")).unwrap();
     let mut catalog = seed(&data);
@@ -74,7 +77,7 @@ fn catalog_pages_require_a_session_escape_names_and_reload_only_after_restart() 
             .1
             .is_empty()
     );
-    assert_eq!(post(address, "/projects", Some(&issued), "").status, 405);
+    assert_eq!(post(address, "/projects", Some(&issued), "").status, 415);
     assert_eq!(fs::read(data.join("projects.bin")).unwrap(), initial);
     assert_eq!(fs::read_dir(&data).unwrap().count(), 2);
     catalog
@@ -84,7 +87,7 @@ fn catalog_pages_require_a_session_escape_names_and_reload_only_after_restart() 
         .unwrap()
         .save(&catalog)
         .unwrap();
-    assert!(!page(address, "GET", Some(&issued)).contains("Added outside the running server"));
+    assert!(page(address, "GET", Some(&issued)).contains("Added outside the running server"));
     drop(server);
     let saved = fs::read(data.join("projects.bin")).unwrap();
     let (_server, address) = start_with(&data);

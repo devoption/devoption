@@ -8,6 +8,9 @@
     const signedIn = byId("auth-signed-in");
     const status = byId("auth-status") || byId("profile-status");
     const signouts = Array.from(document.querySelectorAll("[data-signout]"));
+    const projectForm = byId("project-form");
+    const projectName = byId("project-name");
+    const projectStatus = byId("project-status");
     // null: confirmed signed out; undefined: session check failed; string: verified.
     let csrf = null;
     let busy = false;
@@ -21,6 +24,10 @@
       if (password) password.disabled = busy || csrf !== null;
       if (submit) submit.disabled = busy || csrf !== null;
       signouts.forEach((button) => { button.disabled = busy || !csrf; });
+      if (projectForm) {
+        projectName.disabled = busy || !csrf;
+        byId("project-submit").disabled = busy || !csrf;
+      }
     };
     const state = (value) => {
       csrf = value;
@@ -152,6 +159,50 @@
           if (csrf === undefined) byId("auth-recheck").focus();
           else if (csrf === null) password.focus();
         }
+      }
+    });
+    if (projectForm) projectForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      if (busy || !csrf) return;
+      const name = projectName.value;
+      projectName.removeAttribute("aria-invalid");
+      if (!name || name.trim() !== name || new TextEncoder().encode(name).length > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(name)) {
+        projectStatus.textContent = "Enter a name of up to 128 UTF-8 bytes, without leading or trailing spaces or control characters.";
+        projectName.setAttribute("aria-invalid", "true");
+        projectName.focus();
+        return;
+      }
+      const current = ++version;
+      busy = true;
+      controls();
+      projectStatus.textContent = "Creating project…";
+      let saved = false;
+      try {
+        const response = await request("/projects", {
+          headers: { "content-type": "text/plain;charset=UTF-8", "x-csrf-token": csrf }, body: name,
+        });
+        if (current !== version) return;
+        if (response.status === 204) {
+          saved = true;
+          projectStatus.textContent = "Project saved. Loading the list…";
+          window.location.assign("/projects");
+          return;
+        }
+        if (response.status === 401) {
+          state(null);
+          projectStatus.textContent = "Your session ended. Sign in again to create a project.";
+        } else if (response.status === 400 || response.status === 413) {
+          projectStatus.textContent = "Check the project name: use up to 128 UTF-8 bytes without surrounding spaces or control characters.";
+          projectName.setAttribute("aria-invalid", "true");
+        } else if (response.status === 409) {
+          projectStatus.textContent = "This catalog has reached its limit of 64 projects.";
+        } else {
+          projectStatus.textContent = "Creation could not be confirmed. Reload the project list before trying again.";
+        }
+      } catch {
+        if (current === version) projectStatus.textContent = "Creation could not be confirmed. Reload the project list before trying again.";
+      } finally {
+        if (current === version) { busy = saved; controls(); }
       }
     });
     signouts.forEach((button) => button.addEventListener("click", async function () {

@@ -20,6 +20,15 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Signed-in owners can create named empty projects from the Projects form. Names
+  are bounded and escaped, writes use the catalog lock and atomic persistence,
+  and successful saves reload the current list without restarting the server.
+  Cookie/CSRF/Origin guards reject unauthorized or mixed-transport requests;
+  corruption, contention and write failures never report successful creation.
+  Concurrency, restart, input and browser checks cover the new flow. The screenshot
+  uses temporary fixture data; no repository paths or Git operations are added
+  ([#105](https://github.com/devoption/devoption/issues/105)).
+
 - Configured Projects pages now show saved project names and repository counts
   behind the existing session guard. A bounded domain reader loads a validated
   startup snapshot without writing files; invalid catalogs stop startup, absent

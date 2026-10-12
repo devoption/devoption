@@ -5,10 +5,12 @@ associations and private catalog persistence under
 [#101](https://github.com/devoption/devoption/issues/101), the first core slice of
 [#16](https://github.com/devoption/devoption/issues/16). Under
 [#103](https://github.com/devoption/devoption/issues/103), configured servers read
-the catalog for the authenticated Projects list. There is no registration form,
-project HTTP mutation, repository path intake or Git invocation.
+the catalog for the authenticated Projects list. Under
+[#105](https://github.com/devoption/devoption/issues/105), owners can create named
+empty projects. Repository path intake, registration and Git invocation remain
+unimplemented.
 
-## Read-only service view
+## Authenticated service view and creation
 
 With an existing owner, startup calls the domain crate's `read_catalog` before
 binding the listener. This reader applies the same bounded format and private
@@ -16,20 +18,41 @@ directory/file checks as the store, without creating files or acquiring a writer
 lock. Only an absent catalog becomes an empty list. Invalid, unsupported,
 oversized or unsafe state stops startup without reset or error-data disclosure.
 
-The server renders this validated snapshot once. Every Projects GET/HEAD still
+The server reads the current validated snapshot on every Projects GET/HEAD, which
 passes the existing session-cookie guard; anonymous requests receive the empty
 non-cacheable redirect to Sign in. Names are HTML-escaped by `devoption-ui`, and
-only names and repository counts appear. Restart loads later catalog changes;
-the running server does not watch or reread files. The unconfigured preview never
-loads catalog metadata and retains its public placeholder. No fixture projects
+only names and repository counts appear. No server restart is needed after a save.
+Read failures return 503 without stale rows or private error details. The
+unconfigured preview never loads catalog metadata and retains its public placeholder. No fixture projects
 are added to real storage or the persistent preview.
+
+The form sends `POST /projects` with one plain UTF-8 name in the body and
+`Content-Type: text/plain;charset=UTF-8` (`text/plain` also works). The body is
+limited to 128 bytes and a five-second read deadline. Existing cookie, explicit
+CSRF-header and same-Origin checks run first; Authorization headers are rejected.
+The domain validates a nonempty, trimmed name without control characters and the
+64-project capacity. Names may repeat; they are never paths or identities.
+
+Catalog reads and writes are serialized within each server. Blocking filesystem
+work runs outside the async event loop. Each creation acquires the existing
+exclusive writer lock, loads the latest snapshot, creates an empty project with a
+fresh ID and atomically saves it. Repository records and associations are retained.
+Another process holding the lock causes a closed failure, not a stale overwrite.
+The handler returns an empty, non-cacheable 204 only after save and directory sync
+succeed. The browser then reloads `/projects`; it does not insert an optimistic row.
+Invalid names return 400, oversized bodies 413, unsupported encodings 415, stalled
+bodies 408 and a full catalog 409. Storage failures or contention return 503 with
+no input/path/error disclosure. There is no automatic retry. A connection loss or
+post-rename sync error may leave a saved project: reload and inspect before trying
+again. Creation is not idempotent; intentionally repeating a name creates another
+project.
 
 ## Domain boundary
 
 The crate owns this cohesive domain independently of CLI, HTTP, rendering and
 authentication. It depends on existing pinned randomness and filesystem
 libraries, not `devoption-server` or `devoption-ui`. The server adapts catalog
-reads into UI summaries; the CLI remains responsible for dispatch/startup. Existing owner
+reads and creation into HTTP/UI behavior; the CLI remains responsible for dispatch/startup. Existing owner
 storage and authentication APIs have not moved or changed.
 
 `Catalog` creates distinct `ProjectId` and `RepositoryId` values using OS random
@@ -108,10 +131,11 @@ migration, reset or repair command is provided.
 and projects, IDs across process restart, conflicting writers, complete atomic
 snapshots, injected partial-write failures, abandoned temporary files, malformed
 formats, unsafe paths/files and directory anchoring. The normal README workspace
-checks include this crate.
+checks include this crate. CLI HTTP tests additionally cover authenticated creation,
+input limits, concurrent requests, read-after-write, restart and storage failures.
 
 Later selected slices must define Git worktree/path validation before intake,
-then add owner-authorized bounded requests and escaped UI views. Execution
+then add repository intake to the owner-authorized HTTP/UI flow. Execution
 approval, environment/resource policy and build/artifact directories remain
 separate prerequisites under #15/#17; creating catalog metadata authorizes none
 of them.

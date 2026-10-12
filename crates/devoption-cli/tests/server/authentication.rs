@@ -303,7 +303,7 @@ fn real_sign_in_rotation_and_logout_share_the_production_session_guard() {
             .unwrap()
             .ends_with("Path=/; Secure; HttpOnly; SameSite=Strict")
     );
-    assert_eq!(post(address, "/projects", Some(&first), "").status, 405);
+    assert_eq!(post(address, "/projects", Some(&first), "").status, 415);
     assert_eq!(post(address, "/auth/sign-out", None, "").status, 401);
     let mut wrong = first.clone();
     wrong
@@ -323,7 +323,7 @@ fn real_sign_in_rotation_and_logout_share_the_production_session_guard() {
         post(address, "/auth/sign-out", Some(&first), "").status,
         401
     );
-    assert_eq!(post(address, "/projects", Some(&second), "").status, 405);
+    assert_eq!(post(address, "/projects", Some(&second), "").status, 415);
     // Enrollment remains absent even after a valid sign-in.
     assert_eq!(post(address, "/auth/setup", Some(&second), "").status, 404);
     let (_other_server, other_address) = start_with(&data);
@@ -391,7 +391,7 @@ fn issued_browser_tokens_cannot_authorize_bearer_or_mixed_http_requests() {
         }
     }
     // Rejected requests cannot clear or replace the valid browser session.
-    assert_eq!(post(address, "/projects", Some(&issued), "").status, 405);
+    assert_eq!(post(address, "/projects", Some(&issued), "").status, 415);
     assert_eq!(
         post(address, "/auth/session", Some(&issued), "").status,
         204

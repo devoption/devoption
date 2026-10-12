@@ -40,6 +40,16 @@ pub struct CatalogStore {
 }
 
 impl CatalogStore {
+    /// Load, add an empty project and durably save under this writer's lock.
+    /// Never reuse a caller's potentially stale snapshot for this operation.
+    /// As with save, an error after rename requires inspection before retrying.
+    pub fn create_project(&mut self, name: &str) -> Result<crate::ProjectId, Error> {
+        let mut catalog = self.load()?.unwrap_or_default();
+        let id = catalog.create_project(name)?;
+        self.save(&catalog)?;
+        Ok(id)
+    }
+
     /// Reject relative paths, `..`, and symlinks in every directory component.
     /// Final directory must belong to the current OS user with no group/other
     /// permissions. Opening neither creates directories nor repairs permissions.

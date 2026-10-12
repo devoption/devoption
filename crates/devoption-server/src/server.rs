@@ -19,6 +19,8 @@ type SharedSession = Arc<SessionSlot>;
 
 #[cfg(unix)]
 mod auth;
+#[cfg(unix)]
+mod projects;
 #[cfg(all(test, unix))]
 mod session_tests;
 
@@ -49,18 +51,19 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
         ));
     }
     #[cfg(unix)]
-    let catalog = if owner_auth
+    let projects = if owner_auth
         .as_ref()
         .is_some_and(|(_, configured)| *configured)
     {
-        devoption_projects::read_catalog(data_directory.expect("configured owner has a directory"))
-            .map_err(|error| io::Error::other(format!("project catalog unavailable: {error}")))?
-            .unwrap_or_default()
+        Some(
+            projects::Projects::open(data_directory.expect("configured owner has a directory"))
+                .map_err(|error| {
+                    io::Error::other(format!("project catalog unavailable: {error}"))
+                })?,
+        )
     } else {
-        devoption_projects::Catalog::default()
+        None
     };
-    #[cfg(not(unix))]
-    let catalog = devoption_projects::Catalog::default();
     Builder::new_current_thread()
         .enable_all()
         .build()?
@@ -75,11 +78,11 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
             #[cfg(not(unix))]
             let configured = false;
             let session = Arc::new(SessionSlot::default());
-            let app = page_routes(
-                configured,
-                Arc::clone(&session),
-                &project_summaries(&catalog),
-            );
+            #[cfg(unix)]
+            let project_routes = projects.map(projects::routes).unwrap_or_default();
+            #[cfg(not(unix))]
+            let project_routes = Router::new();
+            let app = page_routes(configured, Arc::clone(&session), project_routes);
             let app = protect(app, address.port(), Arc::clone(&session));
             #[cfg(unix)]
             let app = match &owner_auth {
@@ -95,24 +98,7 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
         })
 }
 
-fn project_summaries(
-    catalog: &devoption_projects::Catalog,
-) -> Vec<devoption_ui::ProjectSummary<'_>> {
-    catalog
-        .projects()
-        .iter()
-        .map(|project| devoption_ui::ProjectSummary {
-            name: project.name(),
-            repository_count: project.repositories().len(),
-        })
-        .collect()
-}
-
-fn page_routes(
-    configured: bool,
-    session: SharedSession,
-    projects: &[devoption_ui::ProjectSummary<'_>],
-) -> Router {
+fn page_routes(configured: bool, session: SharedSession, project_routes: Router) -> Router {
     let mut pages = Router::new();
     for (path, page) in [
         ("/", Page::Home),
@@ -120,13 +106,10 @@ fn page_routes(
         ("/about", Page::About),
         ("/settings/appearance", Page::Appearance),
     ] {
-        // Render the validated startup snapshot once; authorization still runs
-        // for every request before any configured page content is returned.
-        let html = Arc::new(if configured && matches!(page, Page::Projects) {
-            devoption_ui::render_projects(projects)
-        } else {
-            devoption_ui::render_with_account(page, configured)
-        });
+        if configured && matches!(page, Page::Projects) {
+            continue;
+        }
+        let html = Arc::new(devoption_ui::render_with_account(page, configured));
         pages = pages.route(
             path,
             get(move || {
@@ -135,6 +118,7 @@ fn page_routes(
             }),
         );
     }
+    pages = pages.merge(project_routes);
     // This startup decision is fixed even if the owner record later disappears.
     // Layer only the protected routes; Sign in is added afterward and stays public.
     if configured {

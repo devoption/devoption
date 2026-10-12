@@ -2,8 +2,8 @@
 //!
 //! Repository records are identity/display metadata, not validated Git locations.
 //! This core accepts no checkout paths, runs no commands and grants no permissions.
-//! Unix storage is explicit and private. The server can read a bounded snapshot;
-//! it does not expose catalog writes or repository registration.
+//! Unix storage is explicit and private. The server exposes authenticated project
+//! creation and catalog reads; repository registration remains unimplemented.
 
 mod model;
 pub use model::{

@@ -5,7 +5,16 @@ pub struct ProjectSummary<'a> {
 }
 
 pub(super) fn content(projects: &[ProjectSummary<'_>]) -> String {
-    let mut html = String::new();
+    let mut html = String::from(
+        r#"<form id="project-form" class="project-form" action="/projects" method="post">
+      <label for="project-name">Project name</label>
+      <p id="project-hint">Start with an empty project.</p>
+      <input id="project-name" name="name" type="text" required maxlength="128" autocomplete="off" aria-describedby="project-hint project-status" disabled>
+      <button id="project-submit" class="action-button" type="submit" disabled>Create project</button>
+      <p id="project-status" role="status" aria-live="polite"></p>
+      <noscript>JavaScript is required to create a project.</noscript>
+    </form>"#,
+    );
     if !projects.is_empty() {
         html.push_str("<ul class=\"project-list\" aria-label=\"Saved projects\">");
         for project in projects {
@@ -21,9 +30,6 @@ pub(super) fn content(projects: &[ProjectSummary<'_>]) -> String {
         }
         html.push_str("</ul>");
     }
-    html.push_str(
-        "<p class=\"project-note\">Adding or changing projects is not available yet.</p>",
-    );
     html
 }
 
@@ -60,7 +66,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_and_single_repository_views_have_no_fake_controls_or_rows() {
+    fn empty_and_single_repository_views_include_the_creation_form() {
         let empty = crate::render_projects(&[]);
         assert!(empty.contains("No projects yet."));
         assert!(!empty.contains("aria-label=\"Saved projects\""));
@@ -70,7 +76,7 @@ mod tests {
         }]);
         assert!(one.contains("1 repository"));
         assert!(!one.contains("<a "));
-        assert!(!one.contains("<button"));
+        assert!(one.contains("Create project"));
         assert!(
             crate::render(crate::Page::Projects)
                 .contains("Project management is not available yet.")

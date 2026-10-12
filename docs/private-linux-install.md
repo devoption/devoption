@@ -1,8 +1,8 @@
 # Private Ubuntu source installation
 
 This guide covers the current runtime: CLI owner setup, browser sign-in, page
-access, read-only saved-project lists, and browser-local appearance settings.
-Project registration, builds, artifacts and deployments remain unimplemented. It is one step under
+access, saved-project lists and empty-project creation, and browser-local appearance settings.
+Repository registration, builds, artifacts and deployments remain unimplemented. It is one step under
 [#20](https://github.com/devoption/devoption/issues/20), tracked by
 [#90](https://github.com/devoption/devoption/issues/90), not a complete software
 factory installation or a published release.
@@ -78,7 +78,8 @@ inspect the existing state; never delete a record just to retry. Read the
 
 The data path is explicit, outside the checkout and binary directory. It remains
 the same after a rebuild. The server reads the owner record and, when present,
-the optional [project catalog](project-catalog.md) without creating or editing it.
+the optional [project catalog](project-catalog.md) at startup. Signed-in owners can
+create named empty projects; the catalog is saved in this same private directory.
 Sessions and CSRF tokens are memory-only and disappear on restart; appearance
 preferences stay in that browser's local storage and are not in a server backup.
 
