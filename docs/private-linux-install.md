@@ -29,8 +29,9 @@ cargo build --release --locked --offline
 ```
 
 Record the source commit. Use a reviewed commit with passing CI; `main` can move.
-The following fresh-install block stops if its binary or data directory already
-exists. Keep existing installations and data; do not rerun setup over them.
+The following fresh-install block checks both target paths, including dangling
+symlinks, before creating directories. It stops if either already exists. Keep
+existing installations and data; do not rerun setup over them.
 The home directory and all data-path components must be real directories without
 symlinks or `..`. If your home layout differs, choose an absolute real path and
 adjust both commands and the service example consistently.
@@ -39,6 +40,10 @@ adjust both commands and the service example consistently.
 (
   set -eu
   umask 077
+  for destination in "$HOME/.local/lib/devoption" "$HOME/.local/share/devoption"; do
+    test ! -e "$destination"
+    test ! -L "$destination"
+  done
   mkdir -p "$HOME/.local/lib" "$HOME/.local/share"
   mkdir -m 700 "$HOME/.local/lib/devoption"
   mkdir -m 700 "$HOME/.local/share/devoption"
