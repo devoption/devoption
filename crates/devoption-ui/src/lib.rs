@@ -1,13 +1,16 @@
 /// The pages currently available in DevOption.
+#[derive(Clone, Copy)]
 pub enum Page {
     Home,
     Projects,
     About,
     Appearance,
+    SignIn,
 }
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
+const AUTH: &str = include_str!("../assets/auth.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
 const APPEARANCE_CONTROLS: &str = r##"
       <section class="appearance" aria-label="Appearance preferences">
@@ -50,8 +53,33 @@ const APPEARANCE_CONTROLS: &str = r##"
         <p id="appearance-status" role="status">Enable JavaScript to change appearance.</p>
       </section>"##;
 
+const SIGN_IN: &str = r#"
+      <section class="auth" aria-label="Account access">
+        <form id="signin-form" action="/auth/sign-in" method="post">
+          <label for="auth-password">Password</label>
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" required maxlength="1024" aria-describedby="auth-status" disabled>
+          <button id="auth-submit" class="action-button" type="submit" disabled>Sign in</button>
+        </form>
+        <div id="auth-signed-in" hidden>
+          <a class="action-button" href="/">Continue to Home</a>
+          <button class="action-button secondary" type="button" data-signout disabled>Sign out</button>
+        </div>
+        <p id="auth-status" role="status">Enable JavaScript to sign in.</p>
+      </section>"#;
+
+const SETUP_REQUIRED: &str = r#"
+      <section class="auth" aria-label="Owner setup required">
+        <p>Create the first owner from a local or SSH terminal, then restart DevOption.</p>
+        <p>Browser account creation is not available.</p>
+      </section>"#;
+
 /// Render a complete HTML document independently of the HTTP server.
 pub fn render(page: Page) -> String {
+    render_with_account(page, false)
+}
+
+/// Account availability is validated by server startup, not supplied by a visitor.
+pub fn render_with_account(page: Page, account_available: bool) -> String {
     // All rendered values are static; no request data is interpolated into HTML.
     let (title, path, message) = match page {
         Page::Home => ("Home", "/", "No home content yet."),
@@ -66,9 +94,27 @@ pub fn render(page: Page) -> String {
             "/settings/appearance",
             "Choose how DevOption looks in this browser.",
         ),
+        Page::SignIn => (
+            "Sign in",
+            "/sign-in",
+            if account_available {
+                "Use the owner password for this server."
+            } else {
+                "Owner setup is required before you can sign in."
+            },
+        ),
     };
     let (appearance_current, content) = if path == "/settings/appearance" {
         (" aria-current=\"page\"", APPEARANCE_CONTROLS)
+    } else if path == "/sign-in" {
+        (
+            "",
+            if account_available {
+                SIGN_IN
+            } else {
+                SETUP_REQUIRED
+            },
+        )
     } else {
         ("", "")
     };
@@ -102,11 +148,13 @@ pub fn render(page: Page) -> String {
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <meta name=\"referrer\" content=\"no-referrer\">
   <title>{title} · DevOption</title>
   <style>{STYLES}</style>
   <script>{APPEARANCE}</script>
+  <script>{AUTH}</script>
 </head>
-<body>
+<body data-owner-configured=\"{account_available}\">
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
   <aside class=\"sidebar\" aria-label=\"Sidebar\">
     <a class=\"brand\" href=\"/\" aria-label=\"DevOption home\">{LOGO}</a>
@@ -114,11 +162,14 @@ pub fn render(page: Page) -> String {
     <div class=\"profile-area\">
       <button class=\"profile-trigger\" type=\"button\" popovertarget=\"profile-popup\" aria-label=\"Profile menu\">
         <span class=\"profile-avatar\">{profile_icon}</span>
-        <span class=\"profile-label\">Local preview</span><span class=\"chevron\" aria-hidden=\"true\"></span>
+        <span id=\"profile-state\" class=\"profile-label\">Account</span><span class=\"chevron\" aria-hidden=\"true\"></span>
       </button>
       <section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">
-        <h2 id=\"profile-title\">Local preview</h2>
-        <p class=\"profile-note\">Account features are not available yet.</p>
+        <h2 id=\"profile-title\">Account</h2>
+        <p id=\"profile-note\" class=\"profile-note\">Sign in to your local account.</p>
+        <a id=\"profile-account\" class=\"profile-link\" href=\"/sign-in\">Sign in</a>
+        <button class=\"profile-link\" type=\"button\" data-signout hidden disabled>Sign out</button>
+        <p id=\"profile-status\" class=\"profile-note\" role=\"status\"></p>
         <a class=\"profile-link\" href=\"/settings/appearance\"{appearance_current}>Appearance</a>
       </section>
     </div>
@@ -126,8 +177,8 @@ pub fn render(page: Page) -> String {
   <div class=\"workspace\">
     <header class=\"content-header\"><p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p></header>
     <main id=\"main-content\" tabindex=\"-1\">
-      <h1>{title}</h1>
-      <p>{message}</p>
+      <h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>
+      <p id=\"page-message\">{message}</p>
       {content}
     </main>
   </div>

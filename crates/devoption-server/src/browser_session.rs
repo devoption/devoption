@@ -57,6 +57,22 @@ pub fn authenticate(headers: &HeaderMap, slot: &SessionSlot) -> Option<IdentityI
     slot.authenticate_browser(Some(&session), Some(&csrf))
 }
 
+/// Recover the current session's CSRF token using only its strict session cookie.
+/// The caller MUST first require a matching Host/Origin (including on this read).
+/// This neither changes the cookie nor creates, rotates, or extends a session.
+pub fn recover(headers: &HeaderMap, slot: &SessionSlot) -> Response {
+    let Some(csrf) =
+        named_session(headers, COOKIE_NAME).and_then(|token| slot.recover_browser_csrf(&token))
+    else {
+        return empty(StatusCode::UNAUTHORIZED);
+    };
+    let mut response = empty(StatusCode::NO_CONTENT);
+    response
+        .headers_mut()
+        .insert(CSRF_HEADER, sensitive(encode(&csrf)));
+    response
+}
+
 /// Clear the cookie only after atomically logging out the current matching pair.
 /// A failed/stale logout must not clear a newer browser session's cookie.
 /// The caller must enforce Host/Origin before invoking this mutation.
@@ -93,6 +109,13 @@ pub(crate) fn named_credentials(
     headers: &HeaderMap,
     cookie_name: &str,
 ) -> Option<([u8; TOKEN_BYTES], [u8; CSRF_TOKEN_BYTES])> {
+    Some((
+        named_session(headers, cookie_name)?,
+        decode(one_header(headers, CSRF_HEADER)?)?,
+    ))
+}
+
+fn named_session(headers: &HeaderMap, cookie_name: &str) -> Option<[u8; TOKEN_BYTES]> {
     if headers.contains_key(AUTHORIZATION) {
         return None;
     }
@@ -113,7 +136,7 @@ pub(crate) fn named_credentials(
             session = Some(decode(value)?);
         }
     }
-    Some((session?, decode(one_header(headers, CSRF_HEADER)?)?))
+    session
 }
 
 fn one_header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {

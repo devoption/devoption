@@ -58,23 +58,13 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await?;
             let address = listener.local_addr()?;
             println!("Listening on http://{address} (Ctrl+C to stop)");
-            let app = Router::new()
-                .route(
-                    "/",
-                    get(|| async { Html(devoption_ui::render(Page::Home)) }),
-                )
-                .route(
-                    "/projects",
-                    get(|| async { Html(devoption_ui::render(Page::Projects)) }),
-                )
-                .route(
-                    "/about",
-                    get(|| async { Html(devoption_ui::render(Page::About)) }),
-                )
-                .route(
-                    "/settings/appearance",
-                    get(|| async { Html(devoption_ui::render(Page::Appearance)) }),
-                );
+            #[cfg(unix)]
+            let configured = owner_auth
+                .as_ref()
+                .is_some_and(|(_, configured)| *configured);
+            #[cfg(not(unix))]
+            let configured = false;
+            let app = page_routes(configured);
             let session = Arc::new(SessionSlot::default());
             let app = protect(app, address.port(), Arc::clone(&session));
             #[cfg(unix)]
@@ -89,6 +79,28 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
             };
             axum::serve(listener, app).await
         })
+}
+
+fn page_routes(configured: bool) -> Router {
+    let mut pages = Router::new();
+    for (path, page) in [
+        ("/", Page::Home),
+        ("/projects", Page::Projects),
+        ("/about", Page::About),
+        ("/settings/appearance", Page::Appearance),
+        ("/sign-in", Page::SignIn),
+    ] {
+        pages = pages.route(
+            path,
+            get(move || async move {
+                (
+                    [(CACHE_CONTROL, "no-store")],
+                    Html(devoption_ui::render_with_account(page, configured)),
+                )
+            }),
+        );
+    }
+    pages
 }
 
 fn protect(app: Router, port: u16, session: SharedSession) -> Router {

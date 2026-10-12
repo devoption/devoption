@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: '22.22.3'
           package-manager-cache: false
-      - run: node --test scripts/test_appearance.cjs
+      - run: node --test scripts/test_*.cjs
       - run: git diff --exit-code
 
   contribution:

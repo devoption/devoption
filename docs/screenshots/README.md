@@ -15,12 +15,19 @@ Night in Dark and Light modes.
 | Projects | http://127.0.0.1:3000/projects | `projects.jpg` |
 | About | http://127.0.0.1:3000/about | `about.jpg` |
 | Appearance | http://127.0.0.1:3000/settings/appearance | `appearance.jpg` |
+| Sign in | http://127.0.0.1:3000/sign-in | `sign-in.jpg` |
+| Account (signed in) | http://127.0.0.1:3000/sign-in | `account.jpg` |
 
 From the repository root, start the app after the [normal setup](../../README.md#try-it-locally):
 
 ```sh
 cargo run --locked --offline -- serve
 ```
+
+For Sign in and Account, use the [temporary browser fixture](../browser-session-check.md)
+and its printed port instead. Capture `sign-in.jpg` signed out and `account.jpg`
+after fixture sign-in. The main-page images may also use that fixture while signed
+out. Never provision a real owner just to take screenshots.
 
 1. If source or assets changed, stop and restart the server, then refresh the page.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
