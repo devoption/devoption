@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- The README architecture summary now distinguishes startup catalog validation
+  from per-request Projects reads and locked project creation
+  ([#105](https://github.com/devoption/devoption/issues/105)).
+
 - CLI help and authentication module introductions now describe CLI-first owner
   setup followed by the implemented browser sign-in flow, while keeping browser
   owner setup explicitly unavailable

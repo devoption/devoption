@@ -174,9 +174,11 @@ The Rust workspace has four crates. The running service uses
 Server APIs live under `devoption_server`; the CLI is a binary without a library
 facade. Authentication and owner storage remain server modules. The
 [project catalog core](docs/project-catalog.md) has its own model and storage
-tests; it accepts no repository paths. The server reads a validated startup
-snapshot and supplies display summaries to the UI. Executable integration tests
-stay with the CLI; domain logic remains in the project crate.
+tests; it accepts no repository paths. The server validates the catalog at startup,
+then rereads it for each authenticated Projects GET/HEAD request and supplies
+current display summaries to the UI. Project creation uses the domain's locked,
+durable save operation. Executable integration tests stay with the CLI; domain
+logic remains in the project crate.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:
