@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Optional, explicitly approved Linux user lingering guidance and a recorded
+  disposable Ubuntu rehearsal proving readiness before the first login after
+  reboot, continued operation after logout, and deliberate stop behavior. The
+  temporary probe was removed and the original `Linger=no` policy restored
+  ([#94](https://github.com/devoption/devoption/issues/94)).
+
 - A recorded disposable Ubuntu 24.04 x86_64 source-install rehearsal covering
   SSH browser authentication, the user service, private backup/restore, old-session
   rejection, complete logout and recovery after reboot and login. VM artifacts
