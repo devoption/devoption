@@ -14,6 +14,9 @@ cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fi
 Open the printed URL in a fresh browser profile/context. The fixture includes the
 production pages and stops after ten minutes; rerun it if necessary. The fixture
 password is `browser transport fixture only`. It is never a real account password.
+The same temporary directory contains two example projects with two and one
+repository associations. Projects renders their saved metadata through the real
+page renderer and guard; this does not create or register actual Git repositories.
 
 For the UI check, open `/projects` while signed out and confirm a redirect to
 **Sign in** with no protected page content. Home, About and Appearance have the

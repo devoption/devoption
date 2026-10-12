@@ -20,6 +20,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Configured Projects pages now show saved project names and repository counts
+  behind the existing session guard. A bounded domain reader loads a validated
+  startup snapshot without writing files; invalid catalogs stop startup, absent
+  catalogs show an empty list, and unconfigured previews retain their placeholder.
+  Names are escaped, restart/denial/failure paths are tested, and the Projects
+  screenshot uses temporary fixture data. No editing, path intake or Git execution
+  is exposed ([#103](https://github.com/devoption/devoption/issues/103)).
+
 - A dedicated `devoption-projects` crate with separate stable project/repository
   identities, multi-repository associations and a bounded versioned private Unix
   catalog. Exclusive writer locking and atomic snapshots preserve complete state

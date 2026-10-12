@@ -1,5 +1,5 @@
 use super::fixture;
-use crate::{Catalog, CatalogStore, Error, codec};
+use crate::{Catalog, CatalogStore, Error, codec, read_catalog};
 use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
@@ -34,6 +34,30 @@ fn assert_relationships(catalog: &Catalog) {
     let ids: Vec<_> = catalog.repositories().iter().map(|r| r.id()).collect();
     assert_eq!(catalog.projects()[0].repositories(), ids);
     assert_eq!(catalog.projects()[1].repositories(), &ids[1..]);
+}
+
+#[test]
+fn snapshot_reads_create_no_files_and_can_coexist_with_a_writer() {
+    let temporary = directory();
+    let root = temporary.path().canonicalize().unwrap();
+    assert!(read_catalog(&root).unwrap().is_none());
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+    let mut writer = CatalogStore::open_absolute(&root).unwrap();
+    let catalog = fixture();
+    writer.save(&catalog).unwrap();
+    let before = fs::read(root.join("projects.bin")).unwrap();
+    assert_eq!(read_catalog(&root).unwrap().unwrap(), catalog);
+    drop(writer);
+    fs::remove_file(root.join(".projects.lock")).unwrap();
+    assert_eq!(read_catalog(&root).unwrap().unwrap(), catalog);
+    assert_eq!(fs::read(root.join("projects.bin")).unwrap(), before);
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+    write(&root.join("projects.bin"), &vec![0; codec::MAX_BYTES + 1]);
+    assert!(matches!(read_catalog(&root), Err(Error::InvalidCatalog)));
+    assert_eq!(
+        fs::metadata(root.join("projects.bin")).unwrap().len(),
+        (codec::MAX_BYTES + 1) as u64
+    );
 }
 
 #[test]
@@ -261,6 +285,7 @@ fn paths_permissions_and_special_files_fail_closed() {
         root.join("missing"),
     ] {
         assert!(CatalogStore::open_absolute(&path).is_err());
+        assert!(read_catalog(&path).is_err());
     }
     fs::set_permissions(&data, fs::Permissions::from_mode(0o750)).unwrap();
     assert!(matches!(
@@ -283,6 +308,7 @@ fn paths_permissions_and_special_files_fail_closed() {
     let outside = fs::read(root.join("outside")).unwrap();
     symlink(root.join("outside"), data.join("projects.bin")).unwrap();
     assert!(store.save(&fixture()).is_err());
+    assert!(read_catalog(&data).is_err());
     assert_eq!(fs::read(root.join("outside")).unwrap(), outside);
     fs::remove_file(data.join("projects.bin")).unwrap();
     fs::create_dir(data.join("projects.bin")).unwrap();
