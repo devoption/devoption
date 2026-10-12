@@ -67,8 +67,14 @@ explains that CLI setup is required. See [setup limits](docs/local-enrollment.md
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
 at its listening port. Unsafe requests require a matching Origin and a session,
 apart from the protected authentication routes. Without a configured owner, all
-unsafe requests remain denied. Preview pages remain public. There is no TLS or
-supported public deployment configuration. Do not expose it publicly.
+unsafe requests remain denied. With an owner configured at startup, Home, Projects,
+About and Appearance GET/HEAD requests require the current session cookie. Missing,
+invalid or expired sessions receive a non-cacheable redirect to `/sign-in` without
+page content. Sign in stays public; the unconfigured preview stays public. This
+startup choice cannot be changed by a request or by removing the owner record from
+a running server. Page reads never renew sessions and do not replace the CSRF
+requirement on mutations. There is no TLS or supported public deployment
+configuration. Do not expose it publicly.
 
 For an existing owner, `POST /auth/challenge` issues an HttpOnly pre-session cookie
 and a separate `X-CSRF-Token` header. `POST /auth/sign-in` requires that matching

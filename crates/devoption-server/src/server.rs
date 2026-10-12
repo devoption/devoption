@@ -9,7 +9,7 @@ use axum::{
     extract::Request,
     http::{
         HeaderMap, Method, StatusCode,
-        header::{AUTHORIZATION, CACHE_CONTROL, COOKIE, HOST, ORIGIN, WWW_AUTHENTICATE},
+        header::{AUTHORIZATION, CACHE_CONTROL, COOKIE, HOST, LOCATION, ORIGIN, WWW_AUTHENTICATE},
     },
     middleware::{self, Next},
     response::{Html, IntoResponse},
@@ -64,8 +64,8 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
                 .is_some_and(|(_, configured)| *configured);
             #[cfg(not(unix))]
             let configured = false;
-            let app = page_routes(configured);
             let session = Arc::new(SessionSlot::default());
+            let app = page_routes(configured, Arc::clone(&session));
             let app = protect(app, address.port(), Arc::clone(&session));
             #[cfg(unix)]
             let app = match &owner_auth {
@@ -81,14 +81,13 @@ pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
         })
 }
 
-fn page_routes(configured: bool) -> Router {
+fn page_routes(configured: bool, session: SharedSession) -> Router {
     let mut pages = Router::new();
     for (path, page) in [
         ("/", Page::Home),
         ("/projects", Page::Projects),
         ("/about", Page::About),
         ("/settings/appearance", Page::Appearance),
-        ("/sign-in", Page::SignIn),
     ] {
         pages = pages.route(
             path,
@@ -100,7 +99,47 @@ fn page_routes(configured: bool) -> Router {
             }),
         );
     }
-    pages
+    // This startup decision is fixed even if the owner record later disappears.
+    // Layer only the protected routes; Sign in is added afterward and stays public.
+    if configured {
+        pages = pages.route_layer(middleware::from_fn(
+            move |mut request: Request, next: Next| {
+                let session = Arc::clone(&session);
+                async move {
+                    if matches!(*request.method(), Method::GET | Method::HEAD) {
+                        let Some(identity) = page_identity(request.headers(), &session) else {
+                            return (
+                                StatusCode::SEE_OTHER,
+                                [(LOCATION, "/sign-in"), (CACHE_CONTROL, "no-store")],
+                            )
+                                .into_response();
+                        };
+                        request.extensions_mut().insert(identity);
+                    }
+                    next.run(request).await
+                }
+            },
+        ));
+    }
+    pages.route(
+        "/sign-in",
+        get(move || async move {
+            (
+                [(CACHE_CONTROL, "no-store")],
+                Html(devoption_ui::render_with_account(Page::SignIn, configured)),
+            )
+        }),
+    )
+}
+
+fn page_identity(headers: &HeaderMap, session: &SharedSession) -> Option<IdentityId> {
+    #[cfg(unix)]
+    return crate::browser_session::authenticate_read(headers, session);
+    #[cfg(not(unix))]
+    {
+        let _ = (headers, session);
+        None
+    }
 }
 
 fn protect(app: Router, port: u16, session: SharedSession) -> Router {
@@ -146,7 +185,7 @@ fn protect_origin(app: Router, port: u16) -> Router {
 
 fn safe_method(method: &Method) -> bool {
     // RFC 9110 safe methods; extensions require Origin and a session.
-    // Public preview reads remain unauthenticated and must never mutate.
+    // Page-read authorization is separate; all safe methods must never mutate.
     matches!(
         *method,
         Method::GET | Method::HEAD | Method::OPTIONS | Method::TRACE

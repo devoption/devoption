@@ -11,6 +11,9 @@ use std::{
 
 const PASSWORD: &str = "existing owner fixture only";
 
+#[path = "authentication/pages.rs"]
+mod pages;
+
 fn configured() -> (tempfile::TempDir, PathBuf) {
     let (directory, path) = data_directory::fixture();
     let store = OwnerStore::open_absolute(&path).unwrap();

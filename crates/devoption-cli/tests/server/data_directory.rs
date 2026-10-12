@@ -89,7 +89,11 @@ fn configured_preview_accepts_both_option_orders_without_mutating_owner_data() {
                 address,
                 &format!("GET / HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n")
             )
-            .starts_with("HTTP/1.1 200 OK")
+            .starts_with(if existing_owner {
+                "HTTP/1.1 303 See Other"
+            } else {
+                "HTTP/1.1 200 OK"
+            })
         );
         assert!(request(address, &format!(
             "POST /setup HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"

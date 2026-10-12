@@ -10,6 +10,8 @@ use tower::ServiceExt;
 #[cfg(unix)]
 mod browser;
 #[cfg(unix)]
+mod pages;
+#[cfg(unix)]
 mod preauth;
 
 // Predictable fixtures are installed only in this test router, never the server.
