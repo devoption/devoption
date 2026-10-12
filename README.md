@@ -70,8 +70,14 @@ and the scope of [CI and disposable Ubuntu VM validation](docs/linux-rehearsal.m
 ### Local HTTP authentication
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
-at its listening port. Unsafe requests require a matching Origin and a session,
-apart from the protected authentication routes. Without a configured owner, all
+at its listening port. Unsafe requests require a matching Origin, the current
+session cookie and an explicit matching `X-CSRF-Token` header, apart from the
+protected authentication routes described below. The mutation guard rejects
+any `Authorization` header, including a browser token presented as Bearer or
+mixed with valid cookie/CSRF credentials. There is no API or agent credential
+transport; transport-neutral Rust session APIs do not enable one over HTTP.
+Missing or rejected mutation credentials receive an empty, non-cacheable 401
+without a Bearer challenge. Without a configured owner, all
 unsafe requests remain denied. With an owner configured at startup, Home, Projects,
 About and Appearance GET/HEAD requests require the current session cookie. Missing,
 invalid or expired sessions receive a non-cacheable redirect to `/sign-in` without

@@ -266,7 +266,7 @@ fn errors_do_not_stop_the_server() {
             ),
         );
         assert!(post.starts_with("HTTP/1.1 401 Unauthorized"));
-        assert!(post.contains("www-authenticate: Bearer"));
+        assert!(!post.contains("www-authenticate:"));
     }
     assert_parser_rejection(address, "GET / INVALID\r\n\r\n");
     let healthy = request(
@@ -617,7 +617,7 @@ fn unprovisioned_server_denies_credentials_without_echoing_them() {
                 );
                 let (headers, body) = response.split_once("\r\n\r\n").unwrap();
                 assert!(headers.starts_with(&format!("{version} 401 Unauthorized")));
-                assert!(headers.contains("www-authenticate: Bearer\r\n"));
+                assert!(!headers.contains("www-authenticate:"));
                 assert!(headers.contains("cache-control: no-store\r\n"));
                 assert!(!headers.contains("set-cookie:"));
                 assert!(!headers.contains("access-control-allow-origin:"));

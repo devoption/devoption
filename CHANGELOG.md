@@ -5,6 +5,14 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Fixed
+
+- The HTTP mutation guard now requires the browser session cookie and explicit
+  CSRF header after Host/Origin validation, rejecting Authorization credentials
+  and mixed transports without advertising a Bearer challenge. Transport-neutral
+  session APIs remain unchanged; no API or agent authentication is introduced
+  ([#96](https://github.com/devoption/devoption/issues/96)).
+
 ### Added
 
 - Optional, explicitly approved Linux user lingering guidance and a recorded
