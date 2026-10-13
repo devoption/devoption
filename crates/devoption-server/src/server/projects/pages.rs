@@ -42,6 +42,9 @@ async fn show(
     let (Some(id), Some(section)) = (project, section) else {
         return missing();
     };
+    if section == ProjectSection::Code {
+        return super::files::code(projects, id).await;
+    }
     let available = projects.root.is_some();
     let creation = projects.managed.is_some();
     match projects

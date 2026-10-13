@@ -13,7 +13,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
 | Project overview | `/projects/{id}` | Example application; repository summary; 1280 × 900 | `project-details.jpg` |
-| Project code | `/projects/{id}/code` | Managed creation enabled; frontend status read with Last checked; 1280 × 900 | `project-code.jpg` |
+| Project code | `/projects/{id}/code` | Immediate frontend file list; managed creation enabled; status read below files; 1280 × 900 | `project-code.jpg` |
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |
 | Project builds | `/projects/{id}/builds` | Repository source-check choices | `project-builds.jpg` |
@@ -23,7 +23,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit | `project-settings.jpg` |
 | Create repository | `/projects/{id}/code` | New repository dialog; sample-service entered, not submitted | `repository-create.jpg` |
-| Created repository | `/projects/{id}/code` | sample-service created; main, No commits yet, Clean; 1280 × 900 | `repository-created.jpg` |
+| Created repository | `/projects/{id}/repositories/{id}/files` | sample-service created; No tracked files; main, No commits yet, Clean; 1280 × 900 | `repository-created.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; dialogs closed | `project-empty.jpg` |
 | Attach repository | `/projects/{id}/code` | Example new project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
@@ -68,9 +68,10 @@ printed ephemeral origin. Do not create an owner for that capture.
    and Example application before mutating fixture records.
 3. Capture Example application’s Overview and each project section. On Code, select the frontend's **View status**. Wait for branch
    `main`, **No commits yet**, **3 staged**, **1 untracked entry**, and **Last checked**. This time
-   is when the browser received the valid response, not continuous monitoring. Open
-   frontend **Browse files**, capture its three paths, then open `src/main.rs` and
-   capture the source. Return to Code before continuing.
+   is when the browser received the valid response, not continuous monitoring.
+   Code already shows its three tracked paths. Choose **frontend** above the list
+   for the explicit repository URL capture, then open `src/main.rs` and capture
+   the source. Return to Code before continuing.
 4. On Projects, open **New project**, enter **Example new project** and capture
    the dialog. Submit, capture the new empty details page, then open Code and **Attach
    repository**. Wait for the picker, select `tools`, and capture without submitting.
@@ -96,6 +97,10 @@ passed**, append a comment to the temporary backend `src/main.rs`, and use **Che
 again** to capture **Changes needed** with one modified entry. Restore the temporary
 file afterward. The fixture’s printed root identifies these disposable files;
 do not change a real checkout or the persistent preview’s repository root.
+The three browser flags can also be combined to capture the full set in one
+disposable fixture. Check logo/breadcrumb vertical centers at desktop widths and
+their shared left gutter in the stacked mobile layout; check every project section
+at 320, 375, 768, 800 and 1280 pixels without horizontal page overflow.
 
 All Appearance variants use **1280 × 900** and the save confirmation:
 

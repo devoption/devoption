@@ -75,13 +75,14 @@ fn authenticated_file_links_show_escaped_tracked_working_text_and_survive_restar
     )
     .unwrap();
     let (url, other) = seed(&data, &root);
+    let code = format!("{}/code", url.split("/repositories/").next().unwrap());
     let before = [
         fs::read(data.join("owner.bin")).unwrap(),
         fs::read(data.join("projects.bin")).unwrap(),
         fs::read(root.join("main/.git/index")).unwrap(),
     ];
     let (server, address) = start(&data, &root);
-    for path in [&url, &format!("{url}/src/main.rs")] {
+    for path in [&code, &url, &format!("{url}/src/main.rs")] {
         for method in ["GET", "HEAD"] {
             assert_eq!(check(&read(address, method, path, None), 303), "");
         }
@@ -91,6 +92,12 @@ fn authenticated_file_links_show_escaped_tracked_working_text_and_survive_restar
     let list = check(&response, 200);
     assert!(list.contains("src/main.rs") && list.contains("r%C3%A9sum%C3%A9%20%26%20notes.txt"));
     assert!(!list.contains("untracked-secret"));
+    let direct = read(address, "GET", &code, Some(&issued));
+    let direct = check(&direct, 200);
+    assert_eq!(direct, list);
+    assert!(!direct.contains("Browse files") && !direct.contains("Back to repositories"));
+    assert!(direct.find("class=\"tracked-files\"") < direct.find("class=\"repository-details\""));
+    assert!(direct.contains("data-repository-status-view"));
     let response = read(address, "GET", &format!("{url}/src/main.rs"), Some(&issued));
     let body = check(&response, 200);
     assert!(body.contains("&lt;script&gt;fixture_only()&lt;/script&gt;\ncurrent working tree"));
@@ -184,11 +191,17 @@ fn empty_indexes_and_missing_root_have_honest_authenticated_states() {
     let (server, address) = start(&data, &root);
     let issued = sign_in(address);
     assert!(check(&read(address, "GET", &url, Some(&issued)), 200).contains("No tracked files"));
+    let code = format!("{}/code", url.split("/repositories/").next().unwrap());
+    assert!(check(&read(address, "GET", &code, Some(&issued)), 200).contains("No tracked files"));
     drop(server);
     let (_server, address) = start_with(&data);
     let issued = sign_in(address);
     assert!(
         check(&read(address, "GET", &url, Some(&issued)), 503)
-            .contains("Files could not be loaded")
+            .contains("Repository inspection is not configured")
     );
+    let response = read(address, "GET", &code, Some(&issued));
+    let body = check(&response, 503);
+    assert!(body.contains("Repository inspection is not configured"));
+    assert!(!body.contains("No tracked files"));
 }

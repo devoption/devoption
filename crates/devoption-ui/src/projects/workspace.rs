@@ -85,7 +85,7 @@ pub(crate) fn content_with_creation(
                 html.push_str("</caption><thead><tr><th scope=\"col\">Repository</th><th scope=\"col\">Default checkout</th></tr></thead><tbody>");
                 for repository in &project.repositories {
                     let repository_id = identifier(&repository.id);
-                    html.push_str(&format!(r#"<tr><th scope="row"><a href="/projects/{id}/code#repository-{repository_id}">"#));
+                    html.push_str(&format!(r#"<tr><th scope="row"><a href="/projects/{id}/repositories/{repository_id}/files">"#));
                     escape_into(&mut html, repository.name);
                     html.push_str("</a></th><td>");
                     if let Some(path) = repository.default_checkout { escape_into(&mut html, path); } else { html.push_str("Not attached"); }
@@ -132,14 +132,14 @@ pub(super) fn navigation(project: &ProjectSummary<'_>, section: ProjectSection) 
     html
 }
 
-fn repositories(
+pub(super) fn repositories(
     project: &ProjectSummary<'_>,
     attachment_available: bool,
     creation_available: bool,
 ) -> String {
     let id = identifier(&project.id);
     let mut html = String::from(
-        r#"<section aria-labelledby="repositories-title"><div class="section-heading"><h2 id="repositories-title">Repositories</h2>"#,
+        r#"<section class="repository-details" aria-labelledby="repositories-title"><div class="section-heading"><h2 id="repositories-title">Repository details</h2>"#,
     );
     html.push_str(r#"<div class="page-actions">"#);
     if attachment_available {
@@ -167,7 +167,6 @@ fn repositories(
             }
             html.push_str("</p></div></div>");
             if attachment_available && repository.default_checkout.is_some() {
-                html.push_str(&format!(r#"<a class="text-button repository-files-link" href="/projects/{id}/repositories/{repository_id}/files">Browse files <span aria-hidden="true">→</span></a>"#));
                 html.push_str(
                     r#"<div class="repository-inspection" role="group" aria-label="Status for "#,
                 );

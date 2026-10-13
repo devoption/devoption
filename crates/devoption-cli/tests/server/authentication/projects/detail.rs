@@ -117,7 +117,14 @@ fn project_sections_are_deep_linkable_authenticated_and_read_only() {
     for (segment, label) in sections {
         let path = format!("{base}/{segment}");
         let html = page_at(address, "GET", &path, Some(&issued));
-        assert!(html.starts_with("HTTP/1.1 200"));
+        // This fixture has metadata-only associations and no inspection root.
+        // Code now reads files directly and must report that they are unavailable.
+        let status = if segment == "code" { "503" } else { "200" };
+        assert!(html.starts_with(&format!("HTTP/1.1 {status}")));
+        if segment == "code" {
+            assert!(html.contains("Repository inspection is not configured"));
+            assert!(!html.contains("No tracked files"));
+        }
         assert!(html.contains("cache-control: no-store"));
         assert!(html.contains(ESCAPED));
         assert!(!html.contains("Unrelated project"));
@@ -148,7 +155,7 @@ fn project_sections_are_deep_linkable_authenticated_and_read_only() {
             segment == "overview" || segment == "code"
         );
         let head = page_at(address, "HEAD", &path, Some(&issued));
-        assert!(head.starts_with("HTTP/1.1 200"));
+        assert!(head.starts_with(&format!("HTTP/1.1 {status}")));
         assert!(head.split_once("\r\n\r\n").unwrap().1.is_empty());
     }
     for path in [

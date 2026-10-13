@@ -4,7 +4,7 @@ const { join } = require("node:path");
 const { test } = require("node:test");
 const { runInNewContext } = require("node:vm");
 const script = readFileSync(join(__dirname,"../crates/devoption-ui/assets/repository-create.js"),"utf8");
-const project = "01".repeat(16), repository = "02".repeat(16), destination = `/projects/${project}/code#repository-${repository}`;
+const project = "01".repeat(16), repository = "02".repeat(16), destination = `/projects/${project}/repositories/${repository}/files`;
 const response = (status, location, token = "ab".repeat(32)) => ({status, headers: new Map([["location",location],["x-csrf-token",token]])});
 const tick = () => new Promise(resolve=>setImmediate(resolve));
 function page(id = project) {
@@ -24,7 +24,7 @@ test("duplicate pending submissions are ignored and existing paths allow correct
  const p=page();p.session("signed-in");let finish;p.queue.push(response(204),new Promise(resolve=>finish=resolve));const pending=p.submit("existing");await tick();await p.submit("ignored");assert.equal(p.calls.length,2);assert.equal(p.nodes.get("repository-create-submit").disabled,true);finish(response(409));await pending;assert.match(p.status(),/already exists/);assert.equal(p.nodes.get("repository-create-reload").hidden,false);assert.equal(p.nodes.get("repository-create-submit").disabled,false);p.queue.push(response(204),response(204,destination));await p.submit("different");assert.deepEqual(p.navigation,[destination,"reload"]);
 });
 test("uncertain saves and untrusted success destinations block retries until a reload",async()=>{
- for(const result of [response(503),new Error("network"),response(204,"https://attacker.invalid"),response(204,`/projects/${"ff".repeat(16)}/code#repository-${repository}`),response(204)]){
+ for(const result of [response(503),new Error("network"),response(204,"https://attacker.invalid"),response(204,`/projects/${"ff".repeat(16)}/repositories/${repository}/files`),response(204,`${destination}/../status`),response(204)]){
   const p=page();p.session("signed-in");p.queue.push(response(204),result);await p.submit("attempt");assert.equal(p.navigation.length,0);assert.match(p.status(),/could not be confirmed/);assert.equal(p.nodes.get("repository-create-reload").hidden,false);assert.equal(p.nodes.get("repository-create-submit").disabled,true);const count=p.calls.length;await p.submit("again");assert.equal(p.calls.length,count);
  }
 });

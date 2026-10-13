@@ -14,7 +14,7 @@ pub(super) fn routes(projects: Projects) -> Router {
                 _ => StatusCode::SERVICE_UNAVAILABLE,
             })?;
             let hex = |bytes: [u8; 16]| bytes.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
-            Ok::<_, StatusCode>(format!("/projects/{}/code#repository-{}", hex(project.to_bytes()), hex(repository.to_bytes())))
+            Ok::<_, StatusCode>(format!("/projects/{}/repositories/{}/files", hex(project.to_bytes()), hex(repository.to_bytes())))
         }.await;
         match result {
             Ok(location) => (StatusCode::NO_CONTENT, [(CACHE_CONTROL, "no-store"), (LOCATION, location.as_str())]).into_response(),

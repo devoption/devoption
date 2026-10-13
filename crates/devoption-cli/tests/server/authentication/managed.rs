@@ -53,7 +53,11 @@ fn explicit_managed_cli_mode_creates_and_registers_a_repository_that_survives_re
         .split("\r\n")
         .find_map(|line| line.strip_prefix("location: "))
         .unwrap();
-    assert!(location.starts_with(&format!("/projects/{}/code#repository-", hex(project))));
+    assert!(location.starts_with(&format!("/projects/{}/repositories/", hex(project))));
+    assert!(location.ends_with("/files"));
+    assert!(
+        check(&read(address, "GET", location, Some(&issued)), 200).contains("No tracked files")
+    );
     let saved = read_catalog(&data).unwrap().unwrap();
     let repository = saved.projects()[0].repositories()[0];
     assert_eq!(saved.repositories()[0].name(), "new-service");

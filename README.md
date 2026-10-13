@@ -4,7 +4,8 @@ DevOption is an open-source software factory in development, intended to be
 self-hosted for individuals and teams: one place to organize, build and run software.
 
 The current preview supports saved projects, project creation and renaming,
-repository creation, attachment, tracked-file browsing and Git status inspection,
+repository creation, attachment, [file browsing in Code](docs/repository-files.md)
+and Git status inspection,
 [source preparation checks](docs/build-preparation.md) in Builds or the CLI,
 owner sign-in, and appearance preferences. **Builds and deployments are not available yet.** Authentication
 currently supports one owner; team accounts are planned, not implemented.

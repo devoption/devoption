@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Open the tracked-file browser immediately in project Code, retain repository
+  selection and place status/attachment actions below files. New repositories open
+  their own empty file list. Align shared desktop breadcrumbs with the sidebar
+  logo, preserve mobile spacing and refresh the affected page captures
+  ([#179](https://github.com/devoption/devoption/issues/179)).
+
 - Capture complete immutable source snapshots from an explicitly selected saved
   repository and current commit. Collect bounded Git objects, verify their full
   source graph and compare exact checkout bytes, including changes hidden by Git

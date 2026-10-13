@@ -88,7 +88,9 @@ a guarantee for network filesystem durability.
 cookie, explicit CSRF header, Host and same-Origin guards run first. The browser
 cannot supply a root, command, identity or configuration.
 
-Success is an empty, non-cacheable `204` with a same-project Code/entry `Location`.
+Success is an empty, non-cacheable `204` with the new repository's same-project
+`/projects/{project}/repositories/{repository}/files` `Location`. Its empty file
+browser opens inside Code, even when other repositories already exist.
 The browser validates that destination before navigation. Invalid names return
 `400`, missing projects `404`, existing paths/repository-count limits `409`, oversized bodies
 `413`, unsupported media `415`, stalled bodies `408`, and unavailable managed

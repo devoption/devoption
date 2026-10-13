@@ -9,6 +9,8 @@ pub struct FilePreview<'a> {
     pub message: &'a str,
 }
 pub struct RepositoryFilesView<'a> {
+    pub attachment_available: bool,
+    pub creation_available: bool,
     pub repository_id: [u8; 16],
     pub repository_name: &'a str,
     pub entries: Vec<FileEntry<'a>>,
@@ -23,7 +25,22 @@ pub(crate) fn content(project: &ProjectSummary<'_>, files: &RepositoryFilesView<
         identifier(&files.repository_id)
     );
     let mut html = super::workspace::navigation(project, ProjectSection::Code);
-    html.push_str(&format!(r#"<section class="repository-files" aria-labelledby="repository-files-title"><a class="text-button" href="/projects/{project_id}/code">← Back to repositories</a><h2 id="repository-files-title">"#));
+    html.push_str(r#"<section class="repository-files" aria-labelledby="repository-files-title">"#);
+    if project.repositories.len() > 1 {
+        html.push_str(r#"<div class="repository-picker" role="group" aria-label="Choose repository"><span>Repository</span>"#);
+        for repository in &project.repositories {
+            let current = if repository.id == files.repository_id {
+                r#" aria-current="true""#
+            } else {
+                ""
+            };
+            html.push_str(&format!(r#"<a class="text-button" href="/projects/{project_id}/repositories/{}/files"{current}>"#, identifier(&repository.id)));
+            escape_into(&mut html, repository.name);
+            html.push_str("</a>");
+        }
+        html.push_str("</div>");
+    }
+    html.push_str(r#"<h2 id="repository-files-title">"#);
     escape_into(&mut html, files.repository_name);
     html.push_str(r#" · Files</h2><p class="file-context">Tracked files in the current working tree. Content may include uncommitted changes.</p>"#);
     if let Some(message) = files.unavailable {
@@ -63,6 +80,11 @@ pub(crate) fn content(project: &ProjectSummary<'_>, files: &RepositoryFilesView<
         html.push_str("</ul>");
     }
     html.push_str("</section>");
+    html.push_str(&super::workspace::repositories(
+        project,
+        files.attachment_available,
+        files.creation_available,
+    ));
     html
 }
 
@@ -90,6 +112,8 @@ mod tests {
             repositories: vec![],
         };
         let mut files = RepositoryFilesView {
+            attachment_available: true,
+            creation_available: false,
             repository_id: [2; 16],
             repository_name: "<Repository>",
             entries: vec![FileEntry {

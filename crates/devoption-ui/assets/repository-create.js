@@ -49,7 +49,7 @@
         const response = await request(`/projects/${project}/repositories/create`, {headers: {"content-type": "text/plain;charset=UTF-8", "x-csrf-token": csrf}, body: value});
         if (current !== version) return;
         const destination = response.headers.get("location") || "";
-        if (response.status === 204 && new RegExp(`^/projects/${project}/code#repository-[a-f0-9]{32}$`, "i").test(destination)) {
+        if (response.status === 204 && new RegExp(`^/projects/${project}/repositories/[a-f0-9]{32}/files$`, "i").test(destination)) {
           blocked = true; message("Repository created. Opening Code…"); window.history.replaceState(null, "", destination); window.location.reload();
         } else if (response.status === 400 || response.status === 413) {
           message("The repository name was rejected. Check the name and try again.");
