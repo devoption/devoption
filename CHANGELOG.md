@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Scope newly created repository storage and names to each project, allowing each
+  project to have its own `ui` while preserving legacy paths and stable locations
+  after project renames ([#181](https://github.com/devoption/devoption/issues/181)).
+
 - Open the tracked-file browser immediately in project Code, retain repository
   selection and place status/attachment actions below files. New repositories open
   their own empty file list. Align shared desktop breadcrumbs with the sidebar

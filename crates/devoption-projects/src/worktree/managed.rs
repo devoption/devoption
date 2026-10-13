@@ -43,8 +43,12 @@ impl ManagedRoot {
 
     /// Validate before filesystem work. A name is a single portable component.
     pub(crate) fn validate_name(name: &str) -> Result<(), Error> {
+        Self::validate_component(name, 64)
+    }
+
+    fn validate_component(name: &str, limit: usize) -> Result<(), Error> {
         if name.is_empty()
-            || name.len() > 64
+            || name.len() > limit
             || !name.as_bytes()[0].is_ascii_alphanumeric()
             || !name
                 .bytes()
@@ -58,7 +62,9 @@ impl ManagedRoot {
     /// Initialize only a newly created directory. Errors can leave unpublished
     /// private files; preserve them for explicit inspection, never delete on error.
     pub(crate) fn initialize(&self, name: &str) -> Result<PathBuf, Error> {
-        Self::validate_name(name)?;
+        // Internal storage names include a stable project ID. Browser names are
+        // separately limited to 64 bytes before this filesystem operation.
+        Self::validate_component(name, crate::MAX_NAME_BYTES)?;
         let longest = self.root.path.join(name).join(".git/refs/heads");
         super::filesystem::bounded(longest.to_str().ok_or(InspectionError::InvalidPath)?)?;
         let root = self.directory()?;
