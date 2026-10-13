@@ -15,6 +15,8 @@ use devoption_projects::{
 use std::{error::Error as _, time::Duration};
 use tokio::sync::Mutex;
 
+mod pages;
+
 #[cfg(test)]
 mod startup_tests;
 
@@ -64,11 +66,11 @@ impl Projects {
 pub(super) fn routes(projects: Projects) -> Router {
     let reader = projects.clone();
     let attachment = projects.clone();
-    let detail = projects.clone();
     let options = projects.clone();
     let status_reader = projects.clone();
     let renamer = projects.clone();
     Router::new()
+        .merge(pages::routes(projects.clone()))
         .route(
             "/projects/{project}/name",
             axum::routing::post(move |project: Result<RoutePath<String>, PathRejection>, request: Request| async move {
@@ -164,26 +166,6 @@ pub(super) fn routes(projects: Projects) -> Router {
                 };
                 response.headers_mut().insert(CACHE_CONTROL, axum::http::HeaderValue::from_static("no-store"));
                 response
-            }),
-        )
-        .route(
-            "/projects/{project}",
-            get(move |project: Result<RoutePath<String>, PathRejection>| async move {
-                let id = project.ok().and_then(|RoutePath(value)| project_id(&value));
-                let Some(id) = id else {
-                    return (StatusCode::NOT_FOUND, [(CACHE_CONTROL, "no-store")], "Project does not exist.").into_response();
-                };
-                let available = detail.root.is_some();
-                match detail.access(|directory| Ok(directory.load()?.unwrap_or_default())).await {
-                    Ok(catalog) => {
-                        let summaries = summaries(&catalog);
-                        match summaries.iter().find(|project| project.id == id.to_bytes()) {
-                            Some(project) => ([(CACHE_CONTROL, "no-store")], Html(devoption_ui::render_project(project, available))).into_response(),
-                            None => (StatusCode::NOT_FOUND, [(CACHE_CONTROL, "no-store")], "Project does not exist.").into_response(),
-                        }
-                    }
-                    Err(error) => (Failure::from(error).status, [(CACHE_CONTROL, "no-store")], "Project could not be loaded. Reload to try again.").into_response(),
-                }
             }),
         )
         .route(

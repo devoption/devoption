@@ -11,7 +11,7 @@ pub enum Page {
 
 mod auth;
 mod projects;
-pub use projects::{ProjectSummary, RepositorySummary};
+pub use projects::{ProjectSection, ProjectSummary, RepositorySummary};
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
@@ -98,16 +98,25 @@ pub fn render_projects(projects: &[ProjectSummary<'_>], attachment_available: bo
 
 /// Render one authenticated project with its current repository snapshot.
 pub fn render_project(project: &ProjectSummary<'_>, attachment_available: bool) -> String {
+    render_project_section(project, attachment_available, ProjectSection::Overview)
+}
+
+/// Render one authenticated section of a saved project workspace.
+pub fn render_project_section(
+    project: &ProjectSummary<'_>,
+    attachment_available: bool,
+    section: ProjectSection,
+) -> String {
     render_page(
         Page::Projects,
         true,
-        Some(ProjectView::Detail(project, attachment_available)),
+        Some(ProjectView::Detail(project, attachment_available, section)),
     )
 }
 
 enum ProjectView<'a> {
     List(&'a [ProjectSummary<'a>], bool),
-    Detail(&'a ProjectSummary<'a>, bool),
+    Detail(&'a ProjectSummary<'a>, bool, ProjectSection),
 }
 
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
@@ -144,7 +153,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         ),
         Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
-    let (title, main_class) = if let Some(ProjectView::Detail(project, _)) = &projects {
+    let (title, main_class) = if let Some(ProjectView::Detail(project, _, _)) = &projects {
         let mut escaped = String::new();
         projects::escape_into(&mut escaped, project.name);
         (escaped, r#" class="project-detail-page""#)
@@ -155,9 +164,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         Some(ProjectView::List(..)) => {
             r#"<button class="action-button primary" type="button" data-open-dialog="project-dialog" disabled><span aria-hidden="true">＋</span>New project</button>"#
         }
-        Some(ProjectView::Detail(..)) => {
-            r#"<button class="action-button" type="button" data-open-dialog="project-dialog" disabled>Rename project</button>"#
-        }
+        Some(ProjectView::Detail(..)) => "",
         None => "",
     };
     let breadcrumb = if matches!(&projects, Some(ProjectView::Detail(..))) {
@@ -169,9 +176,17 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     } else {
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
+    let document_title = match &projects {
+        Some(ProjectView::Detail(_, _, section)) if *section != ProjectSection::Overview => {
+            format!("{title} · {}", section.label())
+        }
+        _ => title.clone(),
+    };
     let project_content = projects.map(|view| match view {
         ProjectView::List(projects, available) => projects::content(projects, available),
-        ProjectView::Detail(project, available) => projects::detail(project, available),
+        ProjectView::Detail(project, available, section) => {
+            projects::detail(project, available, section)
+        }
     });
     let (appearance_current, content) = if let Some(content) = project_content.as_deref() {
         ("", content)
@@ -223,7 +238,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     .collect();
     let profile_icon = icon("M20 21v-2a8 8 0 0 0-16 0v2M16 7a4 4 0 1 1-8 0a4 4 0 0 1 8 0");
 
-    document(&title, &format!(
+    document(&document_title, &format!(
         "<body data-owner-configured=\"{account_available}\">
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
   <aside class=\"sidebar\" aria-label=\"Sidebar\">

@@ -108,20 +108,23 @@ Projects displays saved names, repository names and counts from the
 or use **Filter projects by name** to find a case-insensitive name fragment in the
 current list. **Clear filter** restores all rows and focuses the search field.
 Filtering stays in the page; it sends no request and saves no browser preference.
-Without JavaScript, the full list remains visible. Project details show
-relative default checkout paths and current build availability at `/projects/{id}`.
-The details page links back to Projects and offers repository attachment in a
-dialog; a successful attachment reloads that same project. Build execution is
-not available yet. Signed-in owners can open the **New project** dialog to create an empty
+Without JavaScript, the full list remains visible. Opening a project enters its
+own workspace at `/projects/{id}`. **Overview** summarizes its repositories;
+**Code** shows repository details and inspection; **Settings** edits the project
+name. **Builds**, **Releases** and **Packages** have dedicated unavailable states.
+The section links use ordinary URLs (`/projects/{id}/code`, for example), so
+refresh, bookmarks and browser Back/Forward keep the selected project and section.
+
+Signed-in owners can open the **New project** dialog to create an empty
 project with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
 characters. Names need not be unique; the catalog holds up to 64 projects. A
 successful save opens the newly created project without restarting the server.
 When repository attachment is configured, **Attach repository** opens its labelled
-dialog on the new details page. If a save cannot be confirmed, reload the list
+dialog on the project’s Code page. If a save cannot be confirmed, reload the list
 before retrying to avoid duplicate names.
 An absent catalog shows an empty list; invalid state stops startup or fails the
 current request without resetting records. The unconfigured preview retains its
-placeholder. On project details, open the **Rename project** dialog, edit the name and select
+placeholder. Open the project’s **Settings**, edit its name and select
 **Save name**. A confirmed save reloads that project with the same ID, repository
 associations and checkout paths. If saving cannot be confirmed, reload before
 retrying. Project deletion is not implemented. The installation
@@ -132,7 +135,7 @@ separate backup.
 On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` to
 `serve --data-dir ABSOLUTE_PATH`. It requires an existing owner and a trusted,
 existing root separate from application data; no root is selected by default.
-Each project details page's **Attach repository** dialog accepts a relative checkout path under
+Each project’s Code page has an **Attach repository** dialog that accepts a relative checkout path under
 that root. Opening the form loads a picker of supported immediate child checkouts.
 Choose one to fill the path, or enter a nested path manually. Discovery checks at
 most 64 root entries; a partial-list notice explains when the limit is reached.
@@ -140,12 +143,12 @@ Empty or failed lists keep manual entry available, and **Refresh** retries disco
 Attachment validates the selected path again. A confirmed save reloads its
 repository list; duplicate attachments
 preserve the existing default, and uncertain saves ask you to inspect the list
-before retrying. Without a configured root, Projects explains why attachment is
+before retrying. Without a configured root, Code explains why attachment is
 unavailable while retaining saved repository summaries.
 Projects support multiple repositories, linked worktrees share a repository ID,
 and each project/repository association keeps one default checkout. Attachment and
 picker discovery run no Git commands and grant no build execution permission.
-On project details, **View status** reads that saved checkout's branch, commit and
+On Code, **View status** reads that saved checkout's branch, commit and
 working-tree counts; **Refresh status** updates them in place. **Last checked**
 is the browser-local time a valid response was received, not continuous monitoring.
 Detached HEAD and branches with no commits have explicit labels. Git must be available on the server's PATH.

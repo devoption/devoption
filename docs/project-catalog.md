@@ -39,11 +39,15 @@ non-cacheable redirect to Sign in. Names are HTML-escaped by `devoption-ui`, and
 project/repository names, repository counts and relative default checkout paths
 appear. The absolute trusted root is not sent to the page. Legacy metadata-only
 associations show **Not attached**. No server restart is needed after a save.
-Saved project names link to `/projects/{id}`, which shows that project’s repository
-list and the same attachment form. Missing or malformed project IDs return 404
-after authentication. Details link back to Projects and explain that build
-execution is not available yet; no build or deployment action is offered
-([#135](https://github.com/devoption/devoption/issues/135)).
+Saved project names link to `/projects/{id}`, the project’s Overview. Its scoped
+navigation opens Code, Builds, Releases, Packages and Settings at
+`/projects/{id}/{section}`. `/overview` is also accepted; the Overview link uses
+the stable base URL. Each section reads the current catalog and requires the same
+session as the list. Missing IDs or unsupported sections return 404 after
+authentication. Code contains repository inspection and optional attachment;
+Settings contains the name form. Builds, Releases and Packages explicitly describe
+unavailable functionality, with no execution or deployment controls
+([#160](https://github.com/devoption/devoption/issues/160)).
 Read failures return 503 without stale rows or private error details. The
 unconfigured preview never loads catalog metadata and retains its public placeholder. No fixture projects
 are added to real storage or the persistent preview.
@@ -66,8 +70,8 @@ The handler returns an empty, non-cacheable 204 only after save and directory sy
 succeed, with `Location: /projects/{id}` for the newly saved project. The browser
 opens that project directly, including when names repeat. If the destination is
 missing or unusable, it falls back to `/projects`; it does not insert an optimistic
-row. An empty project details page expands its first attachment form when a
-trusted root is configured ([#137](https://github.com/devoption/devoption/issues/137)).
+row. The new project opens Overview; optional existing-checkout attachment is
+available from Code when a trusted root is configured.
 Invalid names return 400, oversized bodies 413, unsupported encodings 415, stalled
 bodies 408 and a full catalog 409. Storage failures or contention return 503 with
 no input/path/error disclosure. There is no automatic retry. A connection loss or
@@ -75,8 +79,7 @@ post-rename sync error may leave a saved project: reload and inspect before tryi
 again. Creation is not idempotent; intentionally repeating a name creates another
 project.
 
-Under [#143](https://github.com/devoption/devoption/issues/143), the details page's
-**Rename project** dialog starts with the saved name. **Save name** sends
+The project’s **Settings** form starts with the saved name. **Save name** sends
 `POST /projects/{id}/name` with the same bounded plain UTF-8 body and session,
 CSRF and Origin guards as creation. A fresh, locked catalog snapshot changes only
 that project's display name, preserving IDs, associations, checkout bindings and
@@ -256,7 +259,7 @@ or capacity, 413 oversized body, 415 unsupported encoding, 408 stalled body, and
 503 disabled attachment, busy storage or persistence failure. Messages never echo paths or stored data.
 Inspect saved state after an uncertain result; there is no automatic retry.
 
-Each saved project details page has an **Attach repository** dialog when the root is
+Each project’s Code page has an **Attach repository** dialog when the root is
 configured. Its labelled form submits to that project's ID and accepts a path
 relative to the administrator's root, with at most 4096 UTF-8 bytes and 64 path
 components. Empty components, `.`/`..` and control characters are rejected before
@@ -314,7 +317,7 @@ jobs nor release manifests are implemented here.
 
 ## Repository status
 
-With a configured root, project details offers **View status** for each saved
+With a configured root, Code offers **View status** for each saved
 default checkout. Opening it reads the branch, full commit ID and working-tree
 counts on demand; **Refresh status** repeats the read. Detached HEAD, no commits
 yet, and clean observations are distinct. Loading and errors hide previous

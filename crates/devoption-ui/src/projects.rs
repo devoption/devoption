@@ -1,3 +1,7 @@
+mod workspace;
+pub use workspace::ProjectSection;
+pub(super) use workspace::content as detail;
+
 /// Display-only inputs prepared by the server from a validated catalog snapshot.
 pub struct ProjectSummary<'a> {
     pub id: [u8; 16],
@@ -11,7 +15,7 @@ pub struct RepositorySummary<'a> {
     pub default_checkout: Option<&'a str>,
 }
 
-pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: bool) -> String {
+pub(super) fn content(projects: &[ProjectSummary<'_>], _attachment_available: bool) -> String {
     let mut html = String::from(
         r#"<section class="projects-section" aria-labelledby="projects-title"><div class="section-heading"><h2 id="projects-title">All projects</h2>"#,
     );
@@ -25,7 +29,7 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
     }
     html.push_str("</div>");
     if projects.is_empty() {
-        html.push_str(r#"<div class="empty-state"><h3>No projects yet</h3><p>Create your first project, then attach a repository when you are ready.</p></div>"#);
+        html.push_str(r#"<div class="empty-state"><h3>No projects yet</h3><p>Create your first project to organize your software.</p></div>"#);
     } else {
         html.push_str(
             r#"<ul id="saved-projects" class="project-list" aria-label="Saved projects">"#,
@@ -36,7 +40,7 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
             escape_into(&mut html, project.name);
             html.push_str("</h3><p>");
             if project.repositories.is_empty() {
-                html.push_str("No repositories attached");
+                html.push_str("No repositories yet");
             } else {
                 for (index, repository) in project.repositories.iter().enumerate() {
                     if index > 0 {
@@ -52,71 +56,12 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
         html.push_str("</ul>");
     }
     html.push_str("</section>");
-    if !attachment_available {
-        unavailable_attachment(&mut html);
-    }
     html.push_str(&dialog(
         "project-dialog",
         "New project",
         &project_form(None),
     ));
     html.push_str("<noscript>JavaScript is required to create a project.</noscript>");
-    html
-}
-
-pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -> String {
-    let id = identifier(&project.id);
-    let mut html = String::from(
-        r#"<div class="project-detail"><section aria-labelledby="repositories-title"><div class="section-heading"><h2 id="repositories-title">Repositories</h2>"#,
-    );
-    if attachment_available {
-        html.push_str(r#"<button class="text-button" type="button" data-open-dialog="repository-dialog" disabled><span aria-hidden="true">＋</span>Attach repository</button>"#);
-    }
-    html.push_str("</div>");
-    if project.repositories.is_empty() {
-        html.push_str(r#"<div class="empty-state"><h3>No repositories attached yet.</h3><p>Attach a checkout to see its branch, commit and working-tree status here.</p></div>"#);
-    } else {
-        html.push_str(r#"<ul class="repository-list" aria-label="Repositories">"#);
-        for repository in &project.repositories {
-            let repository_id = identifier(&repository.id);
-            html.push_str(&format!(r#"<li><div class="repository-summary"><span class="repository-icon" aria-hidden="true">{}</span><div><h3>"#, crate::icon("M6 3v12a4 4 0 0 0 8 0V9M3 6a3 3 0 1 0 6 0a3 3 0 0 0-6 0M11 6a3 3 0 1 0 6 0a3 3 0 0 0-6 0")));
-            escape_into(&mut html, repository.name);
-            html.push_str("</h3><p>");
-            if let Some(path) = repository.default_checkout {
-                html.push_str("Default checkout: <code>");
-                escape_into(&mut html, path);
-                html.push_str("</code>");
-            } else {
-                html.push_str("Not attached");
-            }
-            html.push_str("</p></div></div>");
-            if attachment_available && repository.default_checkout.is_some() {
-                html.push_str(
-                    r#"<div class="repository-inspection" role="group" aria-label="Status for "#,
-                );
-                escape_into(&mut html, repository.name);
-                html.push_str(&format!(r#"" data-repository-status-view data-status-url="/projects/{id}/repositories/{repository_id}/status">
-                  <dl data-status-fields hidden><div><dt>Branch</dt><dd data-status-branch></dd></div><div><dt>Commit</dt><dd class="commit-value" data-status-commit></dd></div><div><dt>Working tree</dt><dd data-status-changes></dd></div></dl>
-                  <div class="status-actions"><button class="text-button" type="button" data-status-refresh disabled>View status</button><p data-status-note role="status" aria-live="polite">Enable JavaScript to read repository status.</p></div>
-                </div>"#));
-            }
-            html.push_str("</li>");
-        }
-        html.push_str("</ul>");
-    }
-    if !attachment_available {
-        unavailable_attachment(&mut html);
-    }
-    html.push_str(r#"</section><section class="availability-note" aria-labelledby="builds-title"><h2 id="builds-title">Builds</h2><p>Build execution is not available yet.</p></section></div>"#);
-    html.push_str(&dialog(
-        "project-dialog",
-        "Rename project",
-        &project_form(Some(project)),
-    ));
-    html.push_str("<noscript>JavaScript is required to rename a project.</noscript>");
-    if attachment_available {
-        attachment(&mut html, &id);
-    }
     html
 }
 
@@ -147,8 +92,13 @@ fn project_form(project: Option<&ProjectSummary<'_>>) -> String {
         escape_into(&mut html, project.name);
         html.push('"');
     }
+    let cancel = if project.is_none() {
+        r#"<button class="action-button" type="button" data-close-dialog>Cancel</button>"#
+    } else {
+        ""
+    };
     html.push_str(&format!(r#"><p id="project-status" role="status" aria-live="polite"></p>
-      <div class="form-actions"><button class="action-button" type="button" data-close-dialog>Cancel</button><button id="project-submit" class="action-button primary" type="submit" disabled>{submit}</button></div></form>"#));
+      <div class="form-actions">{cancel}<button id="project-submit" class="action-button primary" type="submit" disabled>{submit}</button></div></form>"#));
     html
 }
 
@@ -249,7 +199,7 @@ mod tests {
         ));
         assert!(html.contains("data-project-name>&lt;Project&gt; &amp; 工具</h3>"));
         assert!(!content(&[], false).contains("id=\"project-filter\""));
-        assert!(!detail(&project, false).contains("id=\"project-filter\""));
+        assert!(!detail(&project, false, ProjectSection::Code).contains("id=\"project-filter\""));
     }
 
     #[test]
@@ -259,10 +209,10 @@ mod tests {
             name: "<Project> & \"工具\"",
             repositories: vec![],
         };
-        let html = detail(&project, false);
+        let html = detail(&project, false, ProjectSection::Settings);
         assert!(html.contains("data-project=\"abababababababababababababababab\" action=\"/projects/abababababababababababababababab/name\""));
         assert!(html.contains("disabled value=\"&lt;Project&gt; &amp; &quot;工具&quot;\""));
-        assert!(html.contains("id=\"project-dialog-title\" tabindex=\"-1\">Rename project</h2>"));
+        assert!(!html.contains("<dialog"));
         assert!(html.contains("disabled>Save name</button>"));
         assert!(!content(&[project], false).contains("Rename project"));
     }
@@ -278,7 +228,7 @@ mod tests {
                 default_checkout: Some("app"),
             }],
         };
-        let html = detail(&project, true);
+        let html = detail(&project, true, ProjectSection::Code);
         assert!(html.contains("data-status-url=\"/projects/abababababababababababababababab/repositories/cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd/status\""));
         assert!(html.contains("aria-label=\"Status for &lt;repo&gt;\""));
         for attribute in [
@@ -292,12 +242,16 @@ mod tests {
         ] {
             assert!(html.contains(attribute), "{attribute}");
         }
-        assert!(!detail(&project, false).contains("data-repository-status-view"));
+        assert!(
+            !detail(&project, false, ProjectSection::Code).contains("data-repository-status-view")
+        );
         assert!(
             !content(std::slice::from_ref(&project), true).contains("data-repository-status-view")
         );
         project.repositories[0].default_checkout = None;
-        assert!(!detail(&project, true).contains("data-repository-status-view"));
+        assert!(
+            !detail(&project, true, ProjectSection::Code).contains("data-repository-status-view")
+        );
     }
 
     #[test]
@@ -307,10 +261,10 @@ mod tests {
             name: "New project",
             repositories: vec![],
         };
-        let empty = detail(&project, true);
+        let empty = detail(&project, true, ProjectSection::Code);
         assert!(empty.contains("<dialog id=\"repository-dialog\""));
-        assert!(empty.contains("No repositories attached yet."));
-        let unavailable = detail(&project, false);
+        assert!(empty.contains("No repositories yet."));
+        let unavailable = detail(&project, false, ProjectSection::Code);
         assert!(!unavailable.contains("class=\"project-form repository-form\""));
         assert!(unavailable.contains("Repository attachment is not configured"));
         project.repositories.push(RepositorySummary {
@@ -318,14 +272,14 @@ mod tests {
             name: "Existing",
             default_checkout: Some("app"),
         });
-        let attached = detail(&project, true);
+        let attached = detail(&project, true, ProjectSection::Code);
         assert!(attached.contains("<dialog id=\"repository-dialog\""));
         assert!(!attached.contains("<details"));
     }
 
     #[test]
     fn detail_escapes_title_and_paths_and_reuses_the_attachment_form() {
-        let html = crate::render_project(
+        let html = crate::render_project_section(
             &ProjectSummary {
                 id: [0xab; 16],
                 name: "<Project> & 工具",
@@ -336,14 +290,15 @@ mod tests {
                 }],
             },
             true,
+            ProjectSection::Code,
         );
-        assert!(html.contains("<title>&lt;Project&gt; &amp; 工具 · DevOption</title>"));
+        assert!(html.contains("<title>&lt;Project&gt; &amp; 工具 · Code · DevOption</title>"));
         assert!(html.contains("tabindex=\"-1\">&lt;Project&gt; &amp; 工具</h1>"));
         assert!(html.contains("team/&lt;checkout&gt;&amp;工具"));
         assert!(html.contains("&lt;repo&gt;"));
         assert!(html.contains("href=\"/projects\" aria-current=\"page\""));
         assert!(html.contains("aria-labelledby=\"repository-dialog-title\" action=\"/projects/abababababababababababababababab/repositories\""));
-        assert!(html.contains("Build execution is not available yet."));
+        assert!(!html.contains("id=\"builds-title\""));
         assert!(!html.contains("Create project"));
     }
 
@@ -401,7 +356,7 @@ mod tests {
             false,
         );
         assert!(one.contains("1 repository"));
-        assert!(one.contains("Repository attachment is not configured"));
+        assert!(!one.contains("Repository attachment is not configured"));
         assert!(!one.contains("data-project="));
         assert!(one.contains("Create project"));
         assert!(
