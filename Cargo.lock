@@ -146,6 +146,7 @@ name = "devoption-builds"
 version = "0.1.0-dev"
 dependencies = [
  "devoption-projects",
+ "devoption-registry",
  "tempfile",
 ]
 
@@ -168,6 +169,10 @@ dependencies = [
  "rustix",
  "tempfile",
 ]
+
+[[package]]
+name = "devoption-registry"
+version = "0.1.0-dev"
 
 [[package]]
 name = "devoption-server"

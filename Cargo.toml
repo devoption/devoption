@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/devoption-builds", "crates/devoption-cli", "crates/devoption-projects", "crates/devoption-server", "crates/devoption-ui"]
+members = ["crates/devoption-builds", "crates/devoption-cli", "crates/devoption-projects", "crates/devoption-registry", "crates/devoption-server", "crates/devoption-ui"]
 resolver = "3"
 
 [workspace.package]

@@ -6,6 +6,7 @@
 #![cfg(unix)]
 
 use devoption_projects::{Catalog, ProjectId, RepositoryId};
+use devoption_registry::CargoMaterialization;
 use std::{collections::HashSet, fmt};
 
 pub const MAX_PATH_BYTES: usize = 4096;
@@ -38,6 +39,8 @@ pub struct PlanInput {
     pub project: ProjectId,
     pub repository: RepositoryId,
     pub commit: String,
+    /// Registry-supplied metadata, not proof of lockfile or bundle verification.
+    pub dependencies: CargoMaterialization,
     pub rust_version: String,
     pub cargo_executable: String,
     pub work_directory: String,
