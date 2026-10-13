@@ -28,7 +28,7 @@
   --content-gutter: clamp(1.5rem, 4vw, 3rem);
   --control-height: 2.75rem;
   --control-radius: 0.375rem;
-  --color-control-border: color-mix(in srgb, var(--color-text) 55%, var(--color-background));
+  --color-control-border: color-mix(in srgb, var(--color-text) 60%, var(--color-background));
 }
 
 :root[data-appearance="light"] {
