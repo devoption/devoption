@@ -213,6 +213,9 @@ policy and resource enforcement remain unimplemented.
 The [offline fixture proof](docs/offline-fixture-build.md) uses a concrete local
 seed provider and real Cargo in Linux tests. This does not enable application builds
 or establish production execution/isolation permissions.
+A separate approved [disposable rehearsal](docs/disposable-build-rehearsal.md)
+completed one offline compile under observed job restrictions, but failed artifact
+verification; its result is not a successful application build.
 The [job lifecycle model](docs/build-jobs.md) binds records to an exact plan and
 attempt and rejects invalid transitions. Starting a job and recording runner
 outcomes require sealed events; queued cancellation is local. No production event
