@@ -1,0 +1,8 @@
+[package]
+name = "ExampleService"
+version = "0.1.0"
+edition = "2024"
+build = false
+
+[dependencies]
+http = "=1.2.3"
