@@ -14,7 +14,7 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
     let mut html = String::from(
         r#"<form id="project-form" class="project-form" action="/projects" method="post">
       <label for="project-name">Project name</label>
-      <p id="project-hint">Start with an empty project.</p>
+      <p id="project-hint">Your new project opens after saving.</p>
       <input id="project-name" name="name" type="text" required maxlength="128" autocomplete="off" aria-describedby="project-hint project-status" disabled>
       <button id="project-submit" class="action-button" type="submit" disabled>Create project</button>
       <p id="project-status" role="status" aria-live="polite"></p>
@@ -40,7 +40,7 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
             repository_count(&mut html, project);
             repositories(&mut html, project);
             if attachment_available {
-                attachment(&mut html, &id, &format!("project-{id}"));
+                attachment(&mut html, &id, &format!("project-{id}"), false);
             }
             html.push_str("</li>");
         }
@@ -65,7 +65,12 @@ pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        attachment(&mut html, &id, "page-title");
+        attachment(
+            &mut html,
+            &id,
+            "page-title",
+            project.repositories.is_empty(),
+        );
     } else {
         html.push_str(r#"<p class="repository-notice">Repository attachment is not configured on this server. A server administrator must select a trusted repository root before you can attach a checkout.</p>"#);
     }
@@ -103,8 +108,9 @@ fn repositories(html: &mut String, project: &ProjectSummary<'_>) {
     }
 }
 
-fn attachment(html: &mut String, id: &str, label: &str) {
-    html.push_str(&format!(r#"<details class="repository-attachment"><summary>Attach repository</summary>
+fn attachment(html: &mut String, id: &str, label: &str, open: bool) {
+    let expanded = if open { " open" } else { "" };
+    html.push_str(&format!(r#"<details class="repository-attachment"{expanded}><summary>Attach repository</summary>
                   <form class="project-form repository-form" data-project="{id}" aria-labelledby="{label}" action="/projects/{id}/repositories" method="post">
                     <label for="repository-path-{id}">Checkout path</label>
                     <p id="repository-hint-{id}">Relative to this server’s trusted root, for example <code>team/app</code>. Attach an existing local checkout.</p>
@@ -131,6 +137,28 @@ pub(super) fn escape_into(html: &mut String, value: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn empty_details_offer_the_first_attachment_only_when_configured() {
+        let mut project = ProjectSummary {
+            id: [0; 16],
+            name: "New project",
+            repositories: vec![],
+        };
+        let empty = detail(&project, true);
+        assert!(empty.contains("<details class=\"repository-attachment\" open>"));
+        assert!(empty.contains("No repositories attached yet."));
+        let unavailable = detail(&project, false);
+        assert!(!unavailable.contains("<form"));
+        assert!(unavailable.contains("Repository attachment is not configured"));
+        project.repositories.push(RepositorySummary {
+            name: "Existing",
+            default_checkout: Some("app"),
+        });
+        let attached = detail(&project, true);
+        assert!(attached.contains("<details class=\"repository-attachment\">"));
+        assert!(!attached.contains("<details class=\"repository-attachment\" open>"));
+    }
 
     #[test]
     fn detail_escapes_title_and_paths_and_reuses_the_attachment_form() {

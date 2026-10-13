@@ -21,7 +21,44 @@ pub(super) fn status(address: SocketAddr, raw: &str) -> u16 {
     assert!(headers.contains("cache-control: no-store"));
     assert!(!headers.contains("set-cookie:"));
     assert!(!headers.contains("x-csrf-token:"));
+    if !headers.starts_with("HTTP/1.1 204") {
+        assert!(!headers.contains("location:"));
+    }
     headers.split_whitespace().nth(1).unwrap().parse().unwrap()
+}
+
+#[test]
+fn creation_locations_open_the_new_saved_project_even_when_names_repeat() {
+    let (_temporary, data) = configured();
+    let (_server, address) = start_with(&data);
+    let issued = sign_in(address);
+    let mut destinations = Vec::new();
+    for _ in 0..2 {
+        let response = request(address, &create_request(address, &issued, NAME));
+        let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+        assert!(headers.starts_with("HTTP/1.1 204"));
+        assert!(headers.contains("cache-control: no-store"));
+        assert!(body.is_empty());
+        let destination = headers
+            .lines()
+            .find_map(|line| line.strip_prefix("location: "))
+            .unwrap();
+        let catalog = devoption_projects::read_catalog(&data).unwrap().unwrap();
+        let newest = catalog.projects().last().unwrap();
+        let id: String = newest
+            .id()
+            .to_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(destination, format!("/projects/{id}"));
+        let details = page_at(address, "GET", destination, Some(&issued));
+        assert!(details.starts_with("HTTP/1.1 200"));
+        assert!(details.contains(ESCAPED));
+        assert!(details.contains("No repositories attached yet."));
+        destinations.push(destination.to_owned());
+    }
+    assert_ne!(destinations[0], destinations[1]);
 }
 
 #[test]

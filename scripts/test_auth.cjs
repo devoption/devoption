@@ -125,12 +125,28 @@ test("project creation failures retain input, report uncertainty and never navig
   ]) {
     const current = page({ form: false, projects: true, initial: response(204, csrf) });
     await tick();
+    failure.headers?.set("location", `/projects/${"ab".repeat(16)}`);
     current.queue.push(failure);
     await current.create("Retained fixture");
     assert.equal(current.nodes.get("project-name").value, "Retained fixture");
     assert.match(current.nodes.get("project-status").textContent, message);
     assert.deepEqual(current.navigation, []);
     assert.equal(current.nodes.get("project-submit").disabled, failure.status === 401);
+  }
+});
+
+test("confirmed creation opens the returned project or falls back to the list", async () => {
+  const target = `/projects/${"ab".repeat(16)}`;
+  for (const location of [target, undefined, "", "/projects", "/projects/not-an-id", `${target}?next=1`, `https://example.invalid${target}`, `//example.invalid${target}`]) {
+    const current = page({ form: false, projects: true, initial: response(204, csrf) });
+    await tick();
+    const saved = response(204);
+    saved.headers.set("location", location);
+    current.queue.push(saved);
+    await current.create("Repeated project name");
+    assert.deepEqual(current.navigation, [location === target ? target : "/projects"]);
+    assert.match(current.nodes.get("project-status").textContent, /Project saved\. Opening/);
+    assert.equal(current.nodes.get("project-submit").disabled, true);
   }
 });
 
