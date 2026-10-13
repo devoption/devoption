@@ -96,6 +96,21 @@ viewport, check labelled input, keyboard access, visible focus and no horizontal
 With JavaScript disabled, the sign-in input and button must remain disabled and
 the page must explain that JavaScript is required.
 
+The dedicated `/sign-in` page has branding and account access without workspace
+navigation or a profile popup. Verify its skip link, labelled password field with
+`autocomplete="current-password"`, and **Open workspace** after a confirmed session.
+Hold the initial session check and a sign-in challenge: controls must remain
+disabled with checking/signing-in feedback, and a second submit must send no extra
+request. Incorrect passwords clear the field, report the error and return focus.
+Check bounded retry feedback, an expired attempt and a network failure. From two
+fixture tabs, sign out in one, then try signing out from the stale Account page:
+it must explain that the session changed or ended. A previously verified page
+restored from history must also explain a confirmed ended session.
+Verify the auth states at 320, 375 and 800 pixels, at 200% text size, and with saved
+Nord, Dracula and Tokyo Night light/dark preferences. An unconfigured ephemeral
+preview must show terminal setup guidance, no credential form and no auth requests.
+This tests markup and browser entry; it does not verify every password manager.
+
 On Appearance, Tab onto the selected Dark, Nord and Purple choices. Each must
 show an outer focus outline distinct from its selected border. Selecting another
 choice must update its pressed state and retain a visible keyboard focus indicator.

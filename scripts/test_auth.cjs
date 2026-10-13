@@ -14,7 +14,7 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 // Exercise the shipped script with controlled responses and navigation races.
 // Native focus, cookies, form validation and layout are checked in a real browser.
-function page({ configured = true, form = true, projects = false, rename, repositories = false, picker = false, initial = response(401) } = {}) {
+function page({ configured = true, form = true, profile = true, projects = false, rename, repositories = false, picker = false, initial = response(401) } = {}) {
   const nodes = new Map();
   let focused;
   function node(id) {
@@ -34,7 +34,8 @@ function page({ configured = true, form = true, projects = false, rename, reposi
     nodes.set(id, element);
     return element;
   }
-  ["profile-state", "profile-note", "profile-account", "profile-status", "page-title", "page-message"].forEach(node);
+  ["page-title", "page-message"].forEach(node);
+  if (profile) ["profile-state", "profile-note", "profile-account", "profile-status"].forEach(node);
   if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
   if (projects) ["project-form", "project-name", "project-submit", "project-status"].forEach(node);
   if (rename !== undefined) nodes.get("project-form").dataset.project = rename;
@@ -49,7 +50,7 @@ function page({ configured = true, form = true, projects = false, rename, reposi
     form.closest = () => disclosure;
     return form;
   }) : [];
-  const signouts = [node("profile-logout"), ...(form ? [node("page-logout")] : [])];
+  const signouts = [...(profile ? [node("profile-logout")] : []), ...(form ? [node("page-logout")] : [])];
   const events = node("window");
   const calls = [];
   const queue = [initial];
@@ -671,4 +672,56 @@ test("checkout picker discards delayed results after leaving the page", async ()
   assert.equal(current.nodes.get('repository-0-choice').disabled, true);
   assert.deepEqual(current.nodes.get('repository-0-choice').children, []);
   assert.doesNotMatch(current.nodes.get('repository-0-options-status').textContent, /Loading/);
+});
+
+test("dedicated auth page gates loading and signs in and out without profile elements", async () => {
+  let checked, challenged;
+  const current = page({profile: false, initial: new Promise(resolve => { checked = resolve; })});
+  assert.equal(current.nodes.get("auth-submit").textContent, "Checking…");
+  assert.equal(current.nodes.get("signin-form").getAttribute("aria-busy"), "true");
+  checked(response(401)); await tick();
+  assert.equal(current.nodes.get("auth-submit").textContent, "Sign in");
+  assert.equal(current.nodes.get("signin-form").getAttribute("aria-busy"), "false");
+  current.queue.push(new Promise(resolve => { challenged = resolve; }), response(204), response(204, nextCsrf));
+  const signingIn = current.submit();
+  assert.equal(current.nodes.get("auth-submit").textContent, "Signing in…");
+  assert.equal(current.nodes.get("auth-password").value, "");
+  await current.submit(); assert.equal(current.calls.length, 2);
+  challenged(response(204, csrf)); await signingIn;
+  assert.equal(current.nodes.get("page-title").textContent, "Account");
+  assert.equal(current.nodes.get("auth-signed-in").hidden, false);
+  current.queue.push(response(204)); await current.logout();
+  assert.equal(current.nodes.get("signin-form").hidden, false);
+  assert.equal(current.focused(), "auth-password");
+  assert.equal(current.status.textContent, "Signed out.");
+});
+
+test("dedicated recovery failure hides the password form until a confirmed session result", async () => {
+  const current = page({profile: false, initial: response(503)}); await tick();
+  assert.equal(current.nodes.get("page-title").textContent, "Check account");
+  assert.equal(current.nodes.get("auth-recheck").hidden, false);
+  assert.equal(current.nodes.get("auth-password").disabled, true);
+  await current.submit(); assert.equal(current.calls.length, 1);
+  current.queue.push(response(204, csrf)); current.event("pageshow", {persisted: true}); await tick();
+  assert.equal(current.nodes.get("auth-signed-in").hidden, false);
+  assert.equal(current.nodes.get("auth-recheck").hidden, true);
+  assert.deepEqual(current.calls.map(call => call.url), ["/auth/session", "/auth/session"]);
+});
+
+test("a formerly verified auth page explains an ended session after history recovery", async () => {
+  const current = page({profile: false, initial: response(204, csrf)}); await tick();
+  current.nodes.get("auth-password").value = "fixture";
+  current.event("pagehide"); current.queue.push(response(401));
+  current.event("pageshow", {persisted: true}); await tick();
+  assert.equal(current.nodes.get("auth-password").value, "");
+  assert.equal(current.nodes.get("signin-form").hidden, false);
+  assert.equal(current.nodes.get("auth-submit").disabled, false);
+  assert.match(current.status.textContent, /Your session ended/);
+  assert.equal(current.nodes.get("auth-signed-in").hidden, true);
+});
+
+test("dedicated CLI setup page makes no authentication requests without form or profile", async () => {
+  const current = page({configured: false, form: false, profile: false}); await tick();
+  assert.deepEqual(current.calls, []);
+  assert.equal(current.signouts.length, 0);
 });

@@ -26,14 +26,21 @@
     let csrf = null;
     let busy = false;
     let version = 0;
+    let hadSession = false;
+    let operation = "";
     const token = (response) => {
       const value = response.headers.get("x-csrf-token");
       return /^[a-f0-9]{64}$/i.test(value || "") ? value : null;
     };
-    const message = (text) => { status.textContent = text; };
+    const text = (id, value) => { const element = byId(id); if (element) element.textContent = value; };
+    const message = (value) => { if (status) status.textContent = value; };
     const controls = () => {
       if (password) password.disabled = busy || csrf !== null;
-      if (submit) submit.disabled = busy || csrf !== null;
+      if (submit) {
+        submit.disabled = busy || csrf !== null;
+        submit.textContent = busy ? operation : "Sign in";
+        form.setAttribute("aria-busy", String(busy));
+      }
       signouts.forEach((button) => { button.disabled = busy || !csrf; });
       repositoryForms.forEach((repository) => {
         repository.path.disabled = busy || !csrf;
@@ -50,6 +57,7 @@
     };
     const state = (value) => {
       csrf = value;
+      if (csrf) hadSession = true;
       const unchecked = csrf === undefined;
       if (!unchecked) repositoryForms.forEach((repository) => {
         if (repository.beforeSessionFailure !== null) {
@@ -63,9 +71,9 @@
       }
       if (signedIn) signedIn.hidden = !csrf;
       signouts.forEach((button) => { button.hidden = !csrf; });
-      byId("profile-state").textContent = unchecked ? "Check account" : csrf ? "Owner" : "Signed out";
-      byId("profile-note").textContent = unchecked ? "Check your current session before signing in again." : csrf ? "Signed in on this server." : "Sign in to your local account.";
-      byId("profile-account").textContent = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
+      text("profile-state", unchecked ? "Check account" : csrf ? "Owner" : "Signed out");
+      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Signed in on this server." : "Sign in to your local account.");
+      text("profile-account", unchecked ? "Check account" : csrf ? "Account" : "Sign in");
       if (form) {
         const title = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
         byId("page-title").textContent = title;
@@ -140,6 +148,7 @@
       if (busy) return;
       const current = ++version;
       busy = true;
+      operation = "Checking…";
       controls();
       message("Checking your session…");
       try {
@@ -150,7 +159,7 @@
           message("");
         } else if (response.status === 401) {
           state(null);
-          message("");
+          message(hadSession ? "Your session ended. Sign in again to continue." : "");
         } else {
           uncheckedSession();
         }
@@ -164,8 +173,8 @@
     }
     if (document.body.dataset.ownerConfigured !== "true") {
       state(null);
-      byId("profile-state").textContent = "Local preview";
-      byId("profile-note").textContent = "Owner setup is required.";
+      text("profile-state", "Local preview");
+      text("profile-note", "Owner setup is required.");
       return;
     }
     if (form) form.addEventListener("submit", async function (event) {
@@ -182,6 +191,7 @@
       }
       const current = ++version;
       busy = true;
+      operation = "Signing in…";
       controls();
       message("Signing in…");
       try {
@@ -371,6 +381,7 @@
       if (busy || !csrf) return;
       const current = ++version;
       busy = true;
+      operation = "Signing out…";
       controls();
       message("Signing out…");
       try {
@@ -378,6 +389,7 @@
         if (current !== version) return;
         if (response.status === 204) {
           state(null);
+          hadSession = false;
           message("Signed out.");
           if (!password) window.location.assign("/sign-in");
         } else if (response.status === 401) {

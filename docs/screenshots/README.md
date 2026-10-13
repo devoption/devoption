@@ -25,6 +25,10 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
 | Check account | `/sign-in` | Session verification blocked | `sign-in-check.jpg` |
+| Sign in, light | `/sign-in` | Signed out; Nord / Light / Purple | `sign-in-light.jpg` |
+| Checking session | `/sign-in` | Hold the initial session response; fields disabled | `sign-in-loading.jpg` |
+| Password error | `/sign-in` | Rejected fixture password; cleared input | `sign-in-error.jpg` |
+| Owner setup | `/sign-in` | Separate unconfigured ephemeral preview; no owner | `sign-in-setup.jpg` |
 
 Start the [temporary browser fixture](../browser-session-check.md) from the
 repository root after installing the [normal prerequisites](../../README.md#try-it-locally):
@@ -37,6 +41,14 @@ Use its printed origin and port, not the persistent preview on port 3000. The
 fixture creates a temporary owner, catalog, Git metadata trees and an untracked
 frontend README; it stops after ten minutes. No real owner or repository is needed.
 The fixture password is `browser transport fixture only`.
+
+The dedicated auth layout was added in [#155](https://github.com/devoption/devoption/issues/155).
+Its seven captures retain the dimensions above. For the light variant, save Nord /
+Light / Purple on Appearance before signing out. Hold the initial `/auth/session`
+response to capture checking; return an actual rejected fixture sign-in for the
+password-error state. Never capture a real password or account. For setup guidance,
+run a separate `devoption serve --port 0` without a data directory and use its
+printed ephemeral origin. Do not create an owner for that capture.
 
 1. Rebuild/restart the fixture after source changes: HTML, CSS, SVG and scripts
    are embedded in the executable. Start with a fresh browser profile/context.
