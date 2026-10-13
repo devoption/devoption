@@ -66,5 +66,7 @@ metadata are covered. Synthetic successful records make no real-build claim.
 
 Persisted records, restart recovery, real approval/runner integration, cancellation
 delivery, bounded logs, artifact retention and execution limits remain future work.
+The [proposed disposable runner profile](disposable-runner-proposal.md) specifies
+one possible next rehearsal for separate approval; it is unimplemented and unapproved.
 The separate [Linux fixture proof](offline-fixture-build.md) remains test-only and
 does not issue these events or authorize a production runner.
