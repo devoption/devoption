@@ -176,6 +176,7 @@ name = "devoption-registry"
 version = "0.1.0-dev"
 dependencies = [
  "sha2",
+ "tempfile",
  "toml",
 ]
 

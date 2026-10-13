@@ -185,7 +185,7 @@ The Rust workspace has six crates. The running service uses
 | `devoption-builds` | Immutable Unix build-plan metadata and bounded Cargo source membership proofs, with no approval or execution |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection |
-| `devoption-registry` | Cargo input validation, immutable dependency/provenance metadata and checked provider contract, with fixture providers only |
+| `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
 | `devoption-ui` | HTML rendering and browser assets |
 
@@ -209,6 +209,9 @@ establish trusted revision selection, complete source context or build permissio
 DevOption-mediated acquisition and isolated offline builds are the selected
 architecture, while registry hosting, fetching, approval, execution, environment
 policy and resource enforcement remain unimplemented.
+The [offline fixture proof](docs/offline-fixture-build.md) uses a concrete local
+seed provider and real Cargo in Linux tests. This does not enable application builds
+or establish production execution/isolation permissions.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:
@@ -220,6 +223,13 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 python3 -m unittest discover -s scripts -p 'test_*.py'
 node --test scripts/test_*.cjs
+```
+
+On Linux, also run the explicit trusted fixture build (GNU `timeout` and the
+installed Rust toolchain/linker are required):
+
+```sh
+cargo test -p devoption-registry --test offline_build --locked --offline -- --ignored --nocapture
 ```
 
 [Changelog](CHANGELOG.md) · [Security reporting](SECURITY.md) ·

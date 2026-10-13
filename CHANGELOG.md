@@ -53,6 +53,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A single-crate local seed provider verifies and supplies actual archive bytes.
+  A separate trusted Linux CI fixture compiles against the pinned dependency
+  through Cargo source replacement, records an artifact checksum, and rejects
+  missing/corrupt seeds without a fallback. Production approval, isolation, job
+  execution and deployment remain unavailable
+  ([#125](https://github.com/devoption/devoption/issues/125)).
+
 - A fixture-only root Cargo source verifier checks typed Git commit/tree/blob
   identities with SHA-1 collision detection, rejects ambiguous root paths/types
   and unsupported configuration, then validates linked manifest/lockfile bytes.

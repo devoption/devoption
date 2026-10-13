@@ -12,5 +12,8 @@ publish.workspace = true
 sha2 = { version = "=0.11.1", default-features = false }
 toml = { version = "=1.1.8", default-features = false, features = ["parse", "serde", "std"] }
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+tempfile = "=3.27.0"
+
 [lints]
 workspace = true

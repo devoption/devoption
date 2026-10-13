@@ -29,6 +29,8 @@ jobs:
       - run: cargo fetch --locked
       - run: cargo clippy --workspace --all-targets --locked --offline -- -D warnings
       - run: cargo test --workspace --locked --offline
+      - name: Build trusted fixture from verified local registry seed
+        run: cargo test -p devoption-registry --test offline_build --locked --offline -- --ignored --nocapture
       - run: cargo build --workspace --locked --offline
       - name: Check private source-install fixtures
         run: |
