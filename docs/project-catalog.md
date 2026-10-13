@@ -11,8 +11,9 @@ empty projects. A separate [root-bounded worktree inspector](worktree-validation
 is available under #107. Under [#109](https://github.com/devoption/devoption/issues/109),
 explicit trusted-root configuration enables the protected repository attachment
 backend described below. [#111](https://github.com/devoption/devoption/issues/111)
-adds its per-project browser form and saved repository summaries. Git invocation
-remains unimplemented.
+adds its per-project browser form and saved repository summaries.
+[#141](https://github.com/devoption/devoption/issues/141) adds on-demand repository
+status using controlled Git reads.
 
 ## Authenticated service view and creation
 
@@ -294,3 +295,60 @@ One default checkout per project/repository association does not constrain futur
 parallel agents/jobs to that checkout. Separate job worktrees and project releases
 that pin an exact commit for every repository are the agreed future model; neither
 jobs nor release manifests are implemented here.
+
+
+## Repository status
+
+With a configured root, project details offers **View status** for each saved
+default checkout. Opening it reads the branch, full commit ID and working-tree
+counts on demand; **Refresh status** repeats the read. Detached HEAD, no commits
+yet, and clean observations are distinct. Loading and errors hide previous
+results. Status has no polling, filesystem path input, build action or catalog
+mutation. The existing Git executable must be available on the service's PATH.
+
+Authenticated `GET /projects/{project_id}/repositories/{repository_id}/status`
+loads the latest catalog, verifies that exact association, and revalidates the
+saved default checkout against the configured root. Existing session and
+Host/Origin guards apply; responses use `Cache-Control: no-store`. The successful
+UTF-8 body contains six newline-separated fields: branch (empty when detached),
+commit (empty before the first commit), staged, modified, untracked and conflicted
+counts. Missing IDs/associations return 404, changed bindings return 409, and
+unavailable/unsupported/limited reads return 503 with fixed feedback. No absolute
+paths, filenames, command output or error details are returned.
+
+The reader copies bounded HEAD/ref, index and local ignore metadata into a private
+temporary Git directory. It preserves only builtin file-mode, symlink, case and text
+normalization settings from the checked config. Git receives no user/system config,
+source hooks, fsmonitor command or filter definitions; optional index writes,
+submodule inspection, replacement objects and network protocols are disabled.
+The private index retains the checked source modification time so Git can detect
+same-size edits within a timestamp tick. That time is also revalidated.
+The original index and catalog are not written. Git reads the original working
+files and objects in place. The root, location identities and copied metadata
+are checked again after the command. This is a point-in-time observation, not an
+atomic filesystem snapshot, hostile-repository sandbox or integrity attestation.
+
+Supported layouts are ordinary SHA-1 repositories and root-contained linked
+worktrees accepted by the existing inspector. Additional status restrictions
+reject shallow repositories, `.gitmodules`, filter definitions, sparse checkout,
+external attributes/ignore settings and `info/attributes`. Split indexes are also
+unsupported: the private index copy does not include `sharedindex.*`, so Git
+fails and the view reports unavailable. Existing rejection of
+includes, extensions, alternate object stores and unsafe inspected metadata still
+applies. User/global ignore and filter configuration is deliberately not loaded;
+results describe the controlled configuration, which may differ from a terminal's
+Git settings. Working-tree ignore files and builtin attributes still apply.
+
+The index and packed refs are each limited to 1 MiB, local config and exclude files
+to 16 KiB, and HEAD/loose refs to 4096 bytes. The Git child has a three-second
+execution deadline, 64 KiB output limit and 1024 status-entry limit; failures are
+unavailable, not partial successes. Temporary metadata is removed and the direct
+child is reaped. These are practical read bounds, not OS resource isolation.
+
+Counts follow Git porcelain status with renames disabled: a renamed file may
+count as a deletion and addition; a path can be both staged and modified.
+Conflicted paths count only as conflicted. Untracked directories count as entries,
+not every file beneath them, and ignored files are excluded. Git index flags such
+as assume-unchanged retain their Git semantics. “Clean” means no entries in this
+successful observation; it does not imply a complete file audit. No upstream,
+ahead/behind, fetch or commit actions are implemented.

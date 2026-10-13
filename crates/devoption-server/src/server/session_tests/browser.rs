@@ -218,6 +218,11 @@ fn manual_cookie_browser_fixture() {
         .unwrap();
         std::fs::write(root.join(name).join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
     }
+    std::fs::write(
+        root.join("frontend/README.md"),
+        "# Disposable browser fixture\n",
+    )
+    .unwrap();
     let mut catalog = devoption_projects::Catalog::default();
     let project = catalog.create_project("Example application").unwrap();
     let docs = catalog.create_project("Example documentation").unwrap();

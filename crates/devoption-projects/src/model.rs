@@ -26,6 +26,11 @@ impl ProjectId {
 pub struct RepositoryId(pub(crate) [u8; 16]);
 
 impl RepositoryId {
+    /// Decode an identifier supplied by an adapter; this grants no authority.
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
     pub const fn to_bytes(self) -> [u8; 16] {
         self.0
     }

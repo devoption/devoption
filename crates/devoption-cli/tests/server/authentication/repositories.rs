@@ -575,3 +575,96 @@ fn projects_render_contextual_forms_fresh_repository_lists_and_fixed_failure_cod
             .contains("x-devoption-error: root-unconfigured\r\n")
     );
 }
+
+#[test]
+fn repository_status_requires_saved_association_revalidates_and_never_writes_catalog() {
+    let (_data, data) = configured();
+    let (_root, root) = root_fixture();
+    let (first, second) = seed(&data);
+    let (server, address) = start_root(&data, &root);
+    let issued = sign_in(address);
+    assert_eq!(
+        status(address, &attachment(address, &issued, first, "main")),
+        204
+    );
+    let catalog = read_catalog(&data).unwrap().unwrap();
+    let hex = |bytes: [u8; 16]| bytes.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let path = format!(
+        "/projects/{}/repositories/{}/status",
+        hex(first.to_bytes()),
+        hex(catalog.repositories()[0].id().to_bytes())
+    );
+    let get = |address: SocketAddr, issued: Option<&Reply>, path: &str, method: &str| {
+        let cookie = issued
+            .map(|reply| {
+                format!(
+                    "Cookie: {}\r\n",
+                    reply
+                        .header("set-cookie")
+                        .unwrap()
+                        .split(';')
+                        .next()
+                        .unwrap()
+                )
+            })
+            .unwrap_or_default();
+        request(
+            address,
+            &format!(
+                "{method} {path} HTTP/1.1\r\nHost: {address}\r\n{cookie}Connection: close\r\n\r\n"
+            ),
+        )
+    };
+    let before = fs::read(data.join("projects.bin")).unwrap();
+    fs::remove_file(data.join(".projects.lock")).unwrap();
+    for method in ["GET", "HEAD"] {
+        assert!(get(address, None, &path, method).starts_with("HTTP/1.1 303"));
+    }
+    let read = || get(address, Some(&issued), &path, "GET");
+    let initial = read();
+    assert!(initial.starts_with("HTTP/1.1 200"), "{initial}");
+    assert!(initial.contains("cache-control: no-store"));
+    assert_eq!(
+        initial.split_once("\r\n\r\n").unwrap().1,
+        "main\n\n0\n0\n0\n0"
+    );
+    assert!(
+        get(address, Some(&issued), &path, "HEAD")
+            .split_once("\r\n\r\n")
+            .unwrap()
+            .1
+            .is_empty()
+    );
+    fs::write(root.join("main/new.txt"), "disposable fixture").unwrap();
+    assert_eq!(
+        read().split_once("\r\n\r\n").unwrap().1,
+        "main\n\n0\n0\n1\n0"
+    );
+    let other_project = path.replace(&hex(first.to_bytes()), &hex(second.to_bytes()));
+    for bad in [
+        other_project,
+        path.replace(&hex(catalog.repositories()[0].id().to_bytes()), "invalid"),
+        path.replace(&hex(first.to_bytes()), &"00".repeat(16)),
+    ] {
+        let denied = get(address, Some(&issued), &bad, "GET");
+        assert!(denied.starts_with("HTTP/1.1 404"));
+        assert!(denied.contains("cache-control: no-store"));
+    }
+    fs::write(root.join("main/.gitmodules"), "fixture").unwrap();
+    let unsupported = read();
+    assert!(unsupported.starts_with("HTTP/1.1 503"));
+    assert!(unsupported.contains("x-devoption-error: unsupported"));
+    fs::remove_file(root.join("main/.gitmodules")).unwrap();
+    fs::rename(root.join("main"), root.join("preserved")).unwrap();
+    fs::rename(root.join("other"), root.join("main")).unwrap();
+    let stale = read();
+    assert!(stale.starts_with("HTTP/1.1 409"));
+    assert!(stale.contains("x-devoption-error: changed"));
+    assert!(!stale.contains(root.to_str().unwrap()));
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
+    assert!(!data.join(".projects.lock").exists());
+    drop(server);
+    let (_server, address) = start_with(&data);
+    assert!(get(address, Some(&sign_in(address)), &path, "GET").starts_with("HTTP/1.1 503"));
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
+}

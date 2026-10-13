@@ -145,8 +145,15 @@ preserve the existing default, and uncertain saves ask you to inspect the list
 before retrying. Without a configured root, Projects explains why attachment is
 unavailable while retaining saved repository summaries.
 Projects support multiple repositories, linked worktrees share a repository ID,
-and each project/repository association keeps one default checkout. This grants
-no execution permission and runs no Git commands.
+and each project/repository association keeps one default checkout. Attachment and
+picker discovery run no Git commands and grant no build execution permission.
+On project details, **View status** reads that saved checkout's branch, commit and
+working-tree counts; **Refresh status** reads it again. Detached HEAD and branches
+with no commits have explicit labels. Git must be available on the server's PATH.
+Status uses private temporary metadata and controlled Git settings. Unsupported
+layouts, changed attachments and failed or bounded-out reads show unavailable
+feedback, never a guessed clean result. See [status limits](docs/project-catalog.md#repository-status)
+for supported configurations and the meaning of the counts.
 See [root policy, endpoint and catalog compatibility](docs/project-catalog.md#repository-attachment-backend)
 before enabling it; no real repository root is configured by this change.
 

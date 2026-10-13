@@ -4,7 +4,8 @@
 //! The Unix worktree inspector accepts only paths under an explicit permitted root,
 //! runs no commands and grants no execution permissions.
 //! Unix storage is explicit and private. The server exposes authenticated project
-//! creation, catalog reads and opt-in validated repository attachment.
+//! creation, catalog reads and opt-in validated repository attachment. A separate
+//! on-demand status reader runs bounded Git against private temporary metadata.
 
 mod model;
 pub use model::{
