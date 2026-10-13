@@ -51,9 +51,25 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
 }
 
 pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -> String {
-    let mut html = String::from(
-        r#"<div class="project-detail"><section aria-labelledby="repositories-title"><h2 id="repositories-title">Repositories</h2>"#,
+    let id: String = project
+        .id
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    let mut html = format!(
+        r#"<details class="project-rename"><summary>Rename project</summary>
+      <form id="project-form" class="project-form" data-project="{id}" action="/projects/{id}/name" method="post">
+        <label for="project-name">Project name</label>
+        <p id="project-hint">Attached repositories keep their names and checkout paths.</p>
+        <input id="project-name" name="name" type="text" required maxlength="128" autocomplete="off" aria-describedby="project-hint project-status" disabled value=""#
     );
+    escape_into(&mut html, project.name);
+    html.push_str(r#"">
+        <button id="project-submit" class="action-button" type="submit" disabled>Save name</button>
+        <p id="project-status" role="status" aria-live="polite"></p>
+        <noscript>JavaScript is required to rename a project.</noscript>
+      </form></details>
+      <div class="project-detail"><section aria-labelledby="repositories-title"><h2 id="repositories-title">Repositories</h2>"#);
     if project.repositories.is_empty() {
         html.push_str("<p>No repositories attached yet.</p>");
     } else {
@@ -165,6 +181,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rename_form_escapes_the_saved_name_and_selects_the_stable_project() {
+        let project = ProjectSummary {
+            id: [0xab; 16],
+            name: "<Project> & \"工具\"",
+            repositories: vec![],
+        };
+        let html = detail(&project, false);
+        assert!(html.contains("data-project=\"abababababababababababababababab\" action=\"/projects/abababababababababababababababab/name\""));
+        assert!(html.contains("disabled value=\"&lt;Project&gt; &amp; &quot;工具&quot;\""));
+        assert!(html.contains("<summary>Rename project</summary>"));
+        assert!(html.contains("disabled>Save name</button>"));
+        assert!(!content(&[project], false).contains("Rename project"));
+    }
+
+    #[test]
     fn status_markup_selects_the_saved_checkout_only_on_configured_details() {
         let mut project = ProjectSummary {
             id: [0xab; 16],
@@ -208,7 +239,7 @@ mod tests {
         assert!(empty.contains("<details class=\"repository-attachment\" open>"));
         assert!(empty.contains("No repositories attached yet."));
         let unavailable = detail(&project, false);
-        assert!(!unavailable.contains("<form"));
+        assert!(!unavailable.contains("class=\"project-form repository-form\""));
         assert!(unavailable.contains("Repository attachment is not configured"));
         project.repositories.push(RepositorySummary {
             id: [1; 16],

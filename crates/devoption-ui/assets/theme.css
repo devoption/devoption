@@ -232,8 +232,9 @@ main > p { font-size: 1.125rem; max-width: 42rem; }
 .repository-inspection dt { color: var(--color-muted); }
 .repository-inspection dd { margin: 0; overflow-wrap: anywhere; }
 .repository-inspection p { font-size: var(--text-small); margin-top: var(--space-2); }
-.repository-attachment summary { width: fit-content; cursor: pointer; color: var(--color-primary); padding: var(--space-2) 0; }
-.repository-attachment summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.repository-attachment summary, .project-rename summary { width: fit-content; cursor: pointer; color: var(--color-primary); padding: var(--space-2) 0; }
+.repository-attachment summary:focus-visible, .project-rename summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.project-rename .project-form { margin-top: var(--space-3); }
 .repository-form { margin-top: var(--space-3); }
 .repository-form input { cursor: text; min-height: 2.75rem; }
 .repository-form select { width: 100%; min-width: 0; padding: var(--space-2) var(--space-3); background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-focus); border-radius: var(--space-1); font: inherit; }

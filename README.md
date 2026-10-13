@@ -126,7 +126,10 @@ attachment form automatically. If a save cannot be confirmed, reload the list
 before retrying to avoid duplicate names.
 An absent catalog shows an empty list; invalid state stops startup or fails the
 current request without resetting records. The unconfigured preview retains its
-placeholder. Project renaming and deletion are not implemented. The installation
+placeholder. On project details, open **Rename project**, edit the name and select
+**Save name**. A confirmed save reloads that project with the same ID, repository
+associations and checkout paths. If saving cannot be confirmed, reload before
+retrying. Project deletion is not implemented. The installation
 guide's [offline backup procedure](docs/private-linux-install.md#restart-backup-and-restore)
 preserves the owner and optional catalog together; repository contents require a
 separate backup.

@@ -1,5 +1,37 @@
 use crate::*;
 
+#[test]
+fn renaming_changes_only_the_selected_name_and_rejects_invalid_input() {
+    let mut catalog = Catalog::default();
+    let project = catalog.create_project("Before").unwrap();
+    let repository = catalog.create_repository("Repository").unwrap();
+    catalog.associate(project, repository).unwrap();
+    for index in 1..MAX_PROJECTS {
+        catalog.create_project(&format!("Project {index}")).unwrap();
+    }
+    let before = catalog.clone();
+    for name in ["", " padded ", "control\u{0085}", &"é".repeat(65)] {
+        assert!(matches!(
+            catalog.rename_project(project, name),
+            Err(Error::InvalidName)
+        ));
+        assert_eq!(catalog, before);
+    }
+    assert!(matches!(
+        catalog.rename_project(ProjectId([0; 16]), "Missing"),
+        Err(Error::UnknownProject)
+    ));
+    assert_eq!(catalog, before);
+    catalog.rename_project(project, "工具 & <renamed>").unwrap();
+    assert_eq!(catalog.projects()[0].name(), "工具 & <renamed>");
+    assert_eq!(catalog.projects()[0].id(), project);
+    assert_eq!(catalog.projects()[0].repositories(), &[repository]);
+    assert_eq!(&catalog.projects()[1..], &before.projects()[1..]);
+    assert_eq!(catalog.repositories(), before.repositories());
+    catalog.rename_project(project, "Project 1").unwrap();
+    assert_eq!(catalog.projects().len(), MAX_PROJECTS);
+}
+
 #[cfg(unix)]
 mod registration;
 #[cfg(unix)]

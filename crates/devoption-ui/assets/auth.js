@@ -11,6 +11,9 @@
     const projectForm = byId("project-form");
     const projectName = byId("project-name");
     const projectStatus = byId("project-status");
+    const renameProject = projectForm?.dataset.project;
+    const renaming = renameProject !== undefined;
+    let projectPending = false;
     const repositoryForms = Array.from(document.querySelectorAll(".repository-form")).map((form) => ({
       form, path: form.querySelector("[data-repository-path]"),
       submit: form.querySelector("[data-repository-submit]"), status: form.querySelector("[data-repository-status]"),
@@ -230,6 +233,10 @@
     if (projectForm) projectForm.addEventListener("submit", async function (event) {
       event.preventDefault();
       if (busy || !csrf) return;
+      if (renaming && !/^[a-f0-9]{32}$/.test(renameProject)) {
+        projectStatus.textContent = "Project unavailable. Reload the project list.";
+        return;
+      }
       const name = projectName.value;
       projectName.removeAttribute("aria-invalid");
       if (!name || name.trim() !== name || new TextEncoder().encode(name).length > 128 || /[\u0000-\u001f\u007f-\u009f]/.test(name)) {
@@ -241,15 +248,22 @@
       const current = ++version;
       busy = true;
       controls();
-      projectStatus.textContent = "Creating project…";
+      projectStatus.textContent = renaming ? "Saving name…" : "Creating project…";
+      projectPending = true;
+      const uncertain = renaming ? "The name change could not be confirmed. Reload this page before trying again." : "Creation could not be confirmed. Reload the project list before trying again.";
       let saved = false;
       try {
-        const response = await request("/projects", {
+        const response = await request(renaming ? `/projects/${renameProject}/name` : "/projects", {
           headers: { "content-type": "text/plain;charset=UTF-8", "x-csrf-token": csrf }, body: name,
         });
         if (current !== version) return;
         if (response.status === 204) {
           saved = true;
+          if (renaming) {
+            projectStatus.textContent = "Name saved. Reloading project…";
+            window.location.reload();
+            return;
+          }
           const location = response.headers.get("location");
           const destination = /^\/projects\/[0-9a-f]{32}$/.test(location || "") ? location : "/projects";
           projectStatus.textContent = destination === "/projects" ? "Project saved. Opening Projects…" : "Project saved. Opening project…";
@@ -258,19 +272,21 @@
         }
         if (response.status === 401) {
           state(null);
-          projectStatus.textContent = "Your session ended. Sign in again to create a project.";
+          projectStatus.textContent = renaming ? "Your session ended. Sign in again to rename this project." : "Your session ended. Sign in again to create a project.";
         } else if (response.status === 400 || response.status === 413) {
           projectStatus.textContent = "Check the project name: use up to 128 UTF-8 bytes without surrounding spaces or control characters.";
           projectName.setAttribute("aria-invalid", "true");
-        } else if (response.status === 409) {
+        } else if (response.status === 409 && !renaming) {
           projectStatus.textContent = "This catalog has reached its limit of 64 projects.";
+        } else if (response.status === 404 && renaming) {
+          projectStatus.textContent = "Project unavailable. Return to the project list.";
         } else {
-          projectStatus.textContent = "Creation could not be confirmed. Reload the project list before trying again.";
+          projectStatus.textContent = uncertain;
         }
       } catch {
-        if (current === version) projectStatus.textContent = "Creation could not be confirmed. Reload the project list before trying again.";
+        if (current === version) projectStatus.textContent = uncertain;
       } finally {
-        if (current === version) { busy = saved; controls(); }
+        if (current === version) { projectPending = saved; busy = saved; controls(); }
       }
     });
     repositoryForms.forEach((repository) => {
@@ -384,6 +400,10 @@
       csrf = null;
       busy = false;
       if (password) password.value = "";
+      if (projectPending) {
+        projectStatus.textContent = "Reload this page to check whether the project was saved before trying again.";
+        projectPending = false;
+      }
       repositoryForms.forEach((repository) => {
         ++repository.optionsVersion;
         repository.optionsLoading = false;

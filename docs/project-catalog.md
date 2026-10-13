@@ -75,6 +75,21 @@ post-rename sync error may leave a saved project: reload and inspect before tryi
 again. Creation is not idempotent; intentionally repeating a name creates another
 project.
 
+Under [#143](https://github.com/devoption/devoption/issues/143), the details page's
+**Rename project** disclosure starts with the saved name. **Save name** sends
+`POST /projects/{id}/name` with the same bounded plain UTF-8 body and session,
+CSRF and Origin guards as creation. A fresh, locked catalog snapshot changes only
+that project's display name, preserving IDs, associations, checkout bindings and
+other records. It uses the existing atomic save without a format migration.
+Renaming works at project capacity, and duplicate names remain allowed. Concurrent
+renames are serialized; the last successful save sets the name.
+
+Confirmed saves return empty, non-cacheable 204 and reload the current project.
+Malformed or missing project IDs return 404; name/body errors use the creation
+statuses above. Storage contention or failure returns 503. Failed requests retain
+the entered name in the browser. A failed or interrupted save may have published:
+reload before retrying, and never infer success from the edited field alone.
+
 ## Domain boundary
 
 The crate owns this cohesive domain independently of CLI, HTTP, rendering and
