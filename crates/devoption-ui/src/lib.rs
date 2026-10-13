@@ -6,15 +6,18 @@ pub enum Page {
     Releases,
     Infrastructure,
     Appearance,
+    Profile,
     SignIn,
 }
 
 mod auth;
+mod profile;
 mod projects;
 pub use projects::{ProjectSection, ProjectSummary, RepositorySummary};
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
+const PROFILE: &str = include_str!("../assets/profile.js");
 const AUTH: &str = include_str!("../assets/auth.js");
 const REPOSITORY_STATUS: &str = include_str!("../assets/repository-status.js");
 const PROJECT_FILTER: &str = include_str!("../assets/project-filter.js");
@@ -151,6 +154,11 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             "/settings/appearance",
             "Choose how DevOption looks in this browser.",
         ),
+        Page::Profile => (
+            "Profile",
+            "/settings/profile",
+            "Choose the name shown in your account menu.",
+        ),
         Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
     let (title, main_class) = if let Some(ProjectView::Detail(project, _, _)) = &projects {
@@ -171,7 +179,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         format!(
             r#"<p class="breadcrumbs"><a href="/projects">Projects</a><span aria-hidden="true">/</span><span>{title}</span></p>"#
         )
-    } else if matches!(page, Page::Appearance) {
+    } else if matches!(page, Page::Appearance | Page::Profile) {
         String::new()
     } else {
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
@@ -196,6 +204,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         (
             "",
             match page {
+                Page::Profile => profile::CONTENT,
                 Page::Home => {
                     r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your software. Builds and deployments are not available yet.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
                 }
@@ -246,7 +255,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     <nav aria-label=\"Main navigation\">{navigation}</nav>
     <div class=\"profile-area\">
       <button class=\"profile-trigger\" type=\"button\" popovertarget=\"profile-popup\" aria-label=\"Profile menu\">
-        <span class=\"profile-avatar\">{profile_icon}</span>
+        <span class=\"profile-avatar\" aria-hidden=\"true\"><span id=\"profile-avatar-icon\">{profile_icon}</span><span id=\"profile-initials\" hidden></span></span>
         <span id=\"profile-state\" class=\"profile-label\">Account</span><span class=\"chevron\" aria-hidden=\"true\"></span>
       </button>
       <section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">
@@ -283,6 +292,7 @@ fn document(title: &str, body: &str) -> String {
   <style>{STYLES}</style>
   <script>{APPEARANCE}</script>
   <script>{AUTH}</script>
+  <script>{PROFILE}</script>
   <script>{REPOSITORY_STATUS}</script>
   <script>{PROJECT_FILTER}</script>
   <script>{INTERFACE}</script>

@@ -46,6 +46,10 @@ for dimensions, states and refresh instructions.
 
 ![Repository attachment](repository-attach.jpg)
 
+**Profile**
+
+![Saved fixture display name and account initials](profile.jpg)
+
 **Appearance**
 
 ![Appearance settings](appearance.jpg)

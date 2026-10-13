@@ -21,4 +21,6 @@ pub mod password;
 pub mod password_form;
 #[cfg(unix)]
 pub mod preauth_csrf;
+#[cfg(unix)]
+mod profile;
 pub mod session;

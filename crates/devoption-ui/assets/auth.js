@@ -71,15 +71,22 @@
       }
       if (signedIn) signedIn.hidden = !csrf;
       signouts.forEach((button) => { button.hidden = !csrf; });
-      text("profile-state", unchecked ? "Check account" : csrf ? "Owner" : "Signed out");
-      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Signed in on this server." : "Sign in to your account.");
-      text("profile-account", unchecked ? "Check account" : csrf ? "Account" : "Sign in");
+      text("profile-state", unchecked ? "Check account" : csrf ? "Account" : "Signed out");
+      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Role: Owner" : "Sign in to your account.");
+      text("profile-account", unchecked ? "Check account" : csrf ? "Profile" : "Sign in");
       if (form) {
         const title = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
         byId("page-title").textContent = title;
         byId("page-message").textContent = unchecked ? "Check your current session before signing in again." : csrf ? "You’re signed in on this server." : "Use the owner password for this server.";
         document.title = title + " · DevOption";
       }
+      const account = byId("profile-account");
+      if (account) {
+        account.setAttribute("href", csrf ? "/settings/profile" : "/sign-in");
+        if (csrf && window.location.pathname === "/settings/profile") account.setAttribute("aria-current", "page");
+        else account.removeAttribute("aria-current");
+      }
+      document.dispatchEvent(new CustomEvent("devoption-session", { detail: csrf ? "signed-in" : unchecked ? "unknown" : "signed-out" }));
       controls();
     };
     const uncheckedSession = () => {

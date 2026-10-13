@@ -1,18 +1,17 @@
 //! Authenticated catalog adapter. Routes must be inside the page/session and
 //! Host/Origin/CSRF guards. Filesystem work never runs on the async event loop.
 
+use super::input::text_body;
 use super::*;
 use axum::{
-    body::to_bytes,
     extract::{Path as RoutePath, rejection::PathRejection},
-    http::header::{CONTENT_TYPE, LOCATION},
+    http::header::LOCATION,
 };
 use devoption_projects::{Catalog, CatalogDirectory, Error, MAX_NAME_BYTES};
 use devoption_projects::{
     ProjectId,
     worktree::{InspectionError, PermittedRoot},
 };
-use std::{error::Error as _, time::Duration};
 use tokio::sync::Mutex;
 
 mod pages;
@@ -323,38 +322,13 @@ async fn name(request: Request) -> Result<String, StatusCode> {
     text_body(request, MAX_NAME_BYTES).await
 }
 
-async fn text_body(request: Request, limit: usize) -> Result<String, StatusCode> {
-    let mut media = request.headers().get_all(CONTENT_TYPE).iter();
-    let accepted = media
-        .next()
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| {
-            value.eq_ignore_ascii_case("text/plain")
-                || value.eq_ignore_ascii_case("text/plain;charset=UTF-8")
-        });
-    if !accepted || media.next().is_some() || request.headers().contains_key("content-encoding") {
-        return Err(StatusCode::UNSUPPORTED_MEDIA_TYPE);
-    }
-    let bytes = tokio::time::timeout(Duration::from_secs(5), to_bytes(request.into_body(), limit))
-        .await
-        .map_err(|_| StatusCode::REQUEST_TIMEOUT)?
-        .map_err(|error| {
-            if error
-                .source()
-                .is_some_and(|source| source.is::<http_body_util::LengthLimitError>())
-            {
-                StatusCode::PAYLOAD_TOO_LARGE
-            } else {
-                StatusCode::BAD_REQUEST
-            }
-        })?;
-    String::from_utf8(bytes.to_vec()).map_err(|_| StatusCode::BAD_REQUEST)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{Body, Bytes};
+    use axum::{
+        body::{Body, Bytes},
+        http::header::CONTENT_TYPE,
+    };
     use std::{
         convert::Infallible,
         pin::Pin,

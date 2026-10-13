@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a dedicated Profile page for saving or clearing a display name. Keep names
+  in private server storage across restarts and show the name and initials in the
+  account menu, with “Account” when unset and Owner retained as the role. Include
+  profile metadata in the documented offline backup/restore procedure
+  ([#161](https://github.com/devoption/devoption/issues/161)).
+
 - Open projects in a dedicated workspace with Overview, Code, Builds, Releases,
   Packages and Settings navigation. Repository inspection stays in Code and
   renaming moves to Settings; unavailable features retain explicit states.

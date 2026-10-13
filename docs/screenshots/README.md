@@ -22,6 +22,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Attach repository | `/projects/{id}/code` | Empty project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
 | Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
+| Profile | `/settings/profile` | Save disposable name Alex Morgan; initials visible | `profile.jpg` |
 | Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
@@ -69,7 +70,9 @@ printed ephemeral origin. Do not create an owner for that capture.
 6. Capture the browser viewport as JPEG, excluding browser/desktop chrome. Keep
    scroll at the top, pointer off controls, and no focus outline or developer
    overlay. Only the two named dialog captures should have a dialog open.
-7. Inspect the images, text, active navigation and gallery entries before
+7. Capture Profile after saving **Alex Morgan** in the disposable fixture. Clear
+   the name before other main-page captures so their account label remains **Account**.
+8. Inspect the images, text, active navigation and gallery entries before
    committing. Restore browser preferences and clear temporary overrides.
 
 All Appearance variants use **1280 × 900** and the save confirmation:

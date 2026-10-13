@@ -56,7 +56,7 @@ fn offline_catalog_backup_preserves_shared_identities_and_default_checkouts() {
             .status
             .success()
     );
-    assert_eq!(fs::read_dir(&backup).unwrap().count(), 3);
+    assert_eq!(fs::read_dir(&backup).unwrap().count(), 4);
     assert_eq!(fs::read_dir(&restored).unwrap().count(), 2);
     let backed_up_binary = backup.join("devoption");
     fs::copy(&binary, &backed_up_binary).unwrap();
