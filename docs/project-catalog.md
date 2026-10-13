@@ -11,8 +11,9 @@ empty projects. A separate [root-bounded worktree inspector](worktree-validation
 is available under #107. Under [#109](https://github.com/devoption/devoption/issues/109),
 explicit trusted-root configuration enables the protected repository attachment
 backend described below. [#111](https://github.com/devoption/devoption/issues/111)
-adds its per-project browser form and saved repository summaries. Git invocation
-remains unimplemented.
+adds its per-project browser form and saved repository summaries.
+[#141](https://github.com/devoption/devoption/issues/141) adds on-demand repository
+status using controlled Git reads.
 
 ## Authenticated service view and creation
 
