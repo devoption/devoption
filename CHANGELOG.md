@@ -59,6 +59,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Owners can rename saved projects from their details page, retaining stable
+  identities, repository associations and checkout bindings through the existing
+  authenticated, atomic catalog write path
+  ([#143](https://github.com/devoption/devoption/issues/143)).
+
 - Project details can read an attached checkout's branch, commit and working-tree
   counts on demand, with refresh, detached/unborn labels and explicit unavailable
   states. Controlled Git status uses private temporary metadata, bounded reads,

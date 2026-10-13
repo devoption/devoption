@@ -67,7 +67,20 @@ pub(super) fn routes(projects: Projects) -> Router {
     let detail = projects.clone();
     let options = projects.clone();
     let status_reader = projects.clone();
+    let renamer = projects.clone();
     Router::new()
+        .route(
+            "/projects/{project}/name",
+            axum::routing::post(move |project: Result<RoutePath<String>, PathRejection>, request: Request| async move {
+                let result = async {
+                    let id = project.ok().and_then(|RoutePath(value)| project_id(&value)).ok_or(StatusCode::NOT_FOUND)?;
+                    let name = name(request).await?;
+                    renamer.access(move |directory| directory.writer()?.rename_project(id, &name))
+                        .await.map_err(|error| Failure::from(error).status)
+                }.await;
+                (result.map_or_else(|status| status, |()| StatusCode::NO_CONTENT), [(CACHE_CONTROL, "no-store")]).into_response()
+            }),
+        )
         .route(
             "/projects/{project}/repositories/{repository}/status",
             get(move |ids: Result<RoutePath<(String, String)>, PathRejection>| async move {

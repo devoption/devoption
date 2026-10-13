@@ -11,6 +11,8 @@ mod create;
 mod detail;
 #[path = "projects/directory.rs"]
 mod directory;
+#[path = "projects/rename.rs"]
+mod rename;
 
 const NAME: &str = "<script>alert('fixture')</script> & \"工具\"";
 const ESCAPED: &str =

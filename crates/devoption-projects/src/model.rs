@@ -106,6 +106,18 @@ impl Catalog {
         Ok(id)
     }
 
+    /// Change only the display name, preserving identity and all associations.
+    pub fn rename_project(&mut self, id: ProjectId, name: &str) -> Result<(), Error> {
+        name_valid(name)?;
+        let project = self
+            .projects
+            .iter_mut()
+            .find(|project| project.id == id)
+            .ok_or(Error::UnknownProject)?;
+        project.name = name.into();
+        Ok(())
+    }
+
     /// Create identity/display metadata only; no Git repository is registered.
     pub fn create_repository(&mut self, name: &str) -> Result<RepositoryId, Error> {
         name_valid(name)?;

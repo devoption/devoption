@@ -14,7 +14,7 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 // Exercise the shipped script with controlled responses and navigation races.
 // Native focus, cookies, form validation and layout are checked in a real browser.
-function page({ configured = true, form = true, projects = false, repositories = false, picker = false, initial = response(401) } = {}) {
+function page({ configured = true, form = true, projects = false, rename, repositories = false, picker = false, initial = response(401) } = {}) {
   const nodes = new Map();
   let focused;
   function node(id) {
@@ -37,6 +37,7 @@ function page({ configured = true, form = true, projects = false, repositories =
   ["profile-state", "profile-note", "profile-account", "profile-status", "page-title", "page-message"].forEach(node);
   if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
   if (projects) ["project-form", "project-name", "project-submit", "project-status"].forEach(node);
+  if (rename !== undefined) nodes.get("project-form").dataset.project = rename;
   const repositoryForms = repositories ? [0, 1].map((index) => {
     const form = node(`repository-${index}-form`);
     form.dataset.project = (index ? "02" : "01").repeat(16);
@@ -100,6 +101,59 @@ function page({ configured = true, form = true, projects = false, repositories =
     },
   };
 }
+
+test("rename uses the saved project context, validates input and reloads only after confirmed save", async () => {
+  const id = "ab".repeat(16);
+  const current = page({form: false, projects: true, rename: id, initial: response(204, csrf)});
+  await tick();
+  for (const name of ["", " padded ", "line\nbreak", "é".repeat(65)]) {
+    await current.create(name);
+    assert.equal(current.calls.length, 1);
+    assert.equal(current.focused(), "project-name");
+  }
+  current.queue.push(response(204));
+  await current.create("工具 & <renamed>");
+  assert.equal(current.calls.at(-1).url, `/projects/${id}/name`);
+  assert.equal(current.calls.at(-1).body, "工具 & <renamed>");
+  assert.equal(current.calls.at(-1).headers["x-csrf-token"], csrf);
+  assert.deepEqual(current.navigation, ["reload"]);
+  assert.equal(current.nodes.get("project-submit").disabled, true);
+  const invalid = page({form: false, projects: true, rename: "../private", initial: response(204, csrf)});
+  await tick(); await invalid.create("Denied fixture");
+  assert.equal(invalid.calls.length, 1);
+});
+
+test("rename errors preserve the entered name and never claim success", async () => {
+  for (const [failure, message] of [
+    [response(400), /Check the project name/], [response(413), /Check the project name/],
+    [response(401), /session ended/], [response(404), /Project unavailable/],
+    [response(403), /could not be confirmed/], [response(503), /could not be confirmed/],
+    [new Error("offline"), /could not be confirmed/],
+  ]) {
+    const current = page({form: false, projects: true, rename: "ab".repeat(16), initial: response(204, csrf)});
+    await tick(); current.queue.push(failure); await current.create("Retained name");
+    assert.equal(current.nodes.get("project-name").value, "Retained name");
+    assert.match(current.nodes.get("project-status").textContent, message);
+    assert.deepEqual(current.navigation, []);
+    assert.equal(current.nodes.get("project-submit").disabled, failure.status === 401);
+  }
+});
+
+test("rename disables duplicate saves and ignores late completion after navigation", async () => {
+  const current = page({form: false, projects: true, rename: "ab".repeat(16), initial: response(204, csrf)});
+  await tick(); let finish;
+  current.queue.push(new Promise(resolve => {finish = resolve;}));
+  const pending = current.create("Pending name");
+  await tick(); await current.create("Duplicate name");
+  assert.equal(current.calls.length, 2);
+  assert.equal(current.nodes.get("project-submit").disabled, true);
+  current.event("pagehide"); finish(response(204)); await pending;
+  assert.deepEqual(current.navigation, []);
+  assert.match(current.nodes.get("project-status").textContent, /Reload this page to check/);
+  current.queue.push(response(204, csrf)); current.event("pageshow", {persisted: true}); await tick();
+  assert.equal(current.nodes.get("project-submit").disabled, false);
+  assert.match(current.nodes.get("project-status").textContent, /Reload this page to check/);
+});
 
 test("project creation waits for a session, validates bytes, and sends only the name with CSRF", async () => {
   let finish;

@@ -107,6 +107,14 @@ impl CatalogStore {
         Ok(id)
     }
 
+    /// Rename in a fresh snapshot under this writer's lock, preserving bindings.
+    /// A post-publication sync failure requires inspection before retrying.
+    pub fn rename_project(&mut self, id: crate::ProjectId, name: &str) -> Result<(), Error> {
+        let mut catalog = self.load()?.unwrap_or_default();
+        catalog.rename_project(id, name)?;
+        self.save(&catalog)
+    }
+
     /// Reject relative paths, `..`, and symlinks in every directory component.
     /// Final directory must belong to the current OS user with no group/other
     /// permissions. Opening neither creates directories nor repairs permissions.

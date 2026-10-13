@@ -316,7 +316,20 @@ fn encoded_binding_capacity_and_metadata_updates_preserve_saved_registrations() 
         .attach_repository(f.first, &f.root(), Path::new("third"))
         .unwrap();
     let id = store.create_project("After migration").unwrap();
+    let registered = store.load().unwrap().unwrap();
+    store
+        .rename_project(f.first, "Renamed registered project")
+        .unwrap();
     let mut saved = store.load().unwrap().unwrap();
+    assert_eq!(saved.root, registered.root);
+    assert_eq!(saved.bindings, registered.bindings);
+    assert_eq!(saved.checkouts, registered.checkouts);
+    assert_eq!(saved.repositories, registered.repositories);
+    assert_eq!(
+        saved.projects[0].repositories,
+        registered.projects[0].repositories
+    );
+    assert_eq!(saved.projects[0].name(), "Renamed registered project");
     assert_eq!(saved.repository_bindings().len(), 3);
     assert_eq!(saved.projects()[2].id(), id);
     assert_eq!(f.bytes()[8], 2);
