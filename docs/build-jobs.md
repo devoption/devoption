@@ -69,7 +69,7 @@ delivery, bounded logs, artifact retention and execution limits remain future wo
 The [disposable runner profile](disposable-runner-proposal.md) received separate
 approval for an initial temporary fixture attempt and one diagnostic repeat.
 The [initial result](disposable-build-rehearsal.md) and [repeat result](disposable-build-repeat.md)
-record successful compiles followed by rejected artifacts; neither issued a job
-event or grants permission for another attempt or production execution.
+record successful compiles followed by rejected artifacts. These fixture attempts
+issued no job events and grant no permission for further builds or production execution.
 The separate [Linux fixture proof](offline-fixture-build.md) remains test-only and
 does not issue these events or authorize a production runner.

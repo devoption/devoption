@@ -216,7 +216,8 @@ or establish production execution/isolation permissions.
 A separately approved [disposable rehearsal](docs/disposable-build-rehearsal.md)
 and [single diagnostic repeat](docs/disposable-build-repeat.md) completed offline
 compiles under observed job restrictions. The repeat identified the output's two
-hard links as its sole rejection; neither produced an accepted artifact or application build.
+hard links as its sole rejection. Both attempts ended without an accepted artifact;
+application builds remain unavailable.
 The [job lifecycle model](docs/build-jobs.md) binds records to an exact plan and
 attempt and rejects invalid transitions. Starting a job and recording runner
 outcomes require sealed events; queued cancellation is local. No production event
