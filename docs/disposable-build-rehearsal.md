@@ -1,4 +1,4 @@
-# Disposable fixture build: observed result
+# First disposable fixture build: observed result
 
 On 2026-10-13, [#131](https://github.com/devoption/devoption/issues/131) exercised
 one separately approved build under the
@@ -6,6 +6,10 @@ one separately approved build under the
 but the overall rehearsal failed during artifact verification.** No artifact
 checksum or size receipt was produced. The artifact was neither executed nor
 exported, and the disposable VM is stopped.
+
+A later, separately approved [single diagnostic repeat](disposable-build-repeat.md)
+identified a two-link output as that repeat's sole rejection. This page preserves
+the first attempt's observations and missing evidence.
 
 This was a temporary harness for a trusted fixture, not a production runner or an
 application build job. It issued no `BuildJob` event and added no runtime route,
@@ -89,10 +93,10 @@ failure. The recorded inner result, not the SSH/cleanup exit status, determines
 the rehearsal outcome. A future harness should record each artifact predicate
 separately, propagate the inner result, and capture live unit properties before
 collection. Any revised artifact policy needs to remain within the reviewed scope.
-Another disposable build requires a new explicit approval; this attempt was not
-repeated and does not close the artifact-verification gap in #131.
+The initial approval covered only this attempt. It ended without an automatic
+retry or closing #131; the later diagnostic repeat had its own separate approval.
 
-## Diagnostic follow-up without another build
+## Diagnostic follow-up before the repeat
 
 The pure [metadata diagnostic helper](../scripts/rehearsal_artifact_metadata.py)
 now reports mode, link count, byte size, the size limit and every failed predicate
@@ -105,7 +109,7 @@ failures, directories, symlinks and the inclusive 4 MiB boundary. These establis
 diagnostic behavior, not which condition failed in the deleted VM artifact.
 The retained attempt's logs and harness are unchanged.
 
-A future, separately approved harness can retain the report before rejecting:
+A harness can retain the report before rejecting:
 
 ```python
 report = describe_artifact_metadata(os.fstat(artifact.fileno()))
@@ -114,10 +118,11 @@ if not report["metadata_accepted"]:
     raise RuntimeError("artifact metadata rejected: " + ", ".join(report["failed_checks"]))
 ```
 
-The helper has not been run in the VM and is not integrated with a production
-runner. Passing its metadata gate does not prove safe path selection, stable
-bytes, a checksum, or artifact acceptance. Future integration must still persist
-failure receipts, propagate the inner failure and verify the live unit controls.
+PR #132 added and tested the helper without another VM build or production
+integration. The later separately approved repeat used it as recorded above.
+Passing its metadata gate does not prove safe path selection, stable
+bytes, a checksum, or artifact acceptance. Persisting failure receipts, propagating
+the inner failure and verifying live unit controls remain the caller's duties.
 
 ## Cleanup and retention
 
