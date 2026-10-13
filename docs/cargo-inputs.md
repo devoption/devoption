@@ -63,8 +63,11 @@ checksums match any actual package bytes. No archives are available to this adap
 Its purpose is bounded input identity and consistency validation, not an execution
 or trust decision.
 
-The next proof must bind these expected hashes to an independently verified source
-snapshot and selected commit, including workspace context and Cargo configuration.
+The [root source verifier](cargo-source-proof.md) can supply these hashes after
+checking a bounded commit/tree/blob membership proof for a selected SHA-1 ID.
+That proves neither independent revision selection nor a complete source snapshot
+or execution context. A future integration must establish those external facts,
+including workspace context and Cargo configuration.
 It must also verify source/target selection and the actual registry package/bundle
 bytes against the descriptor. The registry layer must establish dependency completeness
 against those verified inputs before approval. Toolchain identity, permissions,

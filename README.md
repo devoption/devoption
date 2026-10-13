@@ -182,7 +182,7 @@ The Rust workspace has six crates. The running service uses
 
 | Crate | Responsibility |
 | --- | --- |
-| `devoption-builds` | Immutable Unix build-plan metadata and structural validation, with no approval or execution |
+| `devoption-builds` | Immutable Unix build-plan metadata and bounded Cargo source membership proofs, with no approval or execution |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection |
 | `devoption-registry` | Cargo input validation, immutable dependency/provenance metadata and checked provider contract, with fixture providers only |
@@ -203,6 +203,9 @@ validates explicit inputs against a catalog snapshot without I/O and has no runt
 caller. It includes the [registry dependency descriptor](docs/registry-contract.md):
 the [supplied-byte Cargo adapter](docs/cargo-inputs.md) validates a strict standalone
 manifest/lockfile subset and binds exact input hashes without reading a repository.
+The separate [root source verifier](docs/cargo-source-proof.md) checks a bounded
+supplied Git object chain linking those bytes to a selected commit ID. It does not
+establish trusted revision selection, complete source context or build permission.
 DevOption-mediated acquisition and isolated offline builds are the selected
 architecture, while registry hosting, fetching, approval, execution, environment
 policy and resource enforcement remain unimplemented.

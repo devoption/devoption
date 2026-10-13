@@ -14,6 +14,10 @@ and bundle digest/size. Every field participates in plan equality. No lockfile o
 dependency bytes are read or verified here, and no direct-public-fetch fallback exists.
 The separate [supplied-byte adapter](cargo-inputs.md) validates a narrow Cargo
 subset into that descriptor. It does not verify committed source or actual archives.
+The [root source verifier](cargo-source-proof.md) separately verifies membership
+of both inputs through supplied Git objects relative to a selected commit ID.
+Its proof is not yet required by or bound to `BuildPlan`; independent revision
+selection, complete source/context and archive verification remain future gates.
 
 `BuildPlan::validate` consumes owned `PlanInput` values and reads a supplied
 in-memory catalog snapshot. It requires existing, associated project/repository

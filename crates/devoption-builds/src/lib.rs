@@ -5,6 +5,8 @@
 
 #![cfg(unix)]
 
+pub mod cargo_source;
+
 use devoption_projects::{Catalog, ProjectId, RepositoryId};
 use devoption_registry::CargoMaterialization;
 use std::{collections::HashSet, fmt};
