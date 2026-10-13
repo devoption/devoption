@@ -1,0 +1,20 @@
+# Synthetic metadata; these are not downloaded package archives.
+version = 4
+
+[[package]]
+name = "ExampleService"
+version = "0.1.0"
+dependencies = ["http"]
+
+[[package]]
+name = "http"
+version = "1.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1111111111111111111111111111111111111111111111111111111111111111"
+dependencies = ["bytes 1.0.0"]
+
+[[package]]
+name = "bytes"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2222222222222222222222222222222222222222222222222222222222222222"

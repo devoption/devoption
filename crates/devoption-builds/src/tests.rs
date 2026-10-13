@@ -22,6 +22,7 @@ fn dependencies() -> CargoMaterialization {
     }
     let request = CargoDependencyRequest::new(
         RegistryId::new("local-registry").unwrap(),
+        digest(4),
         digest(2),
         vec![LockedPackage {
             origin: CargoOrigin::CratesIo,
@@ -164,19 +165,29 @@ fn dependency_provenance_lockfile_packages_and_bundle_identity_change_the_plan()
     let request = snapshot.request();
     let mut requests = vec![
         CargoDependencyRequest::new(
+            request.registry().clone(),
+            digest(96),
+            request.lockfile_sha256(),
+            request.packages().to_vec(),
+        )
+        .unwrap(),
+        CargoDependencyRequest::new(
             RegistryId::new("different-provider").unwrap(),
+            digest(4),
             request.lockfile_sha256(),
             request.packages().to_vec(),
         )
         .unwrap(),
         CargoDependencyRequest::new(
             request.registry().clone(),
+            digest(4),
             digest(99),
             request.packages().to_vec(),
         )
         .unwrap(),
         CargoDependencyRequest::new(
             request.registry().clone(),
+            digest(4),
             request.lockfile_sha256(),
             Vec::new(),
         )
@@ -195,6 +206,7 @@ fn dependency_provenance_lockfile_packages_and_bundle_identity_change_the_plan()
         requests.push(
             CargoDependencyRequest::new(
                 request.registry().clone(),
+                digest(4),
                 request.lockfile_sha256(),
                 packages,
             )

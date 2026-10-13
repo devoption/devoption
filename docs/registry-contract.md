@@ -4,30 +4,32 @@
 [#119](https://github.com/devoption/devoption/issues/119), following the approved
 direction: dependency acquisition through DevOption's registry/proxy, then a
 separately approved isolated offline build. Neither stage can run yet. There is
-no registry server, network client, production provider, lockfile parser, bundle
-format, storage, credential transport, approval issuer or executor.
+no registry server, network client, production provider, bundle format, storage,
+credential transport, approval issuer or executor. A bounded
+[supplied-byte Cargo adapter](cargo-inputs.md) validates a narrow manifest/lockfile
+subset without reading a checkout or proving committedness.
 
-The crate has no external dependencies. It is independent of the build and server
-crates. `devoption-builds` includes its immutable materialization descriptor in
+The crate uses pinned TOML parsing and SHA-256 dependencies. It is independent of
+the build and server crates. `devoption-builds` includes its immutable materialization descriptor in
 every candidate plan. The running service does not call either domain.
 
 ## Minimal handoff
 
-1. A future trusted lockfile adapter supplies a `CargoDependencyRequest`: selected
-   logical DevOption registry identity, SHA-256 of the exact lockfile bytes, and
-   the complete locked registry-package set, including transitive/build dependencies.
-   Version requirements are not resolved here. Source-commit and lockfile linkage,
-   package-set completeness, path dependencies and unsupported source rejection
-   remain responsibilities of that adapter.
+1. `CargoDependencyRequest` records the selected logical DevOption registry identity,
+   SHA-256 of both exact manifest and lockfile bytes, and a claimed locked registry-package
+   set. The supplied-byte adapter checks its supported graph, rejects unsupported
+   semantics and binds both hashes. Source-commit linkage and completeness against
+   actual dependency manifests remain future verification requirements; version
+   requirements are not resolved here.
 2. `prepare_dependencies` invokes the supplied `CargoRegistryProvider` once.
    The provider returns `CargoMaterialization`, containing the request plus the
    claimed SHA-256 and byte size of an immutable dependency bundle. No filesystem
    path, network URL, executable or credential crosses this interface.
 3. The handoff rejects a response whose complete request differs, including
-   registry identity, lockfile, package coordinates, origins or expected archive
+   registry identity, manifest, lockfile, package coordinates, origins or expected archive
    checksums. Provider errors propagate without retries or a public-fetch fallback.
 4. The build plan owns this descriptor. Changing any dependency, origin, checksum,
-   lockfile, provider identity, bundle digest or size changes plan equality.
+   manifest, lockfile, provider identity, bundle digest or size changes plan equality.
    No approval exists yet; equality must not substitute for later approval binding
    and fresh validation of actual inputs.
 
@@ -62,17 +64,18 @@ version uniqueness ([registry index](https://doc.rust-lang.org/cargo/reference/r
 
 Requests hold at most 1024 packages and are sorted by original registry, name and
 version identity. Empty sets are supported. SHA-256 inputs require 64 lowercase
-hexadecimal characters; the crate neither computes hashes nor verifies content.
+hexadecimal characters. The supplied-byte adapter computes input hashes, but
+package archive and bundle bytes remain unverified.
 Bundle sizes are `u64` claims, including zero; they do not authorize disk allocation.
 Metadata bounds are not execution/resource policy. Errors omit supplied values,
 and metadata types have no `Debug` implementation that could expose private names.
 
 ## Next dependencies and remaining decisions
 
-The next independent slice can validate committed Cargo manifests/lockfiles into
-this request using fixtures, before selecting any live registry transport. Then
-registry materialization needs verified immutable storage and explicit access and
-upstream policy. The runner consumes the checked descriptor and verified bundle;
+The next source proof must bind the supplied-byte adapter's hashes to a verified
+commit snapshot and establish actual dependency completeness. Registry materialization
+also needs verified immutable storage and explicit access and upstream policy.
+The runner consumes the checked descriptor and verified bundle;
 it must never silently contact an upstream when data is missing.
 
 Fetching untrusted package bytes grants no right to run their code. A future

@@ -9,9 +9,11 @@ HTTP route, UI, persistence, approval issuer or executor. Builds remain unavaila
 Every plan also carries an immutable [Cargo dependency descriptor](registry-contract.md)
 from the DevOption registry contract added in
 [#119](https://github.com/devoption/devoption/issues/119). The descriptor records
-claimed lockfile/package checksums, original source and serving-registry identity,
+manifest/lockfile input hashes, claimed package checksums, original source and serving-registry identity,
 and bundle digest/size. Every field participates in plan equality. No lockfile or
 dependency bytes are read or verified here, and no direct-public-fetch fallback exists.
+The separate [supplied-byte adapter](cargo-inputs.md) validates a narrow Cargo
+subset into that descriptor. It does not verify committed source or actual archives.
 
 `BuildPlan::validate` consumes owned `PlanInput` values and reads a supplied
 in-memory catalog snapshot. It requires existing, associated project/repository
@@ -62,7 +64,7 @@ approval, freshness check or durable plan identifier.
 
 The future approval/execution layer must verify the source commit and fresh
 catalog binding, bind and verify the registry descriptor against the committed
-lockfile and actual bundle, create a clean owned work directory without modifying
+manifest, lockfile and actual bundle, create a clean owned work directory without modifying
 the user's checkout, verify toolchain/executable identity, and define an explicit
 environment allowlist and registry access/network policy. A Cargo `--offline` flag does not
 prevent build scripts or compilers from using the network and is not a sandbox.

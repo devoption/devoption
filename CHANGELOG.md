@@ -53,6 +53,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A bounded supplied-byte Cargo adapter checks a strict standalone manifest and
+  version-4 lock graph using pinned TOML/SHA-256 dependencies. Exact manifest and
+  lockfile hashes now participate in provider matching and build-plan equality;
+  synthetic fixtures cover unsupported, malformed, missing, ambiguous and mismatched
+  inputs. Verified commit provenance, actual dependency-byte integrity, resolution
+  and execution remain unimplemented
+  ([#121](https://github.com/devoption/devoption/issues/121)).
+
 - A separate Cargo registry contract records immutable locked dependency,
   original-source, checksum and materialization metadata. Its checked provider
   handoff rejects mismatched requests without a public-fetch fallback, preserves

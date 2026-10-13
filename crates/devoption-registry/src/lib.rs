@@ -1,11 +1,14 @@
 //! Immutable Cargo dependency descriptors and a DevOption registry contract.
 //!
-//! There is no lockfile parser, checksum computation, storage, network client or
-//! production provider. Descriptors contain claims, not verification or approval.
+//! A bounded supplied-byte Cargo adapter checks a deliberately small manifest and
+//! lockfile subset and hashes those inputs. It performs no filesystem/network I/O.
+//! There is no storage or production provider. Metadata grants no approval.
 //! Provider implementations are responsible for their effects; this crate supplies
 //! only a checked handoff and uses in-memory fixtures in tests.
 
 use std::{cmp::Ordering, fmt};
+
+pub mod cargo_inputs;
 
 pub const MAX_REGISTRY_ID_BYTES: usize = 64;
 pub const MAX_PACKAGE_NAME_BYTES: usize = 64;
@@ -29,11 +32,18 @@ impl RegistryId {
     }
 }
 
-/// A claimed SHA-256 digest. Parsing does not hash or verify any bytes.
+/// SHA-256 value. Parsing accepts a claim; digest computes supplied bytes.
+/// Neither operation establishes source, registry or commit provenance.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Sha256([u8; 32]);
 
 impl Sha256 {
+    /// Hash exact supplied bytes; this establishes no source or registry provenance.
+    pub fn digest(bytes: &[u8]) -> Self {
+        use sha2::Digest;
+        Self(sha2::Sha256::digest(bytes).into())
+    }
+
     pub fn from_hex(value: &str) -> Result<Self, Error> {
         if value.len() != 64
             || !value
@@ -81,12 +91,13 @@ pub struct LockedPackage {
     pub archive_sha256: Sha256,
 }
 
-/// Immutable claimed registry-package set from one lockfile, in canonical order.
-/// The future lockfile adapter must prove completeness, include transitive/build
-/// dependencies and reject unsupported sources. An empty set is permitted.
+/// Immutable claimed registry-package set with both input hashes, in canonical order.
+/// The supplied-byte adapter checks its supported lock graph, not completeness
+/// against verified source and actual dependency manifests. An empty set is permitted.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CargoDependencyRequest {
     registry: RegistryId,
+    manifest_sha256: Sha256,
     lockfile_sha256: Sha256,
     packages: Vec<LockedPackage>,
 }
@@ -94,6 +105,7 @@ pub struct CargoDependencyRequest {
 impl CargoDependencyRequest {
     pub fn new(
         registry: RegistryId,
+        manifest_sha256: Sha256,
         lockfile_sha256: Sha256,
         mut packages: Vec<LockedPackage>,
     ) -> Result<Self, Error> {
@@ -117,6 +129,7 @@ impl CargoDependencyRequest {
         }
         Ok(Self {
             registry,
+            manifest_sha256,
             lockfile_sha256,
             packages,
         })
@@ -128,6 +141,10 @@ impl CargoDependencyRequest {
 
     pub fn lockfile_sha256(&self) -> Sha256 {
         self.lockfile_sha256
+    }
+
+    pub fn manifest_sha256(&self) -> Sha256 {
+        self.manifest_sha256
     }
 
     pub fn packages(&self) -> &[LockedPackage] {

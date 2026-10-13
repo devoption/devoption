@@ -19,7 +19,7 @@ fn package(name: &str) -> LockedPackage {
 }
 
 fn request(packages: Vec<LockedPackage>) -> CargoDependencyRequest {
-    CargoDependencyRequest::new(registry("local-registry"), digest(2), packages).unwrap()
+    CargoDependencyRequest::new(registry("local-registry"), digest(4), digest(2), packages).unwrap()
 }
 
 struct FixtureProvider {
@@ -46,6 +46,7 @@ fn requests_own_their_metadata_and_order_does_not_change_identity() {
     assert!(original.packages()[0].archive_sha256 == digest(1));
     assert_eq!(original.registry().as_str(), "local-registry");
     assert!(original.lockfile_sha256() == digest(2));
+    assert!(original.manifest_sha256() == digest(4));
     assert!(request(Vec::new()).packages().is_empty());
 }
 
@@ -83,7 +84,7 @@ fn logical_registry_and_package_names_are_bounded_and_cannot_be_locations() {
         let mut p = package("valid");
         p.name = name.into();
         assert_eq!(
-            CargoDependencyRequest::new(registry("local"), digest(1), vec![p]).err(),
+            CargoDependencyRequest::new(registry("local"), digest(4), digest(1), vec![p]).err(),
             Some(Error::InvalidPackageName)
         );
     }
@@ -105,6 +106,7 @@ fn cargo_names_preserve_case_but_reject_case_colliding_coordinates() {
     assert_eq!(
         CargoDependencyRequest::new(
             registry("local"),
+            digest(4),
             digest(1),
             vec![package("Example"), package("example")]
         )
@@ -163,7 +165,7 @@ fn versions_are_exact_including_prerelease_and_build_metadata() {
         let mut p = package("valid");
         p.version = version.into();
         assert_eq!(
-            CargoDependencyRequest::new(registry("local"), digest(1), vec![p]).err(),
+            CargoDependencyRequest::new(registry("local"), digest(4), digest(1), vec![p]).err(),
             Some(Error::InvalidVersion)
         );
     }
@@ -199,6 +201,7 @@ fn original_registry_identity_prevents_private_public_package_confusion() {
         assert_eq!(
             CargoDependencyRequest::new(
                 registry("local"),
+                digest(4),
                 digest(1),
                 vec![public.clone(), variant]
             )
@@ -216,7 +219,7 @@ fn package_capacity_is_a_metadata_bound() {
     assert_eq!(request(packages.clone()).packages().len(), MAX_PACKAGES);
     packages.push(package("overflow"));
     assert_eq!(
-        CargoDependencyRequest::new(registry("local"), digest(1), packages).err(),
+        CargoDependencyRequest::new(registry("local"), digest(4), digest(1), packages).err(),
         Some(Error::TooManyPackages)
     );
 }
@@ -227,13 +230,22 @@ fn provider_must_return_the_exact_request_with_no_origin_or_checksum_substitutio
     let changed = |p| request(vec![p]);
     let variants = [
         CargoDependencyRequest::new(
+            expected.registry().clone(),
+            digest(98),
+            expected.lockfile_sha256(),
+            expected.packages().to_vec(),
+        )
+        .unwrap(),
+        CargoDependencyRequest::new(
             registry("other-provider"),
+            digest(4),
             expected.lockfile_sha256(),
             expected.packages().to_vec(),
         )
         .unwrap(),
         CargoDependencyRequest::new(
             expected.registry().clone(),
+            digest(4),
             digest(99),
             expected.packages().to_vec(),
         )
