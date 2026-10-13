@@ -32,7 +32,10 @@ logic remains in the project crate. The separate [build-plan model](build-plans.
 validates explicit inputs against a catalog snapshot without I/O and has no runtime
 caller. The separate [source preparation flow](build-preparation.md) calls existing
 project inspection and Cargo input validation to report current observations in
-Builds, without constructing a plan or job. The plan model includes the [registry dependency descriptor](registry-contract.md):
+Builds or the CLI's explicit Unix `check-source` command, without constructing a
+plan or job. The CLI opens a read-only private catalog capability and validates
+the selected inspection root without reading owner credentials or starting HTTP.
+The plan model includes the [registry dependency descriptor](registry-contract.md):
 the [supplied-byte Cargo adapter](cargo-inputs.md) validates a strict standalone
 manifest/lockfile subset and binds exact input hashes without reading a repository.
 The separate [root source verifier](cargo-source-proof.md) checks a bounded

@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add local/SSH `devoption check-source` with explicit catalog/root paths and saved
+  project/repository IDs. Reuse read-only source preparation, print observed facts
+  and check outcomes, and document passed/failed/invalid-argument exit statuses
+  without HTTP, owner-credential reads, source edits or execution approval
+  ([#173](https://github.com/devoption/devoption/issues/173)).
+
 - Replace the project Builds placeholder with real read-only source preparation:
   inspect observed HEAD, Git changes, tracked Cargo inputs and conventional binary
   source. Show actionable results and fresh rechecks without creating a build job

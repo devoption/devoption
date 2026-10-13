@@ -5,7 +5,8 @@ self-hosted for individuals and teams: one place to organize, build and run soft
 
 The current preview supports saved projects, project creation and renaming,
 repository creation, attachment, tracked-file browsing and Git status inspection,
-source preparation checks, owner sign-in, and appearance preferences. **Builds and deployments are not available yet.** Authentication
+[source preparation checks](docs/build-preparation.md) in Builds or the CLI,
+owner sign-in, and appearance preferences. **Builds and deployments are not available yet.** Authentication
 currently supports one owner; team accounts are planned, not implemented.
 There is no published release or supported public deployment configuration.
 

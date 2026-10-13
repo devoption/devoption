@@ -2,17 +2,21 @@ use std::{env, ffi::OsString, path::PathBuf, process::ExitCode};
 
 #[cfg(unix)]
 mod setup;
+#[cfg(unix)]
+mod source_check;
 
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
        devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
+       devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
 
   -h, --help     Show this help
   -V, --version  Show the development version
   serve         Start HTTP on 127.0.0.1:3000; Ctrl+C stops the process
   setup         Create the first owner using hidden terminal prompts (Unix/local/SSH)
+  check-source  Read saved repository source checks (Unix/local/SSH); no build runs
   --port PORT   Override the port (0 chooses a free port)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
   --repository-root  Explicit trusted checkout root for inspection/attachment
@@ -20,7 +24,8 @@ Usage: devoption [--help | --version]
 
 The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. Startup creates no directories or permissions. Managed mode permits authenticated creation of new repository directories only. Serve creates no accounts; setup never replaces an owner.
 After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH with the same directory, then sign in at /sign-in. Browser owner setup is not available.
-The local server shows Overview, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Releases and Infrastructure show unavailable states. Factory and runtime services are not implemented.";
+The local server shows Overview, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Releases and Infrastructure show unavailable states. Factory and runtime services are not implemented.
+Source checks require all four options and saved 32-character hexadecimal IDs from the project and repository URLs. They use this OS user's filesystem access without reading owner credentials or starting HTTP. Exit status: 0 checks passed, 1 changes needed or unavailable, 2 invalid arguments. Passing checks do not approve execution. See docs/build-preparation.md.";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -30,6 +35,16 @@ fn main() -> ExitCode {
         [flag] if flag == "--version" || flag == "-V" => {
             println!("devoption {}", env!("CARGO_PKG_VERSION"));
             return ExitCode::SUCCESS;
+        }
+        [command, options @ ..] if command == "check-source" => {
+            #[cfg(unix)]
+            return source_check::run(options);
+            #[cfg(not(unix))]
+            {
+                let _ = options;
+                eprintln!("error: source checks require Unix");
+                return ExitCode::FAILURE;
+            }
         }
         [command, flag, path] if command == "setup" && flag == "--data-dir" => {
             let path = PathBuf::from(path);
