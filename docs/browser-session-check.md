@@ -21,10 +21,11 @@ supported Git metadata fixtures named `frontend`, `backend`, `tools` and
 is also attached to Example documentation with the same repository identity.
 Projects uses the real attachment, persistence, rendering and authentication
 paths. The command prints the disposable root for fixture inspection. No real
-repositories are opened and no Git command runs.
+repositories are opened; status checks run controlled Git against the temporary fixtures.
 
-After signing in, use the Projects form to create a new fixture name with the
-keyboard. A confirmed save must open the newly created project details directly,
+After signing in, expand **New project** on Projects with the keyboard, then
+use its form to create a new fixture name. A confirmed save must open the new
+project details directly,
 with zero repositories and the attachment form expanded when a trusted root is
 configured. Reload and verify that project persists. Create another project with
 the same name; it must open a different saved project, not the first one. Use
@@ -42,8 +43,8 @@ or deploy button. Capture `project-details.jpg` before attaching more fixtures.
 Check the other project and a new empty project, then a direct reload and browser
 Back/Forward. Test the details page at a narrow viewport and while signed out.
 A successful attachment from details must reload that same project page.
-For `project-empty.jpg`, create **Example new project**, use 1120 × 900, and
-select `tools` from **Available checkouts** in its already expanded attachment
+For `project-empty.jpg`, open **New project**, create **Example new project**,
+use 1120 × 900, and select `tools` from **Available checkouts** in its already expanded attachment
 form without submitting. Then
 submit with the keyboard and verify that the first repository appears after
 reload while the browser stays on that project.

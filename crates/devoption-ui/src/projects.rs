@@ -12,27 +12,32 @@ pub struct RepositorySummary<'a> {
 }
 
 pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: bool) -> String {
-    let mut html = String::from(
-        r#"<form id="project-form" class="project-form" action="/projects" method="post">
-      <label for="project-name">Project name</label>
-      <p id="project-hint">Your new project opens after saving.</p>
-      <input id="project-name" name="name" type="text" required maxlength="128" autocomplete="off" aria-describedby="project-hint project-status" disabled>
-      <button id="project-submit" class="action-button" type="submit" disabled>Create project</button>
-      <p id="project-status" role="status" aria-live="polite"></p>
-      <noscript>JavaScript is required to create a project.</noscript>
-    </form>"#,
-    );
-    if !attachment_available {
-        html.push_str(r#"<p class="repository-notice">Repository attachment is not configured on this server. A server administrator must select a trusted repository root before you can attach a checkout.</p>"#);
-    }
+    let mut html = String::from("<div class=\"project-tools\">");
     if !projects.is_empty() {
         html.push_str(r#"<div id="project-filter" class="project-form project-filter" role="search" aria-label="Saved projects" hidden>
           <label for="project-query">Filter projects by name</label>
           <input id="project-query" type="search" autocomplete="off" aria-controls="saved-projects" aria-describedby="project-filter-status">
           <button id="project-filter-clear" class="action-button" type="button" disabled>Clear filter</button>
           <p id="project-filter-status" role="status" aria-live="polite" aria-atomic="true"></p>
-        </div>
-        <ul id="saved-projects" class="project-list" aria-label="Saved projects">"#);
+        </div>"#);
+    }
+    let expanded = if projects.is_empty() { " open" } else { "" };
+    html.push_str(&format!(r#"<details class="project-create"{expanded}><summary>New project</summary>
+    <form id="project-form" class="project-form" action="/projects" method="post">
+      <label for="project-name">Project name</label>
+      <p id="project-hint">Your new project opens after saving.</p>
+      <input id="project-name" name="name" type="text" required maxlength="128" autocomplete="off" aria-describedby="project-hint project-status" disabled>
+      <button id="project-submit" class="action-button" type="submit" disabled>Create project</button>
+      <p id="project-status" role="status" aria-live="polite"></p>
+      <noscript>JavaScript is required to create a project.</noscript>
+    </form></details></div>"#));
+    if !attachment_available {
+        html.push_str(r#"<p class="repository-notice">Repository attachment is not configured on this server. A server administrator must select a trusted repository root before you can attach a checkout.</p>"#);
+    }
+    if !projects.is_empty() {
+        html.push_str(
+            r#"<ul id="saved-projects" class="project-list" aria-label="Saved projects">"#,
+        );
         for project in projects {
             let id: String = project
                 .id
@@ -40,11 +45,12 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
                 .map(|byte| format!("{byte:02x}"))
                 .collect();
             html.push_str(&format!(
-                "<li data-project-item aria-labelledby=\"project-{id}\"><h2 id=\"project-{id}\"><a data-project-name href=\"/projects/{id}\">"
+                "<li data-project-item aria-labelledby=\"project-{id}\"><div class=\"section-heading\"><h2 id=\"project-{id}\"><a data-project-name href=\"/projects/{id}\">"
             ));
             escape_into(&mut html, project.name);
             html.push_str("</a></h2>");
             repository_count(&mut html, project);
+            html.push_str("</div>");
             repositories(&mut html, project, false);
             if attachment_available {
                 attachment(&mut html, &id, &format!("project-{id}"), false);
@@ -63,7 +69,8 @@ pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -
         .map(|byte| format!("{byte:02x}"))
         .collect();
     let mut html = format!(
-        r#"<details class="project-rename"><summary>Rename project</summary>
+        r#"<div class="page-actions"><a class="project-back" href="/projects">Back to Projects</a>
+      <details class="project-rename"><summary>Rename project</summary>
       <form id="project-form" class="project-form" data-project="{id}" action="/projects/{id}/name" method="post">
         <label for="project-name">Project name</label>
         <p id="project-hint">Attached repositories keep their names and checkout paths.</p>
@@ -74,12 +81,13 @@ pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -
         <button id="project-submit" class="action-button" type="submit" disabled>Save name</button>
         <p id="project-status" role="status" aria-live="polite"></p>
         <noscript>JavaScript is required to rename a project.</noscript>
-      </form></details>
-      <div class="project-detail"><section aria-labelledby="repositories-title"><h2 id="repositories-title">Repositories</h2>"#);
+      </form></details></div>
+      <div class="project-detail"><section aria-labelledby="repositories-title"><div class="section-heading"><h2 id="repositories-title">Repositories</h2>"#);
     if project.repositories.is_empty() {
-        html.push_str("<p>No repositories attached yet.</p>");
+        html.push_str("</div><p>No repositories attached yet.</p>");
     } else {
         repository_count(&mut html, project);
+        html.push_str("</div>");
         repositories(&mut html, project, attachment_available);
     }
     if attachment_available {
@@ -115,7 +123,7 @@ fn repositories(html: &mut String, project: &ProjectSummary<'_>, status_availabl
     if !project.repositories.is_empty() {
         html.push_str("<ul class=\"repository-list\" aria-label=\"Repositories\">");
         for repository in &project.repositories {
-            html.push_str("<li><span>");
+            html.push_str("<li><div class=\"repository-summary\"><span>");
             escape_into(html, repository.name);
             html.push_str("</span><small>");
             if let Some(path) = repository.default_checkout {
@@ -125,7 +133,7 @@ fn repositories(html: &mut String, project: &ProjectSummary<'_>, status_availabl
             } else {
                 html.push_str("Not attached");
             }
-            html.push_str("</small>");
+            html.push_str("</small></div>");
             if status_available && repository.default_checkout.is_some() {
                 let project: String = project
                     .id
@@ -185,6 +193,25 @@ pub(super) fn escape_into(html: &mut String, value: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_project_creation_is_expanded_and_remains_available_without_javascript() {
+        let empty = content(&[], false);
+        assert!(empty.contains("<details class=\"project-create\" open>"));
+        assert!(empty.contains("action=\"/projects\" method=\"post\""));
+        assert!(empty.contains("disabled>Create project</button>"));
+        assert!(empty.contains("<noscript>JavaScript is required to create a project.</noscript>"));
+        let saved = content(
+            &[ProjectSummary {
+                id: [0; 16],
+                name: "Saved project",
+                repositories: vec![],
+            }],
+            false,
+        );
+        assert!(saved.contains("<details class=\"project-create\"><summary>New project</summary>"));
+        assert!(!saved.contains("<details class=\"project-create\" open>"));
+    }
 
     #[test]
     fn name_filter_progressively_enhances_only_nonempty_project_lists() {

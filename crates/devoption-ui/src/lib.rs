@@ -123,7 +123,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             match &projects {
                 Some(ProjectView::List([], _)) => "No projects yet.",
                 Some(ProjectView::List(..)) => "Your saved projects.",
-                Some(ProjectView::Detail(..)) => "Project details.",
+                Some(ProjectView::Detail(..)) => "",
                 None => "Project management is not available yet.",
             },
         ),
@@ -143,16 +143,12 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             },
         ),
     };
-    let (title, breadcrumb, main_class) = if let Some(ProjectView::Detail(project, _)) = &projects {
+    let (title, main_class) = if let Some(ProjectView::Detail(project, _)) = &projects {
         let mut escaped = String::new();
         projects::escape_into(&mut escaped, project.name);
-        (
-            escaped,
-            r#"<p class="project-back"><a href="/projects">Back to Projects</a></p>"#,
-            r#" class="project-detail-page""#,
-        )
+        (escaped, r#" class="project-detail-page""#)
     } else {
-        (title.to_owned(), "", "")
+        (title.to_owned(), "")
     };
     let project_content = projects.map(|view| match view {
         ProjectView::List(projects, available) => projects::content(projects, available),
@@ -238,7 +234,6 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
       <p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p>
     </header>
     <main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\"{main_class}>
-      {breadcrumb}
       <p id=\"page-message\">{message}</p>
       {content}
     </main>
