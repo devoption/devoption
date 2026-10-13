@@ -1,6 +1,13 @@
 use super::*;
 
-const PATHS: [&str; 4] = ["/", "/projects", "/about", "/settings/appearance"];
+const PATHS: [&str; 6] = [
+    "/",
+    "/projects",
+    "/releases",
+    "/infrastructure",
+    "/about",
+    "/settings/appearance",
+];
 const CSRF: [u8; 32] = [0xcd; 32];
 
 fn app(configured: bool, slot: SharedSession) -> Router {

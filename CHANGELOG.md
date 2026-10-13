@@ -7,13 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
-- Projects groups name filtering with a collapsible creation form, pairs project
-  names with repository counts, and aligns repository metadata and status on
-  details pages ([#149](https://github.com/devoption/devoption/issues/149)).
-
-- The shared shell aligns page titles with the logo, uses consistent control
-  sizing and quieter borders, and presents Appearance without an extra panel
-  ([#147](https://github.com/devoption/devoption/issues/147)).
+- Apply the built interface's shared sidebar, utility header, page hierarchy,
+  project rows and control styling across the app. Project creation, rename and
+  repository attachment use keyboard-accessible dialogs; status reads remain
+  inline. Appearance uses direct choices on its dedicated page while retaining
+  existing preferences and themes. Releases and Infrastructure explicitly show
+  unavailable states, without execution or deployment controls
+  ([#153](https://github.com/devoption/devoption/issues/153)).
 
 ### Fixed
 

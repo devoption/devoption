@@ -41,6 +41,11 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
   const accent = Object.assign(new EventTarget(), { value: "purple", disabled: true });
   const theme = Object.assign(new EventTarget(), { value: "nord", disabled: true });
   const themeNote = { hidden: true };
+  const sections = Object.fromEntries(['mode', 'accent', 'theme'].flatMap(name => ['native', 'options'].map(kind => [`appearance-${name}-${kind}`, {hidden: kind === 'options'}])));
+  const buttons = [['mode', ['light', 'dark', 'system']], ['theme', ['nord', 'dracula', 'tokyo-night']], ['accent', ['purple', 'blue', 'green']]].flatMap(([setting, values]) => values.map(value => Object.assign(new EventTarget(), {
+    dataset: {appearanceSetting: `appearance-${setting}`, appearanceValue: value}, pressed: null,
+    setAttribute(name, value) { assert.equal(name, 'aria-pressed'); this.pressed = value; },
+  })));
   const status = { textContent: "Enable JavaScript to change appearance." };
   const primary = Object.assign(new EventTarget(), { value: "#b48ead", disabled: true });
   const reset = Object.assign(new EventTarget(), { disabled: true });
@@ -55,7 +60,9 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
       dataset: {},
       style: { setProperty: (name, value) => inline.set(name, value), removeProperty: (name) => inline.delete(name) },
     },
+    querySelectorAll: () => buttons,
     getElementById: (id) => hasControls ? ({
+      ...sections,
       "appearance-mode": choice, "appearance-accent": accent,
       "appearance-theme": theme, "appearance-theme-note": themeNote, "appearance-status": status,
       "appearance-primary": primary, "appearance-reset": reset,
@@ -94,7 +101,7 @@ function page(saved = new Map(), faults = {}, deviceDark = false, hasControls = 
     root: document.documentElement,
     choice,
     accent,
-    theme, themeNote,
+    theme, themeNote, buttons, sections,
     status,
     writes,
     primary, reset, warning, hex, inline, computedColor,
@@ -379,6 +386,7 @@ test("all themes retain text and interactive contrast in every mode and preset",
     for (const mode of ["dark", "light"]) {
       for (const accent of ["purple", "blue", "green", "custom"]) {
         const palette = paletteFor(mode, accent, theme);
+        assert.ok(contrast(palette['on-preset'], colorValue(palette, 'preset')) >= 4.5, `Primary button text: ${theme} ${mode} ${accent}`);
         for (const surface of ["background", "sidebar", "surface", "selected"]) {
           const context = `${theme} ${mode} ${accent} on ${surface}`;
           for (const text of ["text", "muted"]) {
@@ -687,4 +695,17 @@ test("Tokyo Night custom contrast follows System while reset restores its purple
   assert.equal(current.warning.hidden, true);
   current.changeDevice(true);
   assert.equal(current.primary.value, "#bb9af7");
+});
+
+ test('visible appearance choices synchronize saved state, custom colors and history', () => {
+  const saved = new Map(); const p = page(saved); p.ready();
+  const button = (setting,value) => p.buttons.find(b => b.dataset.appearanceSetting === `appearance-${setting}` && b.dataset.appearanceValue === value);
+  button('theme','dracula').dispatchEvent(new Event('click'));
+  assert.equal(saved.get(themeKey),'dracula'); assert.equal(button('theme','dracula').pressed,'true'); assert.equal(button('theme','nord').pressed,'false');
+  button('mode','system').dispatchEvent(new Event('click')); p.changeDevice(true);
+  assert.equal(p.root.dataset.appearance,'dark'); assert.equal(button('mode','system').pressed,'true');
+  p.chooseColor('#abcdef'); assert.ok(p.buttons.filter(b=>b.dataset.appearanceSetting==='appearance-accent').every(b=>b.pressed==='false'));
+  p.resetAccent(); assert.equal(button('accent','purple').pressed,'true');
+  saved.set(themeKey,'tokyo-night'); p.restore(); assert.equal(button('theme','tokyo-night').pressed,'true');
+  assert.equal(p.sections['appearance-theme-native'].hidden,true); assert.equal(p.sections['appearance-theme-options'].hidden,false);
 });

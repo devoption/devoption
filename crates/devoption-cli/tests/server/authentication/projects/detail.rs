@@ -38,7 +38,7 @@ fn details_select_one_project_require_auth_and_read_current_catalog() {
     assert!(response.contains("Second fixture"));
     assert!(!response.contains("Other project only"));
     assert!(!response.contains(NAME));
-    assert!(response.contains("Back to Projects"));
+    assert!(response.contains("<a href=\"/projects\">Projects</a>"));
     assert!(response.contains("Build execution is not available yet."));
     assert!(!response.contains("<form class=\"project-form repository-form\""));
     assert!(response.contains("Repository attachment is not configured"));

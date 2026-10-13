@@ -119,7 +119,7 @@ fn normal_response_reads_fail_on_reset_after_partial_success() {
     // assertions, without platform-specific TCP reset setup or extra dependencies.
     for partial in [
         "HTTP/1.1 200 OK\r\n",
-        "HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n<title>Home · DevOption</title>",
+        "HTTP/1.1 200 OK\r\nContent-Length: 1000\r\n\r\n<title>Overview · DevOption</title>",
     ] {
         let mut reader = partial.as_bytes().chain(Reset);
         assert_eq!(
@@ -133,13 +133,27 @@ fn normal_response_reads_fail_on_reset_after_partial_success() {
 fn pages_share_layout_and_have_working_navigation() {
     let (_server, address) = start();
     for (path, title, message) in [
-        ("/", "Home", "No home content yet."),
+        (
+            "/",
+            "Overview",
+            "Your local workspace for software projects.",
+        ),
         (
             "/projects",
             "Projects",
             "Project management is not available yet.",
         ),
-        ("/about", "About", "No about content yet."),
+        (
+            "/about",
+            "About",
+            "A self-hosted software factory, in development.",
+        ),
+        ("/releases", "Releases", "Releases are not available yet"),
+        (
+            "/infrastructure",
+            "Infrastructure",
+            "Runtime management is not available yet",
+        ),
         (
             "/settings/appearance",
             "Appearance",
@@ -168,9 +182,10 @@ fn pages_share_layout_and_have_working_navigation() {
             .unwrap()
             .0;
         for (href, label) in [
-            ("/", "Home"),
+            ("/", "Overview"),
             ("/projects", "Projects"),
-            ("/about", "About"),
+            ("/releases", "Releases"),
+            ("/infrastructure", "Infrastructure"),
         ] {
             let current = if href == path {
                 " aria-current=\"page\""
@@ -219,7 +234,7 @@ fn pages_share_layout_and_have_working_navigation() {
         let main = body.split_once("<main id=\"main-content\"").unwrap().1;
         assert_eq!(main.contains("class=\"theme-preview\""), appearance_page);
         assert_eq!(body.contains("<select"), appearance_page);
-        assert_eq!(body.contains("type=\"color\""), appearance_page);
+        assert_eq!(main.contains("type=\"color\""), appearance_page);
         if appearance_page {
             assert!(main.contains("aria-label=\"Appearance preferences\""));
             assert!(main.contains("id=\"appearance-theme-note\" hidden"));
@@ -266,7 +281,14 @@ fn errors_do_not_stop_the_server() {
         &format!("GET /missing HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
     );
     assert!(missing.starts_with("HTTP/1.1 404 Not Found"));
-    for path in ["/", "/projects", "/about", "/settings/appearance"] {
+    for path in [
+        "/",
+        "/projects",
+        "/releases",
+        "/infrastructure",
+        "/about",
+        "/settings/appearance",
+    ] {
         let post = request(
             address,
             &format!(
@@ -305,7 +327,7 @@ fn local_authorities_work_in_http_10_and_11() {
                 ),
             );
             assert!(response.starts_with(&format!("{version} 200 OK")), "{host}");
-            assert!(response.contains("<title>Home · DevOption</title>"));
+            assert!(response.contains("<title>Overview · DevOption</title>"));
         }
     }
 }

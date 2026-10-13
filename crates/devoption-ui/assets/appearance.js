@@ -70,10 +70,15 @@
     const primary = document.getElementById("appearance-primary");
     const reset = document.getElementById("appearance-reset");
     const warning = document.getElementById("appearance-contrast");
+    const buttons = Array.from(document.querySelectorAll("[data-appearance-setting]"));
     syncControls = () => {
       const custom = isColor(accent.value);
       for (const setting of settings) {
         document.getElementById(setting.id).value = isColor(setting.value) ? "custom" : setting.value;
+      }
+      for (const button of buttons) {
+        const setting = settings.find(setting => setting.id === button.dataset.appearanceSetting);
+        button.setAttribute("aria-pressed", String(setting.value === button.dataset.appearanceValue));
       }
       const palette = getComputedStyle(root);
       const color = (name) => palette.getPropertyValue(`--color-${name}`).trim();
@@ -118,6 +123,12 @@
       choice.addEventListener("change", () => {
         change(setting, choice.value === "custom" ? primary.value : choice.value);
       });
+      document.getElementById(`${setting.id}-native`).hidden = true;
+      document.getElementById(`${setting.id}-options`).hidden = false;
+    }
+    for (const button of buttons) {
+      const setting = settings.find(setting => setting.id === button.dataset.appearanceSetting);
+      button.addEventListener("click", () => change(setting, button.dataset.appearanceValue));
     }
     primary.disabled = false;
     reset.disabled = false;

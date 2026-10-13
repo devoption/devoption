@@ -23,23 +23,27 @@ Projects uses the real attachment, persistence, rendering and authentication
 paths. The command prints the disposable root for fixture inspection. No real
 repositories are opened; status checks run controlled Git against the temporary fixtures.
 
-After signing in, expand **New project** on Projects with the keyboard, then
+After signing in, open **New project** on Projects with the keyboard, then
 use its form to create a new fixture name. A confirmed save must open the new
 project details directly,
-with zero repositories and the attachment form expanded when a trusted root is
+with zero repositories and an **Attach repository** action when a trusted root is
 configured. Reload and verify that project persists. Create another project with
 the same name; it must open a different saved project, not the first one. Use
-**Back to Projects** to confirm both entries. Check a non-ASCII name and markup characters;
+the **Projects** breadcrumb to confirm both entries. Check a non-ASCII name and markup characters;
 they must display as text. Invalid/oversized names must not create a row. A failed
 save must retain the name and ask you to inspect the list before retrying, without
 claiming success. Check the labelled form and submit button at a narrow viewport.
+Check that dialogs contain keyboard focus, Escape/Cancel returns focus to the opener,
+and entered values survive dismissal. An open dialog must close on navigation;
+returning rechecks the session before another mutation. Capture `project-create.jpg`
+with the dialog open and an unsaved fixture name.
 Capture `projects.jpg` before adding extra test records to keep the two standard
 fixture rows consistent. These writes affect only the temporary fixture catalog.
 
 Open **Example application** with the keyboard from its name link. The details
 page must show only that project’s repositories and relative default checkout
-paths, a **Back to Projects** link, and unavailable build execution with no build
-or deploy button. Expand **View status** and use **Refresh status** with the keyboard.
+paths, a **Projects** breadcrumb link, and unavailable build execution with no build
+or deploy button. Select **View status** and use **Refresh status** with the keyboard.
 Confirm loading feedback, in-place updates without navigation, and a browser-local
 **Last checked** time only after a valid response. Failed reads must hide prior
 fields and their check time; a retry must recover. A delayed response from before
@@ -49,8 +53,8 @@ Check the other project and a new empty project, then a direct reload and browse
 Back/Forward. Test the details page at a narrow viewport and while signed out.
 A successful attachment from details must reload that same project page.
 For `project-empty.jpg`, open **New project**, create **Example new project**,
-use 1120 × 900, and select `tools` from **Available checkouts** in its already expanded attachment
-form without submitting. Then
+use 1280 × 800, and capture with dialogs closed. Open **Attach repository**, select
+`tools` from **Available checkouts**, and capture `repository-attach.jpg` without submitting. Then
 submit with the keyboard and verify that the first repository appears after
 reload while the browser stays on that project.
 
@@ -63,7 +67,7 @@ manual option; listing never searches recursively. A selected path removed or
 replaced before attachment must still pass the existing attachment validation.
 Check picker labels, focus, narrow layout, session recovery and disabled JavaScript.
 
-Expand a project's **Attach repository** disclosure with the keyboard, enter
+Open a project's **Attach repository** dialog with the keyboard, enter
 `tools` and submit. Its count and default checkout list must update after the
 confirmed reload and persist across another reload. Attach `工具 & <fixture>`
 and verify literal text rendering. A duplicate `frontend` must preserve its
@@ -81,7 +85,7 @@ for a server administrator to configure a trusted root. This environment switch
 belongs only to the ignored test; production has no root environment fallback.
 
 For the UI check, open `/projects` while signed out and confirm a redirect to
-**Sign in** with no protected page content. Home, About and Appearance have the
+**Sign in** with no protected page content. Overview, Releases, Infrastructure, About and Appearance have the
 same guard; `/sign-in` must remain reachable without redirecting again. Submit an
 incorrect password, then the fixture password. Confirm fixed feedback, password clearing,
 and keyboard focus on the error field or successful Account heading. Reload, then
@@ -91,6 +95,10 @@ reloading or directly opening a protected page redirects to Sign in. At a narrow
 viewport, check labelled input, keyboard access, visible focus and no horizontal overflow.
 With JavaScript disabled, the sign-in input and button must remain disabled and
 the page must explain that JavaScript is required.
+
+On Appearance, Tab onto the selected Dark, Nord and Purple choices. Each must
+show an outer focus outline distinct from its selected border. Selecting another
+choice must update its pressed state and retain a visible keyboard focus indicator.
 
 After sign-in returns 204, temporarily block the following `/auth/session` request
 in the browser tool. The page must show **Check account**, not a signed-out state

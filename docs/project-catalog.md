@@ -76,7 +76,7 @@ again. Creation is not idempotent; intentionally repeating a name creates anothe
 project.
 
 Under [#143](https://github.com/devoption/devoption/issues/143), the details page's
-**Rename project** disclosure starts with the saved name. **Save name** sends
+**Rename project** dialog starts with the saved name. **Save name** sends
 `POST /projects/{id}/name` with the same bounded plain UTF-8 body and session,
 CSRF and Origin guards as creation. A fresh, locked catalog snapshot changes only
 that project's display name, preserving IDs, associations, checkout bindings and
@@ -256,7 +256,7 @@ or capacity, 413 oversized body, 415 unsupported encoding, 408 stalled body, and
 503 disabled attachment, busy storage or persistence failure. Messages never echo paths or stored data.
 Inspect saved state after an uncertain result; there is no automatic retry.
 
-Each saved project has an **Attach repository** disclosure when the root is
+Each saved project details page has an **Attach repository** dialog when the root is
 configured. Its labelled form submits to that project's ID and accepts a path
 relative to the administrator's root, with at most 4096 UTF-8 bytes and 64 path
 components. Empty components, `.`/`..` and control characters are rejected before
