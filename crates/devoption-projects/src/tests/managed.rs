@@ -255,6 +255,7 @@ fn encoded_capacity_after_initialization_requires_inspection_before_retry() {
         .join("b".repeat(180))
         .join("c".repeat(180));
     fs::create_dir_all(f.root.join(&parent)).unwrap();
+    let target_bytes = crate::codec::MAX_BYTES - 32;
     'repositories: for i in 0..16 {
         let name = format!("existing-{i}");
         root.initialize(&name).unwrap();
@@ -263,13 +264,13 @@ fn encoded_capacity_after_initialization_requires_inspection_before_retry() {
         for &project in &projects {
             let mut next = catalog.clone();
             next.attach(project, root.permitted(), &path).unwrap();
-            if matches!(crate::codec::encode(&next), Err(Error::Capacity)) {
-                break 'repositories;
+            match crate::codec::encode(&next) {
+                Ok(bytes) if bytes.len() <= target_bytes => catalog = next,
+                Ok(_) | Err(Error::Capacity) => break 'repositories,
+                Err(error) => panic!("invalid capacity fixture: {error}"),
             }
-            catalog = next;
         }
     }
-    let target_bytes = crate::codec::MAX_BYTES - 32;
     for &project in &projects {
         let length = crate::codec::encode(&catalog).unwrap().len();
         assert!(length <= target_bytes);
