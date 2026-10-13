@@ -18,6 +18,9 @@ The [root source verifier](cargo-source-proof.md) separately verifies membership
 of both inputs through supplied Git objects relative to a selected commit ID.
 Its proof is not yet required by or bound to `BuildPlan`; independent revision
 selection, complete source/context and archive verification remain future gates.
+The [offline fixture proof](offline-fixture-build.md) separately compiles trusted
+test code from a checksum-verified seed. It does not consume a `BuildPlan` or
+implement production approval, isolation or job lifecycle.
 
 `BuildPlan::validate` consumes owned `PlanInput` values and reads a supplied
 in-memory catalog snapshot. It requires existing, associated project/repository

@@ -2,13 +2,15 @@
 //!
 //! A bounded supplied-byte Cargo adapter checks a deliberately small manifest and
 //! lockfile subset and hashes those inputs. It performs no filesystem/network I/O.
-//! There is no storage or production provider. Metadata grants no approval.
-//! Provider implementations are responsible for their effects; this crate supplies
-//! only a checked handoff and uses in-memory fixtures in tests.
+//! A single-crate seed provider verifies and owns supplied archive bytes. There
+//! is no acquisition service or runtime caller. Metadata grants no approval.
+//! Provider implementations are responsible for their effects. A separate Linux
+//! integration test compiles only the checked-in trusted offline fixture.
 
 use std::{cmp::Ordering, fmt};
 
 pub mod cargo_inputs;
+pub mod seeded;
 
 pub const MAX_REGISTRY_ID_BYTES: usize = 64;
 pub const MAX_PACKAGE_NAME_BYTES: usize = 64;
@@ -152,10 +154,11 @@ impl CargoDependencyRequest {
     }
 }
 
-/// Description of a future immutable Cargo dependency bundle, including its
+/// Immutable Cargo dependency-bundle metadata, including its
 /// provenance and complete claimed request. No path, URL, executable or credential.
-/// The digest/size describe bundle bytes, not a serialized Rust struct; a physical
-/// bundle format and the producer/consumer verification remain unimplemented.
+/// The digest/size describe bundle bytes, not a serialized Rust struct. A general
+/// physical bundle format remains unimplemented. The single-crate seed provider
+/// uses the exact raw .crate archive as its narrowly defined bundle.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CargoMaterialization {
     request: CargoDependencyRequest,
@@ -220,6 +223,8 @@ pub enum Error {
     Unavailable,
     Denied,
     Integrity,
+    UnsupportedSeed,
+    SeedTooLarge,
 }
 
 impl fmt::Display for Error {
@@ -235,6 +240,8 @@ impl fmt::Display for Error {
             Self::Unavailable => "registry dependency materialization is unavailable",
             Self::Denied => "registry dependency request is denied",
             Self::Integrity => "registry dependency integrity check failed",
+            Self::UnsupportedSeed => "seed provider requires exactly one crates.io package",
+            Self::SeedTooLarge => "seed archive exceeds the provider input bound",
         })
     }
 }

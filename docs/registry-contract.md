@@ -3,8 +3,9 @@
 `devoption-registry` implements the pure dependency contract in
 [#119](https://github.com/devoption/devoption/issues/119), following the approved
 direction: dependency acquisition through DevOption's registry/proxy, then a
-separately approved isolated offline build. Neither stage can run yet. There is
-no registry server, network client, production provider, bundle format, storage,
+separately approved isolated offline build. Neither stage runs in the service yet.
+There is no registry server, network client, production acquisition provider,
+general bundle format, storage,
 credential transport, approval issuer or executor. A bounded
 [supplied-byte Cargo adapter](cargo-inputs.md) validates a narrow manifest/lockfile
 subset without reading a checkout or proving committedness.
@@ -34,10 +35,14 @@ every candidate plan. The running service does not call either domain.
    and fresh validation of actual inputs.
 
 Provider implementations are responsible for their effects and need independent
-authorization. Only in-memory test providers exist. A public constructor creates
+authorization. The [single-crate seed provider](offline-fixture-build.md) verifies
+and owns actual supplied archive bytes; its only consumer is a trusted test.
+A public `CargoMaterialization` constructor creates
 metadata, not proof of registry identity, checked bytes, availability or permission.
-The physical bundle format is deliberately unspecified. Its future producer and
-consumer must verify the same immutable bytes and expected package checksums;
+The seed provider defines its bundle as the exact raw archive, with index and
+configuration remaining separate fixed test context. A general physical bundle
+format is still unspecified. Its future producer and consumer must verify the same
+immutable bytes and expected package checksums;
 hashing a serialized Rust struct or trusting a mutable cache directory is insufficient.
 
 ## Source identity and bounds
@@ -64,8 +69,9 @@ version uniqueness ([registry index](https://doc.rust-lang.org/cargo/reference/r
 
 Requests hold at most 1024 packages and are sorted by original registry, name and
 version identity. Empty sets are supported. SHA-256 inputs require 64 lowercase
-hexadecimal characters. The supplied-byte adapter computes input hashes, but
-package archive and bundle bytes remain unverified.
+hexadecimal characters. The supplied-byte adapter computes input hashes, and
+the seed provider also verifies its one archive. Other metadata constructors do
+not verify package archive or bundle bytes.
 Bundle sizes are `u64` claims, including zero; they do not authorize disk allocation.
 Metadata bounds are not execution/resource policy. Errors omit supplied values,
 and metadata types have no `Debug` implementation that could expose private names.
