@@ -79,6 +79,42 @@ impl Drop for CatalogStore {
 }
 
 impl CatalogStore {
+    /// Create a new empty checkout and publish its identity/association under the
+    /// catalog lock. Never reuse an existing path or remove files on failure.
+    /// An interrupted initialization/save may leave an unregistered checkout;
+    /// inspect saved state before retrying or explicitly attaching it.
+    pub fn create_managed_repository(
+        &mut self,
+        project: crate::ProjectId,
+        root: &crate::worktree::ManagedRoot,
+        name: &str,
+    ) -> Result<crate::RepositoryId, Error> {
+        crate::worktree::ManagedRoot::validate_name(name)?;
+        if !root.permitted().disjoint_directory(&self.directory)? {
+            return Err(Error::RootMismatch);
+        }
+        let mut catalog = self.load()?.unwrap_or_default();
+        if !catalog
+            .projects()
+            .iter()
+            .any(|candidate| candidate.id() == project)
+        {
+            return Err(Error::UnknownProject);
+        }
+        if catalog.repositories().len() >= crate::MAX_REPOSITORIES {
+            return Err(Error::Capacity);
+        }
+        catalog.check_repository_root(root.permitted())?;
+        let path = root.initialize(name)?;
+        // Initialization has already published filesystem state. Even a capacity
+        // failure during catalog encoding now requires inspection before retry.
+        let repository = catalog
+            .attach(project, root.permitted(), &path)
+            .map_err(|_| Error::CreationUncertain)?;
+        self.save(&catalog).map_err(|_| Error::CreationUncertain)?;
+        Ok(repository)
+    }
+
     /// Validate and attach one selected checkout under this writer's lock.
     /// Shared Git common directories reuse a repository identity across projects.
     /// This grants no execution permission and never invokes Git.

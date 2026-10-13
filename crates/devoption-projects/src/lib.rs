@@ -35,6 +35,8 @@ pub enum Error {
     UnknownProject,
     UnknownRepository,
     AlreadyAssociated,
+    RepositoryExists,
+    CreationUncertain,
     CheckoutRequired,
     RootMismatch,
     StaleCheckout,
@@ -59,6 +61,10 @@ impl fmt::Display for Error {
             Self::Capacity => "catalog capacity reached",
             Self::UnknownProject => "project does not exist in this catalog",
             Self::UnknownRepository => "repository does not exist in this catalog",
+            Self::RepositoryExists => "repository path already exists; it was not changed",
+            Self::CreationUncertain => {
+                "repository creation could not be confirmed; inspect storage before retrying"
+            }
             Self::AlreadyAssociated => "repository is already associated with this project",
             Self::CheckoutRequired => {
                 "registered repositories require a validated default checkout"

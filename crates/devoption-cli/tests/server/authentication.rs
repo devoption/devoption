@@ -13,6 +13,8 @@ const PASSWORD: &str = "existing owner fixture only";
 
 #[path = "authentication/installation.rs"]
 mod installation;
+#[path = "authentication/managed.rs"]
+mod managed;
 #[path = "authentication/pages.rs"]
 mod pages;
 #[path = "authentication/profile.rs"]

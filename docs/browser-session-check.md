@@ -200,3 +200,23 @@ References: [cookie attributes and prefixes](https://developer.mozilla.org/en-US
 [synchronizer CSRF tokens](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#synchronizer-token-pattern).
 The separate pre-session follows the
 [login CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html#possible-csrf-vulnerabilities-in-login-forms).
+
+## Managed repository creation
+
+Run the same fixture with `DEVOPTION_BROWSER_MANAGED_ROOT=1` to explicitly enable
+creation only in its disposable root. The default fixture retains inspection-only
+behavior; `DEVOPTION_BROWSER_ROOT_DISABLED=1` takes precedence and disables both.
+Create a project, open Code, then use **New repository** to create `sample-service`.
+The page must reload with a stable new repository entry. **View status** must show
+`main`, **No commits yet** and **Clean**. Reload and verify the same entry/identity.
+
+Check keyboard focus, Escape/Cancel preservation, narrow viewports and 200% text.
+Try an existing root name such as `frontend`: it must report a conflict without
+changing the existing checkout or adding an association. Invalid names such as
+`../outside` must not submit. Hold a creation response and confirm duplicate
+submission is disabled. For an interrupted or unavailable response, creation must
+remain disabled until the user reloads Code and inspects saved state. A failed
+session check must offer Check account without issuing the creation request.
+Capture the creation dialog and saved empty repository described in the
+[screenshot guide](screenshots/README.md). These tests never enable managed mode
+in the persistent preview or use real repository contents.

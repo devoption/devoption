@@ -42,6 +42,25 @@ pub fn run_with_repository_root(
     data_directory: Option<&Path>,
     repository_root: Option<&Path>,
 ) -> io::Result<()> {
+    run_with_roots(port, data_directory, repository_root, false)
+}
+
+/// Explicit creation capability in a selected private repository root. Existing
+/// entries remain untouched; this grants no build, hook or execution authority.
+pub fn run_with_managed_repository_root(
+    port: u16,
+    data_directory: Option<&Path>,
+    repository_root: &Path,
+) -> io::Result<()> {
+    run_with_roots(port, data_directory, Some(repository_root), true)
+}
+
+fn run_with_roots(
+    port: u16,
+    data_directory: Option<&Path>,
+    repository_root: Option<&Path>,
+    managed: bool,
+) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
     // no enrollment permission; only an already-present owner can sign in.
@@ -64,6 +83,8 @@ pub fn run_with_repository_root(
     #[cfg(unix)]
     let configured = owner_identity.is_some();
     #[cfg(not(unix))]
+    let _ = managed;
+    #[cfg(not(unix))]
     if data_directory.is_some() || repository_root.is_some() {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -73,10 +94,17 @@ pub fn run_with_repository_root(
     #[cfg(unix)]
     let projects = if configured {
         Some(
-            projects::Projects::open_with_root(
-                owner_store.as_ref().expect("configured owner has a store"),
-                repository_root,
-            )
+            if managed {
+                projects::Projects::open_with_managed_root(
+                    owner_store.as_ref().expect("configured owner has a store"),
+                    repository_root.expect("managed root supplied"),
+                )
+            } else {
+                projects::Projects::open_with_root(
+                    owner_store.as_ref().expect("configured owner has a store"),
+                    repository_root,
+                )
+            }
             .map_err(|error| io::Error::other(format!("project catalog unavailable: {error}")))?,
         )
     } else {

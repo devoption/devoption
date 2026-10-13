@@ -54,9 +54,19 @@ impl ProjectSection {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn content(
     project: &ProjectSummary<'_>,
     attachment_available: bool,
+    section: ProjectSection,
+) -> String {
+    content_with_creation(project, attachment_available, false, section)
+}
+
+pub(crate) fn content_with_creation(
+    project: &ProjectSummary<'_>,
+    attachment_available: bool,
+    creation_available: bool,
     section: ProjectSection,
 ) -> String {
     let id = identifier(&project.id);
@@ -103,7 +113,7 @@ pub(crate) fn content(
             }
             html.push_str("</section>");
         }
-        ProjectSection::Code => html.push_str(&repositories(project, attachment_available)),
+        ProjectSection::Code => html.push_str(&repositories(project, attachment_available, creation_available)),
         ProjectSection::Settings => {
             html.push_str(r#"<section class="project-settings" aria-labelledby="project-settings-title"><h2 id="project-settings-title">Project details</h2>"#);
             html.push_str(&project_form(Some(project)));
@@ -116,15 +126,23 @@ pub(crate) fn content(
     html
 }
 
-fn repositories(project: &ProjectSummary<'_>, attachment_available: bool) -> String {
+fn repositories(
+    project: &ProjectSummary<'_>,
+    attachment_available: bool,
+    creation_available: bool,
+) -> String {
     let id = identifier(&project.id);
     let mut html = String::from(
         r#"<section aria-labelledby="repositories-title"><div class="section-heading"><h2 id="repositories-title">Repositories</h2>"#,
     );
+    html.push_str(r#"<div class="page-actions">"#);
     if attachment_available {
         html.push_str(r#"<button class="text-button" type="button" data-open-dialog="repository-dialog" disabled><span aria-hidden="true">＋</span>Attach repository</button>"#);
     }
-    html.push_str("</div>");
+    if creation_available {
+        html.push_str(r#"<button class="action-button primary" type="button" data-open-dialog="repository-create-dialog" disabled><span aria-hidden="true">＋</span>New repository</button>"#);
+    }
+    html.push_str("</div></div>");
     if project.repositories.is_empty() {
         html.push_str(r#"<div class="empty-state"><h3>No repositories yet.</h3><p>Repositories registered for this project will appear here.</p></div>"#);
     } else {
@@ -156,10 +174,26 @@ fn repositories(project: &ProjectSummary<'_>, attachment_available: bool) -> Str
         }
         html.push_str("</ul>");
     }
+    if !creation_available {
+        html.push_str(r#"<p class="repository-notice">Repository creation is not configured on this server. An administrator can select managed repository storage.</p>"#);
+    }
     if !attachment_available {
         unavailable_attachment(&mut html);
     }
     html.push_str("</section>");
+    if creation_available {
+        html.push_str(&super::dialog("repository-create-dialog", "New repository", &format!(r#"
+<form id="repository-create-form" class="project-form" data-project="{id}" aria-labelledby="repository-create-dialog-title">
+<label for="repository-create-name">Repository name</label>
+<p id="repository-create-hint">Create an empty Git repository on this server. Use 1–64 letters, numbers, hyphens or underscores, starting with a letter or number.</p>
+<input id="repository-create-name" name="name" type="text" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="repository-create-hint repository-create-status" disabled>
+<p id="repository-create-status" role="status" aria-live="polite">Checking your session…</p>
+<a id="repository-create-reload" href="/projects/{id}/code" hidden>Reload Code</a>
+<a id="repository-create-signin" href="/sign-in" hidden>Check account</a>
+<div class="form-actions"><button class="action-button" type="button" data-close-dialog>Cancel</button><button id="repository-create-submit" class="action-button primary" type="submit" disabled>Create repository</button></div>
+</form>"#)));
+        html.push_str("<noscript><p>JavaScript is required to create a repository.</p></noscript>");
+    }
     if attachment_available {
         attachment(&mut html, &id);
     }

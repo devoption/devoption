@@ -1,6 +1,8 @@
 mod workspace;
 pub use workspace::ProjectSection;
+#[cfg(test)]
 pub(super) use workspace::content as detail;
+pub(super) use workspace::content_with_creation as detail_with_creation;
 
 /// Display-only inputs prepared by the server from a validated catalog snapshot.
 pub struct ProjectSummary<'a> {

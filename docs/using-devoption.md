@@ -63,7 +63,7 @@ transport; transport-neutral Rust session APIs do not enable one over HTTP.
 Missing or rejected mutation credentials receive an empty, non-cacheable 401
 without a Bearer challenge. Without a configured owner, all
 unsafe requests remain denied. With an owner configured at startup, Overview, Projects, Releases, Infrastructure,
-and Appearance GET/HEAD requests require the current session cookie. Missing,
+Appearance and Profile GET/HEAD requests require the current session cookie. Missing,
 invalid or expired sessions receive a non-cacheable redirect to `/sign-in` without
 page content. Sign in stays public; the unconfigured preview stays public. This
 startup choice cannot be changed by a request or by removing the owner record from
@@ -98,10 +98,11 @@ Development checks create owners only in [temporary fixture stores](browser-sess
 
 ## Projects and repositories
 
-Repository attachment currently inspects existing server checkouts. It is an optional
-preview workflow, not the intended prerequisite for creating software in DevOption.
-Server-managed repository creation through the UI or CLI is planned; it is not
-implemented yet.
+Create repositories through **New repository** on a project's Code page after an
+administrator selects [managed storage](managed-repositories.md). DevOption creates
+and registers each empty Git checkout on the server. Existing-checkout attachment
+is an optional inspection/import path. Source editing, initial commits, Git hosting,
+builds and deployment remain unavailable.
 
 Projects displays saved names, repository names and counts from the
 [catalog](project-catalog.md). Open a project name to see its repositories,
@@ -129,7 +130,7 @@ placeholder. Open the project’s **Settings**, edit its name and select
 associations and checkout paths. If saving cannot be confirmed, reload before
 retrying. Project deletion is not implemented. The installation
 guide's [offline backup procedure](private-linux-install.md#restart-backup-and-restore)
-preserves the owner and optional catalog together; repository contents require a
+preserves the owner, optional profile and optional catalog together; repository contents require a
 separate backup.
 
 On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` to

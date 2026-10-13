@@ -33,6 +33,8 @@ fn renaming_changes_only_the_selected_name_and_rejects_invalid_input() {
 }
 
 #[cfg(unix)]
+mod managed;
+#[cfg(unix)]
 mod registration;
 #[cfg(unix)]
 mod storage;

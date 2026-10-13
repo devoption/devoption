@@ -126,6 +126,12 @@ This does not promise unattended persistence on another host. If `systemctl --us
 cannot connect, stop and have the account/session prerequisites checked; do not
 substitute a root service.
 
+For UI-created repositories, an operator can select an existing private repository
+root with `--managed-repository-root` in the service's `ExecStart`, then reload the
+unit and restart it. This is an explicit creation grant, separate from inspection-only
+`--repository-root`; never use both. See [managed storage and recovery](managed-repositories.md)
+before changing a deployed service. Repository contents need their own backup.
+
 ## Optional startup before login
 
 If unattended startup is required, first obtain approval from the account owner

@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add **New repository** on a project's Code page with explicit managed-root
+  startup configuration. Create and persist empty private Git repositories,
+  preserve existing paths, and keep inspection-only roots unchanged. Document
+  interrupted creation and recovery without automatic deletion or retry
+  ([#162](https://github.com/devoption/devoption/issues/162)).
+
 - Add a dedicated Profile page for saving or clearing a display name. Keep names
   in private server storage across restarts and show the name and initials in the
   account menu, with “Account” when unset and Owner retained as the role. Include

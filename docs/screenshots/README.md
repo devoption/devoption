@@ -13,13 +13,15 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
 | Project overview | `/projects/{id}` | Example application; repository summary; 1280 × 900 | `project-details.jpg` |
-| Project code | `/projects/{id}/code` | Frontend status read with Last checked; 1280 × 900 | `project-code.jpg` |
+| Project code | `/projects/{id}/code` | Managed creation enabled; frontend status read with Last checked; 1280 × 900 | `project-code.jpg` |
 | Project builds | `/projects/{id}/builds` | Unavailable state | `project-builds.jpg` |
 | Project releases | `/projects/{id}/releases` | Unavailable state | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit | `project-settings.jpg` |
+| Create repository | `/projects/{id}/code` | New repository dialog; sample-service entered, not submitted | `repository-create.jpg` |
+| Created repository | `/projects/{id}/code` | sample-service created; main, No commits yet, Clean; 1280 × 900 | `repository-created.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; dialogs closed | `project-empty.jpg` |
-| Attach repository | `/projects/{id}/code` | Empty project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
+| Attach repository | `/projects/{id}/code` | Example new project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
 | Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
 | Profile | `/settings/profile` | Save disposable name Alex Morgan; initials visible | `profile.jpg` |
@@ -36,10 +38,10 @@ Start the [temporary browser fixture](../browser-session-check.md) from the
 repository root after installing the [normal prerequisites](../../README.md#quick-start):
 
 ```sh
-cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
+DEVOPTION_BROWSER_MANAGED_ROOT=1 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
-Use its printed origin and port, not the persistent preview on port 3000. The
+Use its printed origin and port, not the persistent preview on port 3000. Managed creation is enabled only for its temporary root. The
 fixture creates a temporary owner, catalog, Git metadata trees and an untracked
 frontend README; it stops after ten minutes. No real owner or repository is needed.
 The fixture password is `browser transport fixture only`.
@@ -67,12 +69,14 @@ printed ephemeral origin. Do not create an owner for that capture.
 5. For `sign-in-check.jpg`, sign out, start another fixture sign-in and block its
    post-sign-in `/auth/session` check. Capture **Check account**, then remove the
    block and verify recovery without another password submission.
-6. Capture the browser viewport as JPEG, excluding browser/desktop chrome. Keep
+6. On the new project’s Code page, capture **New repository** with **sample-service**
+   entered. Submit, use **View status**, then capture the saved empty repository.
+7. Capture the browser viewport as JPEG, excluding browser/desktop chrome. Keep
    scroll at the top, pointer off controls, and no focus outline or developer
-   overlay. Only the two named dialog captures should have a dialog open.
-7. Capture Profile after saving **Alex Morgan** in the disposable fixture. Clear
+   overlay. Only the named dialog captures should have a dialog open.
+8. Capture Profile after saving **Alex Morgan** in the disposable fixture. Clear
    the name before other main-page captures so their account label remains **Account**.
-8. Inspect the images, text, active navigation and gallery entries before
+9. Inspect the images, text, active navigation and gallery entries before
    committing. Restore browser preferences and clear temporary overrides.
 
 All Appearance variants use **1280 × 900** and the save confirmation:

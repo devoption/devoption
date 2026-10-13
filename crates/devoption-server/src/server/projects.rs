@@ -14,6 +14,7 @@ use devoption_projects::{
 };
 use tokio::sync::Mutex;
 
+mod managed;
 mod pages;
 
 #[cfg(test)]
@@ -24,9 +25,23 @@ pub(super) struct Projects {
     directory: Arc<CatalogDirectory>,
     gate: Arc<Mutex<()>>,
     root: Option<Arc<PermittedRoot>>,
+    managed: Option<Arc<devoption_projects::worktree::ManagedRoot>>,
 }
 
 impl Projects {
+    pub(super) fn open_with_managed_root(
+        owner: &crate::owner_store::OwnerStore,
+        root: &Path,
+    ) -> Result<Self, Error> {
+        let mut projects = Self::open_with_root(owner, Some(root))?;
+        projects.managed = Some(Arc::new(
+            devoption_projects::worktree::ManagedRoot::from_permitted(Arc::clone(
+                projects.root.as_ref().expect("selected root"),
+            ))?,
+        ));
+        Ok(projects)
+    }
+
     pub(super) fn open_with_root(
         owner: &crate::owner_store::OwnerStore,
         root: Option<&Path>,
@@ -44,6 +59,7 @@ impl Projects {
             directory: Arc::new(directory),
             gate: Arc::new(Mutex::new(())),
             root: root.map(Arc::new),
+            managed: None,
         })
     }
 
@@ -63,6 +79,7 @@ impl Projects {
 }
 
 pub(super) fn routes(projects: Projects) -> Router {
+    let creation = managed::routes(projects.clone());
     let reader = projects.clone();
     let attachment = projects.clone();
     let options = projects.clone();
@@ -70,6 +87,7 @@ pub(super) fn routes(projects: Projects) -> Router {
     let renamer = projects.clone();
     Router::new()
         .merge(pages::routes(projects.clone()))
+        .merge(creation)
         .route(
             "/projects/{project}/name",
             axum::routing::post(move |project: Result<RoutePath<String>, PathRejection>, request: Request| async move {
