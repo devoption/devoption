@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Bind candidate build plans to verified root Cargo source proofs. Reject commit
+  and dependency-request mismatches and retain proof identity in job plan equality;
+  build execution and approval remain unimplemented
+  ([#167](https://github.com/devoption/devoption/issues/167)).
+
 - Add **New repository** on a project's Code page with explicit managed-root
   startup configuration. Create and persist empty private Git repositories,
   preserve existing paths, and keep inspection-only roots unchanged. Document

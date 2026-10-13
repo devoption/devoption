@@ -130,7 +130,7 @@ fn changed_plan_cannot_start_or_complete_an_attempt() {
     // Full-field equality already has dedicated BuildPlan tests; exercise its
     // use at this boundary with source, environment, dependency and limit changes.
     let changes: &[fn(&mut crate::PlanInput)] = &[
-        |p| p.commit.replace_range(..1, "a"),
+        crate::tests::change_source_revision,
         |p| p.environment[0].value = "other".into(),
         |p| p.limits.elapsed_seconds += 1,
         |p| p.rust_version = "1.98.0".into(),

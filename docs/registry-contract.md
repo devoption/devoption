@@ -80,8 +80,10 @@ and metadata types have no `Debug` implementation that could expose private name
 
 The separate [root source verifier](cargo-source-proof.md) binds the adapter's
 input bytes through supplied Git objects to a selected commit ID. Independently
-trusted revision selection, complete source/context verification, plan binding
-and actual dependency completeness remain required. Registry materialization
+trusted revision selection, complete source/context verification and actual
+dependency completeness remain required. [Build plans](build-plans.md) now retain
+that proof and require an exact match with the materialization's complete request.
+Registry materialization
 also needs verified immutable storage and explicit access and upstream policy.
 The runner consumes the checked descriptor and verified bundle;
 it must never silently contact an upstream when data is missing.

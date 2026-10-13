@@ -16,8 +16,14 @@ The separate [supplied-byte adapter](cargo-inputs.md) validates a narrow Cargo
 subset into that descriptor. It does not verify committed source or actual archives.
 The [root source verifier](cargo-source-proof.md) separately verifies membership
 of both inputs through supplied Git objects relative to a selected commit ID.
-Its proof is not yet required by or bound to `BuildPlan`; independent revision
-selection, complete source/context and archive verification remain future gates.
+Under [#167](https://github.com/devoption/devoption/issues/167), every plan now
+requires and retains that immutable proof. Validation matches both the selected
+commit and the complete materialization request against it: registry identity,
+manifest/lockfile hashes and the package list with each origin, name, version and
+archive checksum. A mismatch returns `SourceMismatch` before a plan exists.
+The proof's commit/tree SHA-256 values participate in full plan equality.
+Independent revision selection, complete source/context and archive verification
+remain future gates; matching metadata does not verify bundle contents.
 The [offline fixture proof](offline-fixture-build.md) separately compiles trusted
 test code from a checksum-verified seed. It does not consume a `BuildPlan` or
 implement production approval, isolation or job lifecycle.
@@ -29,8 +35,10 @@ issuer, persistence or runtime integration.
 in-memory catalog snapshot. It requires existing, associated project/repository
 IDs with a registered default checkout. Metadata-only associations are rejected.
 It neither re-inspects that checkout nor reads any filesystem, environment, Git
-object or network resource. Tests register synthetic Git layouts in temporary
-directories, remove them, then validate against the saved in-memory snapshot.
+object or network resource. The source proof must first be produced by the existing
+supplied-byte verifier; it cannot be replaced with a raw commit/hash claim.
+Tests register synthetic Git layouts in temporary directories, remove them, then
+validate against the saved in-memory snapshot and public synthetic object proofs.
 
 The immutable result exposes read-only details and a fixed argument vector:
 
@@ -47,7 +55,8 @@ approval, freshness check or durable plan identifier.
 
 - A nonzero, lowercase, full 40-character SHA-1 object ID; symbolic refs,
   abbreviations and SHA-256 are unsupported. Syntax does not establish that the
-  object exists, is a commit or belongs to the selected repository.
+  object belongs to the selected repository. The required proof separately verifies
+  the supplied commit object and root Cargo membership relative to that ID.
 - An exact stable numeric Rust version (`major.minor.patch`, each component at
   most 65535, nonzero major, no leading zeros). Floating channels, prereleases
   and target triples are unsupported. This records the requested version; it
@@ -72,9 +81,9 @@ approval, freshness check or durable plan identifier.
 
 ## Before execution can exist
 
-The future approval/execution layer must verify the source commit and fresh
-catalog binding, bind and verify the registry descriptor against the committed
-manifest, lockfile and actual bundle, create a clean owned work directory without modifying
+The future approval/execution layer must authenticate repository/revision selection
+and a fresh catalog binding, verify the complete source/target and actual registry
+bundle, and create a clean owned work directory without modifying
 the user's checkout, verify toolchain/executable identity, and define an explicit
 environment allowlist and registry access/network policy. A Cargo `--offline` flag does not
 prevent build scripts or compilers from using the network and is not a sandbox.

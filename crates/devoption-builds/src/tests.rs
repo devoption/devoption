@@ -10,7 +10,7 @@ fn digest(byte: u8) -> Sha256 {
     Sha256::from_hex(&format!("{byte:02x}").repeat(32)).unwrap()
 }
 
-fn dependencies() -> CargoMaterialization {
+fn dependencies(source: &cargo_source::RootCargoSource) -> CargoMaterialization {
     struct FixtureProvider;
     impl CargoRegistryProvider for FixtureProvider {
         fn materialize(
@@ -20,19 +20,45 @@ fn dependencies() -> CargoMaterialization {
             Ok(CargoMaterialization::new(request.clone(), digest(3), 100))
         }
     }
-    let request = CargoDependencyRequest::new(
-        RegistryId::new("local-registry").unwrap(),
-        digest(4),
-        digest(2),
-        vec![LockedPackage {
-            origin: CargoOrigin::CratesIo,
-            name: "example-dependency".into(),
-            version: "1.0.0".into(),
-            archive_sha256: digest(1),
-        }],
+    prepare_dependencies(&FixtureProvider, source.request()).unwrap()
+}
+
+// Reuse the public synthetic objects already independently pinned by verifier tests.
+fn source(changed_commit: bool) -> cargo_source::RootCargoSource {
+    let mut commit = include_bytes!("cargo_source/fixtures/root.commit").to_vec();
+    let mut selected = "d968ac8a8213026f1e229bc64c687f51a4f1c09c".to_owned();
+    if changed_commit {
+        commit.extend_from_slice(b"Another fixture revision\n");
+        let mut hash = sha1collisiondetection::Sha1CD::default();
+        hash.update(format!("commit {}\0", commit.len()).as_bytes());
+        hash.update(&commit);
+        selected = hash
+            .finalize_cd()
+            .unwrap()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+    }
+    cargo_source::verify_root(
+        RegistryId::new("fixture-registry").unwrap(),
+        &selected,
+        cargo_source::RootProof {
+            commit: &commit,
+            tree: include_bytes!("cargo_source/fixtures/root.tree"),
+            manifest: include_bytes!(
+                "../../devoption-registry/src/cargo_inputs/fixtures/standalone.toml"
+            ),
+            lockfile: include_bytes!(
+                "../../devoption-registry/src/cargo_inputs/fixtures/standalone.lock"
+            ),
+        },
     )
-    .unwrap();
-    prepare_dependencies(&FixtureProvider, &request).unwrap()
+    .unwrap()
+}
+
+pub(crate) fn change_source_revision(input: &mut PlanInput) {
+    input.source = source(true);
+    input.commit = input.source.commit().to_owned();
 }
 
 // Synthetic Git metadata only: no Git commands, commits, hooks or build scripts.
@@ -74,11 +100,13 @@ pub(crate) fn fixture() -> (Catalog, PlanInput) {
         .attach_repository(other, &root, Path::new("first"))
         .unwrap();
     let catalog = store.load().unwrap().unwrap();
+    let source = source(false);
     let input = PlanInput {
         project,
         repository,
-        commit: "0123456789abcdef0123456789abcdef01234567".into(),
-        dependencies: dependencies(),
+        commit: source.commit().to_owned(),
+        dependencies: dependencies(&source),
+        source,
         rust_version: "1.99.0".into(),
         cargo_executable: "/example/toolchains/1.99.0/bin/cargo".into(),
         work_directory: "/example/jobs/one".into(),
@@ -132,7 +160,7 @@ fn every_reviewed_field_changes_plan_equality() {
     let (catalog, input) = fixture();
     let original = BuildPlan::validate(input.clone(), &catalog).unwrap();
     let changes: &[fn(&mut PlanInput)] = &[
-        |p| p.commit.replace_range(..1, "a"),
+        change_source_revision,
         |p| p.rust_version = "1.98.0".into(),
         |p| p.cargo_executable = "/other/bin/cargo".into(),
         |p| p.work_directory = "/example/jobs/two".into(),
@@ -158,7 +186,7 @@ fn every_reviewed_field_changes_plan_equality() {
 }
 
 #[test]
-fn dependency_provenance_lockfile_packages_and_bundle_identity_change_the_plan() {
+fn source_binding_rejects_mismatched_request_and_retains_bundle_identity() {
     let (catalog, input) = fixture();
     let original = BuildPlan::validate(input.clone(), &catalog).unwrap();
     let snapshot = input.dependencies.clone();
@@ -173,21 +201,21 @@ fn dependency_provenance_lockfile_packages_and_bundle_identity_change_the_plan()
         .unwrap(),
         CargoDependencyRequest::new(
             RegistryId::new("different-provider").unwrap(),
-            digest(4),
+            request.manifest_sha256(),
             request.lockfile_sha256(),
             request.packages().to_vec(),
         )
         .unwrap(),
         CargoDependencyRequest::new(
             request.registry().clone(),
-            digest(4),
+            request.manifest_sha256(),
             digest(99),
             request.packages().to_vec(),
         )
         .unwrap(),
         CargoDependencyRequest::new(
             request.registry().clone(),
-            digest(4),
+            request.manifest_sha256(),
             request.lockfile_sha256(),
             Vec::new(),
         )
@@ -206,32 +234,48 @@ fn dependency_provenance_lockfile_packages_and_bundle_identity_change_the_plan()
         requests.push(
             CargoDependencyRequest::new(
                 request.registry().clone(),
-                digest(4),
+                request.manifest_sha256(),
                 request.lockfile_sha256(),
                 packages,
             )
             .unwrap(),
         );
     }
-    let mut variants: Vec<_> = requests
-        .into_iter()
-        .map(|r| CargoMaterialization::new(r, snapshot.bundle_sha256(), snapshot.bundle_bytes()))
-        .collect();
-    variants.push(CargoMaterialization::new(
-        request.clone(),
-        digest(97),
-        snapshot.bundle_bytes(),
-    ));
-    variants.push(CargoMaterialization::new(
-        request.clone(),
-        snapshot.bundle_sha256(),
-        101,
-    ));
-    for dependencies in variants {
+    for request in requests {
+        let mut changed = input.clone();
+        changed.dependencies =
+            CargoMaterialization::new(request, snapshot.bundle_sha256(), snapshot.bundle_bytes());
+        rejected(&catalog, changed, Error::SourceMismatch);
+    }
+    for dependencies in [
+        CargoMaterialization::new(request.clone(), digest(97), snapshot.bundle_bytes()),
+        CargoMaterialization::new(request.clone(), snapshot.bundle_sha256(), 101),
+    ] {
         let mut changed = input.clone();
         changed.dependencies = dependencies;
         assert!(BuildPlan::validate(changed, &catalog).unwrap() != original);
     }
+}
+
+#[test]
+fn selected_commit_and_proof_cannot_be_changed_independently() {
+    let (catalog, input) = fixture();
+    let before = catalog.clone();
+    let original = BuildPlan::validate(input.clone(), &catalog).unwrap();
+    let mut changed = input.clone();
+    changed.commit = source(true).commit().to_owned();
+    rejected(&catalog, changed, Error::SourceMismatch);
+    let mut changed = input.clone();
+    changed.source = source(true);
+    rejected(&catalog, changed, Error::SourceMismatch);
+    let mut changed = input.clone();
+    change_source_revision(&mut changed);
+    let rebound = BuildPlan::validate(changed, &catalog).unwrap();
+    assert!(rebound != original);
+    assert!(original.details().source == input.source);
+    assert!(rebound.details().source.commit_sha256() != original.details().source.commit_sha256());
+    assert!(rebound.details().source.tree_sha256() == original.details().source.tree_sha256());
+    assert_eq!(catalog, before);
 }
 
 #[test]
