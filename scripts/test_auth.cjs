@@ -149,6 +149,41 @@ test("project requests cannot double-submit or navigate after pagehide", async (
   assert.deepEqual(current.navigation, []);
 });
 
+test("confirmed history recovery clears only temporary repository session errors", async () => {
+  for (const recovered of [response(204, nextCsrf), response(401)]) {
+    const current = page({ form: false, repositories: true, initial: response(503) });
+    await tick();
+    assert.match(current.nodes.get("repository-0-status").textContent, /session could not be checked/);
+    current.event("pagehide");
+    current.queue.push(recovered);
+    current.event("pageshow", { persisted: true });
+    await tick();
+    assert.equal(current.nodes.get("repository-0-status").textContent, "");
+    assert.equal(current.nodes.get("repository-0-submit").disabled, recovered.status === 401);
+  }
+});
+
+test("attachment feedback survives failed and successful history session checks", async () => {
+  const current = page({ form: false, repositories: true, initial: response(204, csrf) });
+  await tick();
+  current.queue.push(response(409, null, null, "already-associated"));
+  await current.attach("team/app");
+  const feedback = current.nodes.get("repository-0-status").textContent;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    current.event("pagehide");
+    current.queue.push(response(503));
+    current.event("pageshow", { persisted: true });
+    await tick();
+    assert.match(current.nodes.get("repository-0-status").textContent, /session could not be checked/);
+  }
+  current.event("pagehide");
+  current.queue.push(response(204, nextCsrf));
+  current.event("pageshow", { persisted: true });
+  await tick();
+  assert.equal(current.nodes.get("repository-0-status").textContent, feedback);
+  assert.equal(current.nodes.get("repository-0-path").value, "team/app");
+});
+
 test("unconfigured preview performs no authentication requests", async () => {
   const current = page({ configured: false, form: false });
   await tick();
@@ -471,6 +506,12 @@ test("attachment shares the mutation gate and ignores responses after pagehide",
   finish(response(204));
   await pending;
   assert.deepEqual(current.navigation, []);
+  assert.match(current.nodes.get("repository-0-status").textContent, /Reload.*whether.*completed/);
+  current.queue.push(response(204, nextCsrf));
+  current.event("pageshow", { persisted: true });
+  await tick();
+  assert.equal(current.nodes.get("repository-0-submit").disabled, false);
+  assert.match(current.nodes.get("repository-0-status").textContent, /Reload.*whether.*completed/);
 });
 
 test("failed session recovery and malformed project context cannot submit a checkout", async () => {

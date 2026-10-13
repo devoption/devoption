@@ -14,6 +14,7 @@
     const repositoryForms = Array.from(document.querySelectorAll(".repository-form")).map((form) => ({
       form, path: form.querySelector("[data-repository-path]"),
       submit: form.querySelector("[data-repository-submit]"), status: form.querySelector("[data-repository-status]"),
+      beforeSessionFailure: null, pending: false,
     }));
     // null: confirmed signed out; undefined: session check failed; string: verified.
     let csrf = null;
@@ -40,6 +41,12 @@
     const state = (value) => {
       csrf = value;
       const unchecked = csrf === undefined;
+      if (!unchecked) repositoryForms.forEach((repository) => {
+        if (repository.beforeSessionFailure !== null) {
+          repository.status.textContent = repository.beforeSessionFailure;
+          repository.beforeSessionFailure = null;
+        }
+      });
       if (form) {
         form.hidden = csrf !== null;
         byId("auth-recheck").hidden = !unchecked;
@@ -60,7 +67,10 @@
     const uncheckedSession = () => {
       state(undefined);
       message("Your session could not be checked. Use Check account to retry.");
-      repositoryForms.forEach((repository) => { repository.status.textContent = "Your session could not be checked. Open Check account to retry."; });
+      repositoryForms.forEach((repository) => {
+        if (repository.beforeSessionFailure === null) repository.beforeSessionFailure = repository.status.textContent;
+        repository.status.textContent = "Your session could not be checked. Open Check account to retry.";
+      });
     };
     const request = (path, options = {}) => fetch(path, {
       method: "POST", credentials: "same-origin", cache: "no-store",
@@ -235,6 +245,7 @@
       busy = true;
       controls();
       repository.status.textContent = "Attaching repository…";
+      repository.pending = true;
       let saved = false;
       const uncertain = "Attachment could not be confirmed. Reload the project list before trying again.";
       try {
@@ -277,7 +288,7 @@
       } catch {
         if (current === version) repository.status.textContent = uncertain;
       } finally {
-        if (current === version) { busy = saved; controls(); }
+        if (current === version) { repository.pending = saved; busy = saved; controls(); }
       }
     }));
     signouts.forEach((button) => button.addEventListener("click", async function () {
@@ -313,6 +324,12 @@
       csrf = null;
       busy = false;
       if (password) password.value = "";
+      repositoryForms.forEach((repository) => {
+        if (repository.pending) {
+          repository.status.textContent = "Reload the project list to check whether the attachment completed before trying again.";
+          repository.pending = false;
+        }
+      });
       controls();
     });
     window.addEventListener("pageshow", (event) => { if (event.persisted) recover(); });

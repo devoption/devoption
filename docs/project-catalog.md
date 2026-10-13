@@ -207,6 +207,10 @@ pending-request gate. An empty 204 reloads the current list; other responses kee
 the entered path and do not claim a saved row. Expired sessions disable mutation
 controls. Without a configured root, the page explains the requirement and omits
 attachment forms while still showing saved summaries.
+History restoration checks the live session again. A confirmed recovery removes
+temporary session-check feedback without erasing attachment results. If navigation
+interrupted a request or its reload, the restored form asks the owner to reload
+the list and check whether attachment completed.
 
 Attachment failures include a fixed `X-DevOption-Error` code: `already-associated`
 and `checkout-changed` distinguish duplicate and stale/root conflicts;

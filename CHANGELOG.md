@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Restored Projects pages clear temporary session-check errors after confirmed
+  recovery, preserve attachment feedback, and replace interrupted progress with
+  a reload warning ([#111](https://github.com/devoption/devoption/issues/111)).
+
 - Repository attachment now distinguishes an unavailable storage response from
   network or unexpected failures while retaining the uncertain-save warning
   and entered path ([#111](https://github.com/devoption/devoption/issues/111)).
