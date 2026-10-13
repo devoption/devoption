@@ -216,7 +216,9 @@ Authentication guards retain their existing 401/403 responses. The browser uses
 only the status and fixed code, never server error text. Duplicates leave the
 existing default unchanged. Stale checkouts require inspection by the server
 administrator; network or storage failures require reloading the saved list
-before retrying. No automatic repair, replacement or retry is offered.
+before retrying. An explicit storage-unavailable response has its own message,
+but does not imply that a save failed before publication. No automatic repair,
+replacement or retry is offered.
 
 Under the writer lock, the domain loads the latest catalog, validates the selected
 checkout with bounded reads, reuses the repository ID for its common Git directory,

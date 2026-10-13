@@ -267,6 +267,8 @@
           repository.status.textContent = "Project unavailable. Reload the project list.";
         } else if (response.status === 503 && code === "root-unconfigured") {
           repository.status.textContent = "Repository attachment is not configured on this server. Ask the server administrator to select a trusted root.";
+        } else if (response.status === 503 && code === "unavailable") {
+          repository.status.textContent = "Repository storage is unavailable. The attachment could not be confirmed. Reload the project list before trying again.";
         } else if (response.status === 403) {
           repository.status.textContent = "The request was denied. Reload the project list before trying again.";
         } else {

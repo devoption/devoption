@@ -439,6 +439,7 @@ test("repository failures retain paths, distinguish conflicts, and never claim a
     [response(409, null, null, "<private>"), /conflicts with saved state/],
     [response(404), /Project unavailable/], [response(401), /session ended/],
     [response(503, null, null, "root-unconfigured"), /not configured/],
+    [response(503, null, null, "unavailable"), /storage is unavailable.*could not be confirmed/],
     [response(403), /request was denied/], [response(503), /could not be confirmed/],
     [response(200), /could not be confirmed/], [new Error("private fixture error"), /could not be confirmed/],
   ]) {

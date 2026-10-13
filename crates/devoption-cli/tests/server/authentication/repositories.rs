@@ -254,7 +254,9 @@ fn attachment_input_and_storage_errors_never_echo_paths_or_report_success() {
         404
     );
     let writer = CatalogStore::open_absolute(&data).unwrap();
-    assert_eq!(status(address, &raw), 503);
+    let unavailable = request(address, &raw);
+    assert!(unavailable.starts_with("HTTP/1.1 503"));
+    assert!(unavailable.contains("x-devoption-error: unavailable\r\n"));
     drop(writer);
     assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
     fs::write(
@@ -262,7 +264,9 @@ fn attachment_input_and_storage_errors_never_echo_paths_or_report_success() {
         b"private fixture corrupt catalog",
     )
     .unwrap();
-    assert_eq!(status(address, &raw), 503);
+    let unavailable = request(address, &raw);
+    assert!(unavailable.starts_with("HTTP/1.1 503"));
+    assert!(unavailable.contains("x-devoption-error: unavailable\r\n"));
     assert_eq!(
         fs::read(data.join("projects.bin")).unwrap(),
         b"private fixture corrupt catalog"

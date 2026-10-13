@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Repository attachment now distinguishes an unavailable storage response from
+  network or unexpected failures while retaining the uncertain-save warning
+  and entered path ([#111](https://github.com/devoption/devoption/issues/111)).
+
 - Dropping a catalog writer now explicitly releases its advisory lock, avoiding
   a spurious busy result while a concurrent subprocess retains a descriptor
   before exec. A deterministic regression preserves live-writer exclusion

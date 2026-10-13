@@ -16,7 +16,7 @@ Use each path below with the fixture's printed origin and port.
 | Page | Path | Capture state | File |
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
-| Projects | `/projects` | Signed in, fixture projects and first attachment form expanded; 1120 × 900 | `projects.jpg` |
+| Projects | `/projects` | Signed in, first attachment form expanded with `tools` entered; 1120 × 900 | `projects.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
 | Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
@@ -50,7 +50,8 @@ Remove the block and verify recovery without another sign-in after capturing it.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
    For Projects, use **1120 × 900** and expand the first project's **Attach
-   repository** form to include both fixture projects and the new controls.
+   repository** form. Enter `tools` without submitting, to show the relative path
+   alongside both fixture projects and the controls.
    A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out
    capture. After sign-in, follow the profile popup's **Appearance** link and confirm
    these choices for the main-page captures. The browser remembers them.
