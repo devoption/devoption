@@ -1,4 +1,10 @@
-# Proposed one-shot local runner rehearsal — not approved or implemented
+# One-shot local runner rehearsal profile
+
+This profile received separate approval for one disposable fixture attempt on
+2026-10-13. That attempt is complete: Cargo exited successfully, but artifact
+verification failed. See the [results and limitations](disposable-build-rehearsal.md).
+The profile below records the approved scope; it is not a reusable execution grant
+or an implemented production runner. Another attempt requires separate approval.
 
 Scope: one trusted `offline-fixture` attempt from this repository's reviewed merge
 commit for [PR #128](https://github.com/devoption/devoption/pull/128). Use only the
@@ -44,7 +50,7 @@ instance, server route/UI, production event issuer, release or deployment.
   stop at 3.75 GiB and require 20 GiB host free space; abort rather than delete
   unrelated or user-owned artifacts. Leave localhost:3000 and other apps untouched.
 
-These are proposed controls to implement and verify in a later scoped change,
-not claims that an execution sandbox already exists. Approval would cover only
-this one disposable fixture attempt and its temporary guest setup/cleanup, not
-production execution, arbitrary code, repository registration or deployment.
+Approval covered only this one disposable fixture attempt and its temporary guest
+setup/cleanup, not production execution, arbitrary code, repository registration
+or deployment. The results distinguish observed controls from unexercised paths;
+this profile alone is not evidence that a control worked.

@@ -59,6 +59,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A separately approved disposable Ubuntu rehearsal records one successful offline
+  Cargo compile, observed job restrictions, and cleanup. Artifact metadata
+  verification failed before a checksum or size was recorded, so the rehearsal
+  is not a successful end-to-end build result. No production runner is added
+  ([#131](https://github.com/devoption/devoption/issues/131)).
+
 - In-memory build jobs bind queued/running/succeeded/failed/cancelled records to
   an exact immutable plan and attempt identity. Transition tests cover mismatched
   results, cancellation, terminal rewrites and artifact metadata; sealed runner
