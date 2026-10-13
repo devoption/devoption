@@ -203,8 +203,10 @@
         if (current !== version) return;
         if (response.status === 204) {
           saved = true;
-          projectStatus.textContent = "Project saved. Loading the list…";
-          window.location.assign("/projects");
+          const location = response.headers.get("location");
+          const destination = /^\/projects\/[0-9a-f]{32}$/.test(location || "") ? location : "/projects";
+          projectStatus.textContent = destination === "/projects" ? "Project saved. Opening Projects…" : "Project saved. Opening project…";
+          window.location.assign(destination);
           return;
         }
         if (response.status === 401) {

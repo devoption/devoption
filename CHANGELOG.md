@@ -59,6 +59,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Creating a project opens its saved details directly, including for duplicate
+  names. Empty projects expand the configured first-repository attachment form
+  ([#137](https://github.com/devoption/devoption/issues/137)).
+
 - Saved project names open a dedicated details page with repositories, relative
   checkout paths, repository attachment and truthful build availability. Attachment
   keeps you on the current page ([#135](https://github.com/devoption/devoption/issues/135)).

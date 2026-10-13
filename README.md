@@ -120,8 +120,10 @@ form; a successful attachment reloads the page you are using. Build execution is
 not available yet. Signed-in owners can create an empty project
 with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
 characters. Names need not be unique; the catalog holds up to 64 projects. A
-successful save reloads the current list without restarting the server. If a save
-cannot be confirmed, reload the list before retrying to avoid duplicate names.
+successful save opens the newly created project without restarting the server.
+When repository attachment is configured, its empty details page opens the first
+attachment form automatically. If a save cannot be confirmed, reload the list
+before retrying to avoid duplicate names.
 An absent catalog shows an empty list; invalid state stops startup or fails the
 current request without resetting records. The unconfigured preview retains its
 placeholder. Project renaming and deletion are not implemented. The installation
@@ -162,6 +164,10 @@ browser installation is deferred. The preview exposes no first-owner setup route
 **Project details (temporary fixture data)**
 
 ![Project details page](docs/screenshots/project-details.jpg)
+
+**New project, ready for its first repository**
+
+![Empty project details](docs/screenshots/project-empty.jpg)
 
 **About**
 

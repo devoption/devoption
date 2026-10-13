@@ -24,8 +24,11 @@ paths. The command prints the disposable root for fixture inspection. No real
 repositories are opened and no Git command runs.
 
 After signing in, use the Projects form to create a new fixture name with the
-keyboard. It must appear with zero repositories immediately after the page reloads
-and remain after another reload. Check a non-ASCII name and markup characters;
+keyboard. A confirmed save must open the newly created project details directly,
+with zero repositories and the attachment form expanded when a trusted root is
+configured. Reload and verify that project persists. Create another project with
+the same name; it must open a different saved project, not the first one. Use
+**Back to Projects** to confirm both entries. Check a non-ASCII name and markup characters;
 they must display as text. Invalid/oversized names must not create a row. A failed
 save must retain the name and ask you to inspect the list before retrying, without
 claiming success. Check the labelled form and submit button at a narrow viewport.
@@ -39,6 +42,10 @@ or deploy button. Capture `project-details.jpg` before attaching more fixtures.
 Check the other project and a new empty project, then a direct reload and browser
 Back/Forward. Test the details page at a narrow viewport and while signed out.
 A successful attachment from details must reload that same project page.
+For `project-empty.jpg`, create **Example new project**, use 1120 × 760, and
+enter `tools` in its already expanded attachment form without submitting. Then
+submit with the keyboard and verify that the first repository appears after
+reload while the browser stays on that project.
 
 Expand a project's **Attach repository** disclosure with the keyboard, enter
 `tools` and submit. Its count and default checkout list must update after the

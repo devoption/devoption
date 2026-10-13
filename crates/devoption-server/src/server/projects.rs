@@ -5,7 +5,7 @@ use super::*;
 use axum::{
     body::to_bytes,
     extract::{Path as RoutePath, rejection::PathRejection},
-    http::header::CONTENT_TYPE,
+    http::header::{CONTENT_TYPE, LOCATION},
 };
 use devoption_projects::{Catalog, CatalogDirectory, Error, MAX_NAME_BYTES};
 use devoption_projects::{
@@ -92,15 +92,18 @@ pub(super) fn routes(projects: Projects) -> Router {
                             directory.writer()?.create_project(&name)
                         })
                         .await
-                        .map_err(|error| Failure::from(error).status)
-                        .map(|_| StatusCode::NO_CONTENT),
+                        .map_err(|error| Failure::from(error).status),
                     Err(status) => Err(status),
                 };
-                (
-                    result.unwrap_or_else(|status| status),
-                    [(CACHE_CONTROL, "no-store")],
-                )
-                    .into_response()
+                let mut response = match result {
+                    Ok(id) => {
+                        let id: String = id.to_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
+                        (StatusCode::NO_CONTENT, [(LOCATION, format!("/projects/{id}"))]).into_response()
+                    }
+                    Err(status) => status.into_response(),
+                };
+                response.headers_mut().insert(CACHE_CONTROL, axum::http::HeaderValue::from_static("no-store"));
+                response
             }),
         )
         .route(

@@ -62,7 +62,11 @@ Another process holding the lock causes a closed failure, not a stale overwrite.
 Dropping the writer explicitly unlocks before closing its descriptor, so a
 concurrent subprocess's brief inherited descriptor cannot extend its lock lifetime.
 The handler returns an empty, non-cacheable 204 only after save and directory sync
-succeed. The browser then reloads `/projects`; it does not insert an optimistic row.
+succeed, with `Location: /projects/{id}` for the newly saved project. The browser
+opens that project directly, including when names repeat. If the destination is
+missing or unusable, it falls back to `/projects`; it does not insert an optimistic
+row. An empty project details page expands its first attachment form when a
+trusted root is configured ([#137](https://github.com/devoption/devoption/issues/137)).
 Invalid names return 400, oversized bodies 413, unsupported encodings 415, stalled
 bodies 408 and a full catalog 409. Storage failures or contention return 503 with
 no input/path/error disclosure. There is no automatic retry. A connection loss or
