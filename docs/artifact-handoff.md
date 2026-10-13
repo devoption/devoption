@@ -60,8 +60,10 @@ filesystems with the stated ownership/link semantics are in this fixture scope.
   is rejected.
 - All supplied source names must refer to the same inode and to distinct actual
   directory entries. Their count must equal the inode's link count. An omitted,
-  duplicate, different-inode or outside-root alias therefore fails. Accepting
-  arbitrary hard-linked source files without accounting for their aliases is
+  duplicate, different-inode or outside-root alias therefore fails. Case-only
+  leaf-name pairs in one directory are conservatively rejected on all
+  hosts, so case-insensitive lookup cannot double-count a single directory entry.
+  Accepting arbitrary hard-linked source files without accounting for their aliases is
   not supported.
 - The helper exclusively creates `artifact` in empty private staging, mode `0600`,
   and copies at most 4 MiB in 64 KiB chunks. It never hard-links, renames or deletes
@@ -87,8 +89,8 @@ staging tree after any failure; it must not treat a leftover file as an artifact
 
 ## Evidence and remaining integration
 
-Twenty-one disposable-file tests prove an independent single-link destination from
-two in-root source links, inclusive size limits, rejection of an outside alias,
+Twenty-two disposable-file tests prove an independent single-link destination from
+two in-root source links, inclusive size limits, rejection of outside/case-only aliases,
 no symlink following, replacement during open/copy, growth/shrink/rewrite,
 destination link or content tampering, short writes/disk failure and cleanup
 conflicts, including cleanup while preserving a caller's own exception. No test

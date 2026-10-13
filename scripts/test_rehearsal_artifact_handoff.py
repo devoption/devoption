@@ -133,6 +133,21 @@ class ArtifactHandoffTests(unittest.TestCase):
         self.alias.chmod(0o700)
         self.assert_rejected()
 
+    def test_case_only_aliases_cannot_count_as_distinct_source_entries(self):
+        upper = self.source.with_name("FIXTURE")
+        if upper.exists():
+            # A case-insensitive filesystem resolves both spellings to one
+            # entry; the actual second link remains outside the supplied root.
+            self.assertTrue(upper.samefile(self.source))
+            self.alias.rename(self.root / "outside-link")
+        else:
+            # The same conservative policy also rejects two genuine case-only
+            # entries on a case-sensitive filesystem, without needing a VM.
+            self.alias.unlink()
+            os.link(self.source, upper)
+        self.assertEqual(self.source.stat().st_nlink, 2)
+        self.assert_rejected((self.paths[0], "release/FIXTURE"))
+
     def test_invalid_or_unbounded_paths_never_escape_source(self):
         for path in ("", "/outside", "../outside", "release/../fixture", "release//fixture",
                      "release/./fixture", "release/fixture\x00", "é", "a/" * 16 + "a",

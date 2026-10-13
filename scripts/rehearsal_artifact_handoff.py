@@ -136,7 +136,10 @@ def _open_source(root, parts, stack, guards):
         _require(_version(os.fstat(fd)) == _version(before), "source changed while opening")
         guards.append((fd, parent, name, _version(before)))
         if leaf:
-            return fd, before, (*_identity(os.fstat(parent)), name)
+            # Paths are ASCII. Conservatively reject case-only aliases even on
+            # case-sensitive hosts, rather than double-counting one entry on
+            # case-insensitive filesystems. Parent identity handles directory aliases.
+            return fd, before, (*_identity(os.fstat(parent)), name.lower())
         parent = fd
 
 
