@@ -59,6 +59,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A fixture-only Unix artifact handoff copies fully accounted source hard links
+  into a bounded, independent private file before applying the unchanged
+  single-link metadata gate and hashing. Disposable tests cover containment,
+  replacements, copy/hash-time changes, size bounds and cleanup conflicts. No VM build,
+  artifact execution/export or production runner integration is added
+  ([#131](https://github.com/devoption/devoption/issues/131)).
+
 - One separately approved diagnostic repeat identifies a regular 445,888-byte
   output with two hard links as the sole artifact rejection. Compilation and
   isolation checks passed; the unchanged gate rejected the output before hashing.

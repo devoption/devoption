@@ -76,3 +76,7 @@ Issue #131 remains open: the diagnostic gap is resolved for this repeat, but the
 is still no accepted artifact or checksum from this runner. Any change to artifact
 selection or the single-link policy needs explicit review; another VM build needs
 separate approval. No production runner, job event, release or deployment was added.
+
+The subsequent [artifact handoff slice](artifact-handoff.md) tests an independent
+private copy without changing this result or running another VM build. It retains
+the destination single-link requirement; supervisor integration remains pending.

@@ -73,3 +73,6 @@ record successful compiles followed by rejected artifacts. These fixture attempt
 issued no job events and grant no permission for further builds or production execution.
 The separate [Linux fixture proof](offline-fixture-build.md) remains test-only and
 does not issue these events or authorize a production runner.
+The [rehearsal artifact handoff](artifact-handoff.md) has disposable filesystem
+tests but no supervisor integration or event issuer. Its hash receipt alone
+cannot complete a job or prove that a runner was stopped.

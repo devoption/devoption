@@ -218,6 +218,9 @@ and [single diagnostic repeat](docs/disposable-build-repeat.md) completed offlin
 compiles under observed job restrictions. The repeat identified the output's two
 hard links as its sole rejection. Both attempts ended without an accepted artifact;
 application builds remain unavailable.
+A fixture-only [artifact handoff](docs/artifact-handoff.md) now copies fully
+accounted source links into an independent private single-link file before hashing.
+Its filesystem tests pass; stopped-runner integration and VM validation remain pending.
 The [job lifecycle model](docs/build-jobs.md) binds records to an exact plan and
 attempt and rejects invalid transitions. Starting a job and recording runner
 outcomes require sealed events; queued cancellation is local. No production event
