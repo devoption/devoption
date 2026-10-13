@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Give sign-in, account recovery and CLI owner-setup guidance a dedicated branded,
+  responsive page using the saved browser theme. Preserve the cookie/CSRF flow,
+  clarify pending and ended-session feedback, and retain accessible password
+  entry and keyboard retry ([#155](https://github.com/devoption/devoption/issues/155)).
+
 - Apply the built interface's shared sidebar, utility header, page hierarchy,
   project rows and control styling across the app. Project creation, rename and
   repository attachment use keyboard-accessible dialogs; status reads remain

@@ -58,8 +58,12 @@ do not include a password in the SSH command. No root privileges are needed.
 The command validates storage before prompting, changes no directory permissions,
 and never replaces an owner. It persists only the generated identity and salted
 Argon2id password hash. Start or restart `serve` with the same directory afterward.
-Open **Sign in** from the profile menu and enter the owner password. The Account
-screen and profile menu offer **Sign out**. Reloading or navigating checks the
+Open `/sign-in`, or **Sign in** from the profile menu, and enter the owner password.
+The dedicated authentication page uses this browser's saved theme and has no
+workspace navigation. It keeps the password field disabled while checking the
+session, reports failed attempts inline, and focuses the field for retry.
+After signing in, **Open workspace** enters Overview. The Account
+screen and workspace profile menu offer **Sign out**. Reloading or navigating checks the
 current session again; a session lasts at most one hour and ends on server restart
 or another sign-in. JavaScript is required. Without an owner, the Sign in page
 explains that CLI setup is required. See [setup limits](docs/local-enrollment.md).
@@ -223,6 +227,22 @@ browser installation is deferred. The preview exposes no first-owner setup route
 **Sign in**
 
 ![Sign in with a configured fixture owner](docs/screenshots/sign-in.jpg)
+
+**Sign in (light mode)**
+
+![Dedicated sign-in in Nord light](docs/screenshots/sign-in-light.jpg)
+
+**Checking the session**
+
+![Disabled sign-in controls during session verification](docs/screenshots/sign-in-loading.jpg)
+
+**Password not recognized**
+
+![Inline sign-in error with a cleared password field](docs/screenshots/sign-in-error.jpg)
+
+**Owner setup required**
+
+![CLI-only owner setup guidance](docs/screenshots/sign-in-setup.jpg)
 
 **Account**
 

@@ -262,6 +262,15 @@ fn sign_in_page_distinguishes_cli_setup_and_keeps_inputs_disabled_without_script
     assert!(page.contains("<label for=\"auth-password\">Password</label>"));
     assert!(page.contains("autocomplete=\"current-password\""));
     assert!(page.contains("aria-describedby=\"auth-status\" disabled"));
+    let body = page.split_once("</head>").unwrap().1;
+    assert!(body.contains("<body class=\"auth-page\""));
+    assert!(body.contains("role=\"img\" aria-label=\"DevOption\""));
+    assert!(body.contains("aria-labelledby=\"page-title\""));
+    assert!(body.contains("action=\"/auth/sign-in\" method=\"post\""));
+    assert_eq!(body.matches("<form ").count(), 1);
+    assert!(!body.contains("<nav"));
+    assert!(!body.contains("profile-popup"));
+    assert!(!body.contains("<header class=\"content-header\""));
     let (_server, address) = start();
     let page = request(
         address,
@@ -270,6 +279,12 @@ fn sign_in_page_distinguishes_cli_setup_and_keeps_inputs_disabled_without_script
     assert!(page.contains("Owner setup is required"));
     assert!(!page.contains("<form id=\"signin-form\""));
     assert!(page.contains("data-owner-configured=\"false\""));
+    let body = page.split_once("</head>").unwrap().1;
+    assert!(body.contains("Set up your workspace"));
+    assert!(body.contains("devoption setup --help"));
+    assert!(!body.contains("<form "));
+    assert!(!body.contains("<input "));
+    assert!(!body.contains("<nav"));
 }
 
 #[test]

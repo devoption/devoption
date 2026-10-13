@@ -10,6 +10,7 @@ pub enum Page {
     SignIn,
 }
 
+mod auth;
 mod projects;
 pub use projects::{ProjectSummary, RepositorySummary};
 
@@ -76,27 +77,6 @@ const APPEARANCE_CONTROLS: &str = r##"
         <p id="appearance-status" role="status">Enable JavaScript to change appearance.</p>
       </section>"##;
 
-const SIGN_IN: &str = r#"
-      <section class="auth" aria-label="Account access">
-        <form id="signin-form" action="/auth/sign-in" method="post">
-          <label for="auth-password">Password</label>
-          <input id="auth-password" name="password" type="password" autocomplete="current-password" required maxlength="1024" aria-describedby="auth-status" disabled>
-          <button id="auth-submit" class="action-button" type="submit" disabled>Sign in</button>
-        </form>
-        <div id="auth-signed-in" hidden>
-          <a class="action-button" href="/">Continue to Home</a>
-          <button class="action-button secondary" type="button" data-signout disabled>Sign out</button>
-        </div>
-        <a id="auth-recheck" class="action-button" href="/sign-in" hidden>Check account</a>
-        <p id="auth-status" role="status">Enable JavaScript to sign in.</p>
-      </section>"#;
-
-const SETUP_REQUIRED: &str = r#"
-      <section class="auth" aria-label="Owner setup required">
-        <p>Create the first owner from a local or SSH terminal, then restart DevOption.</p>
-        <p>Browser account creation is not available.</p>
-      </section>"#;
-
 /// Render a complete HTML document independently of the HTTP server.
 pub fn render(page: Page) -> String {
     render_with_account(page, false)
@@ -132,6 +112,9 @@ enum ProjectView<'a> {
 }
 
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
+    if matches!(page, Page::SignIn) {
+        return auth::render(account_available);
+    }
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
         Page::Home => (
@@ -169,15 +152,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             "/settings/appearance",
             "Choose how DevOption looks in this browser.",
         ),
-        Page::SignIn => (
-            "Sign in",
-            "/sign-in",
-            if account_available {
-                "Use the owner password for this server."
-            } else {
-                "Owner setup is required before you can sign in."
-            },
-        ),
+        Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
     let (title, main_class) = if let Some(ProjectView::Detail(project, _)) = &projects {
         let mut escaped = String::new();
@@ -199,7 +174,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         format!(
             r#"<p class="breadcrumbs"><a href="/projects">Projects</a><span aria-hidden="true">/</span><span>{title}</span></p>"#
         )
-    } else if matches!(page, Page::SignIn | Page::Appearance) {
+    } else if matches!(page, Page::Appearance) {
         String::new()
     } else {
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
@@ -212,15 +187,6 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         ("", content)
     } else if path == "/settings/appearance" {
         (" aria-current=\"page\"", APPEARANCE_CONTROLS)
-    } else if path == "/sign-in" {
-        (
-            "",
-            if account_available {
-                SIGN_IN
-            } else {
-                SETUP_REQUIRED
-            },
-        )
     } else {
         (
             "",
@@ -275,22 +241,8 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         ""
     };
 
-    format!(
-        "<!doctype html>
-<html lang=\"en\">
-<head>
-  <meta charset=\"utf-8\">
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <meta name=\"referrer\" content=\"no-referrer\">
-  <title>{title} · DevOption</title>
-  <style>{STYLES}</style>
-  <script>{APPEARANCE}</script>
-  <script>{AUTH}</script>
-  <script>{REPOSITORY_STATUS}</script>
-  <script>{PROJECT_FILTER}</script>
-  <script>{INTERFACE}</script>
-</head>
-<body data-owner-configured=\"{account_available}\">
+    document(&title, &format!(
+        "<body data-owner-configured=\"{account_available}\">
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
   <aside class=\"sidebar\" aria-label=\"Sidebar\">
     <a class=\"brand\" href=\"/\" aria-label=\"DevOption home\">{LOGO}</a>
@@ -322,7 +274,27 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
       {content}
     </main>
   </div>
-</body>
+</body>"
+    ))
+}
+
+fn document(title: &str, body: &str) -> String {
+    format!(
+        "<!doctype html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"utf-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <meta name=\"referrer\" content=\"no-referrer\">
+  <title>{title} · DevOption</title>
+  <style>{STYLES}</style>
+  <script>{APPEARANCE}</script>
+  <script>{AUTH}</script>
+  <script>{REPOSITORY_STATUS}</script>
+  <script>{PROJECT_FILTER}</script>
+  <script>{INTERFACE}</script>
+</head>
+{body}
 </html>"
     )
 }
