@@ -96,6 +96,10 @@ viewport, check labelled input, keyboard access, visible focus and no horizontal
 With JavaScript disabled, the sign-in input and button must remain disabled and
 the page must explain that JavaScript is required.
 
+On Appearance, Tab onto the selected Dark, Nord and Purple choices. Each must
+show an outer focus outline distinct from its selected border. Selecting another
+choice must update its pressed state and retain a visible keyboard focus indicator.
+
 After sign-in returns 204, temporarily block the following `/auth/session` request
 in the browser tool. The page must show **Check account**, not a signed-out state
 or cookie-failure diagnosis. Remove the block and follow **Check account**: it must

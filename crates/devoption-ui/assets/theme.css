@@ -270,6 +270,7 @@ button.profile-link { width: 100%; text-align: left; background: transparent; }
 .choice-buttons { display: flex; gap: .5rem; flex-wrap: wrap; }
 .choice-buttons button { min-height: 2.875rem; border: 1px solid var(--color-control-border); border-radius: var(--control-radius); padding: .5rem 1rem; background: transparent; color: var(--color-text); }
 .choice-buttons button[aria-pressed="true"] { background: var(--color-selected); outline: 2px solid var(--color-preset); outline-offset: -2px; font-weight: 600; }
+.choice-buttons button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 4px; }
 .theme-options .choice-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .theme-options button { padding: .75rem; text-align: left; }
 .palette-swatch { display: block; height: 1.75rem; margin-bottom: .75rem; border-radius: .25rem; background: linear-gradient(90deg, #2e3440 25%, #3b4252 25% 50%, #eceff4 50% 75%, #b48ead 75%); }
