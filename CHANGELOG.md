@@ -5,6 +5,12 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Changed
+
+- The shared shell aligns page titles with the logo, uses consistent control
+  sizing and quieter borders, and presents Appearance without an extra panel
+  ([#147](https://github.com/devoption/devoption/issues/147)).
+
 ### Fixed
 
 - Server catalog access shares the owner store's selected directory from startup,
