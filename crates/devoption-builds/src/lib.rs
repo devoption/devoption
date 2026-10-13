@@ -1,6 +1,7 @@
 //! Immutable Unix Rust build plans bound to complete verified source snapshots.
-//! Validation reads supplied values only, with no filesystem, process or network I/O.
-//! The separate preparation module performs read-only current-source inspection.
+//! Plan validation reads supplied values only, with no filesystem/process I/O.
+//! Preparation observes current source; registered snapshot capture separately
+//! reads selected Git objects and compares their exact files without execution.
 //! A valid plan is neither reviewed nor approved and grants no execution rights.
 //! See `docs/build-plans.md` for the checks still required before any executor.
 

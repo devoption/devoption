@@ -44,7 +44,10 @@ establish trusted revision selection, complete source context or build permissio
 Plans now retain a [complete source snapshot](source-snapshots.md) containing that
 proof and every supported source file's owned bytes. They reject mismatched commit,
 dependency request or conventional binary target. Snapshot verification consumes
-supplied objects; runtime selection, controlled extraction and execution are absent.
+supplied objects. A separate registered adapter collects a selected current HEAD's
+objects through the inspection root and compares every verified file's exact
+checkout bytes. It has no HTTP/CLI integration; authenticated revision selection,
+controlled extraction and execution are absent.
 DevOption-mediated acquisition and isolated offline builds are the selected
 architecture, while registry hosting, fetching, approval, execution, environment
 policy and resource enforcement remain unimplemented.

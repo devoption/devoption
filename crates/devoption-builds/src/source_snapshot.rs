@@ -15,6 +15,8 @@ pub const MAX_FILE_BYTES: usize = 512 * 1024;
 pub const MAX_PATH_BYTES: usize = 1024;
 pub const MAX_DEPTH: usize = 16;
 
+pub mod registered;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ObjectKind {
     Tree,

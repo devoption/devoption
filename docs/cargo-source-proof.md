@@ -75,10 +75,11 @@ graph passes. Membership is relative to that ID; it proves neither repository
 ownership, authorized revision selection, ref freshness, signatures nor existence
 in a real repository. Pure bytes cannot establish those external facts.
 
-The next integration must obtain the selected repository/revision through an
-independent trusted boundary before supplying this proof to the candidate plan.
-It must obtain a [complete source snapshot](source-snapshots.md) and establish a
-controlled root working directory. Parent-directory/home/system Cargo configuration, environment,
+Candidate plans now require a [complete source snapshot](source-snapshots.md).
+Its separate registered adapter can collect and verify the selected current HEAD
+and compare exact checkout bytes. A future authenticated workflow must select the
+repository/revision and a fresh catalog through a trusted boundary, then establish
+a controlled root working directory. Parent-directory/home/system Cargo configuration, environment,
 toolchain selection, nested attributes/configuration, checkout transformations and
 filesystem aliases are not inspected or controlled here. No extraction safety is
 implied. Actual dependency completeness and registry archive/bundle verification

@@ -11,7 +11,8 @@ mod managed;
 pub use managed::ManagedRoot;
 mod status;
 pub use status::{
-    ChangeCounts, FileContent, GitStatus, RepositoryFiles, SourceInputs, TrackedFile,
+    ChangeCounts, FileContent, GitSourceKind, GitSourceObject, GitSourceObjects, GitStatus,
+    RepositoryFiles, SourceInputs, TrackedFile,
 };
 
 pub use filesystem::{FilesystemIdentity, PermittedRoot};
@@ -31,6 +32,8 @@ pub enum InspectionError {
     UnsupportedLayout,
     Changed,
     Unavailable,
+    UncommittedSource,
+    SelectedCommitMismatch,
 }
 
 impl fmt::Display for InspectionError {
@@ -44,6 +47,10 @@ impl fmt::Display for InspectionError {
             Self::UnsupportedLayout => "Git worktree layout is not supported",
             Self::Changed => "worktree location or metadata changed during inspection",
             Self::Unavailable => "worktree metadata is unavailable",
+            Self::UncommittedSource => {
+                "source has uncommitted changes or differs from the selected commit"
+            }
+            Self::SelectedCommitMismatch => "selected commit no longer matches the checkout HEAD",
         })
     }
 }
