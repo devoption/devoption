@@ -70,7 +70,6 @@ fn checksums_require_complete_canonical_hex_without_claiming_byte_verification()
 fn logical_registry_and_package_names_are_bounded_and_cannot_be_locations() {
     for name in [
         "",
-        "UPPER",
         "1name",
         "https://example.invalid",
         "/tmp/name",
@@ -89,11 +88,42 @@ fn logical_registry_and_package_names_are_bounded_and_cannot_be_locations() {
         );
     }
     assert!(RegistryId::new(&"a".repeat(MAX_REGISTRY_ID_BYTES)).is_ok());
+    assert_eq!(RegistryId::new("UPPER").err(), Some(Error::InvalidRegistry));
     assert_eq!(
         request(vec![package(&"a".repeat(MAX_PACKAGE_NAME_BYTES))])
             .packages()
             .len(),
         1
+    );
+}
+
+#[test]
+fn cargo_names_preserve_case_but_reject_case_colliding_coordinates() {
+    let input = request(vec![package("Example"), package("Another_Name")]);
+    assert_eq!(input.packages()[0].name, "Another_Name");
+    assert_eq!(input.packages()[1].name, "Example");
+    assert_eq!(
+        CargoDependencyRequest::new(
+            registry("local"),
+            digest(1),
+            vec![package("Example"), package("example")]
+        )
+        .err(),
+        Some(Error::DuplicatePackage)
+    );
+    // A provider cannot change the exact spelling from the claimed lockfile.
+    let expected = request(vec![package("Example")]);
+    let provider = FixtureProvider {
+        response: Ok(CargoMaterialization::new(
+            request(vec![package("example")]),
+            digest(3),
+            100,
+        )),
+        calls: Cell::new(0),
+    };
+    assert_eq!(
+        prepare_dependencies(&provider, &expected).err(),
+        Some(Error::MismatchedRequest)
     );
 }
 

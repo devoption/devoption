@@ -50,8 +50,11 @@ their own registry identity ([Cargo source replacement](https://doc.rust-lang.or
 
 The initial contract supports these Cargo sources only. Additional upstreams,
 Git dependencies, publishing and other package formats are unimplemented.
-Logical registry IDs and package names use 1–64 lowercase ASCII bytes: a leading
-letter followed by letters, digits, hyphens or underscores. Versions use exact
+Logical registry IDs use 1–64 lowercase ASCII bytes: a leading letter followed by
+letters, digits, hyphens or underscores. Package names use the same bound and
+characters but permit uppercase letters and preserve exact spelling. Duplicate
+coordinates compare names case-insensitively; provider matching still requires the
+exact requested spelling. Versions use exact
 SemVer spelling, at most 128 bytes, with `u64` core components; prerelease and build
 metadata are supported. Duplicate origin/name/version coordinates are rejected,
 including versions differing only in build metadata, matching Cargo registry

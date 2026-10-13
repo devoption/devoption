@@ -55,7 +55,8 @@ Entries describe implemented changes, not the roadmap.
 
 - A separate Cargo registry contract records immutable locked dependency,
   original-source, checksum and materialization metadata. Its checked provider
-  handoff rejects mismatched requests without a public-fetch fallback, and build
+  handoff rejects mismatched requests without a public-fetch fallback, preserves
+  Cargo package-name case while rejecting case-colliding coordinates, and build
   plans include every descriptor field in equality. Only fixture providers exist;
   registry hosting, actual fetching, approval and execution remain unimplemented
   ([#119](https://github.com/devoption/devoption/issues/119)).

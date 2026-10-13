@@ -5,7 +5,7 @@
 //! Provider implementations are responsible for their effects; this crate supplies
 //! only a checked handoff and uses in-memory fixtures in tests.
 
-use std::fmt;
+use std::{cmp::Ordering, fmt};
 
 pub const MAX_REGISTRY_ID_BYTES: usize = 64;
 pub const MAX_PACKAGE_NAME_BYTES: usize = 64;
@@ -101,17 +101,17 @@ impl CargoDependencyRequest {
             return Err(Error::TooManyPackages);
         }
         for package in &packages {
-            if !name_valid(&package.name, MAX_PACKAGE_NAME_BYTES) {
+            if !package_name_valid(&package.name) {
                 return Err(Error::InvalidPackageName);
             }
             if !exact_version(&package.version) {
                 return Err(Error::InvalidVersion);
             }
         }
-        packages.sort_by(|a, b| coordinates(a).cmp(&coordinates(b)));
+        packages.sort_by(compare_coordinates);
         if packages
             .windows(2)
-            .any(|pair| coordinates(&pair[0]) == coordinates(&pair[1]))
+            .any(|pair| compare_coordinates(&pair[0], &pair[1]).is_eq())
         {
             return Err(Error::DuplicatePackage);
         }
@@ -224,14 +224,33 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-fn coordinates(package: &LockedPackage) -> (&CargoOrigin, &str, &str) {
+fn version_identity(package: &LockedPackage) -> &str {
     // Cargo registry versions are unique without SemVer build metadata.
-    let version = package
+    package
         .version
         .split('+')
         .next()
-        .unwrap_or(&package.version);
-    (&package.origin, &package.name, version)
+        .unwrap_or(&package.version)
+}
+
+fn compare_coordinates(a: &LockedPackage, b: &LockedPackage) -> Ordering {
+    a.origin
+        .cmp(&b.origin)
+        .then_with(|| {
+            a.name
+                .bytes()
+                .map(|b| b.to_ascii_lowercase())
+                .cmp(b.name.bytes().map(|b| b.to_ascii_lowercase()))
+        })
+        .then_with(|| version_identity(a).cmp(version_identity(b)))
+}
+
+fn package_name_valid(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_PACKAGE_NAME_BYTES
+        && value.bytes().enumerate().all(|(i, b)| {
+            b.is_ascii_alphabetic() || (i > 0 && (b.is_ascii_digit() || b == b'-' || b == b'_'))
+        })
 }
 
 fn name_valid(value: &str, limit: usize) -> bool {
