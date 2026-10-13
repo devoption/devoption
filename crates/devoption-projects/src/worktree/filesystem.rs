@@ -232,7 +232,11 @@ pub(super) fn identity(file: &File) -> Result<FilesystemIdentity> {
     })
 }
 
-pub(super) fn text(mut file: File, limit: usize) -> Result<String> {
+pub(super) fn text(file: File, limit: usize) -> Result<String> {
+    String::from_utf8(bytes(file, limit)?).map_err(|_| Error::InvalidLayout)
+}
+
+pub(super) fn bytes(mut file: File, limit: usize) -> Result<Vec<u8>> {
     let before = file.metadata().map_err(|_| Error::Unavailable)?;
     checked(&before, false)?;
     if before.len() > limit as u64 {
@@ -256,7 +260,7 @@ pub(super) fn text(mut file: File, limit: usize) -> Result<String> {
     {
         return Err(Error::Changed);
     }
-    String::from_utf8(bytes).map_err(|_| Error::InvalidLayout)
+    Ok(bytes)
 }
 
 fn io_error(error: Errno) -> Error {

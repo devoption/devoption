@@ -66,7 +66,36 @@ pub(super) fn routes(projects: Projects) -> Router {
     let attachment = projects.clone();
     let detail = projects.clone();
     let options = projects.clone();
+    let status_reader = projects.clone();
     Router::new()
+        .route(
+            "/projects/{project}/repositories/{repository}/status",
+            get(move |ids: Result<RoutePath<(String, String)>, PathRejection>| async move {
+                let ids = ids.ok().and_then(|RoutePath((project, repository))| Some((project_id(&project)?, devoption_projects::RepositoryId::from_bytes(project_id(&repository)?.to_bytes()))));
+                let Some((project, repository)) = ids else {
+                    return (StatusCode::NOT_FOUND, [(CACHE_CONTROL, "no-store")], "Repository is unavailable.").into_response();
+                };
+                let Some(root) = status_reader.root.clone() else {
+                    return (StatusCode::SERVICE_UNAVAILABLE, [(CACHE_CONTROL, "no-store")], "Repository root is not configured.").into_response();
+                };
+                match status_reader.access(move |directory| directory.load()?.unwrap_or_default().repository_status(project, repository, &root)).await {
+                    Ok(status) => {
+                        let changes = status.changes;
+                        ([(CACHE_CONTROL, "no-store")], format!("{}\n{}\n{}\n{}\n{}\n{}", status.branch.unwrap_or_default(), status.commit.unwrap_or_default(), changes.staged, changes.modified, changes.untracked, changes.conflicted)).into_response()
+                    }
+                    Err(error) => {
+                        let (status, code) = match error {
+                            Error::UnknownProject | Error::UnknownRepository => (StatusCode::NOT_FOUND, "missing"),
+                            Error::StaleCheckout | Error::RootMismatch | Error::Inspection(InspectionError::Changed) => (StatusCode::CONFLICT, "changed"),
+                            Error::Inspection(InspectionError::UnsupportedLayout) => (StatusCode::SERVICE_UNAVAILABLE, "unsupported"),
+                            Error::Inspection(InspectionError::LimitExceeded) => (StatusCode::SERVICE_UNAVAILABLE, "limited"),
+                            _ => (StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+                        };
+                        (status, [("cache-control", "no-store"), ("x-devoption-error", code)], "Repository status is unavailable.").into_response()
+                    }
+                }
+            }),
+        )
         .route(
             "/repository-options",
             get(move || async move {
@@ -283,6 +312,7 @@ fn summaries(catalog: &Catalog) -> Vec<devoption_ui::ProjectSummary<'_>> {
                         .expect("validated repository reference");
                     let checkout = checkouts.get(&(project.id(), *id));
                     devoption_ui::RepositorySummary {
+                        id: repository.id().to_bytes(),
                         name: repository.name(),
                         default_checkout: checkout
                             .and_then(|checkout| checkout.relative_path().to_str()),

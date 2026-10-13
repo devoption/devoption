@@ -6,6 +6,7 @@ pub struct ProjectSummary<'a> {
 }
 
 pub struct RepositorySummary<'a> {
+    pub id: [u8; 16],
     pub name: &'a str,
     pub default_checkout: Option<&'a str>,
 }
@@ -38,7 +39,7 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
             escape_into(&mut html, project.name);
             html.push_str("</a></h2>");
             repository_count(&mut html, project);
-            repositories(&mut html, project);
+            repositories(&mut html, project, false);
             if attachment_available {
                 attachment(&mut html, &id, &format!("project-{id}"), false);
             }
@@ -57,7 +58,7 @@ pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -
         html.push_str("<p>No repositories attached yet.</p>");
     } else {
         repository_count(&mut html, project);
-        repositories(&mut html, project);
+        repositories(&mut html, project, attachment_available);
     }
     if attachment_available {
         let id: String = project
@@ -88,7 +89,7 @@ fn repository_count(html: &mut String, project: &ProjectSummary<'_>) {
     html.push_str(&format!("<p>{count} {label}</p>"));
 }
 
-fn repositories(html: &mut String, project: &ProjectSummary<'_>) {
+fn repositories(html: &mut String, project: &ProjectSummary<'_>, status_available: bool) {
     if !project.repositories.is_empty() {
         html.push_str("<ul class=\"repository-list\" aria-label=\"Repositories\">");
         for repository in &project.repositories {
@@ -102,7 +103,28 @@ fn repositories(html: &mut String, project: &ProjectSummary<'_>) {
             } else {
                 html.push_str("Not attached");
             }
-            html.push_str("</small></li>");
+            html.push_str("</small>");
+            if status_available && repository.default_checkout.is_some() {
+                let project: String = project
+                    .id
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect();
+                let repository_id: String = repository
+                    .id
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect();
+                html.push_str(&format!(r#"<details class="repository-inspection" data-repository-status-view data-status-url="/projects/{project}/repositories/{repository_id}/status">
+                  <summary aria-label="View status for "#));
+                escape_into(html, repository.name);
+                html.push_str(r#"">View status</summary>
+                  <dl data-status-fields hidden><dt>Branch</dt><dd data-status-branch></dd><dt>Commit</dt><dd data-status-commit></dd><dt>Working tree</dt><dd data-status-changes></dd></dl>
+                  <button class="action-button" type="button" data-status-refresh disabled>Refresh status</button>
+                  <p data-status-note role="status" aria-live="polite">Enable JavaScript to read repository status.</p>
+                </details>"#);
+            }
+            html.push_str("</li>");
         }
         html.push_str("</ul>");
     }
@@ -156,6 +178,7 @@ mod tests {
         assert!(!unavailable.contains("<form"));
         assert!(unavailable.contains("Repository attachment is not configured"));
         project.repositories.push(RepositorySummary {
+            id: [1; 16],
             name: "Existing",
             default_checkout: Some("app"),
         });
@@ -171,6 +194,7 @@ mod tests {
                 id: [0xab; 16],
                 name: "<Project> & 工具",
                 repositories: vec![RepositorySummary {
+                    id: [1; 16],
                     name: "<repo>",
                     default_checkout: Some("team/<checkout>&工具"),
                 }],
@@ -195,10 +219,12 @@ mod tests {
                 name: "<script>alert('研究 & \"tools\"')</script>",
                 repositories: vec![
                     RepositorySummary {
+                        id: [1; 16],
                         name: "<repo>",
                         default_checkout: Some("team/<checkout>&工具"),
                     },
                     RepositorySummary {
+                        id: [1; 16],
                         name: "Legacy",
                         default_checkout: None,
                     },
@@ -231,6 +257,7 @@ mod tests {
                 id: [0; 16],
                 name: "Example",
                 repositories: vec![RepositorySummary {
+                    id: [1; 16],
                     name: "Legacy",
                     default_checkout: None,
                 }],

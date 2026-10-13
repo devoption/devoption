@@ -224,6 +224,14 @@ main > p { font-size: 1.125rem; max-width: 42rem; }
 .repository-list li { min-width: 0; overflow-wrap: anywhere; }
 .repository-list span, .repository-list small { display: block; }
 .repository-list small { color: var(--color-muted); }
+.repository-inspection { margin-top: var(--space-2); max-width: 38rem; }
+.repository-inspection summary { cursor: pointer; color: var(--color-primary); width: fit-content; padding: var(--space-2) 0; }
+.repository-inspection summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.repository-inspection dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2) var(--space-4); margin: var(--space-3) 0; }
+.repository-inspection dl[hidden] { display: none; }
+.repository-inspection dt { color: var(--color-muted); }
+.repository-inspection dd { margin: 0; overflow-wrap: anywhere; }
+.repository-inspection p { font-size: var(--text-small); margin-top: var(--space-2); }
 .repository-attachment summary { width: fit-content; cursor: pointer; color: var(--color-primary); padding: var(--space-2) 0; }
 .repository-attachment summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
 .repository-form { margin-top: var(--space-3); }

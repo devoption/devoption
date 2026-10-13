@@ -55,8 +55,9 @@ Remove the block and verify recovery without another sign-in after capturing it.
    repository** form. Wait for the checkout list and select `tools` without
    submitting, to show the relative path
    alongside both fixture projects and the controls. For Project details, open
-   **Example application**, use **1120 × 900**, and expand **Attach repository**
-   with `tools` selected without submitting. For the empty-project variant,
+   **Example application**, use **1120 × 900**, and expand the frontend's **View
+   status**. The disposable metadata fixture shows branch `main`, **No commits
+   yet**, and **Clean**; leave attachment collapsed. For the empty-project variant,
    create **Example new project** and select `tools` in its already open form
    without submitting, at the same 1120 × 900 viewport.
    A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out

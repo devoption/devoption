@@ -80,6 +80,36 @@ impl Catalog {
         Ok(())
     }
 
+    /// Read status only for a saved, revalidated project/repository checkout.
+    pub fn repository_status(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+        root: &PermittedRoot,
+    ) -> Result<crate::worktree::GitStatus, Error> {
+        self.check_repository_root(root)?;
+        let selected = self
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .ok_or(Error::UnknownProject)?;
+        if !selected.repositories.contains(&repository) {
+            return Err(Error::UnknownRepository);
+        }
+        let checkout = self
+            .checkouts
+            .iter()
+            .find(|c| c.project == project && c.repository == repository)
+            .ok_or(Error::CheckoutRequired)?;
+        let path = Path::new(&checkout.path);
+        let before = root.inspect(path)?;
+        self.check_checkout(&checkout.path, &before)?;
+        let status = root.git_status(path)?;
+        revalidate_checkout(root, path, &before)?;
+        self.check_repository_root(root)?;
+        Ok(status)
+    }
+
     pub(crate) fn attach(
         &mut self,
         project: ProjectId,

@@ -14,6 +14,7 @@ pub use projects::{ProjectSummary, RepositorySummary};
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const AUTH: &str = include_str!("../assets/auth.js");
+const REPOSITORY_STATUS: &str = include_str!("../assets/repository-status.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
 const APPEARANCE_CONTROLS: &str = r##"
       <section class="appearance" aria-label="Appearance preferences">
@@ -207,6 +208,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
   <style>{STYLES}</style>
   <script>{APPEARANCE}</script>
   <script>{AUTH}</script>
+  <script>{REPOSITORY_STATUS}</script>
 </head>
 <body data-owner-configured=\"{account_available}\">
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>

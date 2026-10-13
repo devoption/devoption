@@ -7,6 +7,8 @@
 
 mod filesystem;
 mod format;
+mod status;
+pub use status::{ChangeCounts, GitStatus};
 
 pub use filesystem::{FilesystemIdentity, PermittedRoot};
 use std::{
@@ -120,6 +122,11 @@ impl PermittedRoot {
     /// Ordinary .git directories and linked gitfiles are supported only when
     /// all inspected metadata is contained in this explicitly selected root.
     pub fn inspect(&self, candidate: &Path) -> Result<WorktreeObservation> {
+        self.inspect_layout(candidate)
+            .map(|(observed, _, _)| observed)
+    }
+
+    fn inspect_layout(&self, candidate: &Path) -> Result<(WorktreeObservation, PathBuf, PathBuf)> {
         filesystem::relative(candidate)?;
         self.check_binding()?;
         let worktree = self.directory(candidate)?;
@@ -194,7 +201,7 @@ impl PermittedRoot {
                 return Err(InspectionError::Changed);
             }
         }
-        Ok(result)
+        Ok((result, git_path, common_path))
     }
 
     fn required(&self, path: &Path, limit: usize) -> Result<String> {

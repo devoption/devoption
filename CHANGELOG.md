@@ -59,6 +59,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Project details can read an attached checkout's branch, commit and working-tree
+  counts on demand, with refresh, detached/unborn labels and explicit unavailable
+  states. Controlled Git status uses private temporary metadata, bounded reads,
+  and saved-association revalidation without source-index or catalog writes
+  ([#141](https://github.com/devoption/devoption/issues/141)).
+
 - Repository attachment offers a bounded picker of supported immediate child
   checkouts, with refresh, loading/empty/error feedback and manual path fallback
   ([#139](https://github.com/devoption/devoption/issues/139)).
