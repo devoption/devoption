@@ -66,7 +66,7 @@ function page({ configured = true, form = true, profile = true, projects = false
       addEventListener: (_, callback) => { ready = callback; },
       get cookie() { throw new Error("Auth must not read cookies"); },
     },
-    window: { addEventListener: events.addEventListener, location: { assign: (url) => navigation.push(url), reload: () => navigation.push("reload") } },
+    window: { addEventListener: events.addEventListener, location: { replace: (url) => navigation.push(`replace:${url}`), assign: (url) => navigation.push(url), reload: () => navigation.push("reload") } },
     localStorage: storage, sessionStorage: storage, TextEncoder, URLSearchParams,
     fetch: async (url, options) => {
       calls.push({ url, ...options });
@@ -298,7 +298,7 @@ test("only confirmed anonymous recovery enables sign-in; failed checks remain un
   }
 });
 
-test("sign-in preserves exact password bytes, clears the field and confirms cookie retention", async () => {
+test("sign-in preserves password bytes and enters the workspace only after cookie confirmation", async () => {
   const current = page();
   await tick();
   current.queue.push(response(204, csrf), response(204, nextCsrf), response(204, nextCsrf));
@@ -312,7 +312,7 @@ test("sign-in preserves exact password bytes, clears the field and confirms cook
   assert.equal(signin.headers["content-type"], "application/x-www-form-urlencoded");
   assert.equal(signin.body.get("password"), "  fixture café +&=  ");
   assert.equal(current.status.textContent, "Signed in.");
-  assert.equal(current.focused(), "page-title");
+  assert.deepEqual(current.navigation, ["replace:/"]);
   current.queue.push(response(204));
   await current.logout();
   assert.equal(current.calls.at(-1).headers["x-csrf-token"], nextCsrf);
@@ -347,6 +347,7 @@ test("challenge failures stop password submission and keep fixed bounded errors"
     await current.submit();
     assert.deepEqual(current.calls.map((call) => call.url), ["/auth/session", "/auth/challenge"]);
     assert.match(current.status.textContent, message);
+    assert.deepEqual(current.navigation, []);
     assert.doesNotMatch(current.status.textContent, /private fixture detail/);
     assert.equal(current.nodes.get("auth-password").value, "");
     assert.equal(current.nodes.get("auth-submit").disabled, false);
@@ -366,6 +367,7 @@ test("failed password retries get a fresh challenge and never claim success", as
     current.queue.push(response(204, csrf), failure);
     await current.submit();
     assert.match(current.status.textContent, message);
+    assert.deepEqual(current.navigation, []);
     assert.equal(current.nodes.get("signin-form").hidden, false);
     assert.equal(current.nodes.get("auth-password").value, "");
     assert.equal(current.focused(), "auth-password");
@@ -382,6 +384,7 @@ test("a blocked Secure cookie does not produce a successful account screen", asy
   current.queue.push(response(204, csrf), response(204, nextCsrf), response(401));
   await current.submit();
   assert.match(current.status.textContent, /could not be retained/);
+  assert.deepEqual(current.navigation, []);
   assert.equal(current.nodes.get("signin-form").hidden, false);
   assert.equal(current.signouts[0].hidden, true);
 });
@@ -400,6 +403,7 @@ test("failed verification after successful sign-in requires checking the account
     assert.equal(current.focused(), "auth-recheck");
     assert.equal(current.signouts[0].hidden, true);
     assert.match(current.status.textContent, /could not be checked.*Check account/);
+    assert.deepEqual(current.navigation, []);
     assert.doesNotMatch(current.status.textContent, /cookies|try signing in|private/);
     const count = current.calls.length;
     await current.submit();
@@ -724,4 +728,38 @@ test("dedicated CLI setup page makes no authentication requests without form or 
   const current = page({configured: false, form: false, profile: false}); await tick();
   assert.deepEqual(current.calls, []);
   assert.equal(current.signouts.length, 0);
+});
+
+
+test("navigation waits for verification, ignores duplicate submits and discards a late success", async () => {
+  for (const leave of [false, true]) {
+    const current = page();
+    await tick();
+    let finish;
+    current.queue.push(response(204, csrf), response(204, nextCsrf), new Promise(resolve => { finish = resolve; }));
+    const pending = current.submit();
+    await tick();
+    assert.deepEqual(current.navigation, []);
+    await current.submit("duplicate");
+    assert.equal(current.calls.length, 4);
+    if (leave) current.event("pagehide");
+    finish(response(204, nextCsrf));
+    await pending;
+    assert.deepEqual(current.navigation, leave ? [] : ["replace:/"]);
+  }
+});
+
+test("an already authenticated account visit stays available, and an expired session can sign in again", async () => {
+  const current = page({ initial: response(204, csrf) });
+  await tick();
+  assert.deepEqual(current.navigation, []);
+  assert.equal(current.nodes.get("auth-signed-in").hidden, false);
+  current.event("pagehide");
+  current.queue.push(response(401));
+  current.event("pageshow", {persisted: true});
+  await tick();
+  assert.match(current.status.textContent, /session ended/);
+  current.queue.push(response(204, csrf), response(204, nextCsrf), response(204, nextCsrf));
+  await current.submit();
+  assert.deepEqual(current.navigation, ["replace:/"]);
 });

@@ -88,7 +88,8 @@ For the UI check, open `/projects` while signed out and confirm a redirect to
 **Sign in** with no protected page content. Overview, Releases, Infrastructure, and Appearance have the
 same guard; `/sign-in` must remain reachable without redirecting again. Submit an
 incorrect password, then the fixture password. Confirm fixed feedback, password clearing,
-and keyboard focus on the error field or successful Account heading. Reload, then
+and keyboard focus on the error field after failure, or automatic navigation to
+Overview after success. Return directly to `/sign-in` to check Account. Reload, then
 navigate to another page: the profile should still offer **Sign out**. Check logout
 from both the Account screen and another page's profile menu, then confirm that
 reloading or directly opening a protected page redirects to Sign in. At a narrow
@@ -98,7 +99,9 @@ the page must explain that JavaScript is required.
 
 The dedicated `/sign-in` page has branding and account access without workspace
 navigation or a profile popup. Verify its skip link, labelled password field with
-`autocomplete="current-password"`, and **Open workspace** after a confirmed session.
+`autocomplete="current-password"`, and automatic navigation to Overview after a
+confirmed sign-in. Query parameters must not change that fixed destination. A direct
+visit with an existing session retains Account and its **Open workspace** link.
 Hold the initial session check and a sign-in challenge: controls must remain
 disabled with checking/signing-in feedback, and a second submit must send no extra
 request. Incorrect passwords clear the field, report the error and return focus.

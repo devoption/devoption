@@ -216,7 +216,8 @@
             if (session.status === 204 && token(session)) {
               state(token(session));
               message("Signed in.");
-              byId("page-title").focus();
+              // A fixed destination cannot carry a caller-controlled return URL.
+              window.location.replace("/");
             } else if (session.status === 401) {
               state(null);
               message("Sign-in could not be retained. Check that this browser accepts secure localhost cookies.");
