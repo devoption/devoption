@@ -69,6 +69,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Successful repository status reads show their browser-local check time after
+  response validation; loading, failed reads, and discarded history responses
+  cannot display a fresh successful-check time
+  ([#151](https://github.com/devoption/devoption/issues/151)).
+
 - The Projects list filters saved project names in the browser, with match counts,
   no-results feedback and a clear action that preserves existing row/form state
   ([#145](https://github.com/devoption/devoption/issues/145)).

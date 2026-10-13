@@ -39,8 +39,9 @@
           return count ? `${count} ${label}` : "";
         }).filter(Boolean);
         item.changes.textContent = changes.length ? changes.join(" · ") : "Clean";
+        const checkedAt = new Date().toLocaleString(undefined, {dateStyle: "medium", timeStyle: "long"});
         item.fields.hidden = false; item.loaded = true;
-        item.note.textContent = "Refresh to read the checkout again.";
+        item.note.textContent = `Last checked ${checkedAt} (browser time).`;
       } catch {
         if (current === item.version) item.note.textContent = "Repository status could not be read. Check your session and checkout, then refresh.";
       } finally {
