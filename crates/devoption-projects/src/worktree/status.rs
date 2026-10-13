@@ -1,12 +1,12 @@
 //! On-demand Git status using private metadata, never source configuration or index writes.
 use super::{InspectionError as Error, PermittedRoot, Result, WorktreeObservation, filesystem};
 use std::{
-    fs,
-    io::{ErrorKind, Read},
+    fs::{self, File},
+    io::{ErrorKind, Read, Write},
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 const MAX_INDEX: usize = 1024 * 1024;
@@ -38,10 +38,16 @@ struct Snapshot {
     branch: Option<String>,
     commit: Option<String>,
     head: String,
-    index: Option<Vec<u8>>,
+    index: Option<Index>,
     exclude: Option<Vec<u8>>,
     config: String,
     objects: PathBuf,
+}
+
+#[derive(PartialEq, Eq)]
+struct Index {
+    bytes: Vec<u8>,
+    modified: SystemTime,
 }
 
 impl PermittedRoot {
@@ -62,7 +68,14 @@ impl PermittedRoot {
         fs::write(metadata.path().join("HEAD"), format!("{head}\n"))
             .map_err(|_| Error::Unavailable)?;
         if let Some(index) = &before.index {
-            fs::write(metadata.path().join("index"), index).map_err(|_| Error::Unavailable)?;
+            let mut copy =
+                File::create(metadata.path().join("index")).map_err(|_| Error::Unavailable)?;
+            copy.write_all(&index.bytes)
+                .map_err(|_| Error::Unavailable)?;
+            // Git uses the index timestamp to detect edits whose cached stat
+            // fields still match. A fresh copy timestamp can hide such changes.
+            copy.set_modified(index.modified)
+                .map_err(|_| Error::Unavailable)?;
         }
         if let Some(exclude) = &before.exclude {
             fs::create_dir(metadata.path().join("info")).map_err(|_| Error::Unavailable)?;
@@ -157,16 +170,35 @@ impl PermittedRoot {
             branch,
             commit,
             head,
-            index: self.optional_status_file(&git.join("index"), MAX_INDEX)?,
+            index: self
+                .optional_status_entry(&git.join("index"))?
+                .map(|file| {
+                    let bytes = filesystem::bytes(
+                        file.try_clone().map_err(|_| Error::Unavailable)?,
+                        MAX_INDEX,
+                    )?;
+                    let modified = file
+                        .metadata()
+                        .and_then(|metadata| metadata.modified())
+                        .map_err(|_| Error::Unavailable)?;
+                    Ok(Index { bytes, modified })
+                })
+                .transpose()?,
             exclude: self.optional_status_file(&common.join("info/exclude"), 16 * 1024)?,
             config: self.required(&common.join("config"), super::MAX_CONFIG)?,
             objects: self.path.join(common.join("objects")),
         })
     }
 
+    fn optional_status_file(&self, path: &Path, limit: usize) -> Result<Option<Vec<u8>>> {
+        self.optional_status_entry(path)?
+            .map(|file| filesystem::bytes(file, limit))
+            .transpose()
+    }
+
     // Missing intermediate metadata directories mean an absent optional file;
     // unsafe/unreadable entries remain errors. Every component uses the root handle.
-    fn optional_status_file(&self, path: &Path, limit: usize) -> Result<Option<Vec<u8>>> {
+    fn optional_status_entry(&self, path: &Path) -> Result<Option<File>> {
         let mut prefix = PathBuf::new();
         for part in path.components() {
             prefix.push(part);
@@ -174,7 +206,7 @@ impl PermittedRoot {
                 return Ok(None);
             };
             if prefix == path {
-                return filesystem::bytes(file, limit).map(Some);
+                return Ok(Some(file));
             }
             self.directory(&prefix)?;
         }

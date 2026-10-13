@@ -313,3 +313,47 @@ fn symlink_emulation_preserves_clean_and_modified_status() {
         1
     );
 }
+
+#[test]
+fn racy_clean_index_detects_same_size_edits_without_changing_source_timestamp() {
+    let (_temp, app, root) = fixture();
+    let timestamp = std::time::UNIX_EPOCH + Duration::from_secs(1_600_000_000);
+    fs::write(app.join("tracked.txt"), "first\n").unwrap();
+    fs::File::open(app.join("tracked.txt"))
+        .unwrap()
+        .set_modified(timestamp)
+        .unwrap();
+    git(&app, &["add", "tracked.txt"]);
+    git(&app, &["commit", "-m", "Disposable timestamp fixture"]);
+    // Make the index timestamp equal its cached file timestamp: Git must check
+    // content even when a same-size overwrite retains those cached stat fields.
+    fs::File::open(app.join(".git/index"))
+        .unwrap()
+        .set_modified(timestamp)
+        .unwrap();
+    fs::write(app.join("tracked.txt"), "other\n").unwrap();
+    fs::File::open(app.join("tracked.txt"))
+        .unwrap()
+        .set_modified(timestamp)
+        .unwrap();
+    let before = files(&app);
+    assert_eq!(
+        git(&app, &["--no-optional-locks", "status", "--porcelain"]),
+        "M tracked.txt"
+    );
+    assert_eq!(
+        root.git_status(Path::new("app")).unwrap().changes,
+        ChangeCounts {
+            modified: 1,
+            ..ChangeCounts::default()
+        }
+    );
+    assert_eq!(files(&app), before);
+    assert_eq!(
+        fs::metadata(app.join(".git/index"))
+            .unwrap()
+            .modified()
+            .unwrap(),
+        timestamp
+    );
+}

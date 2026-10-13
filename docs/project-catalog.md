@@ -320,6 +320,8 @@ temporary Git directory. It preserves only builtin file-mode, symlink, case and 
 normalization settings from the checked config. Git receives no user/system config,
 source hooks, fsmonitor command or filter definitions; optional index writes,
 submodule inspection, replacement objects and network protocols are disabled.
+The private index retains the checked source modification time so Git can detect
+same-size edits within a timestamp tick. That time is also revalidated.
 The original index and catalog are not written. Git reads the original working
 files and objects in place. The root, location identities and copied metadata
 are checked again after the command. This is a point-in-time observation, not an
