@@ -21,6 +21,9 @@ selection, complete source/context and archive verification remain future gates.
 The [offline fixture proof](offline-fixture-build.md) separately compiles trusted
 test code from a checksum-verified seed. It does not consume a `BuildPlan` or
 implement production approval, isolation or job lifecycle.
+The separate [job lifecycle model](build-jobs.md) now defines in-memory records and
+transition rules using exact plan equality. It has no production runner-event
+issuer, persistence or runtime integration.
 
 `BuildPlan::validate` consumes owned `PlanInput` values and reads a supplied
 in-memory catalog snapshot. It requires existing, associated project/repository

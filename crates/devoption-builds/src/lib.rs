@@ -6,6 +6,7 @@
 #![cfg(unix)]
 
 pub mod cargo_source;
+pub mod jobs;
 
 use devoption_projects::{Catalog, ProjectId, RepositoryId};
 use devoption_registry::CargoMaterialization;

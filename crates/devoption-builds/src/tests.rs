@@ -38,7 +38,7 @@ fn dependencies() -> CargoMaterialization {
 // Synthetic Git metadata only: no Git commands, commits, hooks or build scripts.
 // The directories disappear before validation, demonstrating that it reads only
 // the supplied snapshot and cannot attest to the current filesystem state.
-fn fixture() -> (Catalog, PlanInput) {
+pub(crate) fn fixture() -> (Catalog, PlanInput) {
     let temporary = tempfile::tempdir().unwrap();
     let base = temporary.path().canonicalize().unwrap();
     let root_path = base.join("repositories");
