@@ -7,6 +7,9 @@ Keep one default-mode image per main page at a stable filename; Git records earl
 versions. For the shared-shell refinement in [#147](https://github.com/devoption/devoption/issues/147),
 compare the [before captures](https://github.com/devoption/devoption/tree/d0f6341aaac971edf9082ccbd9cee923b0cc8575/docs/screenshots)
 with the current images here; both are rendered from the working app.
+For the Projects refinement in [#149](https://github.com/devoption/devoption/issues/149),
+use the [preceding Projects captures](https://github.com/devoption/devoption/tree/c81293eb361b8f5e0f51f7d4f450b3fa12d66141/docs/screenshots)
+as the before view.
 `appearance-light.jpg` additionally shows Appearance following a light
 device preference. `appearance-custom.jpg` shows a custom primary and its warning.
 `appearance-dracula.jpg` and `appearance-dracula-light.jpg` show Dracula in Dark
@@ -19,7 +22,7 @@ Use each path below with the fixture's printed origin and port.
 | Page | Path | Capture state | File |
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
-| Projects | `/projects` | Signed in, name filter empty, first attachment form expanded with `tools` selected; 1120 × 1200 | `projects.jpg` |
+| Projects | `/projects` | Signed in, New project collapsed, name filter empty, first attachment form expanded with `tools` selected; 1120 × 1000 | `projects.jpg` |
 | Project details | `/projects/{id}` | Signed in, open Example application from Projects, frontend status expanded, rename and attachment collapsed; 1120 × 900 | `project-details.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; rename collapsed, automatic attachment form expanded with `tools` selected; 1120 × 900 | `project-empty.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
@@ -55,14 +58,14 @@ Remove the block and verify recovery without another sign-in after capturing it.
 1. If source or assets changed, rerun the fixture command and use its new URL.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   For Projects, use **1120 × 1200**, leave the name filter empty, and expand the first project's **Attach
-   repository** form. Wait for the checkout list and select `tools` without
+   For Projects, use **1120 × 1000**, leave **New project** collapsed and the name
+   filter empty, and expand the first project's **Attach repository** form. Wait for the checkout list and select `tools` without
    submitting, to show the relative path
    alongside both fixture projects and the controls. For Project details, open
    **Example application**, use **1120 × 900**, and expand the frontend's **View
    status**. The disposable metadata fixture shows branch `main`, **No commits
    yet**, and **1 untracked entry**; leave rename and attachment collapsed. For the empty-project variant,
-   create **Example new project** and select `tools` in its already open form
+   open **New project**, create **Example new project**, and select `tools` in its already open form
    without submitting, at the same 1120 × 900 viewport.
    A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out
    capture. After sign-in, follow the profile popup's **Appearance** link and confirm

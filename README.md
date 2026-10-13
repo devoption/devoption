@@ -121,8 +121,8 @@ Without JavaScript, the full list remains visible. Project details show
 relative default checkout paths and current build availability at `/projects/{id}`.
 The details page links back to Projects and supports the same repository attachment
 form; a successful attachment reloads the page you are using. Build execution is
-not available yet. Signed-in owners can create an empty project
-with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
+not available yet. Signed-in owners can open **New project** to create an empty
+project with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
 characters. Names need not be unique; the catalog holds up to 64 projects. A
 successful save opens the newly created project without restarting the server.
 When repository attachment is configured, its empty details page opens the first
@@ -176,7 +176,7 @@ browser installation is deferred. The preview exposes no first-owner setup route
 
 ![Home page](docs/screenshots/home.jpg)
 
-**Projects (creation form and temporary fixture data)**
+**Projects (search and temporary fixture data)**
 
 ![Projects page](docs/screenshots/projects.jpg)
 

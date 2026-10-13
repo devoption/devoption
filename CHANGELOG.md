@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Projects groups name filtering with a collapsible creation form, pairs project
+  names with repository counts, and aligns repository metadata and status on
+  details pages ([#149](https://github.com/devoption/devoption/issues/149)).
+
 - The shared shell aligns page titles with the logo, uses consistent control
   sizing and quieter borders, and presents Appearance without an extra panel
   ([#147](https://github.com/devoption/devoption/issues/147)).
