@@ -64,6 +64,7 @@ impl Projects {
 pub(super) fn routes(projects: Projects) -> Router {
     let reader = projects.clone();
     let attachment = projects.clone();
+    let detail = projects.clone();
     Router::new()
         .route(
             "/projects",
@@ -100,6 +101,26 @@ pub(super) fn routes(projects: Projects) -> Router {
                     [(CACHE_CONTROL, "no-store")],
                 )
                     .into_response()
+            }),
+        )
+        .route(
+            "/projects/{project}",
+            get(move |project: Result<RoutePath<String>, PathRejection>| async move {
+                let id = project.ok().and_then(|RoutePath(value)| project_id(&value));
+                let Some(id) = id else {
+                    return (StatusCode::NOT_FOUND, [(CACHE_CONTROL, "no-store")], "Project does not exist.").into_response();
+                };
+                let available = detail.root.is_some();
+                match detail.access(|directory| Ok(directory.load()?.unwrap_or_default())).await {
+                    Ok(catalog) => {
+                        let summaries = summaries(&catalog);
+                        match summaries.iter().find(|project| project.id == id.to_bytes()) {
+                            Some(project) => ([(CACHE_CONTROL, "no-store")], Html(devoption_ui::render_project(project, available))).into_response(),
+                            None => (StatusCode::NOT_FOUND, [(CACHE_CONTROL, "no-store")], "Project does not exist.").into_response(),
+                        }
+                    }
+                    Err(error) => (Failure::from(error).status, [(CACHE_CONTROL, "no-store")], "Project could not be loaded. Reload to try again.").into_response(),
+                }
             }),
         )
         .route(
@@ -212,6 +233,10 @@ fn project_id(value: &str) -> Option<ProjectId> {
 }
 
 fn render(catalog: &Catalog, attachment_available: bool) -> String {
+    devoption_ui::render_projects(&summaries(catalog), attachment_available)
+}
+
+fn summaries(catalog: &Catalog) -> Vec<devoption_ui::ProjectSummary<'_>> {
     let repositories: std::collections::HashMap<_, _> = catalog
         .repositories()
         .iter()
@@ -222,7 +247,7 @@ fn render(catalog: &Catalog, attachment_available: bool) -> String {
         .iter()
         .map(|checkout| ((checkout.project(), checkout.repository()), checkout))
         .collect();
-    let summaries: Vec<_> = catalog
+    catalog
         .projects()
         .iter()
         .map(|project| devoption_ui::ProjectSummary {
@@ -244,8 +269,7 @@ fn render(catalog: &Catalog, attachment_available: bool) -> String {
                 })
                 .collect(),
         })
-        .collect();
-    devoption_ui::render_projects(&summaries, attachment_available)
+        .collect()
 }
 
 // One plain UTF-8 name, not a map of fields, paths or client-supplied identities.

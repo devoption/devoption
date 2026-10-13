@@ -113,7 +113,11 @@ verified in Chrome on loopback, not every browser. If a session check fails, use
 Development checks create owners only in [temporary fixture stores](docs/browser-session-check.md).
 
 Projects displays saved names, repository counts and relative default checkout paths from the
-[catalog](docs/project-catalog.md). Signed-in owners can create an empty project
+[catalog](docs/project-catalog.md). Open a project name to see its repositories,
+relative default checkout paths, and current build availability at `/projects/{id}`.
+The details page links back to Projects and supports the same repository attachment
+form; a successful attachment reloads the page you are using. Build execution is
+not available yet. Signed-in owners can create an empty project
 with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
 characters. Names need not be unique; the catalog holds up to 64 projects. A
 successful save reloads the current list without restarting the server. If a save
@@ -154,6 +158,10 @@ browser installation is deferred. The preview exposes no first-owner setup route
 **Projects (creation form and temporary fixture data)**
 
 ![Projects page](docs/screenshots/projects.jpg)
+
+**Project details (temporary fixture data)**
+
+![Project details page](docs/screenshots/project-details.jpg)
 
 **About**
 

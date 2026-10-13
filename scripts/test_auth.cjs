@@ -57,7 +57,7 @@ function page({ configured = true, form = true, projects = false, repositories =
       addEventListener: (_, callback) => { ready = callback; },
       get cookie() { throw new Error("Auth must not read cookies"); },
     },
-    window: { addEventListener: events.addEventListener, location: { assign: (url) => navigation.push(url) } },
+    window: { addEventListener: events.addEventListener, location: { assign: (url) => navigation.push(url), reload: () => navigation.push("reload") } },
     localStorage: storage, sessionStorage: storage, TextEncoder, URLSearchParams,
     fetch: async (url, options) => {
       calls.push({ url, ...options });
@@ -462,7 +462,7 @@ test("repository forms wait for a verified session and validate bounded root-rel
   assert.equal(current.calls.at(-1).body, "team/工具 & app");
   assert.equal(current.calls.at(-1).headers["x-csrf-token"], csrf);
   assert.equal(current.calls.at(-1).headers["content-type"], "text/plain;charset=UTF-8");
-  assert.deepEqual(current.navigation, ["/projects"]);
+  assert.deepEqual(current.navigation, ["reload"]);
 });
 
 test("repository failures retain paths, distinguish conflicts, and never claim a save", async () => {

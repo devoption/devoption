@@ -7,6 +7,8 @@ use std::{
 
 #[path = "projects/create.rs"]
 mod create;
+#[path = "projects/detail.rs"]
+mod detail;
 #[path = "projects/directory.rs"]
 mod directory;
 
@@ -30,6 +32,10 @@ fn seed(path: &Path) -> Catalog {
 }
 
 fn page(address: SocketAddr, method: &str, issued: Option<&Reply>) -> String {
+    page_at(address, method, "/projects", issued)
+}
+
+fn page_at(address: SocketAddr, method: &str, path: &str, issued: Option<&Reply>) -> String {
     let credentials = issued
         .map(|reply| {
             format!(
@@ -46,7 +52,7 @@ fn page(address: SocketAddr, method: &str, issued: Option<&Reply>) -> String {
     request(
         address,
         &format!(
-            "{method} /projects HTTP/1.1\r\nHost: {address}\r\n{credentials}Connection: close\r\n\r\n"
+            "{method} {path} HTTP/1.1\r\nHost: {address}\r\n{credentials}Connection: close\r\n\r\n"
         ),
     )
 }

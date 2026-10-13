@@ -31,12 +31,18 @@ reads current catalog contents; unsafe or unlinked storage fails closed. Restart
 the service explicitly selects the configured path again. The retained catalog
 handle holds no writer lock; each mutation opens and drops its own writer.
 
-The server reads the current validated snapshot on every Projects GET/HEAD, which
-passes the existing session-cookie guard; anonymous requests receive the empty
+The server reads the current validated snapshot on every Projects list or details
+GET/HEAD, which passes the existing session-cookie guard; anonymous requests
+receive the empty
 non-cacheable redirect to Sign in. Names are HTML-escaped by `devoption-ui`, and
 project/repository names, repository counts and relative default checkout paths
 appear. The absolute trusted root is not sent to the page. Legacy metadata-only
 associations show **Not attached**. No server restart is needed after a save.
+Saved project names link to `/projects/{id}`, which shows that project’s repository
+list and the same attachment form. Missing or malformed project IDs return 404
+after authentication. Details link back to Projects and explain that build
+execution is not available yet; no build or deployment action is offered
+([#135](https://github.com/devoption/devoption/issues/135)).
 Read failures return 503 without stale rows or private error details. The
 unconfigured preview never loads catalog metadata and retains its public placeholder. No fixture projects
 are added to real storage or the persistent preview.

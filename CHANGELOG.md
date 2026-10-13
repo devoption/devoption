@@ -59,6 +59,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Saved project names open a dedicated details page with repositories, relative
+  checkout paths, repository attachment and truthful build availability. Attachment
+  keeps you on the current page ([#135](https://github.com/devoption/devoption/issues/135)).
+
 - A fixture-only Unix artifact handoff copies fully accounted source hard links
   into a bounded, independent private file before applying the unchanged
   single-link metadata gate and hashing. Disposable tests cover containment,

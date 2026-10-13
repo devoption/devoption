@@ -90,23 +90,38 @@ pub fn render_with_account(page: Page, account_available: bool) -> String {
 /// Render a configured owner's project snapshot using the shared page shell.
 /// The caller must authenticate the request; display names are escaped here.
 pub fn render_projects(projects: &[ProjectSummary<'_>], attachment_available: bool) -> String {
-    render_page(Page::Projects, true, Some((projects, attachment_available)))
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::List(projects, attachment_available)),
+    )
 }
 
-fn render_page(
-    page: Page,
-    account_available: bool,
-    projects: Option<(&[ProjectSummary<'_>], bool)>,
-) -> String {
+/// Render one authenticated project with its current repository snapshot.
+pub fn render_project(project: &ProjectSummary<'_>, attachment_available: bool) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Detail(project, attachment_available)),
+    )
+}
+
+enum ProjectView<'a> {
+    List(&'a [ProjectSummary<'a>], bool),
+    Detail(&'a ProjectSummary<'a>, bool),
+}
+
+fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
         Page::Home => ("Home", "/", "No home content yet."),
         Page::Projects => (
             "Projects",
             "/projects",
-            match projects {
-                Some(([], _)) => "No projects yet.",
-                Some(_) => "Your saved projects.",
+            match &projects {
+                Some(ProjectView::List([], _)) => "No projects yet.",
+                Some(ProjectView::List(..)) => "Your saved projects.",
+                Some(ProjectView::Detail(..)) => "Project details.",
                 None => "Project management is not available yet.",
             },
         ),
@@ -126,8 +141,21 @@ fn render_page(
             },
         ),
     };
-    let project_content =
-        projects.map(|(projects, available)| projects::content(projects, available));
+    let (title, breadcrumb, main_class) = if let Some(ProjectView::Detail(project, _)) = &projects {
+        let mut escaped = String::new();
+        projects::escape_into(&mut escaped, project.name);
+        (
+            escaped,
+            r#"<p class="project-back"><a href="/projects">Back to Projects</a></p>"#,
+            r#" class="project-detail-page""#,
+        )
+    } else {
+        (title.to_owned(), "", "")
+    };
+    let project_content = projects.map(|view| match view {
+        ProjectView::List(projects, available) => projects::content(projects, available),
+        ProjectView::Detail(project, available) => projects::detail(project, available),
+    });
     let (appearance_current, content) = if let Some(content) = project_content.as_deref() {
         ("", content)
     } else if path == "/settings/appearance" {
@@ -202,7 +230,8 @@ fn render_page(
   </aside>
   <div class=\"workspace\">
     <header class=\"content-header\"><p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p></header>
-    <main id=\"main-content\" tabindex=\"-1\">
+    <main id=\"main-content\" tabindex=\"-1\"{main_class}>
+      {breadcrumb}
       <h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>
       <p id=\"page-message\">{message}</p>
       {content}
