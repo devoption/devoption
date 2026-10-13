@@ -18,6 +18,7 @@ deployments or production hosting are already available.
 ## Implementation references
 
 - [Owner setup and deferred browser enrollment](local-enrollment.md)
+- [Display-name Profile page](profile.md)
 - [Browser session validation](browser-session-check.md)
 - [Project catalog and HTTP operations](project-catalog.md)
 - [Worktree validation](worktree-validation.md)

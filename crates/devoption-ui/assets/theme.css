@@ -339,3 +339,17 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 .project-table a:hover { text-decoration: underline; text-underline-offset: .25em; }
 .project-settings { max-width: 36rem; }
 .project-settings h2 { margin-bottom: 1.5rem; }
+
+/* Display-only profile metadata. Long Unicode names stay within the sidebar. */
+.profile-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#profile-popup h2 { overflow-wrap: anywhere; }
+#profile-initials { font-size: .8125rem; font-weight: 600; }
+.profile-settings { max-width: 34rem; }
+.profile-role { margin: 0 0 2rem; }
+.profile-role strong { margin-left: 1rem; color: var(--color-text); font-weight: 500; }
+#profile-form { display: grid; gap: 1rem; }
+#profile-form label { font-weight: 500; }
+#profile-form input { width: 100%; min-width: 0; }
+#profile-form .action-button, #profile-signin { justify-self: start; }
+#display-name-help, #profile-save-status { font-size: var(--text-small); }
+#profile-save-status:empty { display: none; }

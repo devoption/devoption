@@ -4,6 +4,8 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 
 #[path = "installation/catalog.rs"]
 mod catalog;
+#[path = "installation/profile.rs"]
+mod profile;
 
 // Linux can temporarily reject a copied executable while a concurrent child
 // retains an inherited writable descriptor before exec. Retry only this kernel

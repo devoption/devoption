@@ -172,3 +172,10 @@ Only temporary fixtures use this browser-attempt core. The initial
 installation flow is local/SSH CLI setup followed by ordinary browser sign-in;
 browser installation is deferred. The preview exposes no first-owner setup route.
 
+
+## Profile
+
+Open the account menu and choose **Profile** to save a display name or clear it.
+The name and initials appear in the menu across devices and service restarts.
+An unset name uses **Account**; **Owner** is the role. See the [Profile guide](profile.md)
+for validation, session recovery and storage details.

@@ -190,8 +190,9 @@ revision first, stop the service, retain the previous binary and commit ID, then
 replace the binary and restart. Record the new commit with it. No automatic
 binary upgrade or cross-version recovery is provided.
 
-Back up `owner.bin` and the optional `projects.bin` as one offline snapshot. Stop
-every server or other writer using that data directory and leave it unchanged
+Back up `owner.bin`, optional `projects.bin` and optional `profile.bin` as one
+offline snapshot. Stop every server or other writer using that data directory
+and leave it unchanged
 until the copy and comparisons finish. Stopping the named service alone is not
 enough if another process uses the same directory. Use the installation's actual
 data and binary paths if they differ from this guide.
@@ -220,6 +221,15 @@ the server; it leaves the original data in place and prints the backup location:
   else
     printf 'absent\n' > "$backup/catalog-state"
   fi
+  test ! -L "$devoption_data/profile.bin"
+  if test -e "$devoption_data/profile.bin"; then
+    test -f "$devoption_data/profile.bin"
+    cp -p "$devoption_data/profile.bin" "$backup/profile.bin"
+    cmp "$devoption_data/profile.bin" "$backup/profile.bin"
+    printf 'present\n' > "$backup/profile-state"
+  else
+    printf 'absent\n' > "$backup/profile-state"
+  fi
   # END data-backup
   cp -p "$HOME/.local/lib/devoption/devoption" "$backup/devoption"
   cp -p "$HOME/.local/lib/devoption/source-commit.txt" "$backup/source-commit.txt"
@@ -229,16 +239,21 @@ the server; it leaves the original data in place and prints the backup location:
 ```
 
 If any step fails, the block stops; check the service state before continuing.
-The `catalog-state` marker records whether a catalog existed. Keep it with the
-backup; a missing catalog must not silently become an empty project list. Owner
+The `catalog-state` and `profile-state` markers record whether those optional
+records existed. Keep both with the backup; a missing catalog must not silently
+become an empty project list. Owner
 records contain password-hash material; catalogs contain private project names,
-paths and filesystem observations. Keep all copies private and out of source
-control, logs and issue attachments. This local copy
+paths and filesystem observations; profiles contain the account’s display name.
+Keep all copies private and out of source control, logs and issue attachments.
+This local copy
 does not protect against loss of the host or disk. Off-host encrypted backups and
 their retention policy are separate operator work. Do not copy `.projects.lock`
 or unpublished temporary files, and do not delete them from the original directory.
 The backup contains application records, the compatible binary and source revision;
 it does not contain repository/worktree contents or browser-local appearance settings.
+
+Use the restore instructions from the same source revision as the backed-up binary,
+including for older snapshots that predate Profile.
 
 To check a restore, retain the original data and select a **fresh** directory.
 Replace the backup path below with the directory printed above:
@@ -269,6 +284,21 @@ Replace the backup path below with the directory printed above:
       ;;
     *) printf 'Invalid catalog-state marker\n' >&2; exit 1 ;;
   esac
+  test -f "$backup/profile-state"
+  test ! -L "$backup/profile-state"
+  case "$(cat "$backup/profile-state")" in
+    present)
+      test -f "$backup/profile.bin"
+      test ! -L "$backup/profile.bin"
+      cp -p "$backup/profile.bin" "$restored/profile.bin"
+      cmp "$backup/profile.bin" "$restored/profile.bin"
+      ;;
+    absent)
+      test ! -e "$backup/profile.bin"
+      test ! -L "$backup/profile.bin"
+      ;;
+    *) printf 'Invalid profile-state marker\n' >&2; exit 1 ;;
+  esac
   cp -p "$backup/owner.bin" "$restored/owner.bin"
   cmp "$backup/owner.bin" "$restored/owner.bin"
   # END data-restore
@@ -279,7 +309,8 @@ Replace the backup path below with the directory printed above:
 This foreground check uses the backed-up binary and restored data. Reopen the
 browser/tunnel and sign in with the existing password. Stop it with Ctrl+C after
 verification. Check the project/repository names, counts and default checkout paths
-against the snapshot. Old cookies must not regain access. An invalid record or unsafe
+and the Profile display name against the snapshot. Old cookies must not regain
+access. An invalid record or unsafe
 permissions must stop startup; do not repair it by deleting the record or running
 setup. If copying fails, do not start the partial restore. Retain the original and
 backup and investigate; use another fresh directory for a later attempt. A lost

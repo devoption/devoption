@@ -20,6 +20,10 @@ type SharedSession = Arc<SessionSlot>;
 #[cfg(unix)]
 mod auth;
 #[cfg(unix)]
+mod input;
+#[cfg(unix)]
+mod profile;
+#[cfg(unix)]
 mod projects;
 #[cfg(all(test, unix))]
 mod session_tests;
@@ -47,12 +51,18 @@ pub fn run_with_repository_root(
         .transpose()
         .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?;
     #[cfg(unix)]
-    let configured = owner_store
+    let owner_identity = owner_store
         .as_ref()
-        .map(|store| store.load().map(|record| record.is_some()))
+        .map(|store| {
+            store
+                .load()
+                .map(|record| record.map(|record| record.identity()))
+        })
         .transpose()
         .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?
-        .unwrap_or(false);
+        .flatten();
+    #[cfg(unix)]
+    let configured = owner_identity.is_some();
     #[cfg(not(unix))]
     if data_directory.is_some() || repository_root.is_some() {
         return Err(io::Error::new(
@@ -78,6 +88,16 @@ pub fn run_with_repository_root(
         None
     };
     #[cfg(unix)]
+    let profile = owner_identity
+        .map(|identity| {
+            crate::profile::ProfileStore::new(
+                owner_store.as_ref().expect("configured owner has a store"),
+                identity,
+            )
+        })
+        .transpose()
+        .map_err(|error| io::Error::other(format!("profile unavailable: {error}")))?;
+    #[cfg(unix)]
     let owner_auth = owner_store.map(|store| {
         (
             crate::owner_auth::service::OwnerAuthService::new(store),
@@ -99,7 +119,10 @@ pub fn run_with_repository_root(
             let configured = false;
             let session = Arc::new(SessionSlot::default());
             #[cfg(unix)]
-            let project_routes = projects.map(projects::routes).unwrap_or_default();
+            let project_routes = projects
+                .map(projects::routes)
+                .unwrap_or_default()
+                .merge(profile.map(profile::routes).unwrap_or_default());
             #[cfg(not(unix))]
             let project_routes = Router::new();
             let app = page_routes(configured, Arc::clone(&session), project_routes);
@@ -126,6 +149,7 @@ fn page_routes(configured: bool, session: SharedSession, project_routes: Router)
         ("/releases", Page::Releases),
         ("/infrastructure", Page::Infrastructure),
         ("/settings/appearance", Page::Appearance),
+        ("/settings/profile", Page::Profile),
     ] {
         if configured && matches!(page, Page::Projects) {
             continue;

@@ -244,6 +244,7 @@ fn manual_cookie_browser_fixture() {
     let store = crate::owner_store::OwnerStore::open_absolute(&data).unwrap();
     let projects =
         projects::Projects::open_with_root(&store, enabled.then_some(root.as_path())).unwrap();
+    let profile = crate::profile::ProfileStore::new(&store, identity).unwrap();
     println!("Browser fixture root: {}", root.display());
     Builder::new_current_thread()
         .enable_all()
@@ -254,7 +255,12 @@ fn manual_cookie_browser_fixture() {
             let port = listener.local_addr().unwrap().port();
             let slot = Arc::new(SessionSlot::default());
             let protected = protect(
-                page_routes(true, Arc::clone(&slot), projects::routes(projects)).route(
+                page_routes(
+                    true,
+                    Arc::clone(&slot),
+                    projects::routes(projects).merge(profile::routes(profile)),
+                )
+                .route(
                     "/probe",
                     post(move |Extension(id): Extension<IdentityId>| async move {
                         assert_eq!(id, identity);

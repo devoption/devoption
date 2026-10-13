@@ -64,9 +64,11 @@ function page({ configured = true, form = true, profile = true, projects = false
       createElement: (tag) => node(`created-${tag}-${nodes.size}`),
       querySelectorAll: (selector) => selector === ".repository-form" ? repositoryForms : signouts,
       addEventListener: (_, callback) => { ready = callback; },
+      dispatchEvent: () => {},
       get cookie() { throw new Error("Auth must not read cookies"); },
     },
     window: { addEventListener: events.addEventListener, location: { replace: (url) => navigation.push(`replace:${url}`), assign: (url) => navigation.push(url), reload: () => navigation.push("reload") } },
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },
     localStorage: storage, sessionStorage: storage, TextEncoder, URLSearchParams,
     fetch: async (url, options) => {
       calls.push({ url, ...options });
@@ -279,7 +281,7 @@ test("initial recovery gates controls and restores a live account without signin
   await tick();
   assert.equal(current.nodes.get("signin-form").hidden, true);
   assert.equal(current.nodes.get("auth-signed-in").hidden, false);
-  assert.equal(current.nodes.get("profile-state").textContent, "Owner");
+  assert.equal(current.nodes.get("profile-state").textContent, "Account");
   assert.ok(current.signouts.every((button) => !button.disabled && !button.hidden));
   assert.deepEqual(current.calls.map((call) => call.url), ["/auth/session"]);
 });
@@ -412,7 +414,7 @@ test("failed verification after successful sign-in requires checking the account
     // A fresh page checks the retained cookie without a challenge or sign-in.
     const reloaded = page({ initial: response(204, nextCsrf) });
     await tick();
-    assert.equal(reloaded.nodes.get("profile-state").textContent, "Owner");
+    assert.equal(reloaded.nodes.get("profile-state").textContent, "Account");
     assert.deepEqual(reloaded.calls.map((call) => call.url), ["/auth/session"]);
   }
 });
@@ -426,7 +428,7 @@ test("a failed reload still offers only account checking until the session is co
     current.queue.push(response(204, nextCsrf));
     current.event("pageshow", { persisted: true });
     await tick();
-    assert.equal(current.nodes.get("profile-state").textContent, "Owner");
+    assert.equal(current.nodes.get("profile-state").textContent, "Account");
     assert.deepEqual(current.calls.map((call) => call.url), ["/auth/session", "/auth/session"]);
   }
 });
@@ -444,7 +446,7 @@ test("verification failure after navigation cannot overwrite the restored sessio
   await tick();
   finish(new Error("late fixture failure"));
   await work;
-  assert.equal(current.nodes.get("profile-state").textContent, "Owner");
+  assert.equal(current.nodes.get("profile-state").textContent, "Account");
   assert.equal(current.nodes.get("auth-recheck").hidden, true);
   assert.equal(current.status.textContent, "");
 });
@@ -466,7 +468,7 @@ test("failed logout remains retryable and does not falsely show signed out", asy
     await tick();
     current.queue.push(failure);
     await current.logout();
-    assert.equal(current.nodes.get("profile-state").textContent, "Owner");
+    assert.equal(current.nodes.get("profile-state").textContent, "Account");
     assert.equal(current.signouts[0].disabled, false);
     assert.deepEqual(current.navigation, []);
     current.queue.push(response(204));
@@ -501,7 +503,7 @@ test("pagehide discards pending recovery and bfcache restoration checks the live
   assert.equal(current.nodes.get("auth-password").value, "");
   finish(response(204, csrf));
   await tick();
-  assert.notEqual(current.nodes.get("profile-state").textContent, "Owner");
+  assert.notEqual(current.nodes.get("profile-state").textContent, "Account");
   current.queue.push(response(204, nextCsrf));
   current.event("pageshow", { persisted: true });
   await tick();
