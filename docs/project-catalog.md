@@ -44,6 +44,8 @@ work runs outside the async event loop. Each creation acquires the existing
 exclusive writer lock, loads the latest snapshot, creates an empty project with a
 fresh ID and atomically saves it. Repository records and associations are retained.
 Another process holding the lock causes a closed failure, not a stale overwrite.
+Dropping the writer explicitly unlocks before closing its descriptor, so a
+concurrent subprocess's brief inherited descriptor cannot extend its lock lifetime.
 The handler returns an empty, non-cacheable 204 only after save and directory sync
 succeed. The browser then reloads `/projects`; it does not insert an optimistic row.
 Invalid names return 400, oversized bodies 413, unsupported encodings 415, stalled

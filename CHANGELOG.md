@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Dropping a catalog writer now explicitly releases its advisory lock, avoiding
+  a spurious busy result while a concurrent subprocess retains a descriptor
+  before exec. A deterministic regression preserves live-writer exclusion
+  ([#113](https://github.com/devoption/devoption/issues/113)).
+
 - Failure to re-inspect an initially valid checkout now returns a stale-checkout
   conflict. Deterministic fixture tests cover disappearance, invalid/unsupported
   metadata and replacement between inspections
