@@ -35,6 +35,12 @@ pub struct GitStatus {
     pub changes: ChangeCounts,
 }
 
+/// Bounded current working-tree observations, not an immutable source snapshot.
+pub struct SourceInputs {
+    pub status: GitStatus,
+    pub files: Vec<(&'static str, Option<FileContent>)>,
+}
+
 #[derive(PartialEq, Eq)]
 struct Snapshot {
     observed: WorktreeObservation,
@@ -119,6 +125,27 @@ impl Snapshot {
 }
 
 impl PermittedRoot {
+    /// Inspect only three fixed tracked source inputs and reject detected changes
+    /// across the read. No Cargo invocation or project code execution.
+    pub fn source_inputs(&self, candidate: &Path) -> Result<SourceInputs> {
+        let before = self.status_snapshot(candidate)?;
+        let status = self.git_status(candidate)?;
+        let tracked = files::entries(&before)?;
+        let mut files = Vec::new();
+        for path in ["Cargo.toml", "Cargo.lock", "src/main.rs"] {
+            let content = match tracked.iter().find(|entry| entry.path == path) {
+                None => None,
+                Some(entry) if !entry.regular => Some(FileContent::Unsupported),
+                Some(_) => Some(self.preview_file(&candidate.join(path))?),
+            };
+            files.push((path, content));
+        }
+        if self.git_status(candidate)? != status || self.status_snapshot(candidate)? != before {
+            return Err(Error::Changed);
+        }
+        Ok(SourceInputs { status, files })
+    }
+
     /// Read a bounded status observation. Git receives a private copy of bounded
     /// metadata and no source/global configuration; working files and objects are
     /// read in place. This is not an atomic filesystem snapshot or a sandbox.

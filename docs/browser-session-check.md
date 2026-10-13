@@ -44,9 +44,12 @@ Open **Example application** with Enter from its row. Verify the project Overvie
 and its scoped Overview, Code, Builds, Releases, Packages and Settings links.
 Capture `project-details.jpg`, then use Code to inspect the saved frontend checkout.
 Confirm loading feedback, branch `main`, **No commits yet**, **1 untracked entry**,
-and **Last checked**. Capture `project-code.jpg` at 1280 × 900. Status stays in Code
-without a page navigation. Builds, Releases and Packages must show unavailable
-states rather than fixture execution results; capture their dedicated pages.
+and **Last checked**. With `DEVOPTION_BROWSER_FILES=1`, also expect **3 staged**
+entries; use that variant for `project-code.jpg` at 1280 × 900. Status stays in Code
+without a page navigation. Builds must show **Prepare a build** with source-check
+choices for attached repositories; Releases and Packages retain unavailable states.
+Use the [source-check fixture and captures](screenshots/README.md) to validate real
+preparation results, including a fresh dirty-source recheck.
 Open Settings, rename through its inline form, and confirm the same project ID and
 associations after reload. Capture Settings before changing the fixture name.
 Check section deep links, refresh, Back/Forward, selected link state, keyboard

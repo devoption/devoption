@@ -112,7 +112,10 @@ Filtering stays in the page; it sends no request and saves no browser preference
 Without JavaScript, the full list remains visible. Opening a project enters its
 own workspace at `/projects/{id}`. **Overview** summarizes its repositories;
 **Code** shows repository details and inspection; **Settings** edits the project
-name. **Builds**, **Releases** and **Packages** have dedicated unavailable states.
+name. **Builds** offers [source preparation checks](build-preparation.md) for an
+attached repository: observed commit, Git changes, tracked Cargo inputs and binary
+source. **Check again** reads current state; no build is run or approved. **Releases**
+and **Packages** retain unavailable states.
 The section links use ordinary URLs (`/projects/{id}/code`, for example), so
 refresh, bookmarks and browser Back/Forward keep the selected project and section.
 

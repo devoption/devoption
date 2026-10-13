@@ -3,8 +3,11 @@
 `devoption-builds` implements a pure Unix Rust build-plan model under
 [#116](https://github.com/devoption/devoption/issues/116), an initial domain slice
 of [#15](https://github.com/devoption/devoption/issues/15) and
-[#17](https://github.com/devoption/devoption/issues/17). It has no runtime caller,
-HTTP route, UI, persistence, approval issuer or executor. Builds remain unavailable.
+[#17](https://github.com/devoption/devoption/issues/17). The plan model has no runtime caller,
+persistence, approval issuer or executor. Build execution remains unavailable.
+The crate also provides a separate [source preparation flow](build-preparation.md)
+used by project Builds; those current working-tree observations neither construct
+a BuildPlan nor grant approval.
 
 Every plan also carries an immutable [Cargo dependency descriptor](registry-contract.md)
 from the DevOption registry contract added in

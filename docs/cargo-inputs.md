@@ -4,7 +4,12 @@
 [#121](https://github.com/devoption/devoption/issues/121). It accepts untrusted
 manifest and lockfile byte slices, an explicit DevOption registry identity, and
 expected SHA-256 values for both inputs. It has no filesystem, Git, Cargo,
-process, environment or network access and no runtime caller.
+process, environment or network access. The additional `inspect` entry point
+shares the same parsing, hash computation, bounds and graph checks without an
+expected-hash claim or registry selection. It returns package name/version, input
+hashes and dependency count to the [source preparation flow](build-preparation.md).
+`validate` retains its expected-hash check and explicit registry identity; neither
+entry point proves source provenance or archive availability.
 
 The adapter hashes the exact bytes with pinned `sha2` and parses them with pinned
 `toml`. Parser errors become fixed diagnostics that omit input text. TOML's

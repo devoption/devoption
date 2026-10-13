@@ -364,3 +364,23 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 .tracked-files a span:last-child, .file-path { overflow-wrap: anywhere; }
 .file-path { font-family: var(--font-mono, monospace); font-size: 1rem; margin-top: 1.25rem; }
 .file-content { max-width: 100%; overflow: auto; padding: 1.25rem; background: var(--color-surface); border-radius: 0.5rem; line-height: 1.6; font-size: 0.85rem; tab-size: 4; }
+
+/* Source preparation observations, separate from future execution/history. */
+.build-preparation { max-width: 54rem; }
+.build-preparation h2 { margin-top: 1.25rem; }
+.preparation-note { color: var(--color-muted); margin: 1rem 0 1.5rem; }
+.preparation-repositories, .preparation-checks { list-style: none; padding: 0; margin: 1.5rem 0; }
+.preparation-repositories li, .preparation-checks li { padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
+.preparation-repositories li, .preparation-check-heading, .preparation-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.preparation-repositories h3, .preparation-check-heading h3 { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.preparation-check-heading span { color: var(--color-muted); font-size: var(--text-small); }
+.preparation-checks p { margin: .5rem 0 0; overflow-wrap: anywhere; }
+.preparation-result { font-weight: 600; font-size: 1.125rem; }
+.preparation-summary { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin: 1.5rem 0; }
+.preparation-summary dt { color: var(--color-muted); font-size: var(--text-small); margin-bottom: .35rem; }
+.preparation-summary dd { margin: 0; overflow-wrap: anywhere; }
+.preparation-summary div { min-width: 0; max-width: 100%; }
+.preparation-actions { justify-content: flex-start; margin-top: 1.5rem; }
+.preparation-help { margin-top: 2rem; }
+.preparation-help summary { cursor: pointer; font-weight: 500; }
+.preparation-help p { margin: 1rem 0; }

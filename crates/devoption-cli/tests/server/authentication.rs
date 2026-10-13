@@ -11,6 +11,8 @@ use std::{
 
 const PASSWORD: &str = "existing owner fixture only";
 
+#[path = "authentication/builds.rs"]
+mod builds;
 #[path = "authentication/files.rs"]
 mod files;
 #[path = "authentication/installation.rs"]

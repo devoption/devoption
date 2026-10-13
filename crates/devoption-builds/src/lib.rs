@@ -1,5 +1,6 @@
 //! Immutable Unix Rust build plans bound to verified root Cargo source metadata.
 //! Validation reads supplied values only, with no filesystem, process or network I/O.
+//! The separate preparation module performs read-only current-source inspection.
 //! A valid plan is neither reviewed nor approved and grants no execution rights.
 //! See `docs/build-plans.md` for the checks still required before any executor.
 
@@ -7,6 +8,7 @@
 
 pub mod cargo_source;
 pub mod jobs;
+pub mod preparation;
 
 use devoption_projects::{Catalog, ProjectId, RepositoryId};
 use devoption_registry::CargoMaterialization;

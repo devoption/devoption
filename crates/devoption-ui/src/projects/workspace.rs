@@ -101,7 +101,7 @@ pub(crate) fn content_with_creation(
             html.push_str(&project_form(Some(project)));
             html.push_str("<noscript>JavaScript is required to rename a project.</noscript></section>");
         }
-        ProjectSection::Builds => html.push_str(r#"<section class="empty-state"><h2>Builds are not available yet</h2><p>Build execution and build history are not implemented for this project.</p></section>"#),
+        ProjectSection::Builds => html.push_str(&super::builds::list(project, attachment_available)),
         ProjectSection::Releases => html.push_str(r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and deployment are not implemented for this project.</p></section>"#),
         ProjectSection::Packages => html.push_str(r#"<section class="empty-state"><h2>Packages are not available yet</h2><p>Package management is not implemented for this project.</p></section>"#),
     }

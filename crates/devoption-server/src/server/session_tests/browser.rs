@@ -259,6 +259,48 @@ fn manual_cookie_browser_fixture() {
         )
         .unwrap();
     }
+    if std::env::var_os("DEVOPTION_BROWSER_PREPARATION").is_some() {
+        let app = root.join("backend");
+        std::fs::create_dir(app.join("src")).unwrap();
+        std::fs::write(app.join("Cargo.toml"), "[package]\nname = \"example-service\"\nversion = \"0.1.0\"\nedition = \"2024\"\nbuild = false\n").unwrap();
+        std::fs::write(
+            app.join("Cargo.lock"),
+            "version = 4\n[[package]]\nname = \"example-service\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            app.join("src/main.rs"),
+            "fn main() { println!(\"Preparation fixture\"); }\n",
+        )
+        .unwrap();
+        for args in [
+            vec!["add", "--all"],
+            vec!["commit", "-m", "Disposable preparation fixture"],
+        ] {
+            let result = std::process::Command::new("git")
+                .env_clear()
+                .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", "/dev/null")
+                .env("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z")
+                .env("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
+                .current_dir(&app)
+                .args([
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "commit.gpgsign=false",
+                    "-c",
+                    "user.name=Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                ])
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+        }
+    }
     let mut catalog = devoption_projects::Catalog::default();
     let project = catalog.create_project("Example application").unwrap();
     let docs = catalog.create_project("Example documentation").unwrap();
