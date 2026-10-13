@@ -53,6 +53,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A fixture-only root Cargo source verifier checks typed Git commit/tree/blob
+  identities with SHA-1 collision detection, rejects ambiguous root paths/types
+  and unsupported configuration, then validates linked manifest/lockfile bytes.
+  Independent revision selection, complete source/context, plan binding, archive
+  verification and execution remain unimplemented
+  ([#123](https://github.com/devoption/devoption/issues/123)).
+
 - A bounded supplied-byte Cargo adapter checks a strict standalone manifest and
   version-4 lock graph using pinned TOML/SHA-256 dependencies. Exact manifest and
   lockfile hashes now participate in provider matching and build-plan equality;
