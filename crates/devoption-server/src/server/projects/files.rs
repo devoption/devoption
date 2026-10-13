@@ -35,6 +35,10 @@ pub(super) fn routes(projects: Projects) -> Router {
         )
 }
 
+pub(super) async fn code(projects: Projects, project: ProjectId) -> axum::response::Response {
+    show_selected(projects, project, None, None).await
+}
+
 async fn show(
     projects: Projects,
     project: String,
@@ -46,6 +50,17 @@ async fn show(
     else {
         return missing();
     };
+    show_selected(projects, project, Some(repository), path).await
+}
+
+async fn show_selected(
+    projects: Projects,
+    project: ProjectId,
+    repository: Option<RepositoryId>,
+    path: Option<String>,
+) -> axum::response::Response {
+    let attachment_available = projects.root.is_some();
+    let creation_available = projects.managed.is_some();
     let root = projects.root.clone();
     let loaded = projects
         .access(move |directory| {
@@ -55,6 +70,23 @@ async fn show(
                 .iter()
                 .find(|p| p.id() == project)
                 .ok_or(Error::UnknownProject)?;
+            // Code opens the first attached repository in saved order. Explicit
+            // repository URLs keep their selection, including unavailable ones.
+            let repository = repository.or_else(|| {
+                record
+                    .repositories()
+                    .iter()
+                    .copied()
+                    .find(|id| {
+                        catalog.default_checkouts().iter().any(|checkout| {
+                            checkout.project() == project && checkout.repository() == *id
+                        })
+                    })
+                    .or_else(|| record.repositories().first().copied())
+            });
+            let Some(repository) = repository else {
+                return Ok((catalog, None));
+            };
             if !record.repositories().contains(&repository) {
                 return Err(Error::UnknownRepository);
             }
@@ -64,7 +96,7 @@ async fn show(
                 .and_then(|root| {
                     catalog.repository_files(project, repository, root, path.as_deref())
                 });
-            Ok((catalog, files))
+            Ok((catalog, Some((repository, files))))
         })
         .await;
     let (catalog, result) = match loaded {
@@ -82,6 +114,18 @@ async fn show(
     let projects = summaries(&catalog);
     let Some(project) = projects.iter().find(|p| p.id == project.to_bytes()) else {
         return missing();
+    };
+    let Some((repository, result)) = result else {
+        return (
+            [(CACHE_CONTROL, "no-store")],
+            Html(devoption_ui::render_project_section_with_creation(
+                project,
+                attachment_available,
+                creation_available,
+                devoption_ui::ProjectSection::Code,
+            )),
+        )
+            .into_response();
     };
     let Some(repository) = project
         .repositories
@@ -102,8 +146,16 @@ async fn show(
         ) => (
             StatusCode::CONFLICT,
             Some(
-                "The checkout changed. Return to Code and inspect its attachment before retrying.",
+                "The checkout changed. Check its attachment in Repository details below before retrying.",
             ),
+        ),
+        Err(Error::CheckoutRequired) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Some(if attachment_available {
+                "No checkout is attached to this repository."
+            } else {
+                "Repository inspection is not configured on this server."
+            }),
         ),
         Err(Error::Inspection(InspectionError::LimitExceeded)) => (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -134,6 +186,8 @@ async fn show(
         FilePreview { path, text, message }
     });
     let view = RepositoryFilesView {
+        attachment_available,
+        creation_available,
         repository_id: repository.id,
         repository_name: repository.name,
         entries: files

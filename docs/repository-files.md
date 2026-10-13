@@ -1,8 +1,11 @@
 # Browse repository files
 
-On a project's **Code** page, choose **Browse files** below a repository. Select a
-tracked path to read its current working-tree text. **All tracked files** returns
-to the list; **Back to repositories** returns to Code. Ordinary links support
+Open a project's **Code** page to see tracked files immediately. It selects the
+first attached repository in saved order; when there are several, choose another
+repository above the file list. Explicit repository links retain that selection.
+Select a tracked path to read its current working-tree text. **All tracked files**
+returns to its list. Status and attachment/creation controls remain under
+**Repository details** below the files. Ordinary links support
 bookmarks, refresh, browser history and keyboard navigation. Browsing itself needs
 no JavaScript; signing in still does.
 
@@ -11,6 +14,8 @@ show uncommitted changes and is **not a pinned commit, source proof or build
 approval**. Untracked files are never listed or opened. An empty repository shows
 **No tracked files** until files are staged using Git outside DevOption. Source
 editing, downloads, commits and build execution are not implemented.
+Projects with no repositories show the existing setup actions. Missing roots,
+unattached or unavailable checkouts show an explanation rather than an empty list.
 
 ## Configuration and bounds
 
@@ -55,4 +60,5 @@ bytes. The [screenshot fixture](screenshots/README.md) supplies staged sample so
 for browser checks, including keyboard links, mobile widths, 200% text resizing,
 deep-link reloads and browsing without JavaScript.
 
-Implemented under [#169](https://github.com/devoption/devoption/issues/169).
+Implemented under [#169](https://github.com/devoption/devoption/issues/169), with
+direct Code browsing under [#179](https://github.com/devoption/devoption/issues/179).

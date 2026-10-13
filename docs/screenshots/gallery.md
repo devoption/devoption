@@ -16,7 +16,7 @@ for dimensions, states and refresh instructions.
 
 ![Project Overview](project-details.jpg)
 
-![Project Code and repository status](project-code.jpg)
+![Project Code with files shown immediately and repository details below](project-code.jpg)
 
 **Tracked repository files and current working-tree text**
 

@@ -46,7 +46,8 @@ navigation opens Code, Builds, Releases, Packages and Settings at
 `/projects/{id}/{section}`. `/overview` is also accepted; the Overview link uses
 the stable base URL. Each section reads the current catalog and requires the same
 session as the list. Missing IDs or unsupported sections return 404 after
-authentication. Code contains repository inspection, explicitly configured managed creation and optional attachment;
+authentication. Code opens the [tracked-file browser](repository-files.md) directly,
+with repository inspection, explicitly configured managed creation and optional attachment below;
 Settings contains the name form. Builds now provides [source preparation checks](build-preparation.md);
 Releases and Packages retain unavailable states. There are no execution or deployment controls
 ([#160](https://github.com/devoption/devoption/issues/160)).
