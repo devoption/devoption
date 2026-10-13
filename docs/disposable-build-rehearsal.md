@@ -92,6 +92,33 @@ collection. Any revised artifact policy needs to remain within the reviewed scop
 Another disposable build requires a new explicit approval; this attempt was not
 repeated and does not close the artifact-verification gap in #131.
 
+## Diagnostic follow-up without another build
+
+The pure [metadata diagnostic helper](../scripts/rehearsal_artifact_metadata.py)
+now reports mode, link count, byte size, the size limit and every failed predicate
+before a caller decides whether to reject. It preserves the exact failed
+rehearsal's acceptance rule, including the single-link condition; it neither
+weakens isolation nor changes artifact policy. It performs no I/O or execution.
+
+Temporary-file tests cover regular files, hard links, combined empty/hard-link
+failures, directories, symlinks and the inclusive 4 MiB boundary. These establish
+diagnostic behavior, not which condition failed in the deleted VM artifact.
+The retained attempt's logs and harness are unchanged.
+
+A future, separately approved harness can retain the report before rejecting:
+
+```python
+report = describe_artifact_metadata(os.fstat(artifact.fileno()))
+receipt["artifact_metadata"] = report
+if not report["metadata_accepted"]:
+    raise RuntimeError("artifact metadata rejected: " + ", ".join(report["failed_checks"]))
+```
+
+The helper has not been run in the VM and is not integrated with a production
+runner. Passing its metadata gate does not prove safe path selection, stable
+bytes, a checksum, or artifact acceptance. Future integration must still persist
+failure receipts, propagate the inner failure and verify the live unit controls.
+
 ## Cleanup and retention
 
 Cleanup verified that the complete service cgroup was empty, the transient unit

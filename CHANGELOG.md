@@ -62,15 +62,18 @@ Entries describe implemented changes, not the roadmap.
 - A separately approved disposable Ubuntu rehearsal records one successful offline
   Cargo compile, observed job restrictions, and cleanup. Artifact metadata
   verification failed before a checksum or size was recorded, so the rehearsal
-  is not a successful end-to-end build result. No production runner is added
+  is not a successful end-to-end build result. A tested, I/O-free helper reports
+  each existing metadata predicate without changing acceptance or isolation;
+  it is not a production runner and no further VM build was attempted
   ([#131](https://github.com/devoption/devoption/issues/131)).
 
 - In-memory build jobs bind queued/running/succeeded/failed/cancelled records to
   an exact immutable plan and attempt identity. Transition tests cover mismatched
   results, cancellation, terminal rewrites and artifact metadata; sealed runner
   events have no production issuer. No process launch, persistence, runtime/UI
-  integration or execution authority is added. A disposable fixture runner profile
-  is documented solely as a proposal for later approval
+  integration or execution authority is added. The accompanying disposable fixture
+  runner profile is separate from the job model; its later approved attempt and
+  limitations are recorded under #131 above
   ([#127](https://github.com/devoption/devoption/issues/127)).
 
 - A single-crate local seed provider verifies and supplies actual archive bytes.
