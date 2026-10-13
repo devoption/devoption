@@ -12,9 +12,19 @@ for dimensions, states and refresh instructions.
 
 ![Projects page](projects.jpg)
 
-**Project details (temporary fixture data)**
+**Project workspace (temporary fixture data)**
 
-![Project details page](project-details.jpg)
+![Project Overview](project-details.jpg)
+
+![Project Code and repository status](project-code.jpg)
+
+![Project Builds, unavailable](project-builds.jpg)
+
+![Project Releases, unavailable](project-releases.jpg)
+
+![Project Packages, unavailable](project-packages.jpg)
+
+![Project Settings](project-settings.jpg)
 
 **New project, ready for its first repository**
 

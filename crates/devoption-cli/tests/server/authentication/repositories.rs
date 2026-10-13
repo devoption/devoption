@@ -528,7 +528,7 @@ fn projects_render_contextual_forms_fresh_repository_lists_and_fixed_failure_cod
         request(
             address,
             &format!(
-                "GET /projects/{project_id} HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n",
+                "GET /projects/{project_id}/code HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n",
                 issued
                     .header("set-cookie")
                     .unwrap()

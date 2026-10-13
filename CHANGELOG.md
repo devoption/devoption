@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Open projects in a dedicated workspace with Overview, Code, Builds, Releases,
+  Packages and Settings navigation. Repository inspection stays in Code and
+  renaming moves to Settings; unavailable features retain explicit states.
+  Section URLs support refresh, deep links and browser history
+  ([#160](https://github.com/devoption/devoption/issues/160)).
+
 - Shorten the README, move usage and developer detail into linked guides, and keep
   the full screenshot gallery in documentation. Clarify the intended individual
   and team audience in docs and UI, remove the About page and development badge,

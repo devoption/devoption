@@ -55,7 +55,7 @@ fn creation_locations_open_the_new_saved_project_even_when_names_repeat() {
         let details = page_at(address, "GET", destination, Some(&issued));
         assert!(details.starts_with("HTTP/1.1 200"));
         assert!(details.contains(ESCAPED));
-        assert!(details.contains("No repositories attached yet."));
+        assert!(details.contains("No repositories yet."));
         destinations.push(destination.to_owned());
     }
     assert_ne!(destinations[0], destinations[1]);

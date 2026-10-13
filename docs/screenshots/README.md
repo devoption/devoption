@@ -12,9 +12,14 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Overview | `/` | Signed in | `home.jpg` |
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
-| Project details | `/projects/{id}` | Example application; frontend status read with Last checked visible; 1280 × 900 | `project-details.jpg` |
+| Project overview | `/projects/{id}` | Example application; repository summary; 1280 × 900 | `project-details.jpg` |
+| Project code | `/projects/{id}/code` | Frontend status read with Last checked; 1280 × 900 | `project-code.jpg` |
+| Project builds | `/projects/{id}/builds` | Unavailable state | `project-builds.jpg` |
+| Project releases | `/projects/{id}/releases` | Unavailable state | `project-releases.jpg` |
+| Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
+| Project settings | `/projects/{id}/settings` | Saved fixture name, no edit | `project-settings.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; dialogs closed | `project-empty.jpg` |
-| Attach repository | `/projects/{id}` | Empty project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
+| Attach repository | `/projects/{id}/code` | Empty project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
 | Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
 | Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
@@ -52,11 +57,11 @@ printed ephemeral origin. Do not create an owner for that capture.
    Visit `/sign-in` again to capture Account, then capture the main pages. Use the
    profile menu's Appearance link to confirm Nord / Dark / Purple. Capture Projects
    and Example application before mutating fixture records.
-3. On Example application, select the frontend's **View status**. Wait for branch
+3. Capture Example application’s Overview and each project section. On Code, select the frontend's **View status**. Wait for branch
    `main`, **No commits yet**, **1 untracked entry**, and **Last checked**. This time
    is when the browser received the valid response, not continuous monitoring.
 4. On Projects, open **New project**, enter **Example new project** and capture
-   the dialog. Submit, capture the new empty details page, then open **Attach
+   the dialog. Submit, capture the new empty details page, then open Code and **Attach
    repository**. Wait for the picker, select `tools`, and capture without submitting.
 5. For `sign-in-check.jpg`, sign out, start another fixture sign-in and block its
    post-sign-in `/auth/session` check. Capture **Check account**, then remove the

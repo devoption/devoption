@@ -25,8 +25,8 @@ repositories are opened; status checks run controlled Git against the temporary 
 
 After signing in, open **New project** on Projects with the keyboard, then
 use its form to create a new fixture name. A confirmed save must open the new
-project details directly,
-with zero repositories and an **Attach repository** action when a trusted root is
+project Overview directly,
+with zero repositories. Code offers **Attach repository** when a trusted root is
 configured. Reload and verify that project persists. Create another project with
 the same name; it must open a different saved project, not the first one. Use
 the **Projects** breadcrumb to confirm both entries. Check a non-ASCII name and markup characters;
@@ -40,20 +40,22 @@ with the dialog open and an unsaved fixture name.
 Capture `projects.jpg` before adding extra test records to keep the two standard
 fixture rows consistent. These writes affect only the temporary fixture catalog.
 
-Open **Example application** with the keyboard from its name link. The details
-page must show only that project’s repositories and relative default checkout
-paths, a **Projects** breadcrumb link, and unavailable build execution with no build
-or deploy button. Select **View status** and use **Refresh status** with the keyboard.
-Confirm loading feedback, in-place updates without navigation, and a browser-local
-**Last checked** time only after a valid response. Failed reads must hide prior
-fields and their check time; a retry must recover. A delayed response from before
-Back/Forward must not replace the restored page's result or time.
-Capture `project-details.jpg` before attaching more fixtures.
+Open **Example application** with Enter from its row. Verify the project Overview
+and its scoped Overview, Code, Builds, Releases, Packages and Settings links.
+Capture `project-details.jpg`, then use Code to inspect the saved frontend checkout.
+Confirm loading feedback, branch `main`, **No commits yet**, **1 untracked entry**,
+and **Last checked**. Capture `project-code.jpg` at 1280 × 900. Status stays in Code
+without a page navigation. Builds, Releases and Packages must show unavailable
+states rather than fixture execution results; capture their dedicated pages.
+Open Settings, rename through its inline form, and confirm the same project ID and
+associations after reload. Capture Settings before changing the fixture name.
+Check section deep links, refresh, Back/Forward, selected link state, keyboard
+activation and narrow screens, including a project name containing markup.
 Check the other project and a new empty project, then a direct reload and browser
 Back/Forward. Test the details page at a narrow viewport and while signed out.
-A successful attachment from details must reload that same project page.
+A successful attachment from Code must reload that same project’s Code page.
 For `project-empty.jpg`, open **New project**, create **Example new project**,
-use 1280 × 800, and capture with dialogs closed. Open **Attach repository**, select
+use 1280 × 800, and capture with dialogs closed. Open Code, then **Attach repository**, select
 `tools` from **Available checkouts**, and capture `repository-attach.jpg` without submitting. Then
 submit with the keyboard and verify that the first repository appears after
 reload while the browser stays on that project.
@@ -67,7 +69,7 @@ manual option; listing never searches recursively. A selected path removed or
 replaced before attachment must still pass the existing attachment validation.
 Check picker labels, focus, narrow layout, session recovery and disabled JavaScript.
 
-Open a project's **Attach repository** dialog with the keyboard, enter
+Open a project’s Code page and its **Attach repository** dialog with the keyboard, enter
 `tools` and submit. Its count and default checkout list must update after the
 confirmed reload and persist across another reload. Attach `工具 & <fixture>`
 and verify literal text rendering. A duplicate `frontend` must preserve its

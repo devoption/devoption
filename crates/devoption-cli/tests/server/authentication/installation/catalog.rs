@@ -97,7 +97,7 @@ fn offline_catalog_backup_preserves_shared_identities_and_default_checkouts() {
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>();
             assert!(page.contains(&format!("href=\"/projects/{id}\"")));
-            details.push_str(&request(address, &format!("GET /projects/{id} HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n", session.header("set-cookie").unwrap().split(';').next().unwrap())));
+            details.push_str(&request(address, &format!("GET /projects/{id}/code HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n", session.header("set-cookie").unwrap().split(';').next().unwrap())));
         }
         for path in ["main", "linked", "other"] {
             assert!(details.contains(&format!("Default checkout: <code>{path}</code>")));
