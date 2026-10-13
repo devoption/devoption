@@ -180,6 +180,16 @@ class HandoffReceipt:
     source_links: int
 
 
+def _remove_staged(staging, output):
+    try:
+        named = os.stat(ARTIFACT_NAME, dir_fd=staging.fd, follow_symlinks=False)
+        _require(_identity(named) == _identity(os.fstat(output)),
+                 "staging cleanup conflict; quarantine required")
+        os.unlink(ARTIFACT_NAME, dir_fd=staging.fd)
+    except OSError:
+        raise HandoffError("staging cleanup failed; quarantine required") from None
+
+
 @contextmanager
 def handoff_stopped_artifact(source, source_paths, staging):
     """Yield a bounded hash receipt while the private staged file exists.
@@ -194,20 +204,19 @@ def handoff_stopped_artifact(source, source_paths, staging):
     staging access is required throughout, including named-entry cleanup.
     No receipt authorizes a job.
     """
-    output = None
-    try:
-        source.verify()
-        staging.verify()
-        _require(source.parent_binding == staging.parent_binding
-                 and source.binding[:2] != staging.binding[:2], "directories must be distinct siblings")
-        _require(staging.owner_uid == os.geteuid(), "staging owner is not the supervisor")
-        _private_directory(os.fstat(staging.fd), os.geteuid(), writable=True)
-        _require(isinstance(source_paths, tuple) and 1 <= len(source_paths) <= 2,
-                 "expected one or two exact source names")
-        paths = [_parts(path) for path in source_paths]
-        with os.scandir(staging.fd) as entries:
-            _require(next(entries, None) is None, "staging directory is not empty")
-        with ExitStack() as stack:
+    with ExitStack() as stack:
+        try:
+            source.verify()
+            staging.verify()
+            _require(source.parent_binding == staging.parent_binding
+                     and source.binding[:2] != staging.binding[:2], "directories must be distinct siblings")
+            _require(staging.owner_uid == os.geteuid(), "staging owner is not the supervisor")
+            _private_directory(os.fstat(staging.fd), os.geteuid(), writable=True)
+            _require(isinstance(source_paths, tuple) and 1 <= len(source_paths) <= 2,
+                     "expected one or two exact source names")
+            paths = [_parts(path) for path in source_paths]
+            with os.scandir(staging.fd) as entries:
+                _require(next(entries, None) is None, "staging directory is not empty")
             root_version = _version(os.fstat(source.fd))
             guards = []
             files = [_open_source(source, path, stack, guards) for path in paths]
@@ -220,6 +229,10 @@ def handoff_stopped_artifact(source, source_paths, staging):
             output = os.open(ARTIFACT_NAME, os.O_CREAT | os.O_EXCL | os.O_RDWR
                              | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC,
                              0o600, dir_fd=staging.fd)
+            # LIFO cleanup keeps the created inode pinned until its name is
+            # checked/removed, and always closes it even on cleanup failure.
+            stack.callback(os.close, output)
+            stack.callback(_remove_staged, staging, output)
             created = _identity(os.fstat(output))
             _require(created != _identity(before), "destination is not independent")
             os.fchmod(output, 0o600)
@@ -247,19 +260,9 @@ def handoff_stopped_artifact(source, source_paths, staging):
             _require(_version(_destination(staging, output, created, copied, 0o400))
                      == _version(ready), "destination changed while hashing")
             _verify_sources(source, root_version, guards)
-            yield HandoffReceipt(copied, digest.hexdigest(), before.st_nlink)
-    except OSError:
-        raise HandoffError("filesystem handoff failed") from None
-    finally:
-        if output is not None:
-            try:
-                named = os.stat(ARTIFACT_NAME, dir_fd=staging.fd, follow_symlinks=False)
-                # Keep the created inode pinned until cleanup: a replacement
-                # cannot reuse its inode number while this descriptor is open.
-                _require(_identity(named) == _identity(os.fstat(output)),
-                         "staging cleanup conflict; quarantine required")
-                os.unlink(ARTIFACT_NAME, dir_fd=staging.fd)
-            except OSError:
-                raise HandoffError("staging cleanup failed; quarantine required") from None
-            finally:
-                os.close(output)
+            receipt = HandoffReceipt(copied, digest.hexdigest(), before.st_nlink)
+        except OSError:
+            raise HandoffError("filesystem handoff failed") from None
+        # Caller exceptions are not helper filesystem failures. ExitStack still
+        # performs ownership-checked cleanup and closes every retained handle.
+        yield receipt

@@ -87,11 +87,12 @@ staging tree after any failure; it must not treat a leftover file as an artifact
 
 ## Evidence and remaining integration
 
-Twenty disposable-file tests prove an independent single-link destination from
+Twenty-one disposable-file tests prove an independent single-link destination from
 two in-root source links, inclusive size limits, rejection of an outside alias,
 no symlink following, replacement during open/copy, growth/shrink/rewrite,
 destination link or content tampering, short writes/disk failure and cleanup
-conflicts. No test compiles or executes an artifact. The existing metadata helper
+conflicts, including cleanup while preserving a caller's own exception. No test
+compiles or executes an artifact. The existing metadata helper
 and its rejection of a two-link final file are unchanged.
 
 A final separately approved VM rehearsal is still needed after reviewed supervisor

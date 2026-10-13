@@ -99,6 +99,17 @@ class ArtifactHandoffTests(unittest.TestCase):
         self.assertEqual(receipt.bytes, handoff.MAX_ARTIFACT_BYTES)
         self.assertEqual(receipt.source_links, 1)
 
+    def test_caller_oserror_is_preserved_and_staged_file_is_cleaned(self):
+        failure = FileNotFoundError("caller-owned operation failed")
+        with self.pinned() as (source, staging):
+            with self.assertRaises(FileNotFoundError) as raised:
+                with handoff.handoff_stopped_artifact(source, self.paths, staging):
+                    self.assertTrue(self.destination.exists())
+                    raise failure
+        self.assertIs(raised.exception, failure)
+        self.assertFalse(self.destination.exists())
+        self.assertEqual(self.source.read_bytes(), self.payload)
+
     def test_empty_and_oversized_files_fail_before_destination_creation(self):
         for size in (0, handoff.MAX_ARTIFACT_BYTES + 1):
             with self.subTest(size=size):
