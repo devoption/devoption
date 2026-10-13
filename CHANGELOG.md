@@ -48,6 +48,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Catalog-inclusive offline backup/restore instructions and installed-binary
+  fixtures cover version-2 repository associations and default checkouts, missing
+  catalogs, rejected old sessions and invalid restores. Only temporary fixture
+  data is copied; repository contents and root relocation remain outside this
+  application-state backup ([#114](https://github.com/devoption/devoption/issues/114)).
+
 - Per-project **Attach repository** forms accept bounded relative checkout paths
   when the server has an explicit trusted root. Projects shows saved repository
   names and default checkout paths, reloads after confirmed saves, and explains

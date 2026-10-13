@@ -121,7 +121,9 @@ cannot be confirmed, reload the list before retrying to avoid duplicate names.
 An absent catalog shows an empty list; invalid state stops startup or fails the
 current request without resetting records. The unconfigured preview retains its
 placeholder. Project renaming and deletion are not implemented. The installation
-guide's owner-only backup does not preserve projects.
+guide's [offline backup procedure](docs/private-linux-install.md#restart-backup-and-restore)
+preserves the owner and optional catalog together; repository contents require a
+separate backup.
 
 On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` to
 `serve --data-dir ABSOLUTE_PATH`. It requires an existing owner and a trusted,

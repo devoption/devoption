@@ -11,7 +11,7 @@ fn directory(path: &Path) {
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
 }
 
-fn root_fixture() -> (tempfile::TempDir, PathBuf) {
+pub(super) fn root_fixture() -> (tempfile::TempDir, PathBuf) {
     let (temporary, root) = data_directory::fixture();
     for name in ["main", "other"] {
         directory(&root.join(name).join(".git/objects"));
@@ -37,7 +37,7 @@ fn root_fixture() -> (tempfile::TempDir, PathBuf) {
     (temporary, root)
 }
 
-fn seed(data: &Path) -> (ProjectId, ProjectId) {
+pub(super) fn seed(data: &Path) -> (ProjectId, ProjectId) {
     let mut catalog = Catalog::default();
     let first = catalog.create_project("First fixture").unwrap();
     let second = catalog.create_project("Second fixture").unwrap();
