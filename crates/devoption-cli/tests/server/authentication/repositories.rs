@@ -440,3 +440,67 @@ fn malformed_project_segments_use_fixed_noncacheable_errors_after_authentication
     assert_eq!(fs::read(data.join("projects.bin")).unwrap(), saved);
     assert!(!data.join(".projects.lock").exists());
 }
+
+#[test]
+fn projects_render_contextual_forms_fresh_repository_lists_and_fixed_failure_codes() {
+    let (_data, data) = configured();
+    let (_root, root) = root_fixture();
+    let (first, _) = seed(&data);
+    let (server, address) = start_root(&data, &root);
+    let issued = sign_in(address);
+    let page = |address: SocketAddr, issued: &Reply| {
+        request(
+            address,
+            &format!(
+                "GET /projects HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n",
+                issued
+                    .header("set-cookie")
+                    .unwrap()
+                    .split(';')
+                    .next()
+                    .unwrap()
+            ),
+        )
+    };
+    let initial = page(address, &issued);
+    assert_eq!(
+        initial
+            .matches("class=\"project-form repository-form\"")
+            .count(),
+        2
+    );
+    assert!(initial.contains("data-repository-path"));
+    assert!(!initial.contains(root.to_str().unwrap()));
+    let raw = attachment(address, &issued, first, "main");
+    assert_eq!(status(address, &raw), 204);
+    let saved = page(address, &issued);
+    assert!(saved.contains("<p>1 repository</p>"));
+    assert!(saved.contains("Default checkout: <code>main</code>"));
+    for (raw, code) in [
+        (raw.clone(), "already-associated"),
+        (
+            attachment(address, &issued, first, "../outside"),
+            "invalid-checkout",
+        ),
+        (
+            attachment(address, &issued, ProjectId::from_bytes([0; 16]), "main"),
+            "project-missing",
+        ),
+    ] {
+        assert!(request(address, &raw).contains(&format!("x-devoption-error: {code}\r\n")));
+    }
+    fs::rename(root.join("main"), root.join("old-main")).unwrap();
+    fs::rename(root.join("other"), root.join("main")).unwrap();
+    assert!(request(address, &raw).contains("x-devoption-error: checkout-changed\r\n"));
+    drop(server);
+    let (_server, address) = start_with(&data);
+    let issued = sign_in(address);
+    let disabled = page(address, &issued);
+    assert!(disabled.contains("Repository attachment is not configured on this server"));
+    assert!(!disabled.contains("class=\"project-form repository-form\""));
+    assert!(disabled.contains("Default checkout: <code>main</code>"));
+    assert!(
+        request(address, &attachment(address, &issued, first, "main"))
+            .contains("x-devoption-error: root-unconfigured\r\n")
+    );
+}

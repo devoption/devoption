@@ -42,7 +42,7 @@ impl Projects {
     async fn access<T: Send + 'static>(
         self,
         operation: impl FnOnce(&Path) -> Result<T, Error> + Send + 'static,
-    ) -> Result<T, StatusCode> {
+    ) -> Result<T, Error> {
         let guard = self.gate.lock_owned().await;
         // Keep serialization even if the HTTP request disconnects while saving.
         tokio::task::spawn_blocking(move || {
@@ -50,17 +50,7 @@ impl Projects {
             operation(&self.path)
         })
         .await
-        .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
-        .map_err(|error| match error {
-            Error::Inspection(InspectionError::Changed) => StatusCode::CONFLICT,
-            Error::InvalidName | Error::Inspection(_) => StatusCode::BAD_REQUEST,
-            Error::UnknownProject => StatusCode::NOT_FOUND,
-            Error::Capacity
-            | Error::AlreadyAssociated
-            | Error::RootMismatch
-            | Error::StaleCheckout => StatusCode::CONFLICT,
-            _ => StatusCode::SERVICE_UNAVAILABLE,
-        })
+        .map_err(|_| Error::Io(std::io::Error::other("catalog operation failed")))?
     }
 }
 
@@ -71,15 +61,16 @@ pub(super) fn routes(projects: Projects) -> Router {
         .route(
             "/projects",
             get(move || async move {
+                let attachment_available = reader.root.is_some();
                 match reader
                     .access(|path| Ok(read_catalog(path)?.unwrap_or_default()))
                     .await
                 {
                     Ok(catalog) => {
-                        ([(CACHE_CONTROL, "no-store")], Html(render(&catalog))).into_response()
+                        ([(CACHE_CONTROL, "no-store")], Html(render(&catalog, attachment_available))).into_response()
                     }
-                    Err(status) => (
-                        status,
+                    Err(error) => (
+                        Failure::from(error).status,
                         [(CACHE_CONTROL, "no-store")],
                         "Projects could not be loaded. Reload to try again.",
                     )
@@ -93,6 +84,7 @@ pub(super) fn routes(projects: Projects) -> Router {
                             CatalogStore::open_absolute(path)?.create_project(&name)
                         })
                         .await
+                        .map_err(|error| Failure::from(error).status)
                         .map(|_| StatusCode::NO_CONTENT),
                     Err(status) => Err(status),
                 };
@@ -124,10 +116,10 @@ async fn attach(
 ) -> axum::response::Response {
     let result = async {
         let project = project_id(&project?).ok_or(StatusCode::BAD_REQUEST)?;
-        let root = projects
-            .root
-            .clone()
-            .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+        let root = projects.root.clone().ok_or(Failure {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            code: "root-unconfigured",
+        })?;
         let candidate = text_body(request, 4096).await?;
         projects
             .access(move |path| {
@@ -138,14 +130,15 @@ async fn attach(
                 )
             })
             .await?;
-        Ok::<_, StatusCode>(())
+        Ok::<_, Failure>(())
     }
     .await;
+    let code = result.as_ref().err().map(|failure| failure.code);
     let (status, message) = match result {
         Ok(()) => (StatusCode::NO_CONTENT, ""),
-        Err(status) => (
-            status,
-            match status {
+        Err(failure) => (
+            failure.status,
+            match failure.status {
                 StatusCode::BAD_REQUEST => "Repository checkout could not be validated.",
                 StatusCode::NOT_FOUND => "Project does not exist.",
                 StatusCode::CONFLICT => {
@@ -158,7 +151,48 @@ async fn attach(
             },
         ),
     };
-    (status, [(CACHE_CONTROL, "no-store")], message).into_response()
+    let mut response = (status, [(CACHE_CONTROL, "no-store")], message).into_response();
+    if let Some(code) = code {
+        response.headers_mut().insert(
+            "x-devoption-error",
+            axum::http::HeaderValue::from_static(code),
+        );
+    }
+    response
+}
+
+struct Failure {
+    status: StatusCode,
+    code: &'static str,
+}
+
+impl From<StatusCode> for Failure {
+    fn from(status: StatusCode) -> Self {
+        Self {
+            status,
+            code: "invalid-request",
+        }
+    }
+}
+
+impl From<Error> for Failure {
+    fn from(error: Error) -> Self {
+        let (status, code) = match error {
+            Error::AlreadyAssociated => (StatusCode::CONFLICT, "already-associated"),
+            Error::StaleCheckout
+            | Error::RootMismatch
+            | Error::Inspection(InspectionError::Changed) => {
+                (StatusCode::CONFLICT, "checkout-changed")
+            }
+            Error::Capacity => (StatusCode::CONFLICT, "catalog-full"),
+            Error::UnknownProject => (StatusCode::NOT_FOUND, "project-missing"),
+            Error::InvalidName | Error::Inspection(_) => {
+                (StatusCode::BAD_REQUEST, "invalid-checkout")
+            }
+            _ => (StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+        };
+        Self { status, code }
+    }
 }
 
 fn project_id(value: &str) -> Option<ProjectId> {
@@ -172,16 +206,41 @@ fn project_id(value: &str) -> Option<ProjectId> {
     Some(ProjectId::from_bytes(bytes))
 }
 
-fn render(catalog: &Catalog) -> String {
+fn render(catalog: &Catalog, attachment_available: bool) -> String {
+    let repositories: std::collections::HashMap<_, _> = catalog
+        .repositories()
+        .iter()
+        .map(|repository| (repository.id(), repository))
+        .collect();
+    let checkouts: std::collections::HashMap<_, _> = catalog
+        .default_checkouts()
+        .iter()
+        .map(|checkout| ((checkout.project(), checkout.repository()), checkout))
+        .collect();
     let summaries: Vec<_> = catalog
         .projects()
         .iter()
         .map(|project| devoption_ui::ProjectSummary {
+            id: project.id().to_bytes(),
             name: project.name(),
-            repository_count: project.repositories().len(),
+            repositories: project
+                .repositories()
+                .iter()
+                .map(|id| {
+                    let repository = repositories
+                        .get(id)
+                        .expect("validated repository reference");
+                    let checkout = checkouts.get(&(project.id(), *id));
+                    devoption_ui::RepositorySummary {
+                        name: repository.name(),
+                        default_checkout: checkout
+                            .and_then(|checkout| checkout.relative_path().to_str()),
+                    }
+                })
+                .collect(),
         })
         .collect();
-    devoption_ui::render_projects(&summaries)
+    devoption_ui::render_projects(&summaries, attachment_available)
 }
 
 // One plain UTF-8 name, not a map of fields, paths or client-supplied identities.

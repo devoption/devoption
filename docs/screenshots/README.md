@@ -1,7 +1,7 @@
 # Page screenshots
 
 These images show the real local app, including its current empty placeholders.
-Projects shows the creation form and the temporary fixture's example metadata,
+Projects shows creation, repository attachment and the temporary fixture's example metadata,
 not production records.
 Keep one default-mode image per main page at a stable filename; Git records earlier
 versions. `appearance-light.jpg` additionally shows Appearance following a light
@@ -16,7 +16,7 @@ Use each path below with the fixture's printed origin and port.
 | Page | Path | Capture state | File |
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
-| Projects | `/projects` | Signed in, creation form and fixture projects | `projects.jpg` |
+| Projects | `/projects` | Signed in, fixture projects and first attachment form expanded; 1120 × 900 | `projects.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
 | Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
@@ -31,7 +31,8 @@ installing the [normal prerequisites](../../README.md#try-it-locally):
 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
-The fixture creates only a temporary owner and stops after ten minutes. Use its
+The fixture creates a temporary owner, catalog and Git metadata trees, and stops
+after ten minutes. Use its
 printed URL, not the persistent preview on port 3000. Open `/sign-in` in a fresh
 browser context and capture `sign-in.jpg` before signing in. Then use the fixture
 password `browser transport fixture only`, reload `/sign-in` for `account.jpg`,
@@ -48,6 +49,8 @@ Remove the block and verify recovery without another sign-in after capturing it.
 1. If source or assets changed, rerun the fixture command and use its new URL.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
+   For Projects, use **1120 × 900** and expand the first project's **Attach
+   repository** form to include both fixture projects and the new controls.
    A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out
    capture. After sign-in, follow the profile popup's **Appearance** link and confirm
    these choices for the main-page captures. The browser remembers them.

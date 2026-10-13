@@ -11,6 +11,10 @@
     const projectForm = byId("project-form");
     const projectName = byId("project-name");
     const projectStatus = byId("project-status");
+    const repositoryForms = Array.from(document.querySelectorAll(".repository-form")).map((form) => ({
+      form, path: form.querySelector("[data-repository-path]"),
+      submit: form.querySelector("[data-repository-submit]"), status: form.querySelector("[data-repository-status]"),
+    }));
     // null: confirmed signed out; undefined: session check failed; string: verified.
     let csrf = null;
     let busy = false;
@@ -24,6 +28,10 @@
       if (password) password.disabled = busy || csrf !== null;
       if (submit) submit.disabled = busy || csrf !== null;
       signouts.forEach((button) => { button.disabled = busy || !csrf; });
+      repositoryForms.forEach((repository) => {
+        repository.path.disabled = busy || !csrf;
+        repository.submit.disabled = busy || !csrf;
+      });
       if (projectForm) {
         projectName.disabled = busy || !csrf;
         byId("project-submit").disabled = busy || !csrf;
@@ -52,6 +60,7 @@
     const uncheckedSession = () => {
       state(undefined);
       message("Your session could not be checked. Use Check account to retry.");
+      repositoryForms.forEach((repository) => { repository.status.textContent = "Your session could not be checked. Open Check account to retry."; });
     };
     const request = (path, options = {}) => fetch(path, {
       method: "POST", credentials: "same-origin", cache: "no-store",
@@ -205,6 +214,70 @@
         if (current === version) { busy = saved; controls(); }
       }
     });
+    repositoryForms.forEach((repository) => repository.form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      if (busy || !csrf) return;
+      const project = repository.form.dataset.project;
+      const path = repository.path.value;
+      repository.path.removeAttribute("aria-invalid");
+      const parts = path.split("/");
+      if (!/^[a-f0-9]{32}$/i.test(project || "")) {
+        repository.status.textContent = "Project unavailable. Reload the project list.";
+        return;
+      }
+      if (!path || new TextEncoder().encode(path).length > 4096 || parts.length > 64 || parts.some((part) => !part || part === "." || part === "..") || /[\u0000-\u001f\u007f-\u009f]/.test(path)) {
+        repository.status.textContent = "Enter a relative checkout path of up to 4096 UTF-8 bytes and 64 parts, without empty parts, . or .., or control characters.";
+        repository.path.setAttribute("aria-invalid", "true");
+        repository.path.focus();
+        return;
+      }
+      const current = ++version;
+      busy = true;
+      controls();
+      repository.status.textContent = "Attaching repository…";
+      let saved = false;
+      const uncertain = "Attachment could not be confirmed. Reload the project list before trying again.";
+      try {
+        const response = await request(`/projects/${project}/repositories`, {
+          headers: { "content-type": "text/plain;charset=UTF-8", "x-csrf-token": csrf }, body: path,
+        });
+        if (current !== version) return;
+        if (response.status === 204) {
+          saved = true;
+          repository.status.textContent = "Repository attached. Loading the list…";
+          window.location.assign("/projects");
+          return;
+        }
+        const code = response.headers.get("x-devoption-error");
+        if (response.status === 401) {
+          state(null);
+          repository.status.textContent = "Your session ended. Sign in again to attach a repository.";
+        } else if (response.status === 400 || response.status === 413) {
+          repository.status.textContent = "Check the relative path. It must name a supported local checkout inside the server’s trusted root.";
+          repository.path.setAttribute("aria-invalid", "true");
+        } else if (response.status === 409) {
+          repository.status.textContent = code === "already-associated"
+            ? "This repository is already attached to this project. Its default checkout was not changed."
+            : code === "checkout-changed"
+              ? "The checkout or trusted root changed. Nothing was attached. Reload the project list and ask the server administrator to check the location."
+              : code === "catalog-full"
+                ? "The project catalog has reached its repository or storage limit."
+                : "The attachment conflicts with saved state. Reload the project list before trying again.";
+        } else if (response.status === 404) {
+          repository.status.textContent = "Project unavailable. Reload the project list.";
+        } else if (response.status === 503 && code === "root-unconfigured") {
+          repository.status.textContent = "Repository attachment is not configured on this server. Ask the server administrator to select a trusted root.";
+        } else if (response.status === 403) {
+          repository.status.textContent = "The request was denied. Reload the project list before trying again.";
+        } else {
+          repository.status.textContent = uncertain;
+        }
+      } catch {
+        if (current === version) repository.status.textContent = uncertain;
+      } finally {
+        if (current === version) { busy = saved; controls(); }
+      }
+    }));
     signouts.forEach((button) => button.addEventListener("click", async function () {
       if (busy || !csrf) return;
       const current = ++version;

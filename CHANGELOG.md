@@ -35,6 +35,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Per-project **Attach repository** forms accept bounded relative checkout paths
+  when the server has an explicit trusted root. Projects shows saved repository
+  names and default checkout paths, reloads after confirmed saves, and explains
+  duplicate, stale, unavailable and uncertain results without exposing private
+  errors. Fixture HTTP, script and browser checks cover the flow; the Projects
+  screenshot is refreshed. No real root is configured or Git command executed
+  ([#111](https://github.com/devoption/devoption/issues/111)).
+
 - An explicit Unix `serve --repository-root` option and owner-protected backend
   endpoint attach validated local checkouts to projects. Linked worktrees share
   one repository identity, with a default checkout per project/repository
