@@ -14,6 +14,9 @@ const MAX_OUTPUT: usize = 64 * 1024;
 const MAX_RECORDS: usize = 1024;
 const DEADLINE: Duration = Duration::from_secs(3);
 
+mod files;
+pub use files::{FileContent, RepositoryFiles, TrackedFile};
+
 #[cfg(test)]
 mod tests;
 
@@ -50,13 +53,9 @@ struct Index {
     modified: SystemTime,
 }
 
-impl PermittedRoot {
-    /// Read a bounded status observation. Git receives a private copy of bounded
-    /// metadata and no source/global configuration; working files and objects are
-    /// read in place. This is not an atomic filesystem snapshot or a sandbox.
-    pub fn git_status(&self, candidate: &Path) -> Result<GitStatus> {
-        let before = self.status_snapshot(candidate)?;
-        let config = safe_config(&before.config)?;
+impl Snapshot {
+    fn metadata(&self) -> Result<tempfile::TempDir> {
+        let config = safe_config(&self.config)?;
         let metadata = tempfile::Builder::new()
             .prefix("devoption-status-")
             .tempdir()
@@ -64,10 +63,10 @@ impl PermittedRoot {
         fs::create_dir(metadata.path().join("objects")).map_err(|_| Error::Unavailable)?;
         fs::create_dir(metadata.path().join("refs")).map_err(|_| Error::Unavailable)?;
         fs::write(metadata.path().join("config"), config).map_err(|_| Error::Unavailable)?;
-        let head = before.commit.as_deref().unwrap_or(&before.head);
+        let head = self.commit.as_deref().unwrap_or(&self.head);
         fs::write(metadata.path().join("HEAD"), format!("{head}\n"))
             .map_err(|_| Error::Unavailable)?;
-        if let Some(index) = &before.index {
+        if let Some(index) = &self.index {
             let mut copy =
                 File::create(metadata.path().join("index")).map_err(|_| Error::Unavailable)?;
             copy.write_all(&index.bytes)
@@ -77,11 +76,15 @@ impl PermittedRoot {
             copy.set_modified(index.modified)
                 .map_err(|_| Error::Unavailable)?;
         }
-        if let Some(exclude) = &before.exclude {
+        if let Some(exclude) = &self.exclude {
             fs::create_dir(metadata.path().join("info")).map_err(|_| Error::Unavailable)?;
             fs::write(metadata.path().join("info/exclude"), exclude)
                 .map_err(|_| Error::Unavailable)?;
         }
+        Ok(metadata)
+    }
+
+    fn command(&self, metadata: &Path) -> Command {
         let mut command = Command::new("git");
         command
             .env_clear()
@@ -94,13 +97,13 @@ impl PermittedRoot {
             .env("GIT_OPTIONAL_LOCKS", "0")
             .env("GIT_NO_REPLACE_OBJECTS", "1")
             .env("GIT_TERMINAL_PROMPT", "0")
-            .env("GIT_OBJECT_DIRECTORY", &before.objects)
-            .current_dir(metadata.path())
+            .env("GIT_OBJECT_DIRECTORY", &self.objects)
+            .current_dir(metadata)
             .arg("--no-pager")
             .arg("--git-dir")
-            .arg(metadata.path())
+            .arg(metadata)
             .arg("--work-tree")
-            .arg(&before.observed.path)
+            .arg(&self.observed.path)
             .args([
                 "-c",
                 "core.fsmonitor=false",
@@ -110,13 +113,27 @@ impl PermittedRoot {
                 "core.attributesFile=/dev/null",
                 "-c",
                 "protocol.allow=never",
-                "status",
-                "--porcelain=v1",
-                "-z",
-                "--no-renames",
-                "--untracked-files=normal",
-                "--ignore-submodules=all",
             ]);
+        command
+    }
+}
+
+impl PermittedRoot {
+    /// Read a bounded status observation. Git receives a private copy of bounded
+    /// metadata and no source/global configuration; working files and objects are
+    /// read in place. This is not an atomic filesystem snapshot or a sandbox.
+    pub fn git_status(&self, candidate: &Path) -> Result<GitStatus> {
+        let before = self.status_snapshot(candidate)?;
+        let metadata = before.metadata()?;
+        let mut command = before.command(metadata.path());
+        command.args([
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--no-renames",
+            "--untracked-files=normal",
+            "--ignore-submodules=all",
+        ]);
         let output = run(&mut command, DEADLINE)?;
         let changes = parse(&output)?;
         if self.status_snapshot(candidate)? != before {

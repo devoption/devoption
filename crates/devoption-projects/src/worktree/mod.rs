@@ -10,7 +10,7 @@ mod format;
 mod managed;
 pub use managed::ManagedRoot;
 mod status;
-pub use status::{ChangeCounts, GitStatus};
+pub use status::{ChangeCounts, FileContent, GitStatus, RepositoryFiles, TrackedFile};
 
 pub use filesystem::{FilesystemIdentity, PermittedRoot};
 use std::{

@@ -149,6 +149,11 @@ unavailable while retaining saved repository summaries.
 Projects support multiple repositories, linked worktrees share a repository ID,
 and each project/repository association keeps one default checkout. Attachment and
 picker discovery run no Git commands and grant no build execution permission.
+On Code, **Browse files** lists tracked paths and opens bounded text previews from
+the saved checkout. These are current working-tree contents, including uncommitted
+changes; untracked files are excluded. Browsing needs no managed creation permission
+and does not edit source or approve builds. See [file browsing limits](repository-files.md).
+
 On Code, **View status** reads that saved checkout's branch, commit and
 working-tree counts; **Refresh status** updates them in place. **Last checked**
 is the browser-local time a valid response was received, not continuous monitoring.

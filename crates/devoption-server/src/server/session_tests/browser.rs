@@ -223,6 +223,42 @@ fn manual_cookie_browser_fixture() {
         "# Disposable browser fixture\n",
     )
     .unwrap();
+    if std::env::var_os("DEVOPTION_BROWSER_FILES").is_some() {
+        let app = root.join("frontend");
+        std::fs::create_dir(app.join("src")).unwrap();
+        std::fs::write(
+            app.join("Cargo.toml"),
+            "[package]\nname = \"example-application\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+        )
+        .unwrap();
+        std::fs::write(
+            app.join("src/main.rs"),
+            "fn main() {\n    println!(\"Hello from your project.\");\n}\n",
+        )
+        .unwrap();
+        let result = std::process::Command::new("git")
+            .env_clear()
+            .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .current_dir(&app)
+            .args([
+                "-c",
+                "core.hooksPath=/dev/null",
+                "add",
+                "Cargo.toml",
+                "README.md",
+                "src/main.rs",
+            ])
+            .output()
+            .unwrap();
+        assert!(result.status.success());
+        std::fs::write(
+            app.join("untracked-note.txt"),
+            "Not included in file browsing.\n",
+        )
+        .unwrap();
+    }
     let mut catalog = devoption_projects::Catalog::default();
     let project = catalog.create_project("Example application").unwrap();
     let docs = catalog.create_project("Example documentation").unwrap();
