@@ -39,7 +39,12 @@ fixture rows consistent. These writes affect only the temporary fixture catalog.
 Open **Example application** with the keyboard from its name link. The details
 page must show only that project’s repositories and relative default checkout
 paths, a **Back to Projects** link, and unavailable build execution with no build
-or deploy button. Capture `project-details.jpg` before attaching more fixtures.
+or deploy button. Expand **View status** and use **Refresh status** with the keyboard.
+Confirm loading feedback, in-place updates without navigation, and a browser-local
+**Last checked** time only after a valid response. Failed reads must hide prior
+fields and their check time; a retry must recover. A delayed response from before
+Back/Forward must not replace the restored page's result or time.
+Capture `project-details.jpg` before attaching more fixtures.
 Check the other project and a new empty project, then a direct reload and browser
 Back/Forward. Test the details page at a narrow viewport and while signed out.
 A successful attachment from details must reload that same project page.

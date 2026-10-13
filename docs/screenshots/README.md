@@ -23,7 +23,7 @@ Use each path below with the fixture's printed origin and port.
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
 | Projects | `/projects` | Signed in, New project collapsed, name filter empty, first attachment form expanded with `tools` selected; 1120 × 1000 | `projects.jpg` |
-| Project details | `/projects/{id}` | Signed in, open Example application from Projects, frontend status expanded, rename and attachment collapsed; 1120 × 900 | `project-details.jpg` |
+| Project details | `/projects/{id}` | Signed in, open Example application from Projects, frontend status expanded with Last checked visible, rename and attachment collapsed; 1120 × 900 | `project-details.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; rename collapsed, automatic attachment form expanded with `tools` selected; 1120 × 900 | `project-empty.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
 | Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
@@ -64,7 +64,8 @@ Remove the block and verify recovery without another sign-in after capturing it.
    alongside both fixture projects and the controls. For Project details, open
    **Example application**, use **1120 × 900**, and expand the frontend's **View
    status**. The disposable metadata fixture shows branch `main`, **No commits
-   yet**, and **1 untracked entry**; leave rename and attachment collapsed. For the empty-project variant,
+   yet**, and **1 untracked entry**. Wait for the browser-local **Last checked**
+   time; leave rename and attachment collapsed. For the empty-project variant,
    open **New project**, create **Example new project**, and select `tools` in its already open form
    without submitting, at the same 1120 × 900 viewport.
    A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out

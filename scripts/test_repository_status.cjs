@@ -14,8 +14,13 @@ function page() {
   const nodes = Object.fromEntries(['refresh', 'fields', 'note', 'branch', 'commit', 'changes'].map(name => [name, element()]));
   const view = {...element(), open: false, dataset: {statusUrl: '/projects/fixture/repositories/fixture/status'}, querySelector: selector => nodes[selector.slice(13, -1)]};
   const events = element(), queue = [], calls = [];
-  let ready;
+  let ready, now = '2026-10-13T10:00:00.000Z';
+  class BrowserDate extends Date {
+    constructor() { super(now); }
+    toLocaleString() { return this.toISOString(); }
+  }
   runInNewContext(script, {
+    Date: BrowserDate,
     document: {addEventListener: (_, fn) => ready = fn, querySelectorAll: () => [view]},
     window: {addEventListener: events.addEventListener},
     fetch: async (url, options) => {
@@ -28,7 +33,7 @@ function page() {
     },
   });
   ready();
-  return {nodes, queue, calls, view, event: events.emit, open: () => {view.open = true; view.emit('toggle');}, refresh: () => nodes.refresh.emit('click')};
+  return {nodes, queue, calls, view, setTime: value => now = value, event: events.emit, open: () => {view.open = true; view.emit('toggle');}, refresh: () => nodes.refresh.emit('click')};
 }
 
 test('status is lazy, has a loading state, and refresh replaces observations', async () => {
@@ -39,6 +44,7 @@ test('status is lazy, has a loading state, and refresh replaces observations', a
   release(response()); await tick();
   assert.equal(p.nodes.fields.hidden, false); assert.equal(p.nodes.changes.textContent, 'Clean');
   assert.equal(p.nodes.branch.textContent, 'main'); assert.equal(p.nodes.commit.textContent, 'a'.repeat(40));
+  assert.equal(p.nodes.note.textContent, 'Last checked 2026-10-13T10:00:00.000Z (browser time).');
   p.queue.push(response('feature/<literal>\n\n1\n2\n3\n4')); await p.refresh();
   assert.equal(p.nodes.branch.textContent, 'feature/<literal>'); assert.equal(p.nodes.commit.textContent, 'No commits yet');
   assert.equal(p.nodes.changes.textContent, '1 staged · 2 modified · 3 untracked entries · 4 conflicted');
@@ -60,8 +66,11 @@ test('failed and malformed reads hide a prior clean result and allow retry', asy
   ]) {
     p.queue.push(next); await p.refresh(); assert.equal(p.nodes.fields.hidden, true);
     assert.equal(p.nodes.refresh.disabled, false); assert.match(p.nodes.note.textContent, message);
+    assert.doesNotMatch(p.nodes.note.textContent, /Last checked/);
   }
+  p.setTime('2026-10-13T11:00:00.000Z');
   p.queue.push(response()); await p.refresh(); assert.equal(p.nodes.fields.hidden, false);
+  assert.equal(p.nodes.note.textContent, 'Last checked 2026-10-13T11:00:00.000Z (browser time).');
 });
 
 test('leaving discards delayed status, and back-forward restoration rereads an open view', async () => {
@@ -70,4 +79,34 @@ test('leaving discards delayed status, and back-forward restoration rereads an o
   assert.equal(p.nodes.fields.hidden, true); assert.equal(p.nodes.refresh.disabled, true);
   p.queue.push(response('main\n\n0\n1\n0\n0')); p.event('pageshow', {persisted: true}); await tick();
   assert.equal(p.nodes.fields.hidden, false); assert.equal(p.nodes.changes.textContent, '1 modified');
+});
+
+
+test('last checked uses successful body completion time, not request start or headers', async () => {
+  const p = page(); let release;
+  p.queue.push({...response(), text: () => new Promise(resolve => release = resolve)});
+  p.open(); await tick();
+  assert.match(p.nodes.note.textContent, /Reading/);
+  assert.equal(p.nodes.fields.hidden, true);
+  p.setTime('2026-10-13T10:05:00.000Z');
+  release('main\n\n0\n0\n0\n0'); await tick();
+  assert.equal(p.nodes.note.textContent, 'Last checked 2026-10-13T10:05:00.000Z (browser time).');
+  assert.equal(p.nodes.fields.hidden, false);
+});
+
+test('an old delayed body cannot replace a restored page observation or its check time', async () => {
+  const p = page(); let release;
+  p.queue.push({...response(), text: () => new Promise(resolve => release = resolve)});
+  p.open(); await tick(); p.event('pagehide');
+  assert.doesNotMatch(p.nodes.note.textContent, /Last checked/);
+  p.setTime('2026-10-13T11:00:00.000Z');
+  p.queue.push(response('newer\n\n0\n1\n0\n0'));
+  p.event('pageshow', {persisted: true}); await tick();
+  p.setTime('2026-10-13T12:00:00.000Z');
+  release('older\n\n0\n0\n0\n0'); await tick();
+  assert.equal(p.nodes.branch.textContent, 'newer');
+  assert.equal(p.nodes.changes.textContent, '1 modified');
+  assert.equal(p.nodes.note.textContent, 'Last checked 2026-10-13T11:00:00.000Z (browser time).');
+  assert.equal(p.nodes.fields.hidden, false);
+  assert.equal(p.nodes.refresh.disabled, false);
 });

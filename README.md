@@ -155,8 +155,9 @@ Projects support multiple repositories, linked worktrees share a repository ID,
 and each project/repository association keeps one default checkout. Attachment and
 picker discovery run no Git commands and grant no build execution permission.
 On project details, **View status** reads that saved checkout's branch, commit and
-working-tree counts; **Refresh status** reads it again. Detached HEAD and branches
-with no commits have explicit labels. Git must be available on the server's PATH.
+working-tree counts; **Refresh status** updates them in place. **Last checked**
+is the browser-local time a valid response was received, not continuous monitoring.
+Detached HEAD and branches with no commits have explicit labels. Git must be available on the server's PATH.
 Status uses private temporary metadata and controlled Git settings. Unsupported
 layouts, changed attachments and failed or bounded-out reads show unavailable
 feedback, never a guessed clean result. See [status limits](docs/project-catalog.md#repository-status)
