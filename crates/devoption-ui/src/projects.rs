@@ -33,43 +33,14 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
                 .map(|byte| format!("{byte:02x}"))
                 .collect();
             html.push_str(&format!(
-                "<li aria-labelledby=\"project-{id}\"><h2 id=\"project-{id}\">"
+                "<li aria-labelledby=\"project-{id}\"><h2 id=\"project-{id}\"><a href=\"/projects/{id}\">"
             ));
             escape_into(&mut html, project.name);
-            let count = project.repositories.len();
-            let label = if count == 1 {
-                "repository"
-            } else {
-                "repositories"
-            };
-            html.push_str(&format!("</h2><p>{count} {label}</p>"));
-            if count > 0 {
-                html.push_str("<ul class=\"repository-list\" aria-label=\"Repositories\">");
-                for repository in &project.repositories {
-                    html.push_str("<li><span>");
-                    escape_into(&mut html, repository.name);
-                    html.push_str("</span><small>");
-                    if let Some(path) = repository.default_checkout {
-                        html.push_str("Default checkout: <code>");
-                        escape_into(&mut html, path);
-                        html.push_str("</code>");
-                    } else {
-                        html.push_str("Not attached");
-                    }
-                    html.push_str("</small></li>");
-                }
-                html.push_str("</ul>");
-            }
+            html.push_str("</a></h2>");
+            repository_count(&mut html, project);
+            repositories(&mut html, project);
             if attachment_available {
-                html.push_str(&format!(r#"<details class="repository-attachment"><summary>Attach repository</summary>
-                  <form class="project-form repository-form" data-project="{id}" aria-labelledby="project-{id}" action="/projects/{id}/repositories" method="post">
-                    <label for="repository-path-{id}">Checkout path</label>
-                    <p id="repository-hint-{id}">Relative to this server’s trusted root, for example <code>team/app</code>. Attach an existing local checkout.</p>
-                    <input id="repository-path-{id}" data-repository-path name="path" type="text" required maxlength="4096" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="repository-hint-{id} repository-status-{id}" disabled>
-                    <button class="action-button" data-repository-submit type="submit" disabled>Attach</button>
-                    <p id="repository-status-{id}" data-repository-status role="status" aria-live="polite"></p>
-                    <noscript>JavaScript is required to attach a repository.</noscript>
-                  </form></details>"#));
+                attachment(&mut html, &id, &format!("project-{id}"));
             }
             html.push_str("</li>");
         }
@@ -78,7 +49,73 @@ pub(super) fn content(projects: &[ProjectSummary<'_>], attachment_available: boo
     html
 }
 
-fn escape_into(html: &mut String, value: &str) {
+pub(super) fn detail(project: &ProjectSummary<'_>, attachment_available: bool) -> String {
+    let mut html = String::from(
+        r#"<div class="project-detail"><section aria-labelledby="repositories-title"><h2 id="repositories-title">Repositories</h2>"#,
+    );
+    if project.repositories.is_empty() {
+        html.push_str("<p>No repositories attached yet.</p>");
+    } else {
+        repository_count(&mut html, project);
+        repositories(&mut html, project);
+    }
+    if attachment_available {
+        let id: String = project
+            .id
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        attachment(&mut html, &id, "page-title");
+    } else {
+        html.push_str(r#"<p class="repository-notice">Repository attachment is not configured on this server. A server administrator must select a trusted repository root before you can attach a checkout.</p>"#);
+    }
+    html.push_str(r#"</section><section aria-labelledby="builds-title"><h2 id="builds-title">Builds</h2><p>Build execution is not available yet.</p></section></div>"#);
+    html
+}
+
+fn repository_count(html: &mut String, project: &ProjectSummary<'_>) {
+    let count = project.repositories.len();
+    let label = if count == 1 {
+        "repository"
+    } else {
+        "repositories"
+    };
+    html.push_str(&format!("<p>{count} {label}</p>"));
+}
+
+fn repositories(html: &mut String, project: &ProjectSummary<'_>) {
+    if !project.repositories.is_empty() {
+        html.push_str("<ul class=\"repository-list\" aria-label=\"Repositories\">");
+        for repository in &project.repositories {
+            html.push_str("<li><span>");
+            escape_into(html, repository.name);
+            html.push_str("</span><small>");
+            if let Some(path) = repository.default_checkout {
+                html.push_str("Default checkout: <code>");
+                escape_into(html, path);
+                html.push_str("</code>");
+            } else {
+                html.push_str("Not attached");
+            }
+            html.push_str("</small></li>");
+        }
+        html.push_str("</ul>");
+    }
+}
+
+fn attachment(html: &mut String, id: &str, label: &str) {
+    html.push_str(&format!(r#"<details class="repository-attachment"><summary>Attach repository</summary>
+                  <form class="project-form repository-form" data-project="{id}" aria-labelledby="{label}" action="/projects/{id}/repositories" method="post">
+                    <label for="repository-path-{id}">Checkout path</label>
+                    <p id="repository-hint-{id}">Relative to this server’s trusted root, for example <code>team/app</code>. Attach an existing local checkout.</p>
+                    <input id="repository-path-{id}" data-repository-path name="path" type="text" required maxlength="4096" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="repository-hint-{id} repository-status-{id}" disabled>
+                    <button class="action-button" data-repository-submit type="submit" disabled>Attach</button>
+                    <p id="repository-status-{id}" data-repository-status role="status" aria-live="polite"></p>
+                    <noscript>JavaScript is required to attach a repository.</noscript>
+                  </form></details>"#));
+}
+
+pub(super) fn escape_into(html: &mut String, value: &str) {
     for character in value.chars() {
         match character {
             '&' => html.push_str("&amp;"),
@@ -94,6 +131,29 @@ fn escape_into(html: &mut String, value: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detail_escapes_title_and_paths_and_reuses_the_attachment_form() {
+        let html = crate::render_project(
+            &ProjectSummary {
+                id: [0xab; 16],
+                name: "<Project> & 工具",
+                repositories: vec![RepositorySummary {
+                    name: "<repo>",
+                    default_checkout: Some("team/<checkout>&工具"),
+                }],
+            },
+            true,
+        );
+        assert!(html.contains("<title>&lt;Project&gt; &amp; 工具 · DevOption</title>"));
+        assert!(html.contains("tabindex=\"-1\">&lt;Project&gt; &amp; 工具</h1>"));
+        assert!(html.contains("team/&lt;checkout&gt;&amp;工具"));
+        assert!(html.contains("&lt;repo&gt;"));
+        assert!(html.contains("href=\"/projects\" aria-current=\"page\""));
+        assert!(html.contains("aria-labelledby=\"page-title\" action=\"/projects/abababababababababababababababab/repositories\""));
+        assert!(html.contains("Build execution is not available yet."));
+        assert!(!html.contains("Create project"));
+    }
 
     #[test]
     fn project_repository_names_and_paths_are_escaped_in_their_project_context() {
@@ -115,7 +175,7 @@ mod tests {
             true,
         );
         assert!(html.contains(
-            "&lt;script&gt;alert(&#39;研究 &amp; &quot;tools&quot;&#39;)&lt;/script&gt;</h2>"
+            "&lt;script&gt;alert(&#39;研究 &amp; &quot;tools&quot;&#39;)&lt;/script&gt;</a></h2>"
         ));
         assert!(!html.contains("<script>alert("));
         assert!(html.contains("&lt;repo&gt;"));

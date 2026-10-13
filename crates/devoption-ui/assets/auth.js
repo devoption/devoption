@@ -255,8 +255,8 @@
         if (current !== version) return;
         if (response.status === 204) {
           saved = true;
-          repository.status.textContent = "Repository attached. Loading the list…";
-          window.location.assign("/projects");
+          repository.status.textContent = "Repository attached. Reloading…";
+          window.location.reload();
           return;
         }
         const code = response.headers.get("x-devoption-error");

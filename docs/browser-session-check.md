@@ -32,6 +32,14 @@ claiming success. Check the labelled form and submit button at a narrow viewport
 Capture `projects.jpg` before adding extra test records to keep the two standard
 fixture rows consistent. These writes affect only the temporary fixture catalog.
 
+Open **Example application** with the keyboard from its name link. The details
+page must show only that project’s repositories and relative default checkout
+paths, a **Back to Projects** link, and unavailable build execution with no build
+or deploy button. Capture `project-details.jpg` before attaching more fixtures.
+Check the other project and a new empty project, then a direct reload and browser
+Back/Forward. Test the details page at a narrow viewport and while signed out.
+A successful attachment from details must reload that same project page.
+
 Expand a project's **Attach repository** disclosure with the keyboard, enter
 `tools` and submit. Its count and default checkout list must update after the
 confirmed reload and persist across another reload. Attach `工具 & <fixture>`
