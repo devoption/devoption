@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Require complete immutable source snapshots in candidate build plans. Verify a
+  bounded commit/tree/blob graph, retain every supported source file's exact bytes,
+  and match the conventional binary target to the verified package. Reject missing,
+  extra or inconsistent objects without reading live repositories or enabling
+  extraction, approval or execution
+  ([#175](https://github.com/devoption/devoption/issues/175)).
+
 - Add local/SSH `devoption check-source` with explicit catalog/root paths and saved
   project/repository IDs. Reuse read-only source preparation, print observed facts
   and check outcomes, and document passed/failed/invalid-argument exit statuses

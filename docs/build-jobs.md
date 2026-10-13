@@ -10,8 +10,9 @@ No job records are created in the real instance. Application builds remain unava
 
 `BuildJob::queued` owns a plan and an attempt `JobId`. Events must match both the
 ID and the complete plan value, including dependencies, source, toolchain,
-environment, paths, target, proposed limits and the retained root Cargo source
-proof. A different verified source revision cannot start or complete the original
+environment, paths, target, proposed limits and the retained complete source
+snapshot, including owned file bytes and the root Cargo proof. A different verified
+source revision or source bytes cannot start or complete the original
 attempt. This equality is an in-memory
 identity check, not a stable serialized plan digest or authorization. It does not
 recheck external state or authenticate source selection. A future store must

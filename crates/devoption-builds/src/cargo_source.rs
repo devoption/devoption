@@ -93,11 +93,15 @@ pub fn verify_root(
 }
 
 fn require_object(kind: &str, bytes: &[u8], expected: [u8; 20]) -> Result<(), Error> {
-    let header = format!("{kind} {}\0", bytes.len());
-    if checked_hash(&[header.as_bytes(), bytes])? != expected {
+    if object_id(kind, bytes)? != expected {
         return Err(Error::ObjectMismatch);
     }
     Ok(())
+}
+
+pub(super) fn object_id(kind: &str, bytes: &[u8]) -> Result<[u8; 20], Error> {
+    let header = format!("{kind} {}\0", bytes.len());
+    checked_hash(&[header.as_bytes(), bytes])
 }
 
 fn checked_hash(parts: &[&[u8]]) -> Result<[u8; 20], Error> {
@@ -111,7 +115,7 @@ fn checked_hash(parts: &[&[u8]]) -> Result<[u8; 20], Error> {
         .map_err(|_| Error::Collision)
 }
 
-fn oid(hex: &[u8]) -> Option<[u8; 20]> {
+pub(super) fn oid(hex: &[u8]) -> Option<[u8; 20]> {
     if hex.len() != 40 || hex.iter().all(|&b| b == b'0') {
         return None;
     }
@@ -127,7 +131,7 @@ fn oid(hex: &[u8]) -> Option<[u8; 20]> {
     Some(result)
 }
 
-fn commit_tree(commit: &[u8]) -> Result<[u8; 20], Error> {
+pub(super) fn commit_tree(commit: &[u8]) -> Result<[u8; 20], Error> {
     if commit.contains(&0) {
         return Err(Error::UnsupportedCommit);
     }
@@ -165,10 +169,39 @@ fn commit_tree(commit: &[u8]) -> Result<[u8; 20], Error> {
     Ok(tree)
 }
 
-fn root_entries(mut bytes: &[u8]) -> Result<([u8; 20], [u8; 20]), Error> {
+fn root_entries(bytes: &[u8]) -> Result<([u8; 20], [u8; 20]), Error> {
+    let (mut manifest, mut lockfile) = (None, None);
+    for entry in tree_entries(bytes)? {
+        match entry.name {
+            "Cargo.toml" | "Cargo.lock" => {
+                if entry.mode != b"100644" {
+                    return Err(Error::InvalidTree);
+                }
+                if entry.name == "Cargo.toml" {
+                    manifest = Some(entry.id);
+                } else {
+                    lockfile = Some(entry.id);
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok((
+        manifest.ok_or(Error::InvalidTree)?,
+        lockfile.ok_or(Error::InvalidTree)?,
+    ))
+}
+
+pub(super) struct TreeEntry<'a> {
+    pub mode: &'a [u8],
+    pub name: &'a str,
+    pub id: [u8; 20],
+}
+
+pub(super) fn tree_entries(mut bytes: &[u8]) -> Result<Vec<TreeEntry<'_>>, Error> {
     let mut names = BTreeSet::new();
     let mut previous = Vec::new();
-    let (mut manifest, mut lockfile) = (None, None);
+    let mut entries = Vec::new();
     while !bytes.is_empty() {
         if names.len() == MAX_ROOT_ENTRIES {
             return Err(Error::Capacity);
@@ -225,24 +258,13 @@ fn root_entries(mut bytes: &[u8]) -> Result<([u8; 20], [u8; 20]), Error> {
             return Err(Error::InvalidTree);
         }
         bytes = &bytes[end + 21..];
-        match name {
-            b"Cargo.toml" | b"Cargo.lock" => {
-                if mode != b"100644" {
-                    return Err(Error::InvalidTree);
-                }
-                if name == b"Cargo.toml" {
-                    manifest = Some(id);
-                } else {
-                    lockfile = Some(id);
-                }
-            }
-            _ => {}
-        }
+        entries.push(TreeEntry {
+            mode,
+            name: std::str::from_utf8(name).map_err(|_| Error::InvalidTree)?,
+            id,
+        });
     }
-    Ok((
-        manifest.ok_or(Error::InvalidTree)?,
-        lockfile.ok_or(Error::InvalidTree)?,
-    ))
+    Ok(entries)
 }
 
 /// Fixed diagnostics omit all supplied object contents and private identities.

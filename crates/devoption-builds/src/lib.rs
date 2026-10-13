@@ -1,4 +1,4 @@
-//! Immutable Unix Rust build plans bound to verified root Cargo source metadata.
+//! Immutable Unix Rust build plans bound to complete verified source snapshots.
 //! Validation reads supplied values only, with no filesystem, process or network I/O.
 //! The separate preparation module performs read-only current-source inspection.
 //! A valid plan is neither reviewed nor approved and grants no execution rights.
@@ -9,6 +9,7 @@
 pub mod cargo_source;
 pub mod jobs;
 pub mod preparation;
+pub mod source_snapshot;
 
 use devoption_projects::{Catalog, ProjectId, RepositoryId};
 use devoption_registry::CargoMaterialization;
@@ -44,9 +45,9 @@ pub struct PlanInput {
     pub project: ProjectId,
     pub repository: RepositoryId,
     pub commit: String,
-    /// Verified Cargo membership relative to the selected commit, not repository
-    /// authentication, a complete source snapshot or execution authorization.
-    pub source: cargo_source::RootCargoSource,
+    /// Complete owned source bytes and target relative to the selected commit;
+    /// not repository authentication, filesystem isolation or authorization.
+    pub source: source_snapshot::SourceSnapshot,
     /// Registry-supplied metadata, not proof of lockfile or bundle verification.
     pub dependencies: CargoMaterialization,
     pub rust_version: String,
@@ -119,6 +120,9 @@ impl BuildPlan {
         if !target_name(&input.package) || !target_name(&input.binary) {
             return Err(Error::InvalidTarget);
         }
+        if input.package != input.source.package() || input.binary != input.source.binary() {
+            return Err(Error::TargetMismatch);
+        }
         if input.environment.len() > MAX_ENVIRONMENT_ENTRIES {
             return Err(Error::InvalidEnvironment);
         }
@@ -176,6 +180,7 @@ pub enum Error {
     InvalidExecutable,
     InvalidWorkDirectory,
     InvalidTarget,
+    TargetMismatch,
     InvalidEnvironment,
     InvalidLimits,
 }
@@ -195,6 +200,7 @@ impl fmt::Display for Error {
             Self::InvalidExecutable => "executable must be a bounded absolute Unix cargo path",
             Self::InvalidWorkDirectory => "work directory must be a bounded absolute Unix path",
             Self::InvalidTarget => "package and binary must be bounded ASCII target names",
+            Self::TargetMismatch => "package and binary must match the verified source target",
             Self::InvalidEnvironment => "environment metadata is malformed, duplicate or oversized",
             Self::InvalidLimits => "elapsed time and log limits must be nonzero",
         })

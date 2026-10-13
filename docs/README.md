@@ -27,6 +27,7 @@ deployments or production hosting are already available.
 - [Project Builds source preparation](build-preparation.md)
 - [Build plans](build-plans.md) and [job lifecycle](build-jobs.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
+- [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)
 
 ## Validation evidence
