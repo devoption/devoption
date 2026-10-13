@@ -17,7 +17,7 @@ mod codec;
 #[cfg(unix)]
 mod store;
 #[cfg(unix)]
-pub use store::{CatalogStore, read_catalog};
+pub use store::{CatalogDirectory, CatalogStore, read_catalog};
 
 #[cfg(unix)]
 pub mod registration;

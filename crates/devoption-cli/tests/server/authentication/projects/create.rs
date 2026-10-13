@@ -1,6 +1,6 @@
 use super::*;
 
-fn create_request(address: SocketAddr, issued: &Reply, name: &str) -> String {
+pub(super) fn create_request(address: SocketAddr, issued: &Reply, name: &str) -> String {
     format!(
         "POST /projects HTTP/1.1\r\nHost: {address}\r\nOrigin: http://{address}\r\nCookie: {}\r\nX-CSRF-Token: {}\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{name}",
         issued
@@ -14,7 +14,7 @@ fn create_request(address: SocketAddr, issued: &Reply, name: &str) -> String {
     )
 }
 
-fn status(address: SocketAddr, raw: &str) -> u16 {
+pub(super) fn status(address: SocketAddr, raw: &str) -> u16 {
     let response = request(address, raw);
     let (headers, body) = response.split_once("\r\n\r\n").unwrap();
     assert!(body.is_empty());

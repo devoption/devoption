@@ -103,6 +103,12 @@ pub struct OwnerStore {
 }
 
 impl OwnerStore {
+    /// Share the startup-selected directory with another storage layer without
+    /// resolving its pathname again. The receiving layer revalidates the handle.
+    pub(crate) fn duplicate_directory(&self) -> io::Result<File> {
+        self.directory.try_clone()
+    }
+
     /// Open an explicit server data path without following any symlink component.
     /// Each directory is opened relative to the preceding descriptor, starting at
     /// the filesystem root. No canonicalization, creation, or permission repair.

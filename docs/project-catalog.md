@@ -16,11 +16,20 @@ remains unimplemented.
 
 ## Authenticated service view and creation
 
-With an existing owner, startup calls the domain crate's `read_catalog` before
-binding the listener. This reader applies the same bounded format and private
+With an existing owner, startup derives an unlocked `CatalogDirectory` from the
+already opened owner-store directory and loads its catalog before binding the
+listener. This reader applies the same bounded format and private
 directory/file checks as the store, without creating files or acquiring a writer
 lock. Only an absent catalog becomes an empty list. Invalid, unsupported,
 oversized or unsafe state stops startup without reset or error-data disclosure.
+
+Under [#129](https://github.com/devoption/devoption/issues/129), owner and catalog
+operations share that selected directory identity from startup onward. Renaming
+the directory or an ancestor does not redirect catalog reads, creation or attachment
+to a replacement pathname. Every operation revalidates the retained directory and
+reads current catalog contents; unsafe or unlinked storage fails closed. Restarting
+the service explicitly selects the configured path again. The retained catalog
+handle holds no writer lock; each mutation opens and drops its own writer.
 
 The server reads the current validated snapshot on every Projects GET/HEAD, which
 passes the existing session-cookie guard; anonymous requests receive the empty
@@ -94,6 +103,12 @@ owned by the current OS user and have no group/other permission bits. It creates
 no directory and repairs no existing permissions. Ancestors need not be private;
 operations remain anchored to the opened directory descriptor after a rename.
 Selected checkouts must remain separate from application-owned data.
+
+`CatalogDirectory::from_directory` instead adopts a caller-selected directory
+descriptor after the same private-directory validation. It never resolves a path.
+`load()` reads a fresh snapshot and `writer()` opens an independently locked
+`CatalogStore` anchored to that descriptor. This is the server's shared-directory
+path; the standalone pathname APIs remain available for explicit local operations.
 
 Opening creates `.projects.lock` with mode `0600` subject to the caller's umask.
 The store holds an exclusive, nonblocking advisory lock for its lifetime. Another

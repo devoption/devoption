@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Server catalog access shares the owner store's selected directory from startup,
+  retaining fresh snapshots and short-lived writer locks throughout the service.
+  Temporary fixtures cover storage identity, authenticated operations, startup
+  consistency and fail-closed validation
+  ([#129](https://github.com/devoption/devoption/issues/129)).
+
 - Copied-binary installation fixtures retry Linux's transient executable-busy
   launch error within a fixed bound, retaining immediate failures for other
   errors and covering held writable descriptors and persistent failures
