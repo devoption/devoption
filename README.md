@@ -213,9 +213,9 @@ The [offline fixture proof](docs/offline-fixture-build.md) uses a concrete local
 seed provider and real Cargo in Linux tests. This does not enable application builds
 or establish production execution/isolation permissions.
 The [job lifecycle model](docs/build-jobs.md) binds records to an exact plan and
-attempt, rejects invalid transitions, and requires sealed runner events for running
-or completed outcomes. No production event issuer, persistent jobs or runtime
-integration exists yet.
+attempt and rejects invalid transitions. Starting a job and recording runner
+outcomes require sealed events; queued cancellation is local. No production event
+issuer, persistent jobs or runtime integration exists yet.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:
