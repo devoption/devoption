@@ -606,7 +606,7 @@ test("failed session recovery and malformed project context cannot submit a chec
   assert.match(invalid.nodes.get("repository-0-status").textContent, /Project unavailable/);
 });
 
-test("checkout picker loads on disclosure, fills the existing path, and preserves manual entry", async () => {
+test("checkout picker loads on dialog opening, fills the existing path, and preserves manual entry", async () => {
   const current = page({form: false, repositories: true, picker: true, initial: response(204, csrf)});
   await tick();
   const choice = current.nodes.get('repository-0-choice');
@@ -616,7 +616,7 @@ test("checkout picker loads on disclosure, fills the existing path, and preserve
   let finish;
   current.queue.push(new Promise(resolve => {finish = resolve;}));
   const disclosure = current.nodes.get('repository-0-disclosure');
-  disclosure.open = true; disclosure.emit('toggle');
+  disclosure.open = true; disclosure.emit('dialogopened');
   assert.match(current.nodes.get('repository-0-options-status').textContent, /Loading/);
   assert.equal(current.nodes.get('repository-0-refresh').disabled, true);
   assert.equal(field.disabled, false);

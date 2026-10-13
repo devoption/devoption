@@ -123,7 +123,7 @@
     }
     function loadOpenCheckouts() {
       repositoryForms.forEach((repository) => {
-        if (repository.choice && !repository.optionsLoaded && repository.form.closest("details").open) loadCheckouts(repository);
+        if (repository.choice && !repository.optionsLoaded && repository.form.closest("dialog").open) loadCheckouts(repository);
       });
     }
     const failure = (response) => {
@@ -292,7 +292,7 @@
     repositoryForms.forEach((repository) => {
       if (!repository.choice) return;
       repository.refresh.addEventListener("click", () => loadCheckouts(repository));
-      repository.form.closest("details").addEventListener("toggle", loadOpenCheckouts);
+      repository.form.closest("dialog").addEventListener("dialogopened", loadOpenCheckouts);
       repository.choice.addEventListener("change", () => {
         if (!csrf || busy || repository.choice.disabled || !repository.choice.value) return;
         repository.path.value = repository.choice.value;

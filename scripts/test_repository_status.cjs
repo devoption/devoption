@@ -33,7 +33,7 @@ function page() {
     },
   });
   ready();
-  return {nodes, queue, calls, view, setTime: value => now = value, event: events.emit, open: () => {view.open = true; view.emit('toggle');}, refresh: () => nodes.refresh.emit('click')};
+  return {nodes, queue, calls, view, setTime: value => now = value, event: events.emit, open: () => nodes.refresh.emit('click'), refresh: () => nodes.refresh.emit('click')};
 }
 
 test('status is lazy, has a loading state, and refresh replaces observations', async () => {
@@ -73,7 +73,7 @@ test('failed and malformed reads hide a prior clean result and allow retry', asy
   assert.equal(p.nodes.note.textContent, 'Last checked 2026-10-13T11:00:00.000Z (browser time).');
 });
 
-test('leaving discards delayed status, and back-forward restoration rereads an open view', async () => {
+test('leaving discards delayed status, and back-forward restoration rereads a previously requested view', async () => {
   const p = page(); let release; p.queue.push(new Promise(resolve => release = resolve)); p.open();
   p.event('pagehide'); release(response()); await tick();
   assert.equal(p.nodes.fields.hidden, true); assert.equal(p.nodes.refresh.disabled, true);
@@ -109,4 +109,10 @@ test('an old delayed body cannot replace a restored page observation or its chec
   assert.equal(p.nodes.note.textContent, 'Last checked 2026-10-13T11:00:00.000Z (browser time).');
   assert.equal(p.nodes.fields.hidden, false);
   assert.equal(p.nodes.refresh.disabled, false);
+});
+
+ test('history restoration does not inspect a repository that was never requested', () => {
+  const p = page(); p.event('pagehide'); p.event('pageshow', {persisted: true});
+  assert.equal(p.calls.length, 0); assert.equal(p.nodes.fields.hidden, true);
+  assert.equal(p.nodes.refresh.disabled, false); assert.equal(p.nodes.note.textContent, 'Not checked yet.');
 });

@@ -19,7 +19,7 @@ Usage: devoption [--help | --version]
 
 The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. No directories or permissions are created or changed. Serve creates no accounts; setup never replaces an owner.
 After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH with the same directory, then sign in at /sign-in. Browser owner setup is not available.
-The local server shows Home and About placeholders, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Factory and runtime services are not implemented.";
+The local server shows Overview, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Releases and Infrastructure show unavailable states. Factory and runtime services are not implemented.";
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();

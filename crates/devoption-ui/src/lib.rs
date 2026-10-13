@@ -3,6 +3,8 @@
 pub enum Page {
     Home,
     Projects,
+    Releases,
+    Infrastructure,
     About,
     Appearance,
     SignIn,
@@ -16,10 +18,26 @@ const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const AUTH: &str = include_str!("../assets/auth.js");
 const REPOSITORY_STATUS: &str = include_str!("../assets/repository-status.js");
 const PROJECT_FILTER: &str = include_str!("../assets/project-filter.js");
+const INTERFACE: &str = include_str!("../assets/interface.js");
 const LOGO: &str = include_str!("../assets/devoption.svg");
 const APPEARANCE_CONTROLS: &str = r##"
       <section class="appearance" aria-label="Appearance preferences">
-        <div class="theme-preview">
+        <div id="appearance-mode-options" class="appearance-options" hidden><h2>Mode</h2><div class="choice-buttons" role="group" aria-label="Color mode">
+          <button type="button" data-appearance-setting="appearance-mode" data-appearance-value="light" aria-pressed="false">Light</button>
+          <button type="button" data-appearance-setting="appearance-mode" data-appearance-value="dark" aria-pressed="true">Dark</button>
+          <button type="button" data-appearance-setting="appearance-mode" data-appearance-value="system" aria-pressed="false">System</button>
+        </div></div>
+        <div id="appearance-theme-options" class="appearance-options theme-options" hidden><h2>Theme</h2><div class="choice-buttons" role="group" aria-label="Theme">
+          <button type="button" data-appearance-setting="appearance-theme" data-appearance-value="nord" aria-pressed="true"><span class="palette-swatch" aria-hidden="true"></span>Nord</button>
+          <button type="button" data-appearance-setting="appearance-theme" data-appearance-value="dracula" aria-pressed="false"><span class="palette-swatch" aria-hidden="true"></span>Dracula</button>
+          <button type="button" data-appearance-setting="appearance-theme" data-appearance-value="tokyo-night" aria-pressed="false"><span class="palette-swatch" aria-hidden="true"></span>Tokyo Night</button>
+        </div></div>
+        <div id="appearance-accent-options" class="appearance-options" hidden><h2>Accent</h2><div class="choice-buttons" role="group" aria-label="Accent">
+          <button type="button" data-appearance-setting="appearance-accent" data-appearance-value="purple" aria-pressed="true">Purple</button>
+          <button type="button" data-appearance-setting="appearance-accent" data-appearance-value="blue" aria-pressed="false">Blue</button>
+          <button type="button" data-appearance-setting="appearance-accent" data-appearance-value="green" aria-pressed="false">Green</button>
+        </div></div>
+        <div id="appearance-theme-native" class="theme-preview">
           <span class="theme-swatch" aria-hidden="true"></span>
           <label for="appearance-theme">Theme</label>
           <select id="appearance-theme" aria-describedby="appearance-status" disabled>
@@ -29,7 +47,7 @@ const APPEARANCE_CONTROLS: &str = r##"
           </select>
         </div>
         <p id="appearance-theme-note" hidden>Dracula light is a DevOption adaptation.</p>
-        <div class="mode-choice">
+        <div id="appearance-mode-native" class="mode-choice">
           <label for="appearance-mode">Mode</label>
           <select id="appearance-mode" aria-describedby="appearance-status" disabled>
             <option value="dark">Dark</option>
@@ -37,7 +55,7 @@ const APPEARANCE_CONTROLS: &str = r##"
             <option value="system">System</option>
           </select>
         </div>
-        <div class="mode-choice">
+        <div id="appearance-accent-native" class="mode-choice">
           <label for="appearance-accent">Accent</label>
           <select id="appearance-accent" aria-describedby="appearance-status" disabled>
             <option value="purple">Purple</option>
@@ -116,7 +134,11 @@ enum ProjectView<'a> {
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
-        Page::Home => ("Home", "/", "No home content yet."),
+        Page::Home => (
+            "Overview",
+            "/",
+            "Your local workspace for software projects.",
+        ),
         Page::Projects => (
             "Projects",
             "/projects",
@@ -127,7 +149,21 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
                 None => "Project management is not available yet.",
             },
         ),
-        Page::About => ("About", "/about", "No about content yet."),
+        Page::Releases => (
+            "Releases",
+            "/releases",
+            "Review and manage project releases.",
+        ),
+        Page::Infrastructure => (
+            "Infrastructure",
+            "/infrastructure",
+            "Where your factory and applications will run.",
+        ),
+        Page::About => (
+            "About",
+            "/about",
+            "A self-hosted software factory, in development.",
+        ),
         Page::Appearance => (
             "Appearance",
             "/settings/appearance",
@@ -150,6 +186,24 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     } else {
         (title.to_owned(), "")
     };
+    let actions = match &projects {
+        Some(ProjectView::List(..)) => {
+            r#"<button class="action-button primary" type="button" data-open-dialog="project-dialog" disabled><span aria-hidden="true">＋</span>New project</button>"#
+        }
+        Some(ProjectView::Detail(..)) => {
+            r#"<button class="action-button" type="button" data-open-dialog="project-dialog" disabled>Rename project</button>"#
+        }
+        None => "",
+    };
+    let breadcrumb = if matches!(&projects, Some(ProjectView::Detail(..))) {
+        format!(
+            r#"<p class="breadcrumbs"><a href="/projects">Projects</a><span aria-hidden="true">/</span><span>{title}</span></p>"#
+        )
+    } else if matches!(page, Page::SignIn | Page::Appearance) {
+        String::new()
+    } else {
+        format!(r#"<p class="breadcrumbs">{title}</p>"#)
+    };
     let project_content = projects.map(|view| match view {
         ProjectView::List(projects, available) => projects::content(projects, available),
         ProjectView::Detail(project, available) => projects::detail(project, available),
@@ -168,15 +222,37 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             },
         )
     } else {
-        ("", "")
+        (
+            "",
+            match page {
+                Page::Home => {
+                    r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a workspace and attach your trusted local repositories. Builds and deployments are not available yet.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
+                }
+                Page::Releases => {
+                    r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and publishing are not implemented. Your saved projects and repositories are available in Projects.</p><a class="action-button" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
+                }
+                Page::Infrastructure => {
+                    r#"<section class="empty-state"><h2>Runtime management is not available yet</h2><p>Deployment, runtime enrollment and live health monitoring are not implemented.</p></section>"#
+                }
+                Page::About => {
+                    r#"<section class="about-content"><h2>Built in the open</h2><p>DevOption currently supports local projects, repository attachment and inspection, owner sign-in, and browser-local appearance preferences.</p><p>Build execution, releases and deployment remain in development. This local preview is not a production hosting service.</p></section>"#
+                }
+                _ => "",
+            },
+        )
     };
     let navigation: String = [
-        ("/", "Home", "M3 10 12 3l9 7v11h-6v-7H9v7H3Z"),
+        ("/", "Overview", "M3 10 12 3l9 7v11h-6v-7H9v7H3Z"),
         ("/projects", "Projects", "M3 7V4h6l3 3h9v13H3Z"),
         (
-            "/about",
-            "About",
-            "M12 16v-4M12 8h.01M21 12a9 9 0 1 1-18 0a9 9 0 0 1 18 0",
+            "/releases",
+            "Releases",
+            "M6 3h8l4 4v14H6ZM14 3v5h4M9 12h6M9 16h6",
+        ),
+        (
+            "/infrastructure",
+            "Infrastructure",
+            "M3 3h18v7H3ZM3 14h18v7H3ZM7 6h.01M7 17h.01M12 6h5M12 17h5",
         ),
     ]
     .into_iter()
@@ -193,6 +269,11 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     })
     .collect();
     let profile_icon = icon("M20 21v-2a8 8 0 0 0-16 0v2M16 7a4 4 0 1 1-8 0a4 4 0 0 1 8 0");
+    let about_current = if path == "/about" {
+        " aria-current=\"page\""
+    } else {
+        ""
+    };
 
     format!(
         "<!doctype html>
@@ -207,6 +288,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
   <script>{AUTH}</script>
   <script>{REPOSITORY_STATUS}</script>
   <script>{PROJECT_FILTER}</script>
+  <script>{INTERFACE}</script>
 </head>
 <body data-owner-configured=\"{account_available}\">
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
@@ -230,11 +312,13 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
   </aside>
   <div class=\"workspace\">
     <header class=\"content-header\">
-      <h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>
       <p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p>
+      <a class=\"about-link\" href=\"/about\"{about_current}>About DevOption</a>
     </header>
     <main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\"{main_class}>
-      <p id=\"page-message\">{message}</p>
+      {breadcrumb}
+      <div class=\"page-heading\"><div><h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>
+      <p id=\"page-message\">{message}</p></div><div class=\"page-actions\">{actions}</div></div>
       {content}
     </main>
   </div>

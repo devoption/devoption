@@ -73,7 +73,7 @@ fn authenticated_creation_is_immediately_visible_escaped_and_persists_after_rest
     );
     let response = page(address, "GET", Some(&issued));
     assert!(response.contains(ESCAPED));
-    assert!(response.contains("<p>0 repositories</p>"));
+    assert!(response.contains("0 repositories"));
     assert!(!response.contains(NAME));
     let saved = devoption_projects::read_catalog(&data).unwrap().unwrap();
     assert_eq!(saved.projects().len(), 1);

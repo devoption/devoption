@@ -78,7 +78,7 @@ fn catalog_pages_require_a_session_escape_names_and_read_fresh_snapshots() {
     assert!(response.contains("cache-control: no-store"));
     assert!(response.contains(ESCAPED));
     assert!(!response.contains(NAME));
-    assert!(response.contains("<p>2 repositories</p>"));
+    assert!(response.contains("2 repositories"));
     assert!(response.len() < 128 * 1024);
     assert!(
         page(address, "HEAD", Some(&issued))
@@ -105,7 +105,7 @@ fn catalog_pages_require_a_session_escape_names_and_read_fresh_snapshots() {
     let response = page(address, "GET", Some(&sign_in(address)));
     assert!(response.contains(ESCAPED));
     assert!(response.contains("Added outside the running server"));
-    assert!(response.contains("<p>0 repositories</p>"));
+    assert!(response.contains("0 repositories"));
     assert_eq!(
         devoption_projects::read_catalog(&data).unwrap().unwrap(),
         catalog

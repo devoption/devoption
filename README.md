@@ -3,9 +3,11 @@
 DevOption is an open-source project working toward a self-hosted software factory:
 a place to build, test, and run software.
 
-It currently provides Home and About placeholders, saved projects and an empty-project creation form
-for configured owners, browser-local Appearance settings, and owner sign-in/sign-out.
-An optional trusted local root enables repository attachment from Projects.
+It currently provides saved projects, project creation and repository inspection for
+configured owners, browser-local Appearance settings, and owner sign-in/sign-out.
+An optional trusted local root enables repository attachment from project details.
+Overview introduces the workspace; Releases and Infrastructure show honest
+unavailable states.
 Builds and deployments are not implemented. There is no published release.
 
 ## Try it locally
@@ -78,7 +80,7 @@ mixed with valid cookie/CSRF credentials. There is no API or agent credential
 transport; transport-neutral Rust session APIs do not enable one over HTTP.
 Missing or rejected mutation credentials receive an empty, non-cacheable 401
 without a Bearer challenge. Without a configured owner, all
-unsafe requests remain denied. With an owner configured at startup, Home, Projects,
+unsafe requests remain denied. With an owner configured at startup, Overview, Projects, Releases, Infrastructure,
 About and Appearance GET/HEAD requests require the current session cookie. Missing,
 invalid or expired sessions receive a non-cacheable redirect to `/sign-in` without
 page content. Sign in stays public; the unconfigured preview stays public. This
@@ -112,25 +114,25 @@ verified in Chrome on loopback, not every browser. If a session check fails, use
 **Check account** to retry recovery without submitting the password again.
 Development checks create owners only in [temporary fixture stores](docs/browser-session-check.md).
 
-Projects displays saved names, repository counts and relative default checkout paths from the
+Projects displays saved names, repository names and counts from the
 [catalog](docs/project-catalog.md). Open a project name to see its repositories,
 or use **Filter projects by name** to find a case-insensitive name fragment in the
 current list. **Clear filter** restores all rows and focuses the search field.
 Filtering stays in the page; it sends no request and saves no browser preference.
 Without JavaScript, the full list remains visible. Project details show
 relative default checkout paths and current build availability at `/projects/{id}`.
-The details page links back to Projects and supports the same repository attachment
-form; a successful attachment reloads the page you are using. Build execution is
-not available yet. Signed-in owners can open **New project** to create an empty
+The details page links back to Projects and offers repository attachment in a
+dialog; a successful attachment reloads that same project. Build execution is
+not available yet. Signed-in owners can open the **New project** dialog to create an empty
 project with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
 characters. Names need not be unique; the catalog holds up to 64 projects. A
 successful save opens the newly created project without restarting the server.
-When repository attachment is configured, its empty details page opens the first
-attachment form automatically. If a save cannot be confirmed, reload the list
+When repository attachment is configured, **Attach repository** opens its labelled
+dialog on the new details page. If a save cannot be confirmed, reload the list
 before retrying to avoid duplicate names.
 An absent catalog shows an empty list; invalid state stops startup or fails the
 current request without resetting records. The unconfigured preview retains its
-placeholder. On project details, open **Rename project**, edit the name and select
+placeholder. On project details, open the **Rename project** dialog, edit the name and select
 **Save name**. A confirmed save reloads that project with the same ID, repository
 associations and checkout paths. If saving cannot be confirmed, reload before
 retrying. Project deletion is not implemented. The installation
@@ -141,7 +143,7 @@ separate backup.
 On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` to
 `serve --data-dir ABSOLUTE_PATH`. It requires an existing owner and a trusted,
 existing root separate from application data; no root is selected by default.
-Each project's **Attach repository** form accepts a relative checkout path under
+Each project details page's **Attach repository** dialog accepts a relative checkout path under
 that root. Opening the form loads a picker of supported immediate child checkouts.
 Choose one to fill the path, or enter a nested path manually. Discovery checks at
 most 64 root entries; a partial-list notice explains when the limit is reached.
@@ -165,6 +167,11 @@ for supported configurations and the meaning of the counts.
 See [root policy, endpoint and catalog compatibility](docs/project-catalog.md#repository-attachment-backend)
 before enabling it; no real repository root is configured by this change.
 
+Project dialogs support keyboard focus, Escape and Cancel. Closing a dialog retains
+its entered values; it does not cancel a submitted request. Reopen it to inspect
+pending or failed feedback. Navigation closes dialogs and rechecks the session
+before another mutation.
+
 A [local enrollment authorization core](docs/local-enrollment.md) now supports a
 locally armed, expiring, single-use browser attempt with bounded audit evidence.
 Only temporary fixtures use this browser-attempt core. The selected initial
@@ -173,9 +180,9 @@ browser installation is deferred. The preview exposes no first-owner setup route
 
 ## Screenshots
 
-**Home**
+**Overview**
 
-![Home page](docs/screenshots/home.jpg)
+![Overview page](docs/screenshots/home.jpg)
 
 **Projects (search and temporary fixture data)**
 
@@ -188,6 +195,22 @@ browser installation is deferred. The preview exposes no first-owner setup route
 **New project, ready for its first repository**
 
 ![Empty project details](docs/screenshots/project-empty.jpg)
+
+**Releases (not implemented)**
+
+![Release availability](docs/screenshots/releases.jpg)
+
+**Infrastructure (not implemented)**
+
+![Infrastructure availability](docs/screenshots/infrastructure.jpg)
+
+**New project dialog**
+
+![Project creation](docs/screenshots/project-create.jpg)
+
+**Attach repository dialog**
+
+![Repository attachment](docs/screenshots/repository-attach.jpg)
 
 **About**
 

@@ -123,6 +123,8 @@ fn page_routes(configured: bool, session: SharedSession, project_routes: Router)
     for (path, page) in [
         ("/", Page::Home),
         ("/projects", Page::Projects),
+        ("/releases", Page::Releases),
+        ("/infrastructure", Page::Infrastructure),
         ("/about", Page::About),
         ("/settings/appearance", Page::Appearance),
     ] {

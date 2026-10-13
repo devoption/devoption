@@ -5,11 +5,13 @@
       view, refresh: view.querySelector("[data-status-refresh]"),
       fields: view.querySelector("[data-status-fields]"), note: view.querySelector("[data-status-note]"),
       branch: view.querySelector("[data-status-branch]"), commit: view.querySelector("[data-status-commit]"),
-      changes: view.querySelector("[data-status-changes]"), version: 0, busy: false, loaded: false,
+      changes: view.querySelector("[data-status-changes]"), version: 0, busy: false, requested: false,
     }));
     async function read(item) {
       if (item.busy) return;
       const current = ++item.version;
+      item.requested = true;
+      item.refresh.textContent = "Refresh status";
       item.busy = true; item.refresh.disabled = true; item.fields.hidden = true;
       item.note.textContent = "Reading repository status…";
       try {
@@ -40,7 +42,7 @@
         }).filter(Boolean);
         item.changes.textContent = changes.length ? changes.join(" · ") : "Clean";
         const checkedAt = new Date().toLocaleString(undefined, {dateStyle: "medium", timeStyle: "long"});
-        item.fields.hidden = false; item.loaded = true;
+        item.fields.hidden = false;
         item.note.textContent = `Last checked ${checkedAt} (browser time).`;
       } catch {
         if (current === item.version) item.note.textContent = "Repository status could not be read. Check your session and checkout, then refresh.";
@@ -50,17 +52,15 @@
     }
     views.forEach(item => {
       item.refresh.disabled = false;
-      item.note.textContent = "Open to read the current checkout.";
-      item.view.addEventListener("toggle", () => { if (item.view.open && !item.loaded) read(item); });
+      item.note.textContent = "Not checked yet.";
       item.refresh.addEventListener("click", () => read(item));
-      if (item.view.open) read(item);
     });
     window.addEventListener("pagehide", () => views.forEach(item => {
-      ++item.version; item.busy = false; item.loaded = false; item.fields.hidden = true;
-      item.refresh.disabled = true; item.note.textContent = "Status will refresh when opened.";
+      ++item.version; item.busy = false; item.fields.hidden = true;
+      item.refresh.disabled = true; item.note.textContent = item.requested ? "Status will refresh when you return." : "Not checked yet.";
     }));
     window.addEventListener("pageshow", event => {
-      if (event.persisted) views.forEach(item => { item.refresh.disabled = false; if (item.view.open) read(item); });
+      if (event.persisted) views.forEach(item => { item.refresh.disabled = false; if (item.requested) read(item); });
     });
   });
 })();

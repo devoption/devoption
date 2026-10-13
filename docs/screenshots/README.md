@@ -1,112 +1,79 @@
 # Page screenshots
 
-These images show the real local app, including its current empty placeholders.
-Projects shows creation, repository attachment and the temporary fixture's example metadata,
-not production records.
-Keep one default-mode image per main page at a stable filename; Git records earlier
-versions. For the shared-shell refinement in [#147](https://github.com/devoption/devoption/issues/147),
-compare the [before captures](https://github.com/devoption/devoption/tree/d0f6341aaac971edf9082ccbd9cee923b0cc8575/docs/screenshots)
-with the current images here; both are rendered from the working app.
-For the Projects refinement in [#149](https://github.com/devoption/devoption/issues/149),
-use the [preceding Projects captures](https://github.com/devoption/devoption/tree/c81293eb361b8f5e0f51f7d4f450b3fa12d66141/docs/screenshots)
-as the before view.
-`appearance-light.jpg` additionally shows Appearance following a light
-device preference. `appearance-custom.jpg` shows a custom primary and its warning.
-`appearance-dracula.jpg` and `appearance-dracula-light.jpg` show Dracula in Dark
-and the adapted Light mode.
-`appearance-tokyo-night.jpg` and `appearance-tokyo-night-light.jpg` show Tokyo
-Night in Dark and Light modes.
+These captures show the real local application, using the disposable browser
+fixture's owner and catalog. They are not production records or mockups.
+The complete visual pass in [#153](https://github.com/devoption/devoption/issues/153)
+was implemented freshly against the already-built interface preview. Compare the
+[preceding app captures](https://github.com/devoption/devoption/tree/17c29c22c309cb7c5b936a0e88a904873c48a5f5/docs/screenshots)
+with the current images. The private reference and prototype source are not included.
 
-Use each path below with the fixture's printed origin and port.
+Use stable filenames; Git retains earlier captures. All default captures use
+**1280 × 800**, 100% zoom, Nord / Dark / Purple, unless indicated below.
 
-| Page | Path | Capture state | File |
+| Page or state | Path | Capture state | File |
 | --- | --- | --- | --- |
-| Home | `/` | Signed in | `home.jpg` |
-| Projects | `/projects` | Signed in, New project collapsed, name filter empty, first attachment form expanded with `tools` selected; 1120 × 1000 | `projects.jpg` |
-| Project details | `/projects/{id}` | Signed in, open Example application from Projects, frontend status expanded with Last checked visible, rename and attachment collapsed; 1120 × 900 | `project-details.jpg` |
-| Empty project details | `/projects/{id}` | Create Example new project; rename collapsed, automatic attachment form expanded with `tools` selected; 1120 × 900 | `project-empty.jpg` |
+| Overview | `/` | Signed in | `home.jpg` |
+| Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
+| New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
+| Project details | `/projects/{id}` | Example application; frontend status read with Last checked visible; 1280 × 900 | `project-details.jpg` |
+| Empty project details | `/projects/{id}` | Create Example new project; dialogs closed | `project-empty.jpg` |
+| Attach repository | `/projects/{id}` | Empty project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
+| Releases | `/releases` | Unavailable state | `releases.jpg` |
+| Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
-| Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
+| Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
 | Check account | `/sign-in` | Session verification blocked | `sign-in-check.jpg` |
 
-Use the [temporary browser fixture](../browser-session-check.md) for all captures,
-including the Appearance variants below. Start it from the repository root after
-installing the [normal prerequisites](../../README.md#try-it-locally):
+Start the [temporary browser fixture](../browser-session-check.md) from the
+repository root after installing the [normal prerequisites](../../README.md#try-it-locally):
 
 ```sh
 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
-The fixture creates a temporary owner, catalog, Git metadata trees and an untracked
-frontend README, and stops
-after ten minutes. Use its
-printed URL, not the persistent preview on port 3000. Open `/sign-in` in a fresh
-browser context and capture `sign-in.jpg` before signing in. Then use the fixture
-password `browser transport fixture only`, reload `/sign-in` for `account.jpg`,
-and capture Home, Projects, About and all Appearance images while signed in.
-Configured pages redirect to Sign in without that session. Rerun the fixture if
-it expires; use the new printed port and sign in again. Never provision a real
-owner just to take screenshots.
+Use its printed origin and port, not the persistent preview on port 3000. The
+fixture creates a temporary owner, catalog, Git metadata trees and an untracked
+frontend README; it stops after ten minutes. No real owner or repository is needed.
+The fixture password is `browser transport fixture only`.
 
-For `sign-in-check.jpg`, sign out, begin a new fixture sign-in, and block its
-post-sign-in session check in the browser tool. Capture the resulting **Check
-account** state at the same viewport.
-Remove the block and verify recovery without another sign-in after capturing it.
+1. Rebuild/restart the fixture after source changes: HTML, CSS, SVG and scripts
+   are embedded in the executable. Start with a fresh browser profile/context.
+2. Capture Sign in, then sign in and capture Account and the main pages. Use the
+   profile menu's Appearance link to confirm Nord / Dark / Purple. Capture Projects
+   and Example application before mutating fixture records.
+3. On Example application, select the frontend's **View status**. Wait for branch
+   `main`, **No commits yet**, **1 untracked entry**, and **Last checked**. This time
+   is when the browser received the valid response, not continuous monitoring.
+4. On Projects, open **New project**, enter **Example new project** and capture
+   the dialog. Submit, capture the new empty details page, then open **Attach
+   repository**. Wait for the picker, select `tools`, and capture without submitting.
+5. For `sign-in-check.jpg`, sign out, start another fixture sign-in and block its
+   post-sign-in `/auth/session` check. Capture **Check account**, then remove the
+   block and verify recovery without another password submission.
+6. Capture the browser viewport as JPEG, excluding browser/desktop chrome. Keep
+   scroll at the top, pointer off controls, and no focus outline or developer
+   overlay. Only the two named dialog captures should have a dialog open.
+7. Inspect the images, text, active navigation and root README embeds before
+   committing. Restore browser preferences and clear temporary overrides.
 
-1. If source or assets changed, rerun the fixture command and use its new URL.
-   The HTML, CSS, SVG, and JavaScript are compiled into the executable.
-2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   For Projects, use **1120 × 1000**, leave **New project** collapsed and the name
-   filter empty, and expand the first project's **Attach repository** form. Wait for the checkout list and select `tools` without
-   submitting, to show the relative path
-   alongside both fixture projects and the controls. For Project details, open
-   **Example application**, use **1120 × 900**, and expand the frontend's **View
-   status**. The disposable metadata fixture shows branch `main`, **No commits
-   yet**, and **1 untracked entry**. Wait for the browser-local **Last checked**
-   time; leave rename and attachment collapsed. For the empty-project variant,
-   open **New project**, create **Example new project**, and select `tools` in its already open form
-   without submitting, at the same 1120 × 900 viewport.
-   A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out
-   capture. After sign-in, follow the profile popup's **Appearance** link and confirm
-   these choices for the main-page captures. The browser remembers them.
-3. Open each affected URL at the top of the page. Leave no hover, keyboard-focus
-   outline, open menu, or developer overlay in the capture.
-4. Capture the browser content viewport as JPEG, excluding browser/desktop chrome.
-   Replace the corresponding file above. Do not include private data or use a mockup.
-5. Inspect the saved images for readable text, complete content, and the correct
-   active navigation link. Check their embeds in the root README before committing.
+All Appearance variants use **1280 × 900** and the save confirmation:
 
-For `appearance-light.jpg`, open `/settings/appearance` and use browser developer
-tools to emulate a light device color scheme. Select **Nord**, **System**, and **Blue**,
-with the save confirmation visible and the profile popup closed. Capture the
-same viewport, then clear device emulation and return to **Nord**, **Dark**, and **Purple**.
-Refresh this image when the controls or light palette changes. Never capture
-unrelated browser or profile data.
+| File | Choices |
+| --- | --- |
+| `appearance-light.jpg` | Nord, System following an emulated light device, Blue |
+| `appearance-custom.jpg` | Nord, Dark, Primary color `#2e3440`; measured low-contrast warning visible |
+| `appearance-dracula.jpg` | Dracula, Dark, Purple |
+| `appearance-dracula-light.jpg` | Dracula, System following light, Purple; adaptation note visible |
+| `appearance-tokyo-night.jpg` | Tokyo Night, Dark, Purple |
+| `appearance-tokyo-night-light.jpg` | Tokyo Night, System following light, Purple |
 
-For `appearance-custom.jpg`, use **1120 × 700 pixels** to include the warning,
-choose **Nord** and **Dark**, and set **Primary color** to `#2e3440` (the page background).
-Capture the measured 1:1 warning with the save confirmation visible and no open
-picker or focus outline. Return to **Dark** and **Purple** and clear temporary
-viewport/device overrides after validation.
+The mode/theme/accent choices are buttons. Use **Reset to Purple** after the custom
+capture. The custom warning checks accent/background pairs only and is not a full
+accessibility audit.
 
-For `appearance-dracula.jpg`, use **1120 × 520 pixels** and select **Dracula**,
-**Dark**, and **Purple**. For `appearance-dracula-light.jpg`, emulate a light
-device preference and select **Dracula**, **System**, and **Purple**, including
-the light-adaptation note. Capture both with the save confirmation visible.
-Return to **Nord**, **Dark**, and **Purple** and clear temporary overrides.
-
-For `appearance-tokyo-night.jpg` and `appearance-tokyo-night-light.jpg`, follow
-the same Dark and System/light procedure with **Tokyo Night** and **Purple**.
-Use **1120 × 520 pixels**, with the save confirmation visible. Return to **Nord**,
-**Dark**, and **Purple** and clear temporary overrides.
-
-The initial images were captured with Codex's browser screenshot tool at these
-dimensions. Use an available browser capture tool with the same settings; this
-repository does not install a screenshot runner or run visual regression CI.
-
-Commit refreshed images with each UI change. Shared layout/theme changes refresh
-all main pages. Non-UI changes retain the existing files, without duplicate captures
-or timestamps in filenames. When a new main page is added, extend the table and
-root README with its real screenshot.
+Commit refreshed images in the same commit as visible UI changes. Shared layout
+changes require every main page and affected variants. Non-UI changes retain
+existing files. Add a capture and root README embed for each new main page.
+No screenshot runner or visual regression service is installed by the repository.

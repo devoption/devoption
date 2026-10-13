@@ -519,11 +519,16 @@ fn projects_render_contextual_forms_fresh_repository_lists_and_fixed_failure_cod
     let (first, _) = seed(&data);
     let (server, address) = start_root(&data, &root);
     let issued = sign_in(address);
+    let project_id = first
+        .to_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     let page = |address: SocketAddr, issued: &Reply| {
         request(
             address,
             &format!(
-                "GET /projects HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n",
+                "GET /projects/{project_id} HTTP/1.1\r\nHost: {address}\r\nCookie: {}\r\nConnection: close\r\n\r\n",
                 issued
                     .header("set-cookie")
                     .unwrap()
@@ -538,14 +543,14 @@ fn projects_render_contextual_forms_fresh_repository_lists_and_fixed_failure_cod
         initial
             .matches("class=\"project-form repository-form\"")
             .count(),
-        2
+        1
     );
     assert!(initial.contains("data-repository-path"));
     assert!(!initial.contains(root.to_str().unwrap()));
     let raw = attachment(address, &issued, first, "main");
     assert_eq!(status(address, &raw), 204);
     let saved = page(address, &issued);
-    assert!(saved.contains("<p>1 repository</p>"));
+    assert!(saved.contains("<h3>main</h3>"));
     assert!(saved.contains("Default checkout: <code>main</code>"));
     for (raw, code) in [
         (raw.clone(), "already-associated"),
