@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Capture complete immutable source snapshots from an explicitly selected saved
+  repository and current commit. Collect bounded Git objects, verify their full
+  source graph and compare exact checkout bytes, including changes hidden by Git
+  normalization or index flags. Keep this backend API separate from approval,
+  extraction and execution
+  ([#177](https://github.com/devoption/devoption/issues/177)).
+
 - Require complete immutable source snapshots in candidate build plans. Verify a
   bounded commit/tree/blob graph, retain every supported source file's exact bytes,
   and match the conventional binary target to the verified package. Reject missing,

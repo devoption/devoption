@@ -44,6 +44,9 @@ It neither re-inspects that checkout nor reads any filesystem, environment, Git
 object or network resource. The complete source snapshot must first be produced by
 the supplied-object verifier; it cannot be replaced with a raw commit/hash claim
 or the earlier two-file Cargo proof.
+The separate [registered capture API](source-snapshots.md#capture-from-a-registered-repository)
+collects and verifies a selected current HEAD before comparing its checkout bytes.
+It does not change plan validation's pure boundary or authorize revision selection.
 Tests register synthetic Git layouts in temporary directories, remove them, then
 validate against the saved in-memory snapshot and public synthetic object proofs.
 

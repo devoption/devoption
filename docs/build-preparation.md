@@ -21,6 +21,10 @@ source snapshots. No job, durable preparation record, build history or approval 
 created. Build execution remains unavailable. The flow runs no Cargo, compiler,
 project code, dependency acquisition, network fetch or VM.
 
+The separate backend [registered snapshot API](source-snapshots.md#capture-from-a-registered-repository)
+can verify a selected commit's complete supported file tree and compare exact
+checkout bytes. Neither this page nor `check-source` calls that API yet.
+
 ## Check from a local terminal or SSH
 
 On Unix, run the same checks as the OS user who owns the private catalog directory:

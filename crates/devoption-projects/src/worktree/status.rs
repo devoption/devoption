@@ -15,7 +15,9 @@ const MAX_RECORDS: usize = 1024;
 const DEADLINE: Duration = Duration::from_secs(3);
 
 mod files;
+mod source;
 pub use files::{FileContent, RepositoryFiles, TrackedFile};
+pub use source::{GitSourceKind, GitSourceObject, GitSourceObjects};
 
 #[cfg(test)]
 mod tests;
@@ -346,9 +348,18 @@ impl Drop for Running {
 }
 
 fn run(command: &mut Command, duration: Duration) -> Result<Vec<u8>> {
+    run_bounded(command, duration, MAX_OUTPUT, Stdio::null())
+}
+
+fn run_bounded(
+    command: &mut Command,
+    duration: Duration,
+    limit: usize,
+    input: Stdio,
+) -> Result<Vec<u8>> {
     let mut child = Running(
         command
-            .stdin(Stdio::null())
+            .stdin(input)
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
@@ -376,7 +387,7 @@ fn run(command: &mut Command, duration: Duration) -> Result<Vec<u8>> {
                 }
             }
             Ok(count) => {
-                if output.len() + count > MAX_OUTPUT {
+                if output.len() + count > limit {
                     return Err(Error::LimitExceeded);
                 }
                 output.extend_from_slice(&buffer[..count]);

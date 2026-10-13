@@ -4,9 +4,12 @@
 file tree of a separately selected Git SHA-1 commit. Added under
 [#175](https://github.com/devoption/devoption/issues/175) for the
 [#17 build workflow](https://github.com/devoption/devoption/issues/17), this is a
-concrete in-memory source payload for a future controlled materializer. It performs
-no repository reads, extraction, Cargo invocation, network access, approval or
-execution. Builds and `check-source` still provide
+concrete in-memory source payload for a future controlled materializer. This pure
+verifier performs no repository reads or execution. The separate
+[registered adapter](#capture-from-a-registered-repository) added under
+[#177](https://github.com/devoption/devoption/issues/177) collects its inputs through
+the existing inspection root. Neither extracts files, invokes Cargo, acquires
+dependencies or grants approval. Builds and `check-source` still provide
 [working-tree observations](build-preparation.md); they do not create this snapshot.
 
 ## Verified and retained data
@@ -76,9 +79,10 @@ duplicates/extras, shared subtrees, targets, configuration, modes and bounds.
 
 Membership is relative to the selected commit, not proof of repository ownership,
 authorized revision selection, a fresh catalog binding or a clean working tree.
-The runtime still needs a controlled object reader that selects the registered
-repository and exact revision and enforces the first workflow's clean-source rule.
-Those facts must be revalidated before review/approval.
+The registered adapter below checks a supplied catalog association, selected current
+HEAD and matching checkout bytes. A future authenticated workflow must select those
+inputs, load a fresh catalog and revalidate them before review/approval. No existing
+HTTP route, CLI command or background job calls the adapter.
 
 A materializer must create and verify a separate owned work directory from the
 exact files without changing the user's checkout, and control surrounding Cargo
@@ -86,3 +90,53 @@ configuration, toolchain and environment. Safe in-memory paths alone provide no
 extraction safety or isolation. Registry archive verification, explicit approval,
 persistent jobs and bounded execution remain separate prerequisites. This change
 selects no production paths or runtime permissions.
+
+## Capture from a registered repository
+
+`source_snapshot::registered::capture` requires an explicit catalog snapshot,
+project/repository IDs, `PermittedRoot`, full canonical selected commit and registry
+identity. It revalidates saved associations and checkout/root identities, requires
+the selected current HEAD and clean Git status. Unborn HEAD, older revisions,
+changed bindings and foreign associations fail.
+
+The project domain collects the commit and reachable tree/blob objects with fixed
+`git ls-tree -r -t -z --full-tree`, `git cat-file --batch-check` and
+`git cat-file --batch` commands. Full IDs and one fixed root-tree expression enter
+a private request file. Object types/sizes are preflighted; payload responses must
+match those headers and delimiters exactly. No parent history or unrelated objects
+are requested. Ordinary packed objects and supported linked worktrees are supported.
+
+Git uses the existing private temporary metadata and controlled settings, with
+cleared environment, no source/global configuration, hooks, replacement objects,
+lazy fetch or allowed network protocols. Raw reads use no filters or checkout
+transformations. Every command/status check has a three-second deadline; failed,
+timed-out or over-limit children are killed/reaped. Listing/header output is capped
+at 64 KiB; content output at 4 MiB plus 64 KiB framing. Preflight payload totals are
+at most 4 MiB, with at most 256 tree/blob objects, 64 KiB commit/tree payloads and
+512 KiB blobs. Listing traversal is capped at 256 entries. These bound captured
+output and payloads, not Git's internal memory allocation.
+
+After graph verification, every snapshot file is compared against bounded raw reads
+through the retained root. Symlinks, hard links and unsafe ownership/permissions
+cannot supply bytes. The expected set is capped at 128 files, 512 KiB each and
+4 MiB total. Reads and a final pass check file identity, size, permissions and
+change timestamps; selected HEAD, metadata, clean status and saved bindings are
+checked again. A successful capture runs seven bounded Git commands including four
+status checks, plus local filesystem reads. It is not an atomic operation or a hard
+realtime deadline for filesystem I/O.
+
+Raw comparison catches edits masked by `assume-unchanged`, line-ending normalization
+or ignored executable-mode changes. It conservatively rejects checkout bytes that
+differ from committed bytes even when Git reports clean. Ignored/untracked files
+never enter the snapshot; reported untracked changes fail. No catalog, index or
+source writes occur. Temporary metadata is removed; returned verified bytes remain
+owned in memory.
+
+External filesystem writers and the selected local Git installation remain trusted.
+Checks detect observed changes but cannot freeze the checkout or prevent later
+edits; approval must not treat them as an ongoing lease. Source bytes stay immutable
+after capture. Fixed errors distinguish stale selected commits or uncommitted source
+without printing paths, source content or OS error details. Disposable tests cover
+packed/linked storage, binary/nested files, hidden-dirty source, revision/binding
+changes, unsupported inputs, protocol bounds and unchanged catalog/index/source.
+No test builds or executes repository code.

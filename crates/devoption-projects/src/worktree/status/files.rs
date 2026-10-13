@@ -121,7 +121,7 @@ fn bidi(c: char) -> bool {
     matches!(c, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
 }
 
-fn valid_path(path: &str) -> Result<()> {
+pub(super) fn valid_path(path: &str) -> Result<()> {
     filesystem::relative(Path::new(path))?;
     if path.len() > 1024 || path.split('/').count() > 16 {
         return Err(Error::LimitExceeded);

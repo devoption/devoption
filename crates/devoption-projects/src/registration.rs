@@ -172,6 +172,64 @@ impl Catalog {
         Ok(files)
     }
 
+    /// Collect bounded raw objects only from this saved association's selected HEAD.
+    /// Complete cryptographic/source validation belongs to the build snapshot layer.
+    pub fn source_objects(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+        root: &PermittedRoot,
+        selected: &str,
+    ) -> Result<crate::worktree::GitSourceObjects, Error> {
+        self.inspect_registered_source(project, repository, root, |path| {
+            root.source_objects(path, selected)
+        })
+    }
+
+    /// Compare a complete verified source file set without changing source/index.
+    pub fn check_source_files(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+        root: &PermittedRoot,
+        selected: &str,
+        files: &[(&str, &[u8])],
+    ) -> Result<(), Error> {
+        self.inspect_registered_source(project, repository, root, |path| {
+            root.check_source_files(path, selected, files)
+        })
+    }
+
+    fn inspect_registered_source<T>(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+        root: &PermittedRoot,
+        inspect: impl FnOnce(&Path) -> Result<T, crate::worktree::InspectionError>,
+    ) -> Result<T, Error> {
+        self.check_repository_root(root)?;
+        let project_record = self
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .ok_or(Error::UnknownProject)?;
+        if !project_record.repositories.contains(&repository) {
+            return Err(Error::UnknownRepository);
+        }
+        let checkout = self
+            .checkouts
+            .iter()
+            .find(|c| c.project == project && c.repository == repository)
+            .ok_or(Error::CheckoutRequired)?;
+        let path = Path::new(&checkout.path);
+        let before = root.inspect(path)?;
+        self.check_checkout(&checkout.path, &before)?;
+        let result = inspect(path)?;
+        revalidate_checkout(root, path, &before)?;
+        self.check_repository_root(root)?;
+        Ok(result)
+    }
+
     pub(crate) fn attach(
         &mut self,
         project: ProjectId,
