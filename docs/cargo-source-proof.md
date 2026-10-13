@@ -26,7 +26,10 @@ both content hashes. The public getters are read-only. Under
 [#167](https://github.com/devoption/devoption/issues/167), `BuildPlan` requires and
 retains this result, matching **both** the selected commit and the complete
 materialization request. Full plan equality includes the proof's commit/tree
-SHA-256 identities. This remains a candidate plan with no approval or execution.
+SHA-256 identities. Under [#175](https://github.com/devoption/devoption/issues/175),
+plans require the [complete source snapshot](source-snapshots.md) containing this
+proof, all supported source bytes and the verified binary target. The two-file
+proof alone is no longer sufficient. Plans still grant no approval or execution.
 
 Git identity hashes `type + space + decimal byte length + NUL + payload`;
 it is not a hash of file contents alone. The existing SHA-256 content values
@@ -74,8 +77,8 @@ in a real repository. Pure bytes cannot establish those external facts.
 
 The next integration must obtain the selected repository/revision through an
 independent trusted boundary before supplying this proof to the candidate plan.
-It must establish a complete source/target snapshot and a controlled root
-working directory. Parent-directory/home/system Cargo configuration, environment,
+It must obtain a [complete source snapshot](source-snapshots.md) and establish a
+controlled root working directory. Parent-directory/home/system Cargo configuration, environment,
 toolchain selection, nested attributes/configuration, checkout transformations and
 filesystem aliases are not inspected or controlled here. No extraction safety is
 implied. Actual dependency completeness and registry archive/bundle verification

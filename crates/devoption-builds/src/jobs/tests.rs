@@ -33,7 +33,7 @@ fn queued_attempt_owns_immutable_plan_and_has_no_artifact() {
     input_copy.0.binary = "edited-after-queue".into();
     assert_eq!(job.id().to_bytes(), [1; 16]);
     assert_eq!(job.state(), &State::Queued);
-    assert_eq!(job.plan().details().binary, "example-server");
+    assert_eq!(job.plan().details().binary, "ExampleService");
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn changed_plan_cannot_start_or_complete_an_attempt() {
         |p| p.environment[0].value = "other".into(),
         |p| p.limits.elapsed_seconds += 1,
         |p| p.rust_version = "1.98.0".into(),
-        |p| p.binary = "another-binary".into(),
+        crate::tests::change_source_bytes,
         |p| {
             p.dependencies = devoption_registry::CargoMaterialization::new(
                 p.dependencies.request().clone(),

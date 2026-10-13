@@ -10,7 +10,7 @@ fn digest(byte: u8) -> Sha256 {
     Sha256::from_hex(&format!("{byte:02x}").repeat(32)).unwrap()
 }
 
-fn dependencies(source: &cargo_source::RootCargoSource) -> CargoMaterialization {
+fn dependencies(source: &source_snapshot::SourceSnapshot) -> CargoMaterialization {
     struct FixtureProvider;
     impl CargoRegistryProvider for FixtureProvider {
         fn materialize(
@@ -23,42 +23,47 @@ fn dependencies(source: &cargo_source::RootCargoSource) -> CargoMaterialization 
     prepare_dependencies(&FixtureProvider, source.request()).unwrap()
 }
 
-// Reuse the public synthetic objects already independently pinned by verifier tests.
-fn source(changed_commit: bool) -> cargo_source::RootCargoSource {
-    let mut commit = include_bytes!("cargo_source/fixtures/root.commit").to_vec();
-    let mut selected = "d968ac8a8213026f1e229bc64c687f51a4f1c09c".to_owned();
+// Complete synthetic source objects, without repository reads or execution.
+fn source(changed_commit: bool) -> source_snapshot::SourceSnapshot {
+    let mut fixture = source_snapshot::tests::ProofFixture::new();
     if changed_commit {
-        commit.extend_from_slice(b"Another fixture revision\n");
-        let mut hash = sha1collisiondetection::Sha1CD::default();
-        hash.update(format!("commit {}\0", commit.len()).as_bytes());
-        hash.update(&commit);
-        selected = hash
-            .finalize_cd()
-            .unwrap()
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
+        fixture
+            .commit
+            .extend_from_slice(b"Another fixture revision\n");
     }
-    cargo_source::verify_root(
-        RegistryId::new("fixture-registry").unwrap(),
-        &selected,
-        cargo_source::RootProof {
-            commit: &commit,
-            tree: include_bytes!("cargo_source/fixtures/root.tree"),
-            manifest: include_bytes!(
-                "../../devoption-registry/src/cargo_inputs/fixtures/standalone.toml"
-            ),
-            lockfile: include_bytes!(
-                "../../devoption-registry/src/cargo_inputs/fixtures/standalone.lock"
-            ),
-        },
-    )
-    .unwrap()
+    fixture.verify().unwrap()
 }
 
 pub(crate) fn change_source_revision(input: &mut PlanInput) {
     input.source = source(true);
     input.commit = input.source.commit().to_owned();
+}
+
+pub(crate) fn change_source_bytes(input: &mut PlanInput) {
+    input.source = source_snapshot::tests::ProofFixture::changed_source()
+        .verify()
+        .unwrap();
+    input.commit = input.source.commit().into();
+}
+
+#[test]
+fn exact_source_target_is_required_and_changed_bytes_change_the_plan() {
+    let (catalog, input) = fixture();
+    for field in ["package", "binary"] {
+        let mut changed = input.clone();
+        if field == "package" {
+            changed.package = "different".into();
+        } else {
+            changed.binary = "different".into();
+        }
+        rejected(&catalog, changed, Error::TargetMismatch);
+    }
+    let original = BuildPlan::validate(input.clone(), &catalog).unwrap();
+    let mut changed = input;
+    change_source_bytes(&mut changed);
+    let updated = BuildPlan::validate(changed, &catalog).unwrap();
+    assert!(original != updated);
+    assert!(original.details().source.sha256() != updated.details().source.sha256());
 }
 
 // Synthetic Git metadata only: no Git commands, commits, hooks or build scripts.
@@ -110,8 +115,8 @@ pub(crate) fn fixture() -> (Catalog, PlanInput) {
         rust_version: "1.99.0".into(),
         cargo_executable: "/example/toolchains/1.99.0/bin/cargo".into(),
         work_directory: "/example/jobs/one".into(),
-        package: "example-app".into(),
-        binary: "example-server".into(),
+        package: "ExampleService".into(),
+        binary: "ExampleService".into(),
         environment: vec![EnvironmentEntry {
             name: "LANG".into(),
             value: "C.UTF-8".into(),
@@ -135,7 +140,7 @@ fn immutable_snapshot_produces_only_fixed_cargo_arguments() {
     let plan = BuildPlan::validate(input.clone(), &catalog).unwrap();
     input.package = "edited-after-validation".into();
     input.environment[0].value = "changed".into();
-    assert_eq!(plan.details().package, "example-app");
+    assert_eq!(plan.details().package, "ExampleService");
     assert_eq!(plan.details().environment[0].value, "C.UTF-8");
     assert_eq!(
         plan.cargo_arguments(),
@@ -145,9 +150,9 @@ fn immutable_snapshot_produces_only_fixed_cargo_arguments() {
             "--locked",
             "--offline",
             "--package",
-            "example-app",
+            "ExampleService",
             "--bin",
-            "example-server"
+            "ExampleService"
         ]
     );
     assert_eq!(catalog, before);
@@ -164,8 +169,6 @@ fn every_reviewed_field_changes_plan_equality() {
         |p| p.rust_version = "1.98.0".into(),
         |p| p.cargo_executable = "/other/bin/cargo".into(),
         |p| p.work_directory = "/example/jobs/two".into(),
-        |p| p.package = "other-package".into(),
-        |p| p.binary = "other-binary".into(),
         |p| p.environment[0].name = "LC_ALL".into(),
         |p| p.environment[0].value = "C".into(),
         |p| p.environment.clear(),
@@ -454,8 +457,6 @@ fn required_limits_and_metadata_boundaries_have_no_execution_defaults() {
     rejected(&catalog, zero, Error::InvalidLimits);
     input.work_directory = format!("/{}", "x".repeat(MAX_PATH_BYTES - 1));
     input.cargo_executable = format!("/{}/cargo", "x".repeat(MAX_PATH_BYTES - 7));
-    input.package = "p".repeat(MAX_TARGET_BYTES);
-    input.binary = "b".repeat(MAX_TARGET_BYTES);
     input.environment.clear();
     input.limits = Limits {
         elapsed_seconds: u32::MAX,
