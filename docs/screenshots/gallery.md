@@ -1,7 +1,7 @@
 # Screenshot gallery
 
-These captures show the current application with disposable fixture data. Builds,
-releases and deployments remain unavailable. See the [capture guide](README.md)
+These captures show the current application with disposable fixture data. Build
+execution, releases and deployments remain unavailable. See the [capture guide](README.md)
 for dimensions, states and refresh instructions.
 
 **Overview**
@@ -24,7 +24,11 @@ for dimensions, states and refresh instructions.
 
 ![Current source text](repository-file.jpg)
 
-![Project Builds, unavailable](project-builds.jpg)
+![Project Builds source preparation](project-builds.jpg)
+
+![Passed initial source checks, without execution](build-source-checks.jpg)
+
+![Source changes requiring attention](build-source-changes.jpg)
 
 ![Project Releases, unavailable](project-releases.jpg)
 

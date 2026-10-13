@@ -47,8 +47,8 @@ navigation opens Code, Builds, Releases, Packages and Settings at
 the stable base URL. Each section reads the current catalog and requires the same
 session as the list. Missing IDs or unsupported sections return 404 after
 authentication. Code contains repository inspection, explicitly configured managed creation and optional attachment;
-Settings contains the name form. Builds, Releases and Packages explicitly describe
-unavailable functionality, with no execution or deployment controls
+Settings contains the name form. Builds now provides [source preparation checks](build-preparation.md);
+Releases and Packages retain unavailable states. There are no execution or deployment controls
 ([#160](https://github.com/devoption/devoption/issues/160)).
 Read failures return 503 without stale rows or private error details. The
 unconfigured preview never loads catalog metadata and retains its public placeholder. No fixture projects

@@ -6,12 +6,12 @@ Follow the [contribution guide](../CONTRIBUTING.md) and install the
 ## Current architecture
 
 The Rust workspace has six crates. The running service uses
-`devoption-cli` → `devoption-server`, which composes `devoption-projects` and
-`devoption-ui`. The project domain core is independent of those delivery layers:
+`devoption-cli` → `devoption-server`, which composes `devoption-projects`,
+`devoption-builds` and `devoption-ui`. The project domain core is independent of those delivery layers:
 
 | Crate | Responsibility |
 | --- | --- |
-| `devoption-builds` | Immutable Unix build plans, in-memory job lifecycle records and bounded Cargo source membership proofs, with no approval or execution |
+| `devoption-builds` | Source preparation observations, immutable Unix build plans, in-memory job lifecycle records and bounded Cargo source membership proofs; no approval or execution |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
@@ -30,7 +30,9 @@ current display summaries to the UI. Project creation, managed repository creati
 use the domain's locked, durable save operations. Executable integration tests stay with the CLI; domain
 logic remains in the project crate. The separate [build-plan model](build-plans.md)
 validates explicit inputs against a catalog snapshot without I/O and has no runtime
-caller. It includes the [registry dependency descriptor](registry-contract.md):
+caller. The separate [source preparation flow](build-preparation.md) calls existing
+project inspection and Cargo input validation to report current observations in
+Builds, without constructing a plan or job. The plan model includes the [registry dependency descriptor](registry-contract.md):
 the [supplied-byte Cargo adapter](cargo-inputs.md) validates a strict standalone
 manifest/lockfile subset and binds exact input hashes without reading a repository.
 The separate [root source verifier](cargo-source-proof.md) checks a bounded

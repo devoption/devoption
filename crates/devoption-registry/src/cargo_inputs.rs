@@ -21,6 +21,45 @@ pub struct InputHashes {
     pub lockfile: Sha256,
 }
 
+/// Internally consistent supplied inputs, without a provider or source proof.
+/// No Debug implementation prints package metadata implicitly.
+pub struct InspectedInputs {
+    package: String,
+    version: String,
+    hashes: InputHashes,
+    packages: Vec<LockedPackage>,
+}
+
+impl InspectedInputs {
+    pub fn package(&self) -> &str {
+        &self.package
+    }
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+    pub fn hashes(&self) -> InputHashes {
+        self.hashes
+    }
+    pub fn dependency_count(&self) -> usize {
+        self.packages.len()
+    }
+
+    fn into_request(self, registry: RegistryId) -> CargoDependencyRequest {
+        CargoDependencyRequest {
+            registry,
+            manifest_sha256: self.hashes.manifest,
+            lockfile_sha256: self.hashes.lockfile,
+            packages: self.packages,
+        }
+    }
+}
+
+/// Inspect current supplied bytes without selecting a registry or claiming that
+/// expected hashes came from an independently verified source snapshot.
+pub fn inspect(manifest: &[u8], lockfile: &[u8]) -> Result<InspectedInputs, Error> {
+    inspect_expected(manifest, lockfile, None)
+}
+
 /// Validate one standalone package, exact direct pins and a closed v4 lock graph.
 /// This checks internal consistency only, not Cargo resolution, package archives,
 /// source files, Cargo configuration, target discovery or execution permissions.
@@ -30,6 +69,14 @@ pub fn validate(
     lockfile: &[u8],
     expected: InputHashes,
 ) -> Result<CargoDependencyRequest, Error> {
+    Ok(inspect_expected(manifest, lockfile, Some(expected))?.into_request(registry))
+}
+
+fn inspect_expected(
+    manifest: &[u8],
+    lockfile: &[u8],
+    expected: Option<InputHashes>,
+) -> Result<InspectedInputs, Error> {
     if manifest.is_empty() || lockfile.is_empty() {
         return Err(Error::MissingInput);
     }
@@ -40,7 +87,7 @@ pub fn validate(
         manifest: Sha256::digest(manifest),
         lockfile: Sha256::digest(lockfile),
     };
-    if actual != expected {
+    if expected.is_some_and(|expected| actual != expected) {
         return Err(Error::HashMismatch);
     }
     let manifest = parse(manifest)?;
@@ -146,8 +193,7 @@ pub fn validate(
         });
     }
     let root = root.ok_or(Error::RootMismatch)?;
-    let request = CargoDependencyRequest::new(registry, actual.manifest, actual.lockfile, packages)
-        .map_err(|_| Error::InvalidPackage)?;
+    let packages = crate::canonical_packages(packages).map_err(|_| Error::InvalidPackage)?;
     let edges = resolve_edges(&nodes)?;
     if edges[root].len() != direct.len()
         || edges[root].iter().any(|&i| {
@@ -157,7 +203,12 @@ pub fn validate(
         return Err(Error::DependencyMismatch);
     }
     check_graph(root, &edges)?;
-    Ok(request)
+    Ok(InspectedInputs {
+        package: root_name.into(),
+        version: root_version.into(),
+        hashes: actual,
+        packages,
+    })
 }
 
 struct Node {

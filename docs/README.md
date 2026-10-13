@@ -24,6 +24,7 @@ deployments or production hosting are already available.
 - [Project catalog and HTTP operations](project-catalog.md)
 - [Browse tracked repository files](repository-files.md)
 - [Worktree validation](worktree-validation.md)
+- [Project Builds source preparation](build-preparation.md)
 - [Build plans](build-plans.md) and [job lifecycle](build-jobs.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Artifact handoff](artifact-handoff.md)

@@ -3,7 +3,8 @@
 //! A bounded supplied-byte Cargo adapter checks a deliberately small manifest and
 //! lockfile subset and hashes those inputs. It performs no filesystem/network I/O.
 //! A single-crate seed provider verifies and owns supplied archive bytes. There
-//! is no acquisition service or runtime caller. Metadata grants no approval.
+//! is no acquisition service. The input inspector has a runtime preparation caller;
+//! provider materialization remains separate. Metadata grants no approval.
 //! Provider implementations are responsible for their effects. A separate Linux
 //! integration test compiles only the checked-in trusted offline fixture.
 
@@ -109,26 +110,9 @@ impl CargoDependencyRequest {
         registry: RegistryId,
         manifest_sha256: Sha256,
         lockfile_sha256: Sha256,
-        mut packages: Vec<LockedPackage>,
+        packages: Vec<LockedPackage>,
     ) -> Result<Self, Error> {
-        if packages.len() > MAX_PACKAGES {
-            return Err(Error::TooManyPackages);
-        }
-        for package in &packages {
-            if !package_name_valid(&package.name) {
-                return Err(Error::InvalidPackageName);
-            }
-            if !exact_version(&package.version) {
-                return Err(Error::InvalidVersion);
-            }
-        }
-        packages.sort_by(compare_coordinates);
-        if packages
-            .windows(2)
-            .any(|pair| compare_coordinates(&pair[0], &pair[1]).is_eq())
-        {
-            return Err(Error::DuplicatePackage);
-        }
+        let packages = canonical_packages(packages)?;
         Ok(Self {
             registry,
             manifest_sha256,
@@ -152,6 +136,28 @@ impl CargoDependencyRequest {
     pub fn packages(&self) -> &[LockedPackage] {
         &self.packages
     }
+}
+
+fn canonical_packages(mut packages: Vec<LockedPackage>) -> Result<Vec<LockedPackage>, Error> {
+    if packages.len() > MAX_PACKAGES {
+        return Err(Error::TooManyPackages);
+    }
+    for package in &packages {
+        if !package_name_valid(&package.name) {
+            return Err(Error::InvalidPackageName);
+        }
+        if !exact_version(&package.version) {
+            return Err(Error::InvalidVersion);
+        }
+    }
+    packages.sort_by(compare_coordinates);
+    if packages
+        .windows(2)
+        .any(|pair| compare_coordinates(&pair[0], &pair[1]).is_eq())
+    {
+        return Err(Error::DuplicatePackage);
+    }
+    Ok(packages)
 }
 
 /// Immutable Cargo dependency-bundle metadata, including its

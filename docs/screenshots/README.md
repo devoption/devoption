@@ -16,7 +16,9 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Project code | `/projects/{id}/code` | Managed creation enabled; frontend status read with Last checked; 1280 × 900 | `project-code.jpg` |
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |
-| Project builds | `/projects/{id}/builds` | Unavailable state | `project-builds.jpg` |
+| Project builds | `/projects/{id}/builds` | Repository source-check choices | `project-builds.jpg` |
+| Source checks | `/projects/{id}/builds/{repository}` | backend, clean committed fixture; 1280 × 1400 | `build-source-checks.jpg` |
+| Source changes | `/projects/{id}/builds/{repository}` | backend, one modified source file; 1280 × 1400 | `build-source-changes.jpg` |
 | Project releases | `/projects/{id}/releases` | Unavailable state | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit | `project-settings.jpg` |
@@ -84,6 +86,16 @@ printed ephemeral origin. Do not create an owner for that capture.
    the name before other main-page captures so their account label remains **Account**.
 9. Inspect the images, text, active navigation and gallery entries before
    committing. Restore browser preferences and clear temporary overrides.
+
+For the Builds captures, start a separate fixture with
+`DEVOPTION_BROWSER_PREPARATION=1` using the same Cargo command above. This adds
+three committed backend files with fixed public fixture author/date metadata,
+without running their Rust source. Open Example application → Builds, capture the
+repository choices, then **Check source for backend**. Capture **Source checks
+passed**, append a comment to the temporary backend `src/main.rs`, and use **Check
+again** to capture **Changes needed** with one modified entry. Restore the temporary
+file afterward. The fixture’s printed root identifies these disposable files;
+do not change a real checkout or the persistent preview’s repository root.
 
 All Appearance variants use **1280 × 900** and the save confirmation:
 

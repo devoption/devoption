@@ -142,10 +142,7 @@ fn project_sections_are_deep_linkable_authenticated_and_read_only() {
             html.contains("<form id=\"project-form\""),
             segment == "settings"
         );
-        assert_eq!(
-            html.contains("Builds are not available yet"),
-            segment == "builds"
-        );
+        assert_eq!(html.contains("Prepare a build"), segment == "builds");
         assert_eq!(
             html.contains("First fixture"),
             segment == "overview" || segment == "code"

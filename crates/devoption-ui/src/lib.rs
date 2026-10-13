@@ -14,7 +14,8 @@ mod auth;
 mod profile;
 mod projects;
 pub use projects::{
-    FileEntry, FilePreview, ProjectSection, ProjectSummary, RepositoryFilesView, RepositorySummary,
+    FileEntry, FilePreview, PreparationCheck, PreparationView, ProjectSection, ProjectSummary,
+    RepositoryFilesView, RepositorySummary,
 };
 
 const STYLES: &str = include_str!("../assets/theme.css");
@@ -146,10 +147,22 @@ pub fn render_repository_files(
     )
 }
 
+pub fn render_build_preparation(
+    project: &ProjectSummary<'_>,
+    view: &PreparationView<'_>,
+) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Preparation(project, view)),
+    )
+}
+
 enum ProjectView<'a> {
     List(&'a [ProjectSummary<'a>], bool),
     Detail(&'a ProjectSummary<'a>, bool, bool, ProjectSection),
     Files(&'a ProjectSummary<'a>, &'a RepositoryFilesView<'a>),
+    Preparation(&'a ProjectSummary<'a>, &'a PreparationView<'a>),
 }
 
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
@@ -165,7 +178,9 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             match &projects {
                 Some(ProjectView::List([], _)) => "No projects yet.",
                 Some(ProjectView::List(..)) => "Your saved projects.",
-                Some(ProjectView::Detail(..) | ProjectView::Files(..)) => "",
+                Some(
+                    ProjectView::Detail(..) | ProjectView::Files(..) | ProjectView::Preparation(..),
+                ) => "",
                 None => "Project management is not available yet.",
             },
         ),
@@ -191,26 +206,28 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         ),
         Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
-    let (title, main_class) =
-        if let Some(ProjectView::Detail(project, _, _, _) | ProjectView::Files(project, _)) =
-            &projects
-        {
-            let mut escaped = String::new();
-            projects::escape_into(&mut escaped, project.name);
-            (escaped, r#" class="project-detail-page""#)
-        } else {
-            (title.to_owned(), "")
-        };
+    let (title, main_class) = if let Some(
+        ProjectView::Detail(project, _, _, _)
+        | ProjectView::Files(project, _)
+        | ProjectView::Preparation(project, _),
+    ) = &projects
+    {
+        let mut escaped = String::new();
+        projects::escape_into(&mut escaped, project.name);
+        (escaped, r#" class="project-detail-page""#)
+    } else {
+        (title.to_owned(), "")
+    };
     let actions = match &projects {
         Some(ProjectView::List(..)) => {
             r#"<button class="action-button primary" type="button" data-open-dialog="project-dialog" disabled><span aria-hidden="true">＋</span>New project</button>"#
         }
-        Some(ProjectView::Detail(..) | ProjectView::Files(..)) => "",
+        Some(ProjectView::Detail(..) | ProjectView::Files(..) | ProjectView::Preparation(..)) => "",
         None => "",
     };
     let breadcrumb = if matches!(
         &projects,
-        Some(ProjectView::Detail(..) | ProjectView::Files(..))
+        Some(ProjectView::Detail(..) | ProjectView::Files(..) | ProjectView::Preparation(..))
     ) {
         format!(
             r#"<p class="breadcrumbs"><a href="/projects">Projects</a><span aria-hidden="true">/</span><span>{title}</span></p>"#
@@ -222,6 +239,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     };
     let document_title = match &projects {
         Some(ProjectView::Files(..)) => format!("{title} · Files"),
+        Some(ProjectView::Preparation(..)) => format!("{title} · Builds"),
         Some(ProjectView::Detail(_, _, _, section)) if *section != ProjectSection::Overview => {
             format!("{title} · {}", section.label())
         }
@@ -229,6 +247,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     };
     let project_content = projects.map(|view| match view {
         ProjectView::Files(project, files) => projects::files_content(project, files),
+        ProjectView::Preparation(project, view) => projects::preparation_content(project, view),
         ProjectView::List(projects, available) => projects::content(projects, available),
         ProjectView::Detail(project, available, creation, section) => {
             projects::detail_with_creation(project, available, creation, section)

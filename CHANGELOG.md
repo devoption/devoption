@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Replace the project Builds placeholder with real read-only source preparation:
+  inspect observed HEAD, Git changes, tracked Cargo inputs and conventional binary
+  source. Show actionable results and fresh rechecks without creating a build job
+  or implying execution approval; refresh Builds captures and document the limits
+  ([#171](https://github.com/devoption/devoption/issues/171)).
+
 - Add **Browse files** to project Code with authenticated tracked-file lists and
   escaped, bounded working-tree text previews. Support ordinary links, keyboard
   navigation and browsing without JavaScript; explain empty, binary, oversized

@@ -142,6 +142,36 @@ impl Catalog {
         Ok(files)
     }
 
+    /// Inspect fixed build source inputs only for a saved, revalidated checkout.
+    pub fn source_inputs(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+        root: &PermittedRoot,
+    ) -> Result<crate::worktree::SourceInputs, Error> {
+        self.check_repository_root(root)?;
+        let project_record = self
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .ok_or(Error::UnknownProject)?;
+        if !project_record.repositories.contains(&repository) {
+            return Err(Error::UnknownRepository);
+        }
+        let checkout = self
+            .checkouts
+            .iter()
+            .find(|c| c.project == project && c.repository == repository)
+            .ok_or(Error::CheckoutRequired)?;
+        let path = Path::new(&checkout.path);
+        let before = root.inspect(path)?;
+        self.check_checkout(&checkout.path, &before)?;
+        let files = root.source_inputs(path)?;
+        revalidate_checkout(root, path, &before)?;
+        self.check_repository_root(root)?;
+        Ok(files)
+    }
+
     pub(crate) fn attach(
         &mut self,
         project: ProjectId,

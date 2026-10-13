@@ -388,3 +388,26 @@ fn errors_do_not_echo_untrusted_toml() {
     assert!(!error.to_string().contains(private));
     assert!(!format!("{error:?}").contains(private));
 }
+
+#[test]
+fn inspection_preserves_adapter_results_without_selecting_a_registry() {
+    let inputs = inspect(MANIFEST, LOCK).unwrap();
+    let request = check(MANIFEST, LOCK).unwrap();
+    assert_eq!(
+        (
+            inputs.package(),
+            inputs.version(),
+            inputs.dependency_count()
+        ),
+        ("ExampleService", "0.1.0", 2)
+    );
+    assert!(inputs.hashes().manifest == request.manifest_sha256());
+    assert!(inputs.hashes().lockfile == request.lockfile_sha256());
+    for (manifest, lock) in [
+        (b"[workspace]".as_slice(), LOCK),
+        (MANIFEST, b"invalid".as_slice()),
+        (MANIFEST, b"".as_slice()),
+    ] {
+        assert_eq!(inspect(manifest, lock).err(), check(manifest, lock).err());
+    }
+}

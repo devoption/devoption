@@ -39,14 +39,7 @@ impl PermittedRoot {
             valid_path(path)?;
         }
         let before = self.status_snapshot(candidate)?;
-        let metadata = before.metadata()?;
-        let mut command = before.command(metadata.path());
-        // ls-files needs the copied index only. Sparse entries remain unexpanded;
-        // object lookup cannot reach the source repository or external alternates.
-        command
-            .env("GIT_OBJECT_DIRECTORY", metadata.path().join("objects"))
-            .args(["ls-files", "--cached", "--stage", "--sparse", "-z"]);
-        let entries = parse(&run(&mut command, DEADLINE)?)?;
+        let entries = entries(&before)?;
         let selected = selected
             .map(|path| {
                 let entry = entries
@@ -67,7 +60,7 @@ impl PermittedRoot {
         Ok(RepositoryFiles { entries, selected })
     }
 
-    fn preview_file(&self, path: &Path) -> Result<FileContent> {
+    pub(super) fn preview_file(&self, path: &Path) -> Result<FileContent> {
         let Some(file) = self.entry(path).ok().flatten() else {
             return Ok(FileContent::Unavailable);
         };
@@ -111,6 +104,17 @@ impl PermittedRoot {
             _ => FileContent::Binary,
         })
     }
+}
+
+pub(super) fn entries(snapshot: &Snapshot) -> Result<Vec<TrackedFile>> {
+    let metadata = snapshot.metadata()?;
+    let mut command = snapshot.command(metadata.path());
+    // Only the private index is needed. Never expand sparse directories or read
+    // source objects/alternates to obtain tracked paths.
+    command
+        .env("GIT_OBJECT_DIRECTORY", metadata.path().join("objects"))
+        .args(["ls-files", "--cached", "--stage", "--sparse", "-z"]);
+    parse(&run(&mut command, DEADLINE)?)
 }
 
 fn bidi(c: char) -> bool {
