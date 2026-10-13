@@ -28,6 +28,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Successful sign-in now opens Overview automatically after confirming the session
+  cookie, without requiring an Open workspace click. Failed or unverified attempts
+  stay on the authentication page
+  ([#159](https://github.com/devoption/devoption/issues/159)).
+
 - Server catalog access shares the owner store's selected directory from startup,
   retaining fresh snapshots and short-lived writer locks throughout the service.
   Temporary fixtures cover storage identity, authenticated operations, startup

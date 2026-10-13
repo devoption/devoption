@@ -48,7 +48,8 @@ printed ephemeral origin. Do not create an owner for that capture.
 
 1. Rebuild/restart the fixture after source changes: HTML, CSS, SVG and scripts
    are embedded in the executable. Start with a fresh browser profile/context.
-2. Capture Sign in, then sign in and capture Account and the main pages. Use the
+2. Capture Sign in, then sign in and verify automatic navigation to Overview.
+   Visit `/sign-in` again to capture Account, then capture the main pages. Use the
    profile menu's Appearance link to confirm Nord / Dark / Purple. Capture Projects
    and Example application before mutating fixture records.
 3. On Example application, select the frontend's **View status**. Wait for branch

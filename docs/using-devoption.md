@@ -38,8 +38,10 @@ Open `/sign-in`, or **Sign in** from the profile menu, and enter the owner passw
 The dedicated authentication page uses this browser's saved theme and has no
 workspace navigation. It keeps the password field disabled while checking the
 session, reports failed attempts inline, and focuses the field for retry.
-After signing in, **Open workspace** enters Overview. The Account
-screen and workspace profile menu offer **Sign out**. Reloading or navigating checks the
+After a successful sign-in and confirmed session cookie, DevOption opens Overview
+automatically. A direct visit to `/sign-in` while already signed in shows Account
+with **Open workspace** and **Sign out**; the workspace profile menu also offers
+**Sign out**. Reloading or navigating checks the
 current session again; a session lasts at most one hour and ends on server restart
 or another sign-in. JavaScript is required. Without an owner, the Sign in page
 explains that CLI setup is required. See [setup limits](local-enrollment.md).
