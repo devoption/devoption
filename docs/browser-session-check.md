@@ -14,9 +14,14 @@ cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fi
 Open the printed URL in a fresh browser profile/context. The fixture includes the
 production pages and stops after ten minutes; rerun it if necessary. The fixture
 password is `browser transport fixture only`. It is never a real account password.
-The same temporary directory contains two example projects with two and one
-repository associations. Projects renders their saved metadata through the real
-page renderer and guard; this does not create or register actual Git repositories.
+The owner directory also contains two example projects with two and one
+repository associations. A separate temporary trusted root contains minimal
+supported Git metadata fixtures named `frontend`, `backend`, `tools` and
+`工具 & <fixture>`. The first two are attached to Example application; frontend
+is also attached to Example documentation with the same repository identity.
+Projects uses the real attachment, persistence, rendering and authentication
+paths. The command prints the disposable root for fixture inspection. No real
+repositories are opened and no Git command runs.
 
 After signing in, use the Projects form to create a new fixture name with the
 keyboard. It must appear with zero repositories immediately after the page reloads
@@ -26,6 +31,23 @@ save must retain the name and ask you to inspect the list before retrying, witho
 claiming success. Check the labelled form and submit button at a narrow viewport.
 Capture `projects.jpg` before adding extra test records to keep the two standard
 fixture rows consistent. These writes affect only the temporary fixture catalog.
+
+Expand a project's **Attach repository** disclosure with the keyboard, enter
+`tools` and submit. Its count and default checkout list must update after the
+confirmed reload and persist across another reload. Attach `工具 & <fixture>`
+and verify literal text rendering. A duplicate `frontend` must preserve its
+default checkout; `../escape` and a missing checkout must fail without changing
+the list. Simulate an HTTP or network failure and check that the path is retained
+with an uncertain-result message. Replacing a fixture checkout must produce a
+stale-checkout conflict. Check labelled controls, visible focus, narrow layout,
+failed session recovery and a session ended from another tab. With JavaScript
+disabled, attachment fields and buttons must stay disabled.
+
+To check the root-unconfigured state, start a fresh fixture with
+`DEVOPTION_BROWSER_ROOT_DISABLED=1` before the command above. Its saved lists
+remain visible, but attachment forms are absent and the page explains the need
+for a server administrator to configure a trusted root. This environment switch
+belongs only to the ignored test; production has no root environment fallback.
 
 For the UI check, open `/projects` while signed out and confirm a redirect to
 **Sign in** with no protected page content. Home, About and Appearance have the

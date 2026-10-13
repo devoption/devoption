@@ -10,7 +10,9 @@ the catalog for the authenticated Projects list. Under
 empty projects. A separate [root-bounded worktree inspector](worktree-validation.md)
 is available under #107. Under [#109](https://github.com/devoption/devoption/issues/109),
 explicit trusted-root configuration enables the protected repository attachment
-backend described below. The browser form and Git invocation remain unimplemented.
+backend described below. [#111](https://github.com/devoption/devoption/issues/111)
+adds its per-project browser form and saved repository summaries. Git invocation
+remains unimplemented.
 
 ## Authenticated service view and creation
 
@@ -23,7 +25,9 @@ oversized or unsafe state stops startup without reset or error-data disclosure.
 The server reads the current validated snapshot on every Projects GET/HEAD, which
 passes the existing session-cookie guard; anonymous requests receive the empty
 non-cacheable redirect to Sign in. Names are HTML-escaped by `devoption-ui`, and
-only names and repository counts appear. No server restart is needed after a save.
+project/repository names, repository counts and relative default checkout paths
+appear. The absolute trusted root is not sent to the page. Legacy metadata-only
+associations show **Not attached**. No server restart is needed after a save.
 Read failures return 503 without stale rows or private error details. The
 unconfigured preview never loads catalog metadata and retains its public placeholder. No fixture projects
 are added to real storage or the persistent preview.
@@ -40,6 +44,8 @@ work runs outside the async event loop. Each creation acquires the existing
 exclusive writer lock, loads the latest snapshot, creates an empty project with a
 fresh ID and atomically saves it. Repository records and associations are retained.
 Another process holding the lock causes a closed failure, not a stale overwrite.
+Dropping the writer explicitly unlocks before closing its descriptor, so a
+concurrent subprocess's brief inherited descriptor cannot extend its lock lifetime.
 The handler returns an empty, non-cacheable 204 only after save and directory sync
 succeed. The browser then reloads `/projects`; it does not insert an optimistic row.
 Invalid names return 400, oversized bodies 413, unsupported encodings 415, stalled
@@ -155,9 +161,8 @@ formats, unsafe paths/files and directory anchoring. The normal README workspace
 checks include this crate. CLI HTTP tests additionally cover authenticated creation,
 input limits, concurrent requests, read-after-write, restart and storage failures.
 
-Tests for the worktree inspector and registration backend use temporary fixture
-trees only. The browser attachment form and path/status presentation remain a later
-slice. Execution
+Tests for the worktree inspector, registration backend and browser attachment
+form use temporary fixture trees only. Execution
 approval, environment/resource policy and build/artifact directories remain
 separate prerequisites under #15/#17; creating catalog metadata authorizes none
 of them.
@@ -184,13 +189,40 @@ production root and registers no real repository; tests create temporary fixture
 plain body (`text/plain` or `text/plain;charset=UTF-8`), limited to 4096 bytes and
 a five-second upload deadline. The project ID is exactly 32 hexadecimal digits.
 Existing cookie, CSRF, Host and Origin guards run first; any Authorization header
-is rejected. There is no browser form or project-ID discovery UI yet. The endpoint
+is rejected. The endpoint
 returns 204 only after a durable save, with `Cache-Control: no-store`. Failures
 use fixed messages: 400 invalid ID/path or rejected inspection, 404 unknown
 project, 409 duplicate association, stale/root conflict, observed filesystem change
 or capacity, 413 oversized body, 415 unsupported encoding, 408 stalled body, and
 503 disabled attachment, busy storage or persistence failure. Messages never echo paths or stored data.
 Inspect saved state after an uncertain result; there is no automatic retry.
+
+Each saved project has an **Attach repository** disclosure when the root is
+configured. Its labelled form submits to that project's ID and accepts a path
+relative to the administrator's root, with at most 4096 UTF-8 bytes and 64 path
+components. Empty components, `.`/`..` and control characters are rejected before
+submission; server inspection remains authoritative. JavaScript and a recovered
+owner session are required. Attachment, project creation and sign-out share a
+pending-request gate. An empty 204 reloads the current list; other responses keep
+the entered path and do not claim a saved row. Expired sessions disable mutation
+controls. Without a configured root, the page explains the requirement and omits
+attachment forms while still showing saved summaries.
+History restoration checks the live session again. A confirmed recovery removes
+temporary session-check feedback without erasing attachment results. If navigation
+interrupted a request or its reload, the restored form asks the owner to reload
+the list and check whether attachment completed.
+
+Attachment failures include a fixed `X-DevOption-Error` code: `already-associated`
+and `checkout-changed` distinguish duplicate and stale/root conflicts;
+`catalog-full`, `project-missing`, `invalid-checkout`, `root-unconfigured`,
+`invalid-request` and `unavailable` classify the remaining handler failures.
+Authentication guards retain their existing 401/403 responses. The browser uses
+only the status and fixed code, never server error text. Duplicates leave the
+existing default unchanged. Stale checkouts require inspection by the server
+administrator; network or storage failures require reloading the saved list
+before retrying. An explicit storage-unavailable response has its own message,
+but does not imply that a save failed before publication. No automatic repair,
+replacement or retry is offered.
 
 Under the writer lock, the domain loads the latest catalog, validates the selected
 checkout with bounded reads, reuses the repository ID for its common Git directory,

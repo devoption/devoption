@@ -10,7 +10,7 @@ fn app(configured: bool, slot: SharedSession) -> Router {
             get(|| async {
                 (
                     [(CACHE_CONTROL, "no-store")],
-                    Html(devoption_ui::render_projects(&[])),
+                    Html(devoption_ui::render_projects(&[], false)),
                 )
             }),
         )

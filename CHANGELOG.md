@@ -7,6 +7,19 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Restored Projects pages clear temporary session-check errors after confirmed
+  recovery, preserve attachment feedback, and replace interrupted progress with
+  a reload warning ([#111](https://github.com/devoption/devoption/issues/111)).
+
+- Repository attachment now distinguishes an unavailable storage response from
+  network or unexpected failures while retaining the uncertain-save warning
+  and entered path ([#111](https://github.com/devoption/devoption/issues/111)).
+
+- Dropping a catalog writer now explicitly releases its advisory lock, avoiding
+  a spurious busy result while a concurrent subprocess retains a descriptor
+  before exec. A deterministic regression preserves live-writer exclusion
+  ([#113](https://github.com/devoption/devoption/issues/113)).
+
 - Failure to re-inspect an initially valid checkout now returns a stale-checkout
   conflict. Deterministic fixture tests cover disappearance, invalid/unsupported
   metadata and replacement between inspections
@@ -34,6 +47,14 @@ Entries describe implemented changes, not the roadmap.
   ([#96](https://github.com/devoption/devoption/issues/96)).
 
 ### Added
+
+- Per-project **Attach repository** forms accept bounded relative checkout paths
+  when the server has an explicit trusted root. Projects shows saved repository
+  names and default checkout paths, reloads after confirmed saves, and explains
+  duplicate, stale, unavailable and uncertain results without exposing private
+  errors. Fixture HTTP, script and browser checks cover the flow; the Projects
+  screenshot is refreshed. No real root is configured or Git command executed
+  ([#111](https://github.com/devoption/devoption/issues/111)).
 
 - An explicit Unix `serve --repository-root` option and owner-protected backend
   endpoint attach validated local checkouts to projects. Linked worktrees share

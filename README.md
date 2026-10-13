@@ -5,8 +5,8 @@ a place to build, test, and run software.
 
 It currently provides Home and About placeholders, saved projects and an empty-project creation form
 for configured owners, browser-local Appearance settings, and owner sign-in/sign-out.
-An optional trusted local root enables backend repository attachment; the browser
-attachment form, builds and deployments are not implemented. There is no published release.
+An optional trusted local root enables repository attachment from Projects.
+Builds and deployments are not implemented. There is no published release.
 
 ## Try it locally
 
@@ -112,7 +112,7 @@ verified in Chrome on loopback, not every browser. If a session check fails, use
 **Check account** to retry recovery without submitting the password again.
 Development checks create owners only in [temporary fixture stores](docs/browser-session-check.md).
 
-Projects displays saved names and repository counts from the
+Projects displays saved names, repository counts and relative default checkout paths from the
 [catalog](docs/project-catalog.md). Signed-in owners can create an empty project
 with a name of 1–128 UTF-8 bytes, without surrounding whitespace or control
 characters. Names need not be unique; the catalog holds up to 64 projects. A
@@ -126,10 +126,14 @@ guide's owner-only backup does not preserve projects.
 On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` to
 `serve --data-dir ABSOLUTE_PATH`. It requires an existing owner and a trusted,
 existing root separate from application data; no root is selected by default.
-The protected backend can attach a validated relative checkout to a project.
+Each project's **Attach repository** form accepts a relative checkout path under
+that root. A confirmed save reloads its repository list; duplicate attachments
+preserve the existing default, and uncertain saves ask you to inspect the list
+before retrying. Without a configured root, Projects explains why attachment is
+unavailable while retaining saved repository summaries.
 Projects support multiple repositories, linked worktrees share a repository ID,
 and each project/repository association keeps one default checkout. This grants
-no execution permission and runs no Git commands. The browser form is deferred.
+no execution permission and runs no Git commands.
 See [root policy, endpoint and catalog compatibility](docs/project-catalog.md#repository-attachment-backend)
 before enabling it; no real repository root is configured by this change.
 

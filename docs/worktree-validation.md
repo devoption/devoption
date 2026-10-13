@@ -5,8 +5,9 @@ inspector in `devoption_projects::worktree`, before repository registration unde
 [#16](https://github.com/devoption/devoption/issues/16). The inspector itself neither
 selects nor registers a production path. The separate
 [#109 registration backend](project-catalog.md#repository-attachment-backend) now
-uses this core under an explicit local root option and authenticated endpoint;
-no browser field or execution permission is enabled.
+uses this core under an explicit local root option and authenticated endpoint.
+The #111 Projects form supplies only a relative checkout path beneath that root;
+it cannot select the root or grant execution permission.
 
 ## Root authority and containment
 

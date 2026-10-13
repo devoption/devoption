@@ -9,7 +9,7 @@ pub enum Page {
 }
 
 mod projects;
-pub use projects::ProjectSummary;
+pub use projects::{ProjectSummary, RepositorySummary};
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
@@ -89,14 +89,14 @@ pub fn render_with_account(page: Page, account_available: bool) -> String {
 
 /// Render a configured owner's project snapshot using the shared page shell.
 /// The caller must authenticate the request; display names are escaped here.
-pub fn render_projects(projects: &[ProjectSummary<'_>]) -> String {
-    render_page(Page::Projects, true, Some(projects))
+pub fn render_projects(projects: &[ProjectSummary<'_>], attachment_available: bool) -> String {
+    render_page(Page::Projects, true, Some((projects, attachment_available)))
 }
 
 fn render_page(
     page: Page,
     account_available: bool,
-    projects: Option<&[ProjectSummary<'_>]>,
+    projects: Option<(&[ProjectSummary<'_>], bool)>,
 ) -> String {
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
@@ -105,7 +105,7 @@ fn render_page(
             "Projects",
             "/projects",
             match projects {
-                Some([]) => "No projects yet.",
+                Some(([], _)) => "No projects yet.",
                 Some(_) => "Your saved projects.",
                 None => "Project management is not available yet.",
             },
@@ -126,7 +126,8 @@ fn render_page(
             },
         ),
     };
-    let project_content = projects.map(projects::content);
+    let project_content =
+        projects.map(|(projects, available)| projects::content(projects, available));
     let (appearance_current, content) = if let Some(content) = project_content.as_deref() {
         ("", content)
     } else if path == "/settings/appearance" {

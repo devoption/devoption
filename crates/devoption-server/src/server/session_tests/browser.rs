@@ -200,19 +200,45 @@ fn cookie_credentials_cannot_bypass_host_origin_rotation_or_logout() {
 fn manual_cookie_browser_fixture() {
     let (directory, auth, identity) = owner();
     let data = directory.path().canonicalize().unwrap();
+    let repositories = tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let root = repositories.path().canonicalize().unwrap();
+    for name in ["frontend", "backend", "tools", "工具 & <fixture>"] {
+        for child in ["", ".git", ".git/objects", ".git/refs"] {
+            let path = root.join(name).join(child);
+            std::fs::create_dir(&path).unwrap();
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        std::fs::write(
+            root.join(name).join(".git/config"),
+            "[core]\nrepositoryformatversion = 0\nbare = false\n",
+        )
+        .unwrap();
+        std::fs::write(root.join(name).join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+    }
     let mut catalog = devoption_projects::Catalog::default();
     let project = catalog.create_project("Example application").unwrap();
-    let frontend = catalog.create_repository("Frontend fixture").unwrap();
-    let backend = catalog.create_repository("Backend fixture").unwrap();
-    catalog.associate(project, frontend).unwrap();
-    catalog.associate(project, backend).unwrap();
     let docs = catalog.create_project("Example documentation").unwrap();
-    catalog.associate(docs, frontend).unwrap();
-    devoption_projects::CatalogStore::open_absolute(&data)
-        .unwrap()
-        .save(&catalog)
-        .unwrap();
-    let projects = projects::Projects::open_with_root(&data, None).unwrap();
+    let permitted = devoption_projects::worktree::PermittedRoot::open_absolute(&root).unwrap();
+    {
+        let mut store = devoption_projects::CatalogStore::open_absolute(&data).unwrap();
+        store.save(&catalog).unwrap();
+        store
+            .attach_repository(project, &permitted, Path::new("frontend"))
+            .unwrap();
+        store
+            .attach_repository(project, &permitted, Path::new("backend"))
+            .unwrap();
+        store
+            .attach_repository(docs, &permitted, Path::new("frontend"))
+            .unwrap();
+    }
+    let enabled = std::env::var_os("DEVOPTION_BROWSER_ROOT_DISABLED").is_none();
+    let projects =
+        projects::Projects::open_with_root(&data, enabled.then_some(root.as_path())).unwrap();
+    println!("Browser fixture root: {}", root.display());
     Builder::new_current_thread()
         .enable_all()
         .build()

@@ -7,21 +7,21 @@ const { runInNewContext } = require("node:vm");
 const script = readFileSync(join(__dirname, "../crates/devoption-ui/assets/auth.js"), "utf8");
 const csrf = "ab".repeat(32);
 const nextCsrf = "cd".repeat(32);
-const response = (status, token, retry) => ({
-  status, headers: new Map([["x-csrf-token", token], ["retry-after", retry]]),
+const response = (status, token, retry, code) => ({
+  status, headers: new Map([["x-csrf-token", token], ["retry-after", retry], ["x-devoption-error", code]]),
 });
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 // Exercise the shipped script with controlled responses and navigation races.
 // Native focus, cookies, form validation and layout are checked in a real browser.
-function page({ configured = true, form = true, projects = false, initial = response(401) } = {}) {
+function page({ configured = true, form = true, projects = false, repositories = false, initial = response(401) } = {}) {
   const nodes = new Map();
   let focused;
   function node(id) {
     const listeners = new Map();
     const attributes = new Map();
     const element = {
-      textContent: "", value: "", disabled: false, hidden: false,
+      textContent: "", value: "", disabled: false, hidden: false, dataset: {},
       addEventListener: (name, callback) => listeners.set(name, callback),
       emit: (name, event = {}) => listeners.get(name)?.(event),
       setAttribute: (name, value) => attributes.set(name, value),
@@ -35,6 +35,13 @@ function page({ configured = true, form = true, projects = false, initial = resp
   ["profile-state", "profile-note", "profile-account", "profile-status", "page-title", "page-message"].forEach(node);
   if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
   if (projects) ["project-form", "project-name", "project-submit", "project-status"].forEach(node);
+  const repositoryForms = repositories ? [0, 1].map((index) => {
+    const form = node(`repository-${index}-form`);
+    form.dataset.project = (index ? "02" : "01").repeat(16);
+    const fields = new Map(["path", "submit", "status"].map((field) => [`[data-repository-${field}]`, node(`repository-${index}-${field}`)]));
+    form.querySelector = (selector) => fields.get(selector);
+    return form;
+  }) : [];
   const signouts = [node("profile-logout"), ...(form ? [node("page-logout")] : [])];
   const events = node("window");
   const calls = [];
@@ -46,7 +53,7 @@ function page({ configured = true, form = true, projects = false, initial = resp
     document: {
       body: { dataset: { ownerConfigured: String(configured) } },
       getElementById: (id) => nodes.get(id) || null,
-      querySelectorAll: () => signouts,
+      querySelectorAll: (selector) => selector === ".repository-form" ? repositoryForms : signouts,
       addEventListener: (_, callback) => { ready = callback; },
       get cookie() { throw new Error("Auth must not read cookies"); },
     },
@@ -76,6 +83,10 @@ function page({ configured = true, form = true, projects = false, initial = resp
       return nodes.get("signin-form").emit("submit", { preventDefault() {} });
     },
     logout: () => signouts[0].emit("click"),
+    attach: (value, index = 0) => {
+      nodes.get(`repository-${index}-path`).value = value;
+      return nodes.get(`repository-${index}-form`).emit("submit", { preventDefault() {} });
+    },
     create: (value) => {
       nodes.get("project-name").value = value;
       return nodes.get("project-form").emit("submit", { preventDefault() {} });
@@ -136,6 +147,41 @@ test("project requests cannot double-submit or navigate after pagehide", async (
   finish(response(204));
   await pending;
   assert.deepEqual(current.navigation, []);
+});
+
+test("confirmed history recovery clears only temporary repository session errors", async () => {
+  for (const recovered of [response(204, nextCsrf), response(401)]) {
+    const current = page({ form: false, repositories: true, initial: response(503) });
+    await tick();
+    assert.match(current.nodes.get("repository-0-status").textContent, /session could not be checked/);
+    current.event("pagehide");
+    current.queue.push(recovered);
+    current.event("pageshow", { persisted: true });
+    await tick();
+    assert.equal(current.nodes.get("repository-0-status").textContent, "");
+    assert.equal(current.nodes.get("repository-0-submit").disabled, recovered.status === 401);
+  }
+});
+
+test("attachment feedback survives failed and successful history session checks", async () => {
+  const current = page({ form: false, repositories: true, initial: response(204, csrf) });
+  await tick();
+  current.queue.push(response(409, null, null, "already-associated"));
+  await current.attach("team/app");
+  const feedback = current.nodes.get("repository-0-status").textContent;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    current.event("pagehide");
+    current.queue.push(response(503));
+    current.event("pageshow", { persisted: true });
+    await tick();
+    assert.match(current.nodes.get("repository-0-status").textContent, /session could not be checked/);
+  }
+  current.event("pagehide");
+  current.queue.push(response(204, nextCsrf));
+  current.event("pageshow", { persisted: true });
+  await tick();
+  assert.equal(current.nodes.get("repository-0-status").textContent, feedback);
+  assert.equal(current.nodes.get("repository-0-path").value, "team/app");
 });
 
 test("unconfigured preview performs no authentication requests", async () => {
@@ -393,4 +439,92 @@ test("navigation during a challenge never sends the captured password afterward"
   await work;
   assert.deepEqual(current.calls.map((call) => call.url), ["/auth/session", "/auth/challenge"]);
   assert.equal(current.nodes.get("auth-password").value, "");
+});
+
+
+test("repository forms wait for a verified session and validate bounded root-relative paths", async () => {
+  let finish;
+  const current = page({ form: false, repositories: true, initial: new Promise((resolve) => { finish = resolve; }) });
+  assert.equal(current.nodes.get("repository-0-submit").disabled, true);
+  await current.attach("blocked");
+  assert.equal(current.calls.length, 1);
+  finish(response(204, csrf));
+  await tick();
+  for (const path of ["", "/absolute", "../outside", "team/./app", "team//app", "team/app/", "line\nbreak", "é".repeat(2049), Array(65).fill("a").join("/")]) {
+    await current.attach(path);
+    assert.equal(current.calls.length, 1);
+    assert.equal(current.focused(), "repository-0-path");
+    assert.equal(current.nodes.get("repository-0-path").getAttribute("aria-invalid"), "true");
+  }
+  current.queue.push(response(204));
+  await current.attach("team/工具 & app", 1);
+  assert.equal(current.calls.at(-1).url, `/projects/${"02".repeat(16)}/repositories`);
+  assert.equal(current.calls.at(-1).body, "team/工具 & app");
+  assert.equal(current.calls.at(-1).headers["x-csrf-token"], csrf);
+  assert.equal(current.calls.at(-1).headers["content-type"], "text/plain;charset=UTF-8");
+  assert.deepEqual(current.navigation, ["/projects"]);
+});
+
+test("repository failures retain paths, distinguish conflicts, and never claim a save", async () => {
+  for (const [failure, message] of [
+    [response(400), /Check the relative path/], [response(413), /Check the relative path/],
+    [response(409, null, null, "already-associated"), /already attached.*default checkout was not changed/],
+    [response(409, null, null, "checkout-changed"), /checkout or trusted root changed/],
+    [response(409, null, null, "catalog-full"), /catalog has reached/],
+    [response(409, null, null, "<private>"), /conflicts with saved state/],
+    [response(404), /Project unavailable/], [response(401), /session ended/],
+    [response(503, null, null, "root-unconfigured"), /not configured/],
+    [response(503, null, null, "unavailable"), /storage is unavailable.*could not be confirmed/],
+    [response(403), /request was denied/], [response(503), /could not be confirmed/],
+    [response(200), /could not be confirmed/], [new Error("private fixture error"), /could not be confirmed/],
+  ]) {
+    const current = page({ form: false, repositories: true, initial: response(204, csrf) });
+    await tick();
+    current.queue.push(failure);
+    await current.attach("retained/checkout");
+    const status = current.nodes.get("repository-0-status").textContent;
+    assert.match(status, message);
+    assert.doesNotMatch(status, /private|Repository attached/);
+    assert.equal(current.nodes.get("repository-0-path").value, "retained/checkout");
+    assert.deepEqual(current.navigation, []);
+    assert.equal(current.nodes.get("repository-1-submit").disabled, failure.status === 401);
+  }
+});
+
+test("attachment shares the mutation gate and ignores responses after pagehide", async () => {
+  const current = page({ form: false, projects: true, repositories: true, initial: response(204, csrf) });
+  await tick();
+  let finish;
+  current.queue.push(new Promise((resolve) => { finish = resolve; }));
+  const pending = current.attach("first");
+  await current.attach("second", 1);
+  await current.create("blocked project");
+  await current.logout();
+  assert.equal(current.calls.length, 2);
+  assert.equal(current.nodes.get("repository-1-submit").disabled, true);
+  current.event("pagehide");
+  finish(response(204));
+  await pending;
+  assert.deepEqual(current.navigation, []);
+  assert.match(current.nodes.get("repository-0-status").textContent, /Reload.*whether.*completed/);
+  current.queue.push(response(204, nextCsrf));
+  current.event("pageshow", { persisted: true });
+  await tick();
+  assert.equal(current.nodes.get("repository-0-submit").disabled, false);
+  assert.match(current.nodes.get("repository-0-status").textContent, /Reload.*whether.*completed/);
+});
+
+test("failed session recovery and malformed project context cannot submit a checkout", async () => {
+  const unchecked = page({ form: false, repositories: true, initial: response(503) });
+  await tick();
+  await unchecked.attach("team/app");
+  assert.equal(unchecked.calls.length, 1);
+  assert.equal(unchecked.nodes.get("repository-0-submit").disabled, true);
+  assert.match(unchecked.nodes.get("repository-0-status").textContent, /session could not be checked/);
+  const invalid = page({ form: false, repositories: true, initial: response(204, csrf) });
+  await tick();
+  invalid.nodes.get("repository-0-form").dataset.project = "../private";
+  await invalid.attach("team/app");
+  assert.equal(invalid.calls.length, 1);
+  assert.match(invalid.nodes.get("repository-0-status").textContent, /Project unavailable/);
 });

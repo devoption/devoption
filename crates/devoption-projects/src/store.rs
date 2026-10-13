@@ -39,6 +39,14 @@ pub struct CatalogStore {
     lock: File,
 }
 
+impl Drop for CatalogStore {
+    fn drop(&mut self) {
+        // A concurrent spawn can retain a duplicate until exec. Release this
+        // writer's lock now instead of waiting for every duplicate to close.
+        let _ = flock(&self.lock, FlockOperation::Unlock);
+    }
+}
+
 impl CatalogStore {
     /// Validate and attach one selected checkout under this writer's lock.
     /// Shared Git common directories reuse a repository identity across projects.
@@ -235,5 +243,42 @@ struct Pending<'a> {
 impl Drop for Pending<'_> {
     fn drop(&mut self) {
         let _ = unlinkat(self.directory, self.name.as_str(), AtFlags::empty());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn dropping_writer_releases_lock_even_when_a_descriptor_was_duplicated() {
+        let directory = tempfile::Builder::new()
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
+        let root = directory.path().canonicalize().unwrap();
+        let store = CatalogStore::open_absolute(&root).unwrap();
+        // A subprocess spawn can briefly inherit the same open-file description
+        // before CLOEXEC closes it. Duplication reproduces that lifetime without
+        // a timing-dependent fork or changes to the production descriptor flags.
+        let inherited = store.lock.try_clone().unwrap();
+        assert!(matches!(
+            CatalogStore::open_absolute(&root),
+            Err(Error::Busy)
+        ));
+        drop(store);
+        let next = CatalogStore::open_absolute(&root).unwrap();
+        assert!(matches!(
+            CatalogStore::open_absolute(&root),
+            Err(Error::Busy)
+        ));
+        drop(inherited);
+        assert!(matches!(
+            CatalogStore::open_absolute(&root),
+            Err(Error::Busy)
+        ));
+        drop(next);
+        assert!(CatalogStore::open_absolute(&root).is_ok());
     }
 }
