@@ -17,6 +17,11 @@ fn git(path: &Path, args: &[&str]) -> String {
             "core.hooksPath=/dev/null",
             "-c",
             "commit.gpgsign=false",
+            // Fixture writes must finish before source-preservation snapshots.
+            "-c",
+            "maintenance.auto=false",
+            "-c",
+            "gc.auto=0",
         ])
         .args(args)
         .output()
