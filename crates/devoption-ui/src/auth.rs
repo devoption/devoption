@@ -44,8 +44,7 @@ pub(super) fn render(account_available: bool) -> String {
       <a class="skip-link" href="#main-content">Skip to account access</a>
       <header class="auth-brand">
         <div class="auth-wordmark" role="img" aria-label="DevOption">{logo}</div>
-        <div class="auth-introduction"><p class="auth-eyebrow">Self-hosted software</p><p class="auth-statement">Your local<br>workspace.</p><p>One place for your projects and connected repositories.</p></div>
-        <p class="stage"><span aria-hidden="true"></span>In development</p>
+        <div class="auth-introduction"><p class="auth-eyebrow">Software factory</p><p class="auth-statement">Your projects.<br>One place.</p><p>One place for your projects and connected repositories.</p></div>
       </header>
       <main id="main-content" class="auth-main" tabindex="-1" aria-labelledby="page-title">
         <div class="auth-content"><p class="auth-eyebrow">Owner access</p>

@@ -72,7 +72,7 @@
       if (signedIn) signedIn.hidden = !csrf;
       signouts.forEach((button) => { button.hidden = !csrf; });
       text("profile-state", unchecked ? "Check account" : csrf ? "Owner" : "Signed out");
-      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Signed in on this server." : "Sign in to your local account.");
+      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Signed in on this server." : "Sign in to your account.");
       text("profile-account", unchecked ? "Check account" : csrf ? "Account" : "Sign in");
       if (form) {
         const title = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
@@ -173,7 +173,7 @@
     }
     if (document.body.dataset.ownerConfigured !== "true") {
       state(null);
-      text("profile-state", "Local preview");
+      text("profile-state", "Account");
       text("profile-note", "Owner setup is required.");
       return;
     }

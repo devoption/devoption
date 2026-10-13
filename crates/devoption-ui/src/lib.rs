@@ -5,7 +5,6 @@ pub enum Page {
     Projects,
     Releases,
     Infrastructure,
-    About,
     Appearance,
     SignIn,
 }
@@ -117,11 +116,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     }
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
-        Page::Home => (
-            "Overview",
-            "/",
-            "Your local workspace for software projects.",
-        ),
+        Page::Home => ("Overview", "/", "One place for your software projects."),
         Page::Projects => (
             "Projects",
             "/projects",
@@ -141,11 +136,6 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             "Infrastructure",
             "/infrastructure",
             "Where your factory and applications will run.",
-        ),
-        Page::About => (
-            "About",
-            "/about",
-            "A self-hosted software factory, in development.",
         ),
         Page::Appearance => (
             "Appearance",
@@ -192,16 +182,13 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             "",
             match page {
                 Page::Home => {
-                    r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a workspace and attach your trusted local repositories. Builds and deployments are not available yet.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
+                    r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your software. Builds and deployments are not available yet.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
                 }
                 Page::Releases => {
                     r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and publishing are not implemented. Your saved projects and repositories are available in Projects.</p><a class="action-button" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
                 }
                 Page::Infrastructure => {
                     r#"<section class="empty-state"><h2>Runtime management is not available yet</h2><p>Deployment, runtime enrollment and live health monitoring are not implemented.</p></section>"#
-                }
-                Page::About => {
-                    r#"<section class="about-content"><h2>Built in the open</h2><p>DevOption currently supports local projects, repository attachment and inspection, owner sign-in, and browser-local appearance preferences.</p><p>Build execution, releases and deployment remain in development. This local preview is not a production hosting service.</p></section>"#
                 }
                 _ => "",
             },
@@ -235,11 +222,6 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     })
     .collect();
     let profile_icon = icon("M20 21v-2a8 8 0 0 0-16 0v2M16 7a4 4 0 1 1-8 0a4 4 0 0 1 8 0");
-    let about_current = if path == "/about" {
-        " aria-current=\"page\""
-    } else {
-        ""
-    };
 
     document(&title, &format!(
         "<body data-owner-configured=\"{account_available}\">
@@ -254,7 +236,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
       </button>
       <section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">
         <h2 id=\"profile-title\">Account</h2>
-        <p id=\"profile-note\" class=\"profile-note\">Sign in to your local account.</p>
+        <p id=\"profile-note\" class=\"profile-note\">Sign in to your account.</p>
         <a id=\"profile-account\" class=\"profile-link\" href=\"/sign-in\">Sign in</a>
         <button class=\"profile-link\" type=\"button\" data-signout hidden disabled>Sign out</button>
         <p id=\"profile-status\" class=\"profile-note\" role=\"status\"></p>
@@ -263,10 +245,6 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     </div>
   </aside>
   <div class=\"workspace\">
-    <header class=\"content-header\">
-      <p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p>
-      <a class=\"about-link\" href=\"/about\"{about_current}>About DevOption</a>
-    </header>
     <main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\"{main_class}>
       {breadcrumb}
       <div class=\"page-heading\"><div><h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>

@@ -133,20 +133,11 @@ fn normal_response_reads_fail_on_reset_after_partial_success() {
 fn pages_share_layout_and_have_working_navigation() {
     let (_server, address) = start();
     for (path, title, message) in [
-        (
-            "/",
-            "Overview",
-            "Your local workspace for software projects.",
-        ),
+        ("/", "Overview", "One place for your software projects."),
         (
             "/projects",
             "Projects",
             "Project management is not available yet.",
-        ),
-        (
-            "/about",
-            "About",
-            "A self-hosted software factory, in development.",
         ),
         ("/releases", "Releases", "Releases are not available yet"),
         (
@@ -208,15 +199,15 @@ fn pages_share_layout_and_have_working_navigation() {
                 "<main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\">"
             )
         );
-        assert!(body.contains("<header class=\"content-header\">"));
-        assert!(body.contains("In development</p>"));
+        assert!(!body.contains("In development</p>"));
+        assert!(!body.contains("href=\"/about\""));
         assert!(body.contains("popovertarget=\"profile-popup\" aria-label=\"Profile menu\""));
         let (_, popup) = body
             .split_once("<section id=\"profile-popup\" popover aria-labelledby=\"profile-title\">")
             .unwrap();
         let (popup, _) = popup.split_once("</section>").unwrap();
         assert!(popup.contains("id=\"profile-title\""));
-        assert!(popup.contains("Sign in to your local account."));
+        assert!(popup.contains("Sign in to your account."));
         assert!(popup.contains("href=\"/sign-in\">Sign in</a>"));
         let appearance_page = path == "/settings/appearance";
         let current = if appearance_page {
@@ -281,12 +272,18 @@ fn errors_do_not_stop_the_server() {
         &format!("GET /missing HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
     );
     assert!(missing.starts_with("HTTP/1.1 404 Not Found"));
+    for method in ["GET", "HEAD"] {
+        let removed = request(
+            address,
+            &format!("{method} /about HTTP/1.1\r\nHost: {address}\r\nConnection: close\r\n\r\n"),
+        );
+        assert!(removed.starts_with("HTTP/1.1 404 Not Found"));
+    }
     for path in [
         "/",
         "/projects",
         "/releases",
         "/infrastructure",
-        "/about",
         "/settings/appearance",
     ] {
         let post = request(
@@ -432,7 +429,7 @@ fn absolute_targets_must_match_the_allowed_host_and_port() {
             for (method, path, status) in [
                 ("GET", "", "200"),
                 ("GET", "/projects?tab=all", "200"),
-                ("HEAD", "/about", "200"),
+                ("HEAD", "/releases", "200"),
                 ("GET", "/missing", "404"),
                 ("POST", "/", "401"),
             ] {

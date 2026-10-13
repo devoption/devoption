@@ -85,7 +85,7 @@ for a server administrator to configure a trusted root. This environment switch
 belongs only to the ignored test; production has no root environment fallback.
 
 For the UI check, open `/projects` while signed out and confirm a redirect to
-**Sign in** with no protected page content. Overview, Releases, Infrastructure, About and Appearance have the
+**Sign in** with no protected page content. Overview, Releases, Infrastructure, and Appearance have the
 same guard; `/sign-in` must remain reachable without redirecting again. Submit an
 incorrect password, then the fixture password. Confirm fixed feedback, password clearing,
 and keyboard focus on the error field or successful Account heading. Reload, then

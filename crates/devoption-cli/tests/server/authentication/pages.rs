@@ -1,6 +1,6 @@
 use super::*;
 
-const PATHS: [&str; 4] = ["/", "/projects", "/about", "/settings/appearance"];
+const PATHS: [&str; 3] = ["/", "/projects", "/settings/appearance"];
 
 fn read(address: SocketAddr, method: &str, path: &str, credentials: &str) -> String {
     request(

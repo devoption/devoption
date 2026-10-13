@@ -125,7 +125,6 @@ fn page_routes(configured: bool, session: SharedSession, project_routes: Router)
         ("/projects", Page::Projects),
         ("/releases", Page::Releases),
         ("/infrastructure", Page::Infrastructure),
-        ("/about", Page::About),
         ("/settings/appearance", Page::Appearance),
     ] {
         if configured && matches!(page, Page::Projects) {
