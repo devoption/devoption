@@ -53,6 +53,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- In-memory build jobs bind queued/running/succeeded/failed/cancelled records to
+  an exact immutable plan and attempt identity. Transition tests cover mismatched
+  results, cancellation, terminal rewrites and artifact metadata; sealed runner
+  events have no production issuer. No process launch, persistence, runtime/UI
+  integration or execution authority is added
+  ([#127](https://github.com/devoption/devoption/issues/127)).
+
 - A single-crate local seed provider verifies and supplies actual archive bytes.
   A separate trusted Linux CI fixture compiles against the pinned dependency
   through Cargo source replacement, records an artifact checksum, and rejects

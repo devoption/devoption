@@ -182,7 +182,7 @@ The Rust workspace has six crates. The running service uses
 
 | Crate | Responsibility |
 | --- | --- |
-| `devoption-builds` | Immutable Unix build-plan metadata and bounded Cargo source membership proofs, with no approval or execution |
+| `devoption-builds` | Immutable Unix build plans, in-memory job lifecycle records and bounded Cargo source membership proofs, with no approval or execution |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
@@ -212,6 +212,10 @@ policy and resource enforcement remain unimplemented.
 The [offline fixture proof](docs/offline-fixture-build.md) uses a concrete local
 seed provider and real Cargo in Linux tests. This does not enable application builds
 or establish production execution/isolation permissions.
+The [job lifecycle model](docs/build-jobs.md) binds records to an exact plan and
+attempt, rejects invalid transitions, and requires sealed runner events for running
+or completed outcomes. No production event issuer, persistent jobs or runtime
+integration exists yet.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:
