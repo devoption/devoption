@@ -59,6 +59,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Repository attachment offers a bounded picker of supported immediate child
+  checkouts, with refresh, loading/empty/error feedback and manual path fallback
+  ([#139](https://github.com/devoption/devoption/issues/139)).
+
 - Creating a project opens its saved details directly, including for duplicate
   names. Empty projects expand the configured first-repository attachment form
   ([#137](https://github.com/devoption/devoption/issues/137)).

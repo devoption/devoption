@@ -14,7 +14,7 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 // Exercise the shipped script with controlled responses and navigation races.
 // Native focus, cookies, form validation and layout are checked in a real browser.
-function page({ configured = true, form = true, projects = false, repositories = false, initial = response(401) } = {}) {
+function page({ configured = true, form = true, projects = false, repositories = false, picker = false, initial = response(401) } = {}) {
   const nodes = new Map();
   let focused;
   function node(id) {
@@ -28,6 +28,8 @@ function page({ configured = true, form = true, projects = false, repositories =
       removeAttribute: (name) => attributes.delete(name),
       getAttribute: (name) => attributes.get(name),
       focus: () => { assert.equal(element.disabled, false); focused = id; },
+      children: [],
+      replaceChildren: (...children) => { element.children = children; element.value = children[0]?.value || ""; },
     };
     nodes.set(id, element);
     return element;
@@ -39,7 +41,11 @@ function page({ configured = true, form = true, projects = false, repositories =
     const form = node(`repository-${index}-form`);
     form.dataset.project = (index ? "02" : "01").repeat(16);
     const fields = new Map(["path", "submit", "status"].map((field) => [`[data-repository-${field}]`, node(`repository-${index}-${field}`)]));
+    if (picker) ["choice", "refresh", "options-status"].forEach((field) => fields.set(`[data-repository-${field}]`, node(`repository-${index}-${field}`)));
     form.querySelector = (selector) => fields.get(selector);
+    const disclosure = node(`repository-${index}-disclosure`);
+    disclosure.open = false;
+    form.closest = () => disclosure;
     return form;
   }) : [];
   const signouts = [node("profile-logout"), ...(form ? [node("page-logout")] : [])];
@@ -53,6 +59,7 @@ function page({ configured = true, form = true, projects = false, repositories =
     document: {
       body: { dataset: { ownerConfigured: String(configured) } },
       getElementById: (id) => nodes.get(id) || null,
+      createElement: (tag) => node(`created-${tag}-${nodes.size}`),
       querySelectorAll: (selector) => selector === ".repository-form" ? repositoryForms : signouts,
       addEventListener: (_, callback) => { ready = callback; },
       get cookie() { throw new Error("Auth must not read cookies"); },
@@ -61,7 +68,7 @@ function page({ configured = true, form = true, projects = false, repositories =
     localStorage: storage, sessionStorage: storage, TextEncoder, URLSearchParams,
     fetch: async (url, options) => {
       calls.push({ url, ...options });
-      assert.equal(options.method, "POST");
+      assert.equal(options.method, url === "/repository-options" ? "GET" : "POST");
       assert.equal(options.credentials, "same-origin");
       assert.equal(options.cache, "no-store");
       assert.equal(options.redirect, "error");
@@ -543,4 +550,71 @@ test("failed session recovery and malformed project context cannot submit a chec
   await invalid.attach("team/app");
   assert.equal(invalid.calls.length, 1);
   assert.match(invalid.nodes.get("repository-0-status").textContent, /Project unavailable/);
+});
+
+test("checkout picker loads on disclosure, fills the existing path, and preserves manual entry", async () => {
+  const current = page({form: false, repositories: true, picker: true, initial: response(204, csrf)});
+  await tick();
+  const choice = current.nodes.get('repository-0-choice');
+  const field = current.nodes.get('repository-0-path');
+  assert.equal(choice.disabled, true);
+  assert.equal(current.calls.length, 1);
+  let finish;
+  current.queue.push(new Promise(resolve => {finish = resolve;}));
+  const disclosure = current.nodes.get('repository-0-disclosure');
+  disclosure.open = true; disclosure.emit('toggle');
+  assert.match(current.nodes.get('repository-0-options-status').textContent, /Loading/);
+  assert.equal(current.nodes.get('repository-0-refresh').disabled, true);
+  assert.equal(field.disabled, false);
+  finish({...response(200), text: async () => 'app\n工具 & <fixture>'});
+  await tick();
+  assert.equal(choice.disabled, false);
+  assert.deepEqual(choice.children.map(option => option.textContent), ['Choose a checkout', 'app', '工具 & <fixture>']);
+  choice.value = '工具 & <fixture>'; choice.emit('change');
+  assert.equal(field.value, '工具 & <fixture>');
+  field.value = 'nested/manual'; field.emit('input');
+  assert.equal(choice.value, '');
+  assert.equal(field.value, 'nested/manual');
+  assert.equal(current.calls.at(-1).url, '/repository-options');
+  assert.equal(current.calls.at(-1).headers, undefined);
+});
+
+test("checkout picker empty, partial and failed lists have truthful recoverable feedback", async () => {
+  const partial = {...response(200), text: async () => 'app'};
+  partial.headers.set('x-devoption-list-limited', 'true');
+  for (const [result, expected, enabled] of [
+    [{...response(200), text: async () => ''}, /No supported checkouts/, false],
+    [partial, /first 64 entries/, true],
+    [response(503), /could not be loaded.*Refresh/, false],
+    [new Error('private error'), /could not be loaded/, false],
+    [{...response(200), text: async () => '../escape'}, /could not be loaded/, false],
+    [{...response(200), text: async () => Array(65).fill('app').join('\n')}, /could not be loaded/, false],
+  ]) {
+    const current = page({form:false, repositories:true, picker:true, initial:response(204,csrf)});
+    await tick();
+    current.nodes.get('repository-0-path').value = 'preserved';
+    current.queue.push(result);
+    await current.nodes.get('repository-0-refresh').emit('click');
+    assert.match(current.nodes.get('repository-0-options-status').textContent, expected);
+    assert.equal(current.nodes.get('repository-0-choice').disabled, !enabled);
+    assert.equal(current.nodes.get('repository-0-refresh').disabled, false);
+    assert.equal(current.nodes.get('repository-0-path').value, 'preserved');
+    current.queue.push({...response(200), text: async () => 'recovered'});
+    await current.nodes.get('repository-0-refresh').emit('click');
+    assert.equal(current.nodes.get('repository-0-choice').disabled, false);
+  }
+});
+
+test("checkout picker discards delayed results after leaving the page", async () => {
+  const current = page({form:false, repositories:true, picker:true, initial:response(204,csrf)});
+  await tick();
+  let finish;
+  current.queue.push(new Promise(resolve => {finish = resolve;}));
+  const pending = current.nodes.get('repository-0-refresh').emit('click');
+  current.event('pagehide');
+  finish({...response(200), text: async () => 'stale'});
+  await pending;
+  assert.equal(current.nodes.get('repository-0-choice').disabled, true);
+  assert.deepEqual(current.nodes.get('repository-0-choice').children, []);
+  assert.doesNotMatch(current.nodes.get('repository-0-options-status').textContent, /Loading/);
 });

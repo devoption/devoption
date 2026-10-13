@@ -192,6 +192,24 @@ approval, environment/resource policy and build/artifact directories remain
 separate prerequisites under #15/#17; creating catalog metadata authorizes none
 of them.
 
+## Checkout picker
+
+Opening an attachment form loads `GET /repository-options`, an authenticated,
+non-cacheable read of the configured root. It considers at most 64 immediate
+entries (including non-checkouts), omits unsupported/unsafe entries and returns
+sorted supported relative names as newline-separated UTF-8 text. Names follow
+the existing repository-name limits and contain no control characters. The
+`X-DevOption-List-Limited` header indicates whether additional entries were not
+considered. Partial lists do not imply the remaining entries are invalid.
+
+Discovery uses the retained root capability and existing bounded metadata
+inspection. It does not recurse, follow symlinks, run Git, modify the catalog or
+read working files. Failed root/catalog reads return a fixed 503, not an empty
+success. The picker displays loading, empty, partial and retry states; manual
+paths remain available. Selection only fills the path field: attachment performs
+its existing independent validation, including duplicate/stale-checkout handling.
+Listing a checkout grants no authority or guarantee for a later attachment.
+
 ## Repository attachment backend
 
 This Unix-only option is explicit local administrator configuration:

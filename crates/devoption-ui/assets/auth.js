@@ -14,6 +14,9 @@
     const repositoryForms = Array.from(document.querySelectorAll(".repository-form")).map((form) => ({
       form, path: form.querySelector("[data-repository-path]"),
       submit: form.querySelector("[data-repository-submit]"), status: form.querySelector("[data-repository-status]"),
+      choice: form.querySelector("[data-repository-choice]"), refresh: form.querySelector("[data-repository-refresh]"),
+      optionsStatus: form.querySelector("[data-repository-options-status]"),
+      optionsLoaded: false, optionsLoading: false, optionsAvailable: false, optionsVersion: 0,
       beforeSessionFailure: null, pending: false,
     }));
     // null: confirmed signed out; undefined: session check failed; string: verified.
@@ -32,6 +35,10 @@
       repositoryForms.forEach((repository) => {
         repository.path.disabled = busy || !csrf;
         repository.submit.disabled = busy || !csrf;
+        if (repository.choice) {
+          repository.choice.disabled = busy || !csrf || repository.optionsLoading || !repository.optionsLoaded || !repository.optionsAvailable;
+          repository.refresh.disabled = busy || !csrf || repository.optionsLoading;
+        }
       });
       if (projectForm) {
         projectName.disabled = busy || !csrf;
@@ -76,6 +83,46 @@
       method: "POST", credentials: "same-origin", cache: "no-store",
       redirect: "error", referrerPolicy: "no-referrer", ...options,
     });
+    async function loadCheckouts(repository) {
+      if (!csrf || busy || repository.optionsLoading) return;
+      const current = ++repository.optionsVersion;
+      repository.optionsLoading = true;
+      repository.optionsStatus.textContent = "Loading checkouts…";
+      controls();
+      try {
+        const response = await request("/repository-options", { method: "GET" });
+        if (response.status !== 200) throw new Error("Checkouts unavailable");
+        const text = await response.text();
+        if (current !== repository.optionsVersion || !csrf) return;
+        const paths = text ? text.split("\n") : [];
+        if (paths.length > 64 || paths.some((path) => !path || /[\/\u0000-\u001f\u007f-\u009f]/.test(path) || path === "." || path === ".." || new TextEncoder().encode(path).length > 128)) throw new Error("Invalid checkout list");
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = paths.length ? "Choose a checkout" : "No checkouts found";
+        repository.choice.replaceChildren(placeholder, ...paths.map((path) => {
+          const option = document.createElement("option");
+          option.value = path; option.textContent = path; return option;
+        }));
+        repository.optionsLoaded = true;
+        repository.optionsAvailable = paths.length > 0;
+        repository.optionsStatus.textContent = response.headers.get("x-devoption-list-limited") === "true"
+          ? "Only the first 64 entries were checked. Enter a path if your checkout is not listed."
+          : paths.length ? "Select a checkout to fill its path below."
+            : "No supported checkouts found directly in the trusted root. Enter a nested path, or add a checkout and refresh.";
+      } catch {
+        if (current === repository.optionsVersion && csrf) {
+          repository.optionsLoaded = false;
+          repository.optionsStatus.textContent = "Checkouts could not be loaded. Refresh to retry, or enter a path below.";
+        }
+      } finally {
+        if (current === repository.optionsVersion) { repository.optionsLoading = false; controls(); }
+      }
+    }
+    function loadOpenCheckouts() {
+      repositoryForms.forEach((repository) => {
+        if (repository.choice && !repository.optionsLoaded && repository.form.closest("details").open) loadCheckouts(repository);
+      });
+    }
     const failure = (response) => {
       if (response.status === 429 || response.status === 503) {
         const seconds = Number(response.headers.get("retry-after"));
@@ -109,7 +156,7 @@
           uncheckedSession();
         }
       } finally {
-        if (current === version) { busy = false; controls(); }
+        if (current === version) { busy = false; controls(); loadOpenCheckouts(); }
       }
     }
     if (document.body.dataset.ownerConfigured !== "true") {
@@ -226,6 +273,17 @@
         if (current === version) { busy = saved; controls(); }
       }
     });
+    repositoryForms.forEach((repository) => {
+      if (!repository.choice) return;
+      repository.refresh.addEventListener("click", () => loadCheckouts(repository));
+      repository.form.closest("details").addEventListener("toggle", loadOpenCheckouts);
+      repository.choice.addEventListener("change", () => {
+        if (!csrf || busy || repository.choice.disabled || !repository.choice.value) return;
+        repository.path.value = repository.choice.value;
+        repository.path.removeAttribute("aria-invalid");
+      });
+      repository.path.addEventListener("input", () => { repository.choice.value = ""; });
+    });
     repositoryForms.forEach((repository) => repository.form.addEventListener("submit", async function (event) {
       event.preventDefault();
       if (busy || !csrf) return;
@@ -327,6 +385,10 @@
       busy = false;
       if (password) password.value = "";
       repositoryForms.forEach((repository) => {
+        ++repository.optionsVersion;
+        repository.optionsLoading = false;
+        repository.optionsLoaded = false;
+        if (repository.optionsStatus) repository.optionsStatus.textContent = "Checkouts will refresh when your session is checked.";
         if (repository.pending) {
           repository.status.textContent = "Reload the project list to check whether the attachment completed before trying again.";
           repository.pending = false;
