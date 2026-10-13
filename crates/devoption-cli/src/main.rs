@@ -6,7 +6,7 @@ mod setup;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
 
   -h, --help     Show this help
@@ -15,9 +15,10 @@ Usage: devoption [--help | --version]
   setup         Create the first owner using hidden terminal prompts (Unix/local/SSH)
   --port PORT   Override the port (0 chooses a free port)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
-  --repository-root  Explicit trusted checkout root; requires an existing configured owner
+  --repository-root  Explicit trusted checkout root for inspection/attachment
+  --managed-repository-root  Explicit private root allowing creation of new repositories
 
-The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. No directories or permissions are created or changed. Serve creates no accounts; setup never replaces an owner.
+The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. Startup creates no directories or permissions. Managed mode permits authenticated creation of new repository directories only. Serve creates no accounts; setup never replaces an owner.
 After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH with the same directory, then sign in at /sign-in. Browser owner setup is not available.
 The local server shows Overview, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Releases and Infrastructure show unavailable states. Factory and runtime services are not implemented.";
 
@@ -67,13 +68,23 @@ fn main() -> ExitCode {
         port,
         data_directory,
         repository_root,
+        managed_repository_root,
     }) = options
     {
-        if let Err(error) = devoption_server::run_with_repository_root(
-            port,
-            data_directory.as_deref(),
-            repository_root.as_deref(),
-        ) {
+        let result = if let Some(root) = managed_repository_root {
+            devoption_server::run_with_managed_repository_root(
+                port,
+                data_directory.as_deref(),
+                &root,
+            )
+        } else {
+            devoption_server::run_with_repository_root(
+                port,
+                data_directory.as_deref(),
+                repository_root.as_deref(),
+            )
+        };
+        if let Err(error) = result {
             eprintln!("error: could not serve on 127.0.0.1:{port}: {error}");
             return ExitCode::FAILURE;
         }
@@ -87,12 +98,14 @@ struct ServeOptions {
     port: u16,
     data_directory: Option<PathBuf>,
     repository_root: Option<PathBuf>,
+    managed_repository_root: Option<PathBuf>,
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     let mut port = None;
     let mut data_directory = None;
     let mut repository_root = None;
+    let mut managed_repository_root = None;
     while !args.is_empty() {
         let [flag, value, rest @ ..] = args else {
             return Err("serve options require a value");
@@ -110,23 +123,32 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
                 return Err("data directory requires an absolute path");
             }
             data_directory = Some(path);
-        } else if flag == "--repository-root" && repository_root.is_none() {
+        } else if (flag == "--repository-root" || flag == "--managed-repository-root")
+            && repository_root.is_none()
+            && managed_repository_root.is_none()
+        {
             let path = PathBuf::from(value);
             if !path.is_absolute() {
                 return Err("repository root requires an absolute path");
             }
-            repository_root = Some(path);
+            if flag == "--managed-repository-root" {
+                managed_repository_root = Some(path);
+            } else {
+                repository_root = Some(path);
+            }
         } else {
             return Err("unsupported or duplicate serve option");
         }
         args = rest;
     }
-    if repository_root.is_some() && data_directory.is_none() {
+    if (repository_root.is_some() || managed_repository_root.is_some()) && data_directory.is_none()
+    {
         return Err("repository root requires --data-dir with an existing configured owner");
     }
     Ok(ServeOptions {
         port: port.unwrap_or(3000),
         data_directory,
         repository_root,
+        managed_repository_root,
     })
 }

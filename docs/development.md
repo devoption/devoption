@@ -13,7 +13,7 @@ The Rust workspace has six crates. The running service uses
 | --- | --- |
 | `devoption-builds` | Immutable Unix build plans, in-memory job lifecycle records and bounded Cargo source membership proofs, with no approval or execution |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
-| `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection |
+| `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
 | `devoption-ui` | HTML rendering and browser assets |
@@ -26,7 +26,7 @@ bounded candidates under an explicit trusted local root, with opt-in backend
 attachment tested using temporary fixtures. The server validates the catalog through
 the same opened directory as owner storage at startup, then rereads it for each
 authenticated Projects GET/HEAD request and supplies
-current display summaries to the UI. Project creation and repository attachment
+current display summaries to the UI. Project creation, managed repository creation and repository attachment
 use the domain's locked, durable save operations. Executable integration tests stay with the CLI; domain
 logic remains in the project crate. The separate [build-plan model](build-plans.md)
 validates explicit inputs against a catalog snapshot without I/O and has no runtime

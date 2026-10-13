@@ -43,6 +43,7 @@ async fn show(
         return missing();
     };
     let available = projects.root.is_some();
+    let creation = projects.managed.is_some();
     match projects
         .access(|directory| Ok(directory.load()?.unwrap_or_default()))
         .await
@@ -52,8 +53,8 @@ async fn show(
             match summaries.iter().find(|project| project.id == id.to_bytes()) {
                 Some(project) => (
                     [(CACHE_CONTROL, "no-store")],
-                    Html(devoption_ui::render_project_section(
-                        project, available, section,
+                    Html(devoption_ui::render_project_section_with_creation(
+                        project, available, creation, section,
                     )),
                 )
                     .into_response(),

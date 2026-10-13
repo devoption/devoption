@@ -242,8 +242,11 @@ fn manual_cookie_browser_fixture() {
     }
     let enabled = std::env::var_os("DEVOPTION_BROWSER_ROOT_DISABLED").is_none();
     let store = crate::owner_store::OwnerStore::open_absolute(&data).unwrap();
-    let projects =
-        projects::Projects::open_with_root(&store, enabled.then_some(root.as_path())).unwrap();
+    let projects = if enabled && std::env::var_os("DEVOPTION_BROWSER_MANAGED_ROOT").is_some() {
+        projects::Projects::open_with_managed_root(&store, &root).unwrap()
+    } else {
+        projects::Projects::open_with_root(&store, enabled.then_some(root.as_path())).unwrap()
+    };
     let profile = crate::profile::ProfileStore::new(&store, identity).unwrap();
     println!("Browser fixture root: {}", root.display());
     Builder::new_current_thread()

@@ -42,6 +42,12 @@ for dimensions, states and refresh instructions.
 
 ![Project creation](project-create.jpg)
 
+**New repository dialog and saved empty repository**
+
+![Create a repository in configured managed storage](repository-create.jpg)
+
+![Created repository with main branch and no commits yet](repository-created.jpg)
+
 **Attach repository dialog**
 
 ![Repository attachment](repository-attach.jpg)

@@ -20,6 +20,7 @@ deployments or production hosting are already available.
 - [Owner setup and deferred browser enrollment](local-enrollment.md)
 - [Display-name Profile page](profile.md)
 - [Browser session validation](browser-session-check.md)
+- [Create server-managed repositories](managed-repositories.md)
 - [Project catalog and HTTP operations](project-catalog.md)
 - [Worktree validation](worktree-validation.md)
 - [Build plans](build-plans.md) and [job lifecycle](build-jobs.md)

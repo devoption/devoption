@@ -7,6 +7,8 @@
 
 mod filesystem;
 mod format;
+mod managed;
+pub use managed::ManagedRoot;
 mod status;
 pub use status::{ChangeCounts, GitStatus};
 

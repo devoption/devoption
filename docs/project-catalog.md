@@ -13,7 +13,9 @@ explicit trusted-root configuration enables the protected repository attachment
 backend described below. [#111](https://github.com/devoption/devoption/issues/111)
 adds its per-project browser form and saved repository summaries.
 [#141](https://github.com/devoption/devoption/issues/141) adds on-demand repository
-status using controlled Git reads.
+status using controlled Git reads. [#162](https://github.com/devoption/devoption/issues/162)
+adds [explicitly managed empty repository creation](managed-repositories.md) using
+the same version 2 catalog and identities.
 
 ## Authenticated service view and creation
 
@@ -44,7 +46,7 @@ navigation opens Code, Builds, Releases, Packages and Settings at
 `/projects/{id}/{section}`. `/overview` is also accepted; the Overview link uses
 the stable base URL. Each section reads the current catalog and requires the same
 session as the list. Missing IDs or unsupported sections return 404 after
-authentication. Code contains repository inspection and optional attachment;
+authentication. Code contains repository inspection, explicitly configured managed creation and optional attachment;
 Settings contains the name form. Builds, Releases and Packages explicitly describe
 unavailable functionality, with no execution or deployment controls
 ([#160](https://github.com/devoption/devoption/issues/160)).
@@ -119,8 +121,8 @@ before calling it.
 The current resource limits are 64 projects, 256 repository records and 128 UTF-8
 bytes per name. A project may reference any subset of those repositories. Names
 must be nonempty, trimmed and contain no control characters. Other characters
-are retained as data: future renderers must escape them. Names never become
-filenames. These bounds limit memory and storage, not the product's relationship
+are retained as data: future renderers must escape them. General metadata names never become filenames. The separate managed-creation
+operation accepts a stricter portable name that selects one new directory component. These bounds limit memory and storage, not the product's relationship
 model.
 
 ## Private storage contract

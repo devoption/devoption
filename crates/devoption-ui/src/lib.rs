@@ -17,6 +17,7 @@ pub use projects::{ProjectSection, ProjectSummary, RepositorySummary};
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
+const REPOSITORY_CREATE: &str = include_str!("../assets/repository-create.js");
 const PROFILE: &str = include_str!("../assets/profile.js");
 const AUTH: &str = include_str!("../assets/auth.js");
 const REPOSITORY_STATUS: &str = include_str!("../assets/repository-status.js");
@@ -110,16 +111,31 @@ pub fn render_project_section(
     attachment_available: bool,
     section: ProjectSection,
 ) -> String {
+    render_project_section_with_creation(project, attachment_available, false, section)
+}
+
+/// Render creation controls only when startup granted managed storage authority.
+pub fn render_project_section_with_creation(
+    project: &ProjectSummary<'_>,
+    attachment_available: bool,
+    creation_available: bool,
+    section: ProjectSection,
+) -> String {
     render_page(
         Page::Projects,
         true,
-        Some(ProjectView::Detail(project, attachment_available, section)),
+        Some(ProjectView::Detail(
+            project,
+            attachment_available,
+            creation_available,
+            section,
+        )),
     )
 }
 
 enum ProjectView<'a> {
     List(&'a [ProjectSummary<'a>], bool),
-    Detail(&'a ProjectSummary<'a>, bool, ProjectSection),
+    Detail(&'a ProjectSummary<'a>, bool, bool, ProjectSection),
 }
 
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
@@ -161,7 +177,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         ),
         Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
-    let (title, main_class) = if let Some(ProjectView::Detail(project, _, _)) = &projects {
+    let (title, main_class) = if let Some(ProjectView::Detail(project, _, _, _)) = &projects {
         let mut escaped = String::new();
         projects::escape_into(&mut escaped, project.name);
         (escaped, r#" class="project-detail-page""#)
@@ -185,15 +201,15 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
     let document_title = match &projects {
-        Some(ProjectView::Detail(_, _, section)) if *section != ProjectSection::Overview => {
+        Some(ProjectView::Detail(_, _, _, section)) if *section != ProjectSection::Overview => {
             format!("{title} · {}", section.label())
         }
         _ => title.clone(),
     };
     let project_content = projects.map(|view| match view {
         ProjectView::List(projects, available) => projects::content(projects, available),
-        ProjectView::Detail(project, available, section) => {
-            projects::detail(project, available, section)
+        ProjectView::Detail(project, available, creation, section) => {
+            projects::detail_with_creation(project, available, creation, section)
         }
     });
     let (appearance_current, content) = if let Some(content) = project_content.as_deref() {
@@ -293,6 +309,7 @@ fn document(title: &str, body: &str) -> String {
   <script>{APPEARANCE}</script>
   <script>{AUTH}</script>
   <script>{PROFILE}</script>
+  <script>{REPOSITORY_CREATE}</script>
   <script>{REPOSITORY_STATUS}</script>
   <script>{PROJECT_FILTER}</script>
   <script>{INTERFACE}</script>

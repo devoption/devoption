@@ -201,7 +201,7 @@ pub(super) fn relative(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn bounded(value: &str) -> Result<()> {
+pub(super) fn bounded(value: &str) -> Result<()> {
     if value.is_empty() || value.chars().any(char::is_control) {
         return Err(Error::InvalidPath);
     }
