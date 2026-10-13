@@ -289,3 +289,27 @@ fn split_index_is_unavailable_without_copying_shared_index_dependencies() {
     assert_eq!(root.git_status(Path::new("app")), Err(Error::Unavailable));
     assert_eq!(files(&app), before);
 }
+
+#[test]
+fn symlink_emulation_preserves_clean_and_modified_status() {
+    let (_temp, app, root) = fixture();
+    commit(&app, "fixture\n");
+    symlink("tracked.txt", app.join("link")).unwrap();
+    git(&app, &["add", "link"]);
+    git(&app, &["commit", "-m", "Disposable symlink fixture"]);
+    git(&app, &["config", "core.symlinks", "false"]);
+    fs::remove_file(app.join("link")).unwrap();
+    fs::write(app.join("link"), "tracked.txt").unwrap();
+    assert!(git(&app, &["status", "--porcelain"]).is_empty());
+    let before = files(&app);
+    assert_eq!(
+        root.git_status(Path::new("app")).unwrap().changes,
+        ChangeCounts::default()
+    );
+    assert_eq!(files(&app), before);
+    fs::write(app.join("link"), "another-target.txt").unwrap();
+    assert_eq!(
+        root.git_status(Path::new("app")).unwrap().changes.modified,
+        1
+    );
+}

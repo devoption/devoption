@@ -245,6 +245,7 @@ fn safe_config(source: &str) -> Result<String> {
             }
             if [
                 "filemode",
+                "symlinks",
                 "ignorecase",
                 "precomposeunicode",
                 "autocrlf",

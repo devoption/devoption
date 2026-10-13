@@ -316,7 +316,7 @@ unavailable/unsupported/limited reads return 503 with fixed feedback. No absolut
 paths, filenames, command output or error details are returned.
 
 The reader copies bounded HEAD/ref, index and local ignore metadata into a private
-temporary Git directory. It preserves only builtin file-mode, case and text
+temporary Git directory. It preserves only builtin file-mode, symlink, case and text
 normalization settings from the checked config. Git receives no user/system config,
 source hooks, fsmonitor command or filter definitions; optional index writes,
 submodule inspection, replacement objects and network protocols are disabled.
