@@ -18,6 +18,12 @@ for dimensions, states and refresh instructions.
 
 ![Project Code and repository status](project-code.jpg)
 
+**Tracked repository files and current working-tree text**
+
+![Tracked frontend paths](repository-files.jpg)
+
+![Current source text](repository-file.jpg)
+
 ![Project Builds, unavailable](project-builds.jpg)
 
 ![Project Releases, unavailable](project-releases.jpg)

@@ -13,7 +13,9 @@ pub enum Page {
 mod auth;
 mod profile;
 mod projects;
-pub use projects::{ProjectSection, ProjectSummary, RepositorySummary};
+pub use projects::{
+    FileEntry, FilePreview, ProjectSection, ProjectSummary, RepositoryFilesView, RepositorySummary,
+};
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
@@ -133,9 +135,21 @@ pub fn render_project_section_with_creation(
     )
 }
 
+pub fn render_repository_files(
+    project: &ProjectSummary<'_>,
+    files: &RepositoryFilesView<'_>,
+) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Files(project, files)),
+    )
+}
+
 enum ProjectView<'a> {
     List(&'a [ProjectSummary<'a>], bool),
     Detail(&'a ProjectSummary<'a>, bool, bool, ProjectSection),
+    Files(&'a ProjectSummary<'a>, &'a RepositoryFilesView<'a>),
 }
 
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
@@ -151,7 +165,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             match &projects {
                 Some(ProjectView::List([], _)) => "No projects yet.",
                 Some(ProjectView::List(..)) => "Your saved projects.",
-                Some(ProjectView::Detail(..)) => "",
+                Some(ProjectView::Detail(..) | ProjectView::Files(..)) => "",
                 None => "Project management is not available yet.",
             },
         ),
@@ -177,21 +191,27 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         ),
         Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
-    let (title, main_class) = if let Some(ProjectView::Detail(project, _, _, _)) = &projects {
-        let mut escaped = String::new();
-        projects::escape_into(&mut escaped, project.name);
-        (escaped, r#" class="project-detail-page""#)
-    } else {
-        (title.to_owned(), "")
-    };
+    let (title, main_class) =
+        if let Some(ProjectView::Detail(project, _, _, _) | ProjectView::Files(project, _)) =
+            &projects
+        {
+            let mut escaped = String::new();
+            projects::escape_into(&mut escaped, project.name);
+            (escaped, r#" class="project-detail-page""#)
+        } else {
+            (title.to_owned(), "")
+        };
     let actions = match &projects {
         Some(ProjectView::List(..)) => {
             r#"<button class="action-button primary" type="button" data-open-dialog="project-dialog" disabled><span aria-hidden="true">＋</span>New project</button>"#
         }
-        Some(ProjectView::Detail(..)) => "",
+        Some(ProjectView::Detail(..) | ProjectView::Files(..)) => "",
         None => "",
     };
-    let breadcrumb = if matches!(&projects, Some(ProjectView::Detail(..))) {
+    let breadcrumb = if matches!(
+        &projects,
+        Some(ProjectView::Detail(..) | ProjectView::Files(..))
+    ) {
         format!(
             r#"<p class="breadcrumbs"><a href="/projects">Projects</a><span aria-hidden="true">/</span><span>{title}</span></p>"#
         )
@@ -201,12 +221,14 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
     let document_title = match &projects {
+        Some(ProjectView::Files(..)) => format!("{title} · Files"),
         Some(ProjectView::Detail(_, _, _, section)) if *section != ProjectSection::Overview => {
             format!("{title} · {}", section.label())
         }
         _ => title.clone(),
     };
     let project_content = projects.map(|view| match view {
+        ProjectView::Files(project, files) => projects::files_content(project, files),
         ProjectView::List(projects, available) => projects::content(projects, available),
         ProjectView::Detail(project, available, creation, section) => {
             projects::detail_with_creation(project, available, creation, section)

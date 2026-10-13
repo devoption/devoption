@@ -70,25 +70,7 @@ pub(crate) fn content_with_creation(
     section: ProjectSection,
 ) -> String {
     let id = identifier(&project.id);
-    let mut html =
-        String::from(r#"<nav class="project-navigation" aria-label="Project sections">"#);
-    for item in ProjectSection::ALL {
-        let path = if item == ProjectSection::Overview {
-            format!("/projects/{id}")
-        } else {
-            format!("/projects/{id}/{}", item.segment())
-        };
-        let current = if section == item {
-            r#" aria-current="page""#
-        } else {
-            ""
-        };
-        html.push_str(&format!(
-            r#"<a href="{path}"{current}>{}</a>"#,
-            item.label()
-        ));
-    }
-    html.push_str("</nav>");
+    let mut html = navigation(project, section);
     match section {
         ProjectSection::Overview => {
             html.push_str(r#"<section aria-labelledby="project-overview-title"><div class="section-heading"><h2 id="project-overview-title">Repositories</h2>"#);
@@ -123,6 +105,30 @@ pub(crate) fn content_with_creation(
         ProjectSection::Releases => html.push_str(r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and deployment are not implemented for this project.</p></section>"#),
         ProjectSection::Packages => html.push_str(r#"<section class="empty-state"><h2>Packages are not available yet</h2><p>Package management is not implemented for this project.</p></section>"#),
     }
+    html
+}
+
+pub(super) fn navigation(project: &ProjectSummary<'_>, section: ProjectSection) -> String {
+    let id = identifier(&project.id);
+    let mut html =
+        String::from(r#"<nav class="project-navigation" aria-label="Project sections">"#);
+    for item in ProjectSection::ALL {
+        let path = if item == ProjectSection::Overview {
+            format!("/projects/{id}")
+        } else {
+            format!("/projects/{id}/{}", item.segment())
+        };
+        let current = if section == item {
+            r#" aria-current="page""#
+        } else {
+            ""
+        };
+        html.push_str(&format!(
+            r#"<a href="{path}"{current}>{}</a>"#,
+            item.label()
+        ));
+    }
+    html.push_str("</nav>");
     html
 }
 
@@ -161,6 +167,7 @@ fn repositories(
             }
             html.push_str("</p></div></div>");
             if attachment_available && repository.default_checkout.is_some() {
+                html.push_str(&format!(r#"<a class="text-button repository-files-link" href="/projects/{id}/repositories/{repository_id}/files">Browse files <span aria-hidden="true">→</span></a>"#));
                 html.push_str(
                     r#"<div class="repository-inspection" role="group" aria-label="Status for "#,
                 );

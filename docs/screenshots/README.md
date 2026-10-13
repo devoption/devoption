@@ -14,6 +14,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
 | Project overview | `/projects/{id}` | Example application; repository summary; 1280 × 900 | `project-details.jpg` |
 | Project code | `/projects/{id}/code` | Managed creation enabled; frontend status read with Last checked; 1280 × 900 | `project-code.jpg` |
+| Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
+| Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |
 | Project builds | `/projects/{id}/builds` | Unavailable state | `project-builds.jpg` |
 | Project releases | `/projects/{id}/releases` | Unavailable state | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
@@ -38,12 +40,14 @@ Start the [temporary browser fixture](../browser-session-check.md) from the
 repository root after installing the [normal prerequisites](../../README.md#quick-start):
 
 ```sh
-DEVOPTION_BROWSER_MANAGED_ROOT=1 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
+DEVOPTION_BROWSER_MANAGED_ROOT=1 DEVOPTION_BROWSER_FILES=1 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
-Use its printed origin and port, not the persistent preview on port 3000. Managed creation is enabled only for its temporary root. The
-fixture creates a temporary owner, catalog, Git metadata trees and an untracked
-frontend README; it stops after ten minutes. No real owner or repository is needed.
+Use its printed origin and port, not the persistent preview on port 3000. Managed
+creation is enabled only for its temporary root. The fixture creates a temporary
+owner, catalog, Git metadata trees, three staged frontend files (`README.md`,
+`Cargo.toml`, `src/main.rs`) and an untracked note; it stops after ten minutes.
+No real owner or repository is needed.
 The fixture password is `browser transport fixture only`.
 
 The dedicated auth layout was added in [#155](https://github.com/devoption/devoption/issues/155).
@@ -61,8 +65,10 @@ printed ephemeral origin. Do not create an owner for that capture.
    profile menu's Appearance link to confirm Nord / Dark / Purple. Capture Projects
    and Example application before mutating fixture records.
 3. Capture Example application’s Overview and each project section. On Code, select the frontend's **View status**. Wait for branch
-   `main`, **No commits yet**, **1 untracked entry**, and **Last checked**. This time
-   is when the browser received the valid response, not continuous monitoring.
+   `main`, **No commits yet**, **3 staged**, **1 untracked entry**, and **Last checked**. This time
+   is when the browser received the valid response, not continuous monitoring. Open
+   frontend **Browse files**, capture its three paths, then open `src/main.rs` and
+   capture the source. Return to Code before continuing.
 4. On Projects, open **New project**, enter **Example new project** and capture
    the dialog. Submit, capture the new empty details page, then open Code and **Attach
    repository**. Wait for the picker, select `tools`, and capture without submitting.

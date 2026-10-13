@@ -14,6 +14,7 @@ use devoption_projects::{
 };
 use tokio::sync::Mutex;
 
+mod files;
 mod managed;
 mod pages;
 
@@ -87,6 +88,7 @@ pub(super) fn routes(projects: Projects) -> Router {
     let renamer = projects.clone();
     Router::new()
         .merge(pages::routes(projects.clone()))
+        .merge(files::routes(projects.clone()))
         .merge(creation)
         .route(
             "/projects/{project}/name",

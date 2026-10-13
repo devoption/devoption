@@ -1,3 +1,6 @@
+mod files;
+pub(super) use files::content as files_content;
+pub use files::{FileEntry, FilePreview, RepositoryFilesView};
 mod workspace;
 pub use workspace::ProjectSection;
 #[cfg(test)]

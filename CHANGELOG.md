@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add **Browse files** to project Code with authenticated tracked-file lists and
+  escaped, bounded working-tree text previews. Support ordinary links, keyboard
+  navigation and browsing without JavaScript; explain empty, binary, oversized
+  and unavailable files without exposing untracked contents or enabling execution
+  ([#169](https://github.com/devoption/devoption/issues/169)).
+
 - Bind candidate build plans to verified root Cargo source proofs. Reject commit
   and dependency-request mismatches and retain proof identity in job plan equality;
   build execution and approval remain unimplemented

@@ -110,6 +110,38 @@ impl Catalog {
         Ok(status)
     }
 
+    /// Browse only a saved, revalidated association. Selected paths are tracked
+    /// working-tree files, never arbitrary root-relative filesystem reads.
+    pub fn repository_files(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+        root: &PermittedRoot,
+        selected: Option<&str>,
+    ) -> Result<crate::worktree::RepositoryFiles, Error> {
+        self.check_repository_root(root)?;
+        let project_record = self
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .ok_or(Error::UnknownProject)?;
+        if !project_record.repositories.contains(&repository) {
+            return Err(Error::UnknownRepository);
+        }
+        let checkout = self
+            .checkouts
+            .iter()
+            .find(|c| c.project == project && c.repository == repository)
+            .ok_or(Error::CheckoutRequired)?;
+        let path = Path::new(&checkout.path);
+        let before = root.inspect(path)?;
+        self.check_checkout(&checkout.path, &before)?;
+        let files = root.repository_files(path, selected)?;
+        revalidate_checkout(root, path, &before)?;
+        self.check_repository_root(root)?;
+        Ok(files)
+    }
+
     pub(crate) fn attach(
         &mut self,
         project: ProjectId,
