@@ -266,7 +266,7 @@ test("unconfigured preview performs no authentication requests", async () => {
   const current = page({ configured: false, form: false });
   await tick();
   assert.equal(current.calls.length, 0);
-  assert.equal(current.nodes.get("profile-state").textContent, "Local preview");
+  assert.equal(current.nodes.get("profile-state").textContent, "Account");
   assert.equal(current.signouts[0].hidden, true);
 });
 

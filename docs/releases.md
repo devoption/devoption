@@ -20,7 +20,7 @@ When a maintainer intentionally chooses to release:
    `## [0.1.0] - YYYY-MM-DD`, using the actual release date. Leave `Unreleased`
    for later changes. Notes need real change bullets and repository issue links;
    describe limitations and any breaking changes honestly.
-4. Run all README checks and `python3 scripts/release_notes.py 0.1.0`.
+4. Run all [development checks](development.md#checks) and `python3 scripts/release_notes.py 0.1.0`.
    The script rejects mismatched versions, missing/duplicate sections, invalid
    or future dates, and notes without issue links. Review the output; automation
    cannot decide whether every statement is accurate.

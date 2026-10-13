@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Shorten the README, move usage and developer detail into linked guides, and keep
+  the full screenshot gallery in documentation. Clarify the intended individual
+  and team audience in docs and UI, remove the About page and development badge,
+  and preserve current preview limits
+  ([#157](https://github.com/devoption/devoption/issues/157)).
+
 - Give sign-in, account recovery and CLI owner-setup guidance a dedicated branded,
   responsive page using the saved browser theme. Preserve the cookie/CSRF flow,
   clarify pending and ended-session feedback, and retain accessible password

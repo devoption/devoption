@@ -25,7 +25,8 @@ problem clearly, and avoid posting private data.
    and docs changes. Explain what changed and link the issue. Keep setup and
    usage documentation consistent with the code. A release preparation PR may
    move those entries to a dated version section instead.
-6. Run the build, tests, format, lint, and Python checks from the README. Describe
+6. Run the build, tests, format, lint, Python and Node checks in
+   [the development guide](docs/development.md#checks). Describe
    results and remaining limitations in the PR. Review the diff for credentials,
    private paths/data, unsupported claims, and unrelated changes.
 7. Request review once the scope is complete. Preserve the issue reference in
@@ -38,8 +39,15 @@ branches and PRs, including fixes to bootstrap CI. Do not push directly to `main
 Every commit that changes visible UI must refresh the affected page screenshots
 in `docs/screenshots/` in that same commit. Shared layout or theme changes require
 all main-page captures. Reuse the existing filenames; non-UI commits keep
-the existing images. Add a capture and README embed when adding a main page.
+the existing images. Add a capture and [gallery](docs/screenshots/gallery.md) entry
+when adding a main page.
 Follow the [capture instructions](docs/screenshots/README.md).
+
+Keep the root README a concise product introduction, current status, minimal quick
+start and documentation links, with at most two representative screenshots. Put
+operational detail, technical references and new page captures in `docs/`. Describe
+DevOption as a deployable software factory intended for individuals and teams;
+keep current owner-only and loopback limits distinct from that direction.
 
 Dependency updates follow this same issue-first process. Keep `Cargo.lock`
 committed, use locked builds, and verify action updates against official upstream

@@ -1,11 +1,8 @@
 # Page screenshots
 
-These captures show the real local application, using the disposable browser
-fixture's owner and catalog. They are not production records or mockups.
-The complete visual pass in [#153](https://github.com/devoption/devoption/issues/153)
-was implemented freshly against the already-built interface preview. Compare the
-[preceding app captures](https://github.com/devoption/devoption/tree/17c29c22c309cb7c5b936a0e88a904873c48a5f5/docs/screenshots)
-with the current images. The private reference and prototype source are not included.
+See the [screenshot gallery](gallery.md). These captures show the running
+application using a disposable browser fixture; they are not production records
+or mockups.
 
 Use stable filenames; Git retains earlier captures. All default captures use
 **1280 × 800**, 100% zoom, Nord / Dark / Purple, unless indicated below.
@@ -20,7 +17,6 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Attach repository | `/projects/{id}` | Empty project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
 | Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
-| About | `/about` | Signed in | `about.jpg` |
 | Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
@@ -31,7 +27,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Owner setup | `/sign-in` | Separate unconfigured ephemeral preview; no owner | `sign-in-setup.jpg` |
 
 Start the [temporary browser fixture](../browser-session-check.md) from the
-repository root after installing the [normal prerequisites](../../README.md#try-it-locally):
+repository root after installing the [normal prerequisites](../../README.md#quick-start):
 
 ```sh
 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
@@ -67,7 +63,7 @@ printed ephemeral origin. Do not create an owner for that capture.
 6. Capture the browser viewport as JPEG, excluding browser/desktop chrome. Keep
    scroll at the top, pointer off controls, and no focus outline or developer
    overlay. Only the two named dialog captures should have a dialog open.
-7. Inspect the images, text, active navigation and root README embeds before
+7. Inspect the images, text, active navigation and gallery entries before
    committing. Restore browser preferences and clear temporary overrides.
 
 All Appearance variants use **1280 × 900** and the save confirmation:
@@ -87,5 +83,5 @@ accessibility audit.
 
 Commit refreshed images in the same commit as visible UI changes. Shared layout
 changes require every main page and affected variants. Non-UI changes retain
-existing files. Add a capture and root README embed for each new main page.
+existing files. Add a capture and [gallery](gallery.md) entry for each new main page.
 No screenshot runner or visual regression service is installed by the repository.
