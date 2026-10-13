@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Copied-binary installation fixtures retry Linux's transient executable-busy
+  launch error within a fixed bound, retaining immediate failures for other
+  errors and covering held writable descriptors and persistent failures
+  ([#118](https://github.com/devoption/devoption/issues/118)).
+
 - Restored Projects pages clear temporary session-check errors after confirmed
   recovery, preserve attachment feedback, and replace interrupted progress with
   a reload warning ([#111](https://github.com/devoption/devoption/issues/111)).
