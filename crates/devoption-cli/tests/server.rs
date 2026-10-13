@@ -188,7 +188,11 @@ fn pages_share_layout_and_have_working_navigation() {
         }
         assert_eq!(body.matches("aria-current=\"page\"").count(), 1);
         assert!(body.contains("href=\"#main-content\""));
-        assert!(body.contains("<main id=\"main-content\" tabindex=\"-1\">"));
+        assert!(
+            body.contains(
+                "<main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\">"
+            )
+        );
         assert!(body.contains("<header class=\"content-header\">"));
         assert!(body.contains("In development</p>"));
         assert!(body.contains("popovertarget=\"profile-popup\" aria-label=\"Profile menu\""));

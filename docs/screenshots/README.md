@@ -4,7 +4,10 @@ These images show the real local app, including its current empty placeholders.
 Projects shows creation, repository attachment and the temporary fixture's example metadata,
 not production records.
 Keep one default-mode image per main page at a stable filename; Git records earlier
-versions. `appearance-light.jpg` additionally shows Appearance following a light
+versions. For the shared-shell refinement in [#147](https://github.com/devoption/devoption/issues/147),
+compare the [before captures](https://github.com/devoption/devoption/tree/d0f6341aaac971edf9082ccbd9cee923b0cc8575/docs/screenshots)
+with the current images here; both are rendered from the working app.
+`appearance-light.jpg` additionally shows Appearance following a light
 device preference. `appearance-custom.jpg` shows a custom primary and its warning.
 `appearance-dracula.jpg` and `appearance-dracula-light.jpg` show Dracula in Dark
 and the adapted Light mode.

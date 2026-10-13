@@ -233,10 +233,12 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     </div>
   </aside>
   <div class=\"workspace\">
-    <header class=\"content-header\"><p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p></header>
-    <main id=\"main-content\" tabindex=\"-1\"{main_class}>
-      {breadcrumb}
+    <header class=\"content-header\">
       <h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>
+      <p class=\"stage\"><span aria-hidden=\"true\"></span>In development</p>
+    </header>
+    <main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\"{main_class}>
+      {breadcrumb}
       <p id=\"page-message\">{message}</p>
       {content}
     </main>
