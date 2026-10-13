@@ -33,7 +33,11 @@
         item.branch.textContent = fields[0] || "Detached HEAD";
         item.commit.textContent = fields[1] || "No commits yet";
         const labels = ["staged", "modified", "untracked entries", "conflicted"];
-        const changes = fields.slice(2).map((value, index) => Number(value) ? `${Number(value)} ${labels[index]}` : "").filter(Boolean);
+        const changes = fields.slice(2).map((value, index) => {
+          const count = Number(value);
+          const label = index === 2 && count === 1 ? "untracked entry" : labels[index];
+          return count ? `${count} ${label}` : "";
+        }).filter(Boolean);
         item.changes.textContent = changes.length ? changes.join(" · ") : "Clean";
         item.fields.hidden = false; item.loaded = true;
         item.note.textContent = "Refresh to read the checkout again.";

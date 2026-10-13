@@ -279,3 +279,13 @@ fn process_and_porcelain_failures_are_bounded() {
     );
     assert_eq!(parse(b"?? \xff\nname\0").unwrap().untracked, 1);
 }
+
+#[test]
+fn split_index_is_unavailable_without_copying_shared_index_dependencies() {
+    let (_temp, app, root) = fixture();
+    commit(&app, "fixture\n");
+    git(&app, &["update-index", "--split-index"]);
+    let before = files(&app);
+    assert_eq!(root.git_status(Path::new("app")), Err(Error::Unavailable));
+    assert_eq!(files(&app), before);
+}

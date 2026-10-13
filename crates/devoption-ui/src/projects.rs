@@ -165,6 +165,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn status_markup_selects_the_saved_checkout_only_on_configured_details() {
+        let mut project = ProjectSummary {
+            id: [0xab; 16],
+            name: "Example",
+            repositories: vec![RepositorySummary {
+                id: [0xcd; 16],
+                name: "<repo>",
+                default_checkout: Some("app"),
+            }],
+        };
+        let html = detail(&project, true);
+        assert!(html.contains("data-status-url=\"/projects/abababababababababababababababab/repositories/cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd/status\""));
+        assert!(html.contains("aria-label=\"View status for &lt;repo&gt;\""));
+        for attribute in [
+            "data-repository-status-view",
+            "data-status-fields hidden",
+            "data-status-branch",
+            "data-status-commit",
+            "data-status-changes",
+            "data-status-refresh disabled",
+            "data-status-note",
+        ] {
+            assert!(html.contains(attribute), "{attribute}");
+        }
+        assert!(!detail(&project, false).contains("data-repository-status-view"));
+        assert!(
+            !content(std::slice::from_ref(&project), true).contains("data-repository-status-view")
+        );
+        project.repositories[0].default_checkout = None;
+        assert!(!detail(&project, true).contains("data-repository-status-view"));
+    }
+
+    #[test]
     fn empty_details_offer_the_first_attachment_only_when_configured() {
         let mut project = ProjectSummary {
             id: [0; 16],

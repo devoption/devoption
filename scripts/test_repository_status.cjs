@@ -44,6 +44,8 @@ test('status is lazy, has a loading state, and refresh replaces observations', a
   assert.equal(p.nodes.changes.textContent, '1 staged · 2 modified · 3 untracked entries · 4 conflicted');
   p.queue.push(response('\n' + 'b'.repeat(40) + '\n0\n0\n0\n0')); await p.refresh();
   assert.equal(p.nodes.branch.textContent, 'Detached HEAD');
+  p.queue.push(response('main\n\n0\n0\n1\n0')); await p.refresh();
+  assert.equal(p.nodes.changes.textContent, '1 untracked entry');
 });
 
 test('failed and malformed reads hide a prior clean result and allow retry', async () => {

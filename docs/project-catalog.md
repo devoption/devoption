@@ -328,7 +328,9 @@ atomic filesystem snapshot, hostile-repository sandbox or integrity attestation.
 Supported layouts are ordinary SHA-1 repositories and root-contained linked
 worktrees accepted by the existing inspector. Additional status restrictions
 reject shallow repositories, `.gitmodules`, filter definitions, sparse checkout,
-external attributes/ignore settings and `info/attributes`. Existing rejection of
+external attributes/ignore settings and `info/attributes`. Split indexes are also
+unsupported: the private index copy does not include `sharedindex.*`, so Git
+fails and the view reports unavailable. Existing rejection of
 includes, extensions, alternate object stores and unsafe inspected metadata still
 applies. User/global ignore and filter configuration is deliberately not loaded;
 results describe the controlled configuration, which may differ from a terminal's

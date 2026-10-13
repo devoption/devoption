@@ -17,7 +17,7 @@ Use each path below with the fixture's printed origin and port.
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
 | Projects | `/projects` | Signed in, first attachment form expanded with `tools` selected; 1120 × 1080 | `projects.jpg` |
-| Project details | `/projects/{id}` | Signed in, open Example application from Projects, attachment form expanded with `tools` selected; 1120 × 900 | `project-details.jpg` |
+| Project details | `/projects/{id}` | Signed in, open Example application from Projects, frontend status expanded, attachment collapsed; 1120 × 900 | `project-details.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; automatic attachment form expanded with `tools` selected; 1120 × 900 | `project-empty.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
 | Appearance | `/settings/appearance` | Signed in | `appearance.jpg` |
@@ -33,7 +33,8 @@ installing the [normal prerequisites](../../README.md#try-it-locally):
 cargo test -p devoption-server --lib --locked --offline manual_cookie_browser_fixture -- --ignored --nocapture
 ```
 
-The fixture creates a temporary owner, catalog and Git metadata trees, and stops
+The fixture creates a temporary owner, catalog, Git metadata trees and an untracked
+frontend README, and stops
 after ten minutes. Use its
 printed URL, not the persistent preview on port 3000. Open `/sign-in` in a fresh
 browser context and capture `sign-in.jpg` before signing in. Then use the fixture
@@ -57,7 +58,7 @@ Remove the block and verify recovery without another sign-in after capturing it.
    alongside both fixture projects and the controls. For Project details, open
    **Example application**, use **1120 × 900**, and expand the frontend's **View
    status**. The disposable metadata fixture shows branch `main`, **No commits
-   yet**, and **Clean**; leave attachment collapsed. For the empty-project variant,
+   yet**, and **1 untracked entry**; leave attachment collapsed. For the empty-project variant,
    create **Example new project** and select `tools` in its already open form
    without submitting, at the same 1120 × 900 viewport.
    A fresh context starts with **Nord**, **Dark**, and **Purple** for the signed-out
