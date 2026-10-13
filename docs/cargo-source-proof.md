@@ -22,10 +22,11 @@ root tree, root `Cargo.toml` blob and root `Cargo.lock` blob.
 
 The immutable `RootCargoSource` has private fields and records the selected
 commit, SHA-256 of the exact commit/tree payloads, and the Cargo request with
-both content hashes. The public getters are read-only. Future plan binding must
-match **both** the selected commit and the complete request against this result;
-the existing `BuildPlan` remains a metadata candidate and does not require or
-consume this proof yet.
+both content hashes. The public getters are read-only. Under
+[#167](https://github.com/devoption/devoption/issues/167), `BuildPlan` requires and
+retains this result, matching **both** the selected commit and the complete
+materialization request. Full plan equality includes the proof's commit/tree
+SHA-256 identities. This remains a candidate plan with no approval or execution.
 
 Git identity hashes `type + space + decimal byte length + NUL + payload`;
 it is not a hash of file contents alone. The existing SHA-256 content values
@@ -72,8 +73,8 @@ ownership, authorized revision selection, ref freshness, signatures nor existenc
 in a real repository. Pure bytes cannot establish those external facts.
 
 The next integration must obtain the selected repository/revision through an
-independent trusted boundary, preserve this proof, and bind it to the candidate
-plan. It must establish a complete source/target snapshot and a controlled root
+independent trusted boundary before supplying this proof to the candidate plan.
+It must establish a complete source/target snapshot and a controlled root
 working directory. Parent-directory/home/system Cargo configuration, environment,
 toolchain selection, nested attributes/configuration, checkout transformations and
 filesystem aliases are not inspected or controlled here. No extraction safety is

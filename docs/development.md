@@ -36,6 +36,7 @@ manifest/lockfile subset and binds exact input hashes without reading a reposito
 The separate [root source verifier](cargo-source-proof.md) checks a bounded
 supplied Git object chain linking those bytes to a selected commit ID. It does not
 establish trusted revision selection, complete source context or build permission.
+Plans retain this proof and reject a mismatched commit or dependency request.
 DevOption-mediated acquisition and isolated offline builds are the selected
 architecture, while registry hosting, fetching, approval, execution, environment
 policy and resource enforcement remain unimplemented.

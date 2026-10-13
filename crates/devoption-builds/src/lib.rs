@@ -1,5 +1,5 @@
-//! Immutable Unix Rust build-plan metadata. Validation reads only the supplied
-//! catalog snapshot; it performs no filesystem, process, environment or network I/O.
+//! Immutable Unix Rust build plans bound to verified root Cargo source metadata.
+//! Validation reads supplied values only, with no filesystem, process or network I/O.
 //! A valid plan is neither reviewed nor approved and grants no execution rights.
 //! See `docs/build-plans.md` for the checks still required before any executor.
 
@@ -34,7 +34,7 @@ pub struct Limits {
     pub log_bytes: u32,
 }
 
-/// Inputs to structural validation. Absolute paths are only candidate Unix paths;
+/// Inputs to source-binding and structural validation. Paths are candidate Unix paths;
 /// no existence, ownership, toolchain identity or source cleanliness is implied.
 /// Owned strings ensure later edits to a caller's copy cannot change a plan.
 #[derive(Clone, PartialEq, Eq)]
@@ -42,6 +42,9 @@ pub struct PlanInput {
     pub project: ProjectId,
     pub repository: RepositoryId,
     pub commit: String,
+    /// Verified Cargo membership relative to the selected commit, not repository
+    /// authentication, a complete source snapshot or execution authorization.
+    pub source: cargo_source::RootCargoSource,
     /// Registry-supplied metadata, not proof of lockfile or bundle verification.
     pub dependencies: CargoMaterialization,
     pub rust_version: String,
@@ -96,6 +99,11 @@ impl BuildPlan {
             || input.commit.bytes().all(|b| b == b'0')
         {
             return Err(Error::InvalidCommit);
+        }
+        if input.commit != input.source.commit()
+            || input.dependencies.request() != input.source.request()
+        {
+            return Err(Error::SourceMismatch);
         }
         if !exact_version(&input.rust_version) {
             return Err(Error::InvalidRustVersion);
@@ -161,6 +169,7 @@ pub enum Error {
     NotAssociated,
     NotRegistered,
     InvalidCommit,
+    SourceMismatch,
     InvalidRustVersion,
     InvalidExecutable,
     InvalidWorkDirectory,
@@ -177,6 +186,9 @@ impl fmt::Display for Error {
             Self::NotAssociated => "repository is not associated with this project",
             Self::NotRegistered => "association has no registered default checkout",
             Self::InvalidCommit => "commit must be a nonzero full lowercase SHA-1 object ID",
+            Self::SourceMismatch => {
+                "commit and dependency request must match verified Cargo source"
+            }
             Self::InvalidRustVersion => "Rust version must be an exact stable numeric version",
             Self::InvalidExecutable => "executable must be a bounded absolute Unix cargo path",
             Self::InvalidWorkDirectory => "work directory must be a bounded absolute Unix path",
