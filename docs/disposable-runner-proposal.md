@@ -1,10 +1,12 @@
 # One-shot local runner rehearsal profile
 
-This profile received separate approval for one disposable fixture attempt on
-2026-10-13. That attempt is complete: Cargo exited successfully, but artifact
-verification failed. See the [results and limitations](disposable-build-rehearsal.md).
-The profile below records the approved scope; it is not a reusable execution grant
-or an implemented production runner. Another attempt requires separate approval.
+This profile received separate approvals for an initial disposable fixture attempt
+and one diagnostic repeat on 2026-10-13. Both are complete: Cargo exited successfully,
+but neither produced an accepted artifact. See the [initial results](disposable-build-rehearsal.md)
+and the [repeat's confirmed two-link rejection](disposable-build-repeat.md).
+The profile below records the original approved scope; it is not a reusable
+execution grant or an implemented production runner. Another attempt requires
+separate approval.
 
 Scope: one trusted `offline-fixture` attempt from this repository's reviewed merge
 commit for [PR #128](https://github.com/devoption/devoption/pull/128). Use only the
@@ -50,7 +52,8 @@ instance, server route/UI, production event issuer, release or deployment.
   stop at 3.75 GiB and require 20 GiB host free space; abort rather than delete
   unrelated or user-owned artifacts. Leave localhost:3000 and other apps untouched.
 
-Approval covered only this one disposable fixture attempt and its temporary guest
+Each approval covered one disposable fixture attempt and its temporary guest
 setup/cleanup, not production execution, arbitrary code, repository registration
-or deployment. The results distinguish observed controls from unexercised paths;
-this profile alone is not evidence that a control worked.
+or deployment. The repeat retained the initial harness's additional single-link
+predicate. The results distinguish observed controls from unexercised paths; this
+profile alone is not evidence that a control worked.

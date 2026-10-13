@@ -59,12 +59,18 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- One separately approved diagnostic repeat identifies a regular 445,888-byte
+  output with two hard links as the sole artifact rejection. Compilation and
+  isolation checks passed; the unchanged gate rejected the output before hashing.
+  Cleanup and VM shutdown are verified, with no execution or export of the artifact
+  ([#131](https://github.com/devoption/devoption/issues/131)).
+
 - A separately approved disposable Ubuntu rehearsal records one successful offline
   Cargo compile, observed job restrictions, and cleanup. Artifact metadata
   verification failed before a checksum or size was recorded, so the rehearsal
   is not a successful end-to-end build result. A tested, I/O-free helper reports
   each existing metadata predicate without changing acceptance or isolation;
-  it is not a production runner and no further VM build was attempted
+  it is not a production runner
   ([#131](https://github.com/devoption/devoption/issues/131)).
 
 - In-memory build jobs bind queued/running/succeeded/failed/cancelled records to
@@ -72,7 +78,7 @@ Entries describe implemented changes, not the roadmap.
   results, cancellation, terminal rewrites and artifact metadata; sealed runner
   events have no production issuer. No process launch, persistence, runtime/UI
   integration or execution authority is added. The accompanying disposable fixture
-  runner profile is separate from the job model; its later approved attempt and
+  runner profile is separate from the job model; its later approved attempts and
   limitations are recorded under #131 above
   ([#127](https://github.com/devoption/devoption/issues/127)).
 
