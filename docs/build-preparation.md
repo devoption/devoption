@@ -21,6 +21,43 @@ source snapshots. No job, durable preparation record, build history or approval 
 created. Build execution remains unavailable. The flow runs no Cargo, compiler,
 project code, dependency acquisition, network fetch or VM.
 
+## Check from a local terminal or SSH
+
+On Unix, run the same checks as the OS user who owns the private catalog directory:
+
+```sh
+devoption check-source \
+  --data-dir /absolute/private/directory \
+  --repository-root /absolute/trusted/repositories \
+  --project PROJECT_ID \
+  --repository REPOSITORY_ID
+```
+
+For a source checkout, use `cargo run --locked --offline -- check-source` with the
+same options. Replace both IDs with the saved 32-character hexadecimal values:
+the project ID is in `/projects/{project}`, and **Check source** links to
+`/projects/{project}/builds/{repository}`. Names and checkout paths are not IDs.
+All four options are required; there is no default storage path or managed-write
+option. Relative paths, unknown/duplicate options and malformed IDs are rejected.
+
+The command prints the actual observed HEAD, inspected package/version and locked
+dependency count when available, followed by each check's result. Exit status is
+**0** only when all checks pass, **1** for changes needed or unavailable checks,
+and **2** for invalid arguments. A completed report goes to stdout; argument,
+storage and association failures use fixed diagnostics on stderr without paths,
+project names or source contents. A passing exit does not authorize execution.
+
+This explicit local command uses the OS user's filesystem permissions. It needs
+no HTTP listener, browser session or owner password, and does not read or create
+owner credentials. The data directory must already exist, be private to that OS
+user, and have no symlink or parent-traversal components. The explicit trusted
+repository root must be separate from application data and match the saved
+attachment. Catalog reads create no lock file and can run while the server holds
+its catalog writer lock. Git inspection uses private temporary metadata as below;
+the catalog and source checkout are not modified. No root permission or server
+configuration is changed. Current working-tree observations and all bounds below
+also apply to CLI results.
+
 ## Current checks
 
 The association must have a saved default checkout under the configured inspection
@@ -76,4 +113,5 @@ cancellation and restart recovery are also not implemented. No passing report ca
 be submitted as an execution capability.
 
 Implemented and tested with disposable repositories under
-[#171](https://github.com/devoption/devoption/issues/171).
+[#171](https://github.com/devoption/devoption/issues/171) and exposed through the
+CLI under [#173](https://github.com/devoption/devoption/issues/173).

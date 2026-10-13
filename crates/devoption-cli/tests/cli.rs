@@ -20,6 +20,11 @@ fn help_explains_the_actual_scope() {
         assert!(text.contains("with the same directory, then sign in at /sign-in"));
         assert!(text.contains("Browser owner setup is not available"));
         assert!(text.contains("services are not implemented"));
+        assert!(text.contains("devoption check-source --data-dir"));
+        assert!(text.contains("--project 32HEX --repository 32HEX"));
+        assert!(
+            text.contains("0 checks passed, 1 changes needed or unavailable, 2 invalid arguments")
+        );
     }
 }
 

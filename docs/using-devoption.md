@@ -116,6 +116,9 @@ name. **Builds** offers [source preparation checks](build-preparation.md) for an
 attached repository: observed commit, Git changes, tracked Cargo inputs and binary
 source. **Check again** reads current state; no build is run or approved. **Releases**
 and **Packages** retain unavailable states.
+The same read-only checks are available locally or over SSH through
+[`devoption check-source`](build-preparation.md#check-from-a-local-terminal-or-ssh),
+with explicit catalog/root paths, saved IDs and documented exit statuses.
 The section links use ordinary URLs (`/projects/{id}/code`, for example), so
 refresh, bookmarks and browser Back/Forward keep the selected project and section.
 

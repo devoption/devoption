@@ -37,6 +37,12 @@ pub struct CatalogDirectory {
 }
 
 impl CatalogDirectory {
+    /// Open an existing private directory without creating files or taking a
+    /// writer lock. Reject relative paths, parent traversal and symlink components.
+    pub fn open_absolute(path: &Path) -> Result<Self, Error> {
+        Self::from_directory(open_directory(path)?)
+    }
+
     /// Adopt an already selected directory descriptor after checking its type,
     /// ownership and private mode. The caller selects the directory; no pathname
     /// is resolved here. This permits shared identity with another storage layer.
