@@ -42,17 +42,17 @@ pub fn run_with_repository_root(
     // Retain the same descriptor through the service. Selecting storage grants
     // no enrollment permission; only an already-present owner can sign in.
     #[cfg(unix)]
-    let owner_auth = data_directory
-        .map(|path| {
-            let store = crate::owner_store::OwnerStore::open_absolute(path)?;
-            let configured = store.load()?.is_some();
-            Ok::<_, crate::owner_store::StoreError>((
-                crate::owner_auth::service::OwnerAuthService::new(store),
-                configured,
-            ))
-        })
+    let owner_store = data_directory
+        .map(crate::owner_store::OwnerStore::open_absolute)
         .transpose()
         .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?;
+    #[cfg(unix)]
+    let configured = owner_store
+        .as_ref()
+        .map(|store| store.load().map(|record| record.is_some()))
+        .transpose()
+        .map_err(|error| io::Error::other(format!("data directory unavailable: {error}")))?
+        .unwrap_or(false);
     #[cfg(not(unix))]
     if data_directory.is_some() || repository_root.is_some() {
         return Err(io::Error::new(
@@ -61,13 +61,10 @@ pub fn run_with_repository_root(
         ));
     }
     #[cfg(unix)]
-    let projects = if owner_auth
-        .as_ref()
-        .is_some_and(|(_, configured)| *configured)
-    {
+    let projects = if configured {
         Some(
             projects::Projects::open_with_root(
-                data_directory.expect("configured owner has a directory"),
+                owner_store.as_ref().expect("configured owner has a store"),
                 repository_root,
             )
             .map_err(|error| io::Error::other(format!("project catalog unavailable: {error}")))?,
@@ -80,6 +77,13 @@ pub fn run_with_repository_root(
         }
         None
     };
+    #[cfg(unix)]
+    let owner_auth = owner_store.map(|store| {
+        (
+            crate::owner_auth::service::OwnerAuthService::new(store),
+            configured,
+        )
+    });
     Builder::new_current_thread()
         .enable_all()
         .build()?

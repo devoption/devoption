@@ -7,33 +7,40 @@ use axum::{
     extract::{Path as RoutePath, rejection::PathRejection},
     http::header::CONTENT_TYPE,
 };
-use devoption_projects::{Catalog, CatalogStore, Error, MAX_NAME_BYTES, read_catalog};
+use devoption_projects::{Catalog, CatalogDirectory, Error, MAX_NAME_BYTES};
 use devoption_projects::{
     ProjectId,
     worktree::{InspectionError, PermittedRoot},
 };
-use std::{error::Error as _, path::PathBuf, time::Duration};
+use std::{error::Error as _, time::Duration};
 use tokio::sync::Mutex;
+
+#[cfg(test)]
+mod startup_tests;
 
 #[derive(Clone)]
 pub(super) struct Projects {
-    path: Arc<PathBuf>,
+    directory: Arc<CatalogDirectory>,
     gate: Arc<Mutex<()>>,
     root: Option<Arc<PermittedRoot>>,
 }
 
 impl Projects {
-    pub(super) fn open_with_root(path: &Path, root: Option<&Path>) -> Result<Self, Error> {
-        let catalog = read_catalog(path)?.unwrap_or_default();
+    pub(super) fn open_with_root(
+        owner: &crate::owner_store::OwnerStore,
+        root: Option<&Path>,
+    ) -> Result<Self, Error> {
+        let directory = CatalogDirectory::from_directory(owner.duplicate_directory()?)?;
+        let catalog = directory.load()?.unwrap_or_default();
         let root = root.map(PermittedRoot::open_absolute).transpose()?;
         if let Some(root) = &root {
-            if !root.is_disjoint(&PermittedRoot::open_absolute(path)?)? {
+            if !directory.is_disjoint(root)? {
                 return Err(Error::RootMismatch);
             }
             catalog.check_repository_root(root)?;
         }
         Ok(Self {
-            path: Arc::new(path.into()),
+            directory: Arc::new(directory),
             gate: Arc::new(Mutex::new(())),
             root: root.map(Arc::new),
         })
@@ -41,13 +48,13 @@ impl Projects {
 
     async fn access<T: Send + 'static>(
         self,
-        operation: impl FnOnce(&Path) -> Result<T, Error> + Send + 'static,
+        operation: impl FnOnce(&CatalogDirectory) -> Result<T, Error> + Send + 'static,
     ) -> Result<T, Error> {
         let guard = self.gate.lock_owned().await;
         // Keep serialization even if the HTTP request disconnects while saving.
         tokio::task::spawn_blocking(move || {
             let _guard = guard;
-            operation(&self.path)
+            operation(&self.directory)
         })
         .await
         .map_err(|_| Error::Io(std::io::Error::other("catalog operation failed")))?
@@ -63,7 +70,7 @@ pub(super) fn routes(projects: Projects) -> Router {
             get(move || async move {
                 let attachment_available = reader.root.is_some();
                 match reader
-                    .access(|path| Ok(read_catalog(path)?.unwrap_or_default()))
+                    .access(|directory| Ok(directory.load()?.unwrap_or_default()))
                     .await
                 {
                     Ok(catalog) => {
@@ -80,8 +87,8 @@ pub(super) fn routes(projects: Projects) -> Router {
             .post(move |request: Request| async move {
                 let result = match name(request).await {
                     Ok(name) => projects
-                        .access(move |path| {
-                            CatalogStore::open_absolute(path)?.create_project(&name)
+                        .access(move |directory| {
+                            directory.writer()?.create_project(&name)
                         })
                         .await
                         .map_err(|error| Failure::from(error).status)
@@ -122,12 +129,10 @@ async fn attach(
         })?;
         let candidate = text_body(request, 4096).await?;
         projects
-            .access(move |path| {
-                CatalogStore::open_absolute(path)?.attach_repository(
-                    project,
-                    &root,
-                    Path::new(&candidate),
-                )
+            .access(move |directory| {
+                directory
+                    .writer()?
+                    .attach_repository(project, &root, Path::new(&candidate))
             })
             .await?;
         Ok::<_, Failure>(())

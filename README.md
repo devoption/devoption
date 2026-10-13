@@ -194,8 +194,9 @@ facade. Authentication and owner storage remain server modules. The
 [project catalog core](docs/project-catalog.md) has its own model and storage
 tests. Its separate [worktree inspector](docs/worktree-validation.md) accepts
 bounded candidates under an explicit trusted local root, with opt-in backend
-attachment tested using temporary fixtures. The server validates the catalog at
-startup, then rereads it for each authenticated Projects GET/HEAD request and supplies
+attachment tested using temporary fixtures. The server validates the catalog through
+the same opened directory as owner storage at startup, then rereads it for each
+authenticated Projects GET/HEAD request and supplies
 current display summaries to the UI. Project creation and repository attachment
 use the domain's locked, durable save operations. Executable integration tests stay with the CLI; domain
 logic remains in the project crate. The separate [build-plan model](docs/build-plans.md)

@@ -7,6 +7,8 @@ use std::{
 
 #[path = "projects/create.rs"]
 mod create;
+#[path = "projects/directory.rs"]
+mod directory;
 
 const NAME: &str = "<script>alert('fixture')</script> & \"工具\"";
 const ESCAPED: &str =

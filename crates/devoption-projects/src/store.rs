@@ -30,6 +30,37 @@ pub fn read_catalog(path: &Path) -> Result<Option<Catalog>, Error> {
     load_snapshot(&open_directory(path)?)
 }
 
+/// An unlocked catalog directory capability. Reads load fresh snapshots; writers
+/// acquire their own short-lived locks. Retaining this handle never holds a lock.
+pub struct CatalogDirectory {
+    directory: File,
+}
+
+impl CatalogDirectory {
+    /// Adopt an already selected directory descriptor after checking its type,
+    /// ownership and private mode. The caller selects the directory; no pathname
+    /// is resolved here. This permits shared identity with another storage layer.
+    pub fn from_directory(directory: File) -> Result<Self, Error> {
+        directory_valid(&directory)?;
+        Ok(Self { directory })
+    }
+
+    pub fn load(&self) -> Result<Option<Catalog>, Error> {
+        load_snapshot(&self.directory)
+    }
+
+    pub fn writer(&self) -> Result<CatalogStore, Error> {
+        CatalogStore::open_directory(self.directory.try_clone()?)
+    }
+
+    /// Check actual ancestry against the retained data directory, not a reopened
+    /// data pathname. The repository root retains its own binding checks.
+    pub fn is_disjoint(&self, root: &crate::worktree::PermittedRoot) -> Result<bool, Error> {
+        directory_valid(&self.directory)?;
+        Ok(root.disjoint_directory(&self.directory)?)
+    }
+}
+
 /// An exclusive catalog writer anchored to an existing private directory.
 /// Opening creates only a private lock file. Drop releases the lock, not its file.
 /// Share this handle through application serialization; do not cache competing
@@ -80,7 +111,11 @@ impl CatalogStore {
     /// Final directory must belong to the current OS user with no group/other
     /// permissions. Opening neither creates directories nor repairs permissions.
     pub fn open_absolute(path: &Path) -> Result<Self, Error> {
-        let directory = open_directory(path)?;
+        Self::open_directory(open_directory(path)?)
+    }
+
+    fn open_directory(directory: File) -> Result<Self, Error> {
+        directory_valid(&directory)?;
         let lock = File::from(openat(
             &directory,
             LOCK,

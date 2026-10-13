@@ -236,8 +236,9 @@ fn manual_cookie_browser_fixture() {
             .unwrap();
     }
     let enabled = std::env::var_os("DEVOPTION_BROWSER_ROOT_DISABLED").is_none();
+    let store = crate::owner_store::OwnerStore::open_absolute(&data).unwrap();
     let projects =
-        projects::Projects::open_with_root(&data, enabled.then_some(root.as_path())).unwrap();
+        projects::Projects::open_with_root(&store, enabled.then_some(root.as_path())).unwrap();
     println!("Browser fixture root: {}", root.display());
     Builder::new_current_thread()
         .enable_all()
