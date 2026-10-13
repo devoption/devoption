@@ -86,6 +86,73 @@ fn status(address: SocketAddr, raw: &str) -> u16 {
 }
 
 #[test]
+fn picker_is_authenticated_bounded_read_only_and_attachment_revalidates_selection() {
+    let (_data, data) = configured();
+    let (_root, root) = root_fixture();
+    let (first, _) = seed(&data);
+    let (_server, address) = start_root(&data, &root);
+    let before = fs::read(data.join("projects.bin")).unwrap();
+    let get = |method: &str, issued: Option<&Reply>| {
+        let cookie = issued
+            .map(|reply| {
+                format!(
+                    "Cookie: {}\r\n",
+                    reply
+                        .header("set-cookie")
+                        .unwrap()
+                        .split(';')
+                        .next()
+                        .unwrap()
+                )
+            })
+            .unwrap_or_default();
+        request(
+            address,
+            &format!(
+                "{method} /repository-options HTTP/1.1\r\nHost: {address}\r\n{cookie}Connection: close\r\n\r\n"
+            ),
+        )
+    };
+    for method in ["GET", "HEAD"] {
+        assert!(get(method, None).starts_with("HTTP/1.1 303"));
+    }
+    let issued = sign_in(address);
+    let response = get("GET", Some(&issued));
+    assert!(response.starts_with("HTTP/1.1 200"));
+    assert!(response.contains("cache-control: no-store"));
+    assert!(response.contains("x-devoption-list-limited: false"));
+    assert_eq!(
+        response.split_once("\r\n\r\n").unwrap().1,
+        "linked\nmain\nother"
+    );
+    assert!(!response.contains(&root.to_string_lossy().to_string()));
+    assert!(
+        get("HEAD", Some(&issued))
+            .split_once("\r\n\r\n")
+            .unwrap()
+            .1
+            .is_empty()
+    );
+    fs::rename(root.join("other"), root.join("preserved")).unwrap();
+    symlink(root.join("preserved"), root.join("other")).unwrap();
+    assert_eq!(
+        status(address, &attachment(address, &issued, first, "other")),
+        400
+    );
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
+    let fresh = get("GET", Some(&issued));
+    assert_eq!(
+        fresh.split_once("\r\n\r\n").unwrap().1,
+        "linked\nmain\npreserved"
+    );
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o777)).unwrap();
+    let failed = get("GET", Some(&issued));
+    assert!(failed.starts_with("HTTP/1.1 503"));
+    assert!(!failed.contains(&root.to_string_lossy().to_string()));
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
+}
+
+#[test]
 fn attachments_share_identity_support_multiple_repositories_and_survive_process_restart() {
     let (_data, data) = configured();
     let (_root, root) = root_fixture();

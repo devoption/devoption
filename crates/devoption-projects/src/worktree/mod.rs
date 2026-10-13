@@ -49,6 +49,16 @@ const MAX_PATH: usize = 4096;
 const MAX_COMPONENTS: usize = 64;
 const MAX_CONFIG: usize = 16 * 1024;
 
+/// Maximum immediate root entries considered in one picker request.
+pub const MAX_CHECKOUT_ENTRIES: usize = 64;
+
+/// Display-only choices. Attachment must inspect the selected path again.
+#[derive(Debug, PartialEq, Eq)]
+pub struct CheckoutOptions {
+    pub paths: Vec<String>,
+    pub limited: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WorktreeKind {
     Main,
@@ -69,6 +79,43 @@ pub struct WorktreeObservation {
 }
 
 impl PermittedRoot {
+    /// List supported immediate child checkouts without recursion or Git commands.
+    /// Invalid, unsafe and unsupported entries are omitted. The limit counts all
+    /// root entries, not just checkouts; a partial list makes no completeness claim.
+    pub fn checkout_options(&self) -> Result<CheckoutOptions> {
+        self.check_binding()?;
+        let directory = self.directory(Path::new(""))?;
+        let entries =
+            rustix::fs::Dir::read_from(&directory).map_err(|_| InspectionError::Unavailable)?;
+        let mut paths = Vec::new();
+        let mut seen = 0;
+        let mut limited = false;
+        for entry in entries {
+            let entry = entry.map_err(|_| InspectionError::Unavailable)?;
+            let name = entry.file_name().to_bytes();
+            if name == b"." || name == b".." {
+                continue;
+            }
+            if seen == MAX_CHECKOUT_ENTRIES {
+                limited = true;
+                break;
+            }
+            seen += 1;
+            let Ok(name) = std::str::from_utf8(name) else {
+                continue;
+            };
+            if name.trim() == name
+                && name.len() <= crate::MAX_NAME_BYTES
+                && self.inspect(Path::new(name)).is_ok()
+            {
+                paths.push(name.to_owned());
+            }
+        }
+        self.check_binding()?;
+        paths.sort();
+        Ok(CheckoutOptions { paths, limited })
+    }
+
     /// Inspect one relative directory, without parent search or enumeration.
     /// Ordinary .git directories and linked gitfiles are supported only when
     /// all inspected metadata is contained in this explicitly selected root.

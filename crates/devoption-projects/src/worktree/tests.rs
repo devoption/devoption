@@ -55,6 +55,59 @@ fn linked_tree(root: &Path, name: &str) {
 }
 
 #[test]
+fn checkout_options_list_only_supported_immediate_children_without_following_links() {
+    let (_temp, root) = fixture();
+    linked_tree(&root, "linked");
+    main_tree(&root, "工具 & <fixture>");
+    main_tree(&root, "nested/hidden");
+    directory(&root.join("ordinary"));
+    write(&root.join("file"), "not a checkout");
+    symlink(root.join("main"), root.join("alias")).unwrap();
+    let (_outside, outside) = fixture();
+    symlink(outside.join("main"), root.join("outside-alias")).unwrap();
+    main_tree(&root, "unsafe");
+    fs::set_permissions(root.join("unsafe"), fs::Permissions::from_mode(0o777)).unwrap();
+    let permitted = PermittedRoot::open_absolute(&root).unwrap();
+    let options = permitted.checkout_options().unwrap();
+    assert_eq!(options.paths, ["linked", "main", "工具 & <fixture>"]);
+    assert!(!options.limited);
+    assert_eq!(permitted.checkout_options().unwrap(), options);
+}
+
+#[test]
+fn checkout_options_count_non_checkout_entries_toward_the_limit() {
+    let (_temp, root) = fixture();
+    for index in 1..MAX_CHECKOUT_ENTRIES {
+        write(&root.join(format!("entry-{index}")), "fixture");
+    }
+    let permitted = PermittedRoot::open_absolute(&root).unwrap();
+    assert_eq!(permitted.checkout_options().unwrap().paths, ["main"]);
+    assert!(!permitted.checkout_options().unwrap().limited);
+    write(&root.join("one-more"), "fixture");
+    let options = permitted.checkout_options().unwrap();
+    assert!(options.limited);
+    assert!(options.paths.len() <= 1);
+}
+
+#[test]
+fn checkout_options_reject_replaced_or_unsafe_roots() {
+    let (_temp, root) = fixture();
+    directory(&root.join("selected"));
+    main_tree(&root, "selected/original");
+    let permitted = PermittedRoot::open_absolute(&root.join("selected")).unwrap();
+    fs::rename(root.join("selected"), root.join("preserved")).unwrap();
+    directory(&root.join("selected"));
+    main_tree(&root, "selected/replacement");
+    assert_eq!(permitted.checkout_options(), Err(InspectionError::Changed));
+    let current = PermittedRoot::open_absolute(&root.join("selected")).unwrap();
+    fs::set_permissions(root.join("selected"), fs::Permissions::from_mode(0o777)).unwrap();
+    assert_eq!(
+        current.checkout_options(),
+        Err(InspectionError::UnsafeEntry)
+    );
+}
+
+#[test]
 fn main_and_linked_worktrees_have_stable_distinct_and_shared_identities() {
     let (_temp, root) = fixture();
     linked_tree(&root, "linked");

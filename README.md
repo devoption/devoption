@@ -135,7 +135,12 @@ On Unix, an administrator may explicitly add `--repository-root ABSOLUTE_PATH` t
 `serve --data-dir ABSOLUTE_PATH`. It requires an existing owner and a trusted,
 existing root separate from application data; no root is selected by default.
 Each project's **Attach repository** form accepts a relative checkout path under
-that root. A confirmed save reloads its repository list; duplicate attachments
+that root. Opening the form loads a picker of supported immediate child checkouts.
+Choose one to fill the path, or enter a nested path manually. Discovery checks at
+most 64 root entries; a partial-list notice explains when the limit is reached.
+Empty or failed lists keep manual entry available, and **Refresh** retries discovery.
+Attachment validates the selected path again. A confirmed save reloads its
+repository list; duplicate attachments
 preserve the existing default, and uncertain saves ask you to inspect the list
 before retrying. Without a configured root, Projects explains why attachment is
 unavailable while retaining saved repository summaries.

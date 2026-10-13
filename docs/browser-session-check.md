@@ -42,10 +42,20 @@ or deploy button. Capture `project-details.jpg` before attaching more fixtures.
 Check the other project and a new empty project, then a direct reload and browser
 Back/Forward. Test the details page at a narrow viewport and while signed out.
 A successful attachment from details must reload that same project page.
-For `project-empty.jpg`, create **Example new project**, use 1120 × 760, and
-enter `tools` in its already expanded attachment form without submitting. Then
+For `project-empty.jpg`, create **Example new project**, use 1120 × 900, and
+select `tools` from **Available checkouts** in its already expanded attachment
+form without submitting. Then
 submit with the keyboard and verify that the first repository appears after
 reload while the browser stays on that project.
+
+Verify that opening an attachment form loads immediate child checkouts. Select a
+checkout with the keyboard, confirm its relative path is filled, then use Attach.
+Check Unicode names as literal text. Refresh must update the list without replacing
+a manually entered path. Simulate loading, empty, partial and failed responses;
+keep manual entry usable and confirm Refresh recovers. Nested paths remain a
+manual option; listing never searches recursively. A selected path removed or
+replaced before attachment must still pass the existing attachment validation.
+Check picker labels, focus, narrow layout, session recovery and disabled JavaScript.
 
 Expand a project's **Attach repository** disclosure with the keyboard, enter
 `tools` and submit. Its count and default checkout list must update after the

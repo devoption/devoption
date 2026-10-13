@@ -112,8 +112,12 @@ fn attachment(html: &mut String, id: &str, label: &str, open: bool) {
     let expanded = if open { " open" } else { "" };
     html.push_str(&format!(r#"<details class="repository-attachment"{expanded}><summary>Attach repository</summary>
                   <form class="project-form repository-form" data-project="{id}" aria-labelledby="{label}" action="/projects/{id}/repositories" method="post">
+                    <label for="repository-choice-{id}">Available checkouts</label>
+                    <select id="repository-choice-{id}" data-repository-choice aria-describedby="repository-options-status-{id}" disabled><option value="">Choose a checkout</option></select>
+                    <button class="action-button" data-repository-refresh type="button" disabled>Refresh</button>
+                    <p id="repository-options-status-{id}" data-repository-options-status role="status" aria-live="polite">Checkouts load when you open this form.</p>
                     <label for="repository-path-{id}">Checkout path</label>
-                    <p id="repository-hint-{id}">Relative to this server’s trusted root, for example <code>team/app</code>. Attach an existing local checkout.</p>
+                    <p id="repository-hint-{id}">Choose above or enter a path relative to this server’s trusted root, for example <code>team/app</code>.</p>
                     <input id="repository-path-{id}" data-repository-path name="path" type="text" required maxlength="4096" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="repository-hint-{id} repository-status-{id}" disabled>
                     <button class="action-button" data-repository-submit type="submit" disabled>Attach</button>
                     <p id="repository-status-{id}" data-repository-status role="status" aria-live="polite"></p>

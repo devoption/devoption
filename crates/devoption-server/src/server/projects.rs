@@ -65,7 +65,25 @@ pub(super) fn routes(projects: Projects) -> Router {
     let reader = projects.clone();
     let attachment = projects.clone();
     let detail = projects.clone();
+    let options = projects.clone();
     Router::new()
+        .route(
+            "/repository-options",
+            get(move || async move {
+                let Some(root) = options.root.clone() else {
+                    return (StatusCode::SERVICE_UNAVAILABLE, [(CACHE_CONTROL, "no-store")], "Repository attachment is not configured.").into_response();
+                };
+                let result = options.access(move |directory| {
+                    let catalog = directory.load()?.unwrap_or_default();
+                    catalog.check_repository_root(&root)?;
+                    Ok(root.checkout_options()?)
+                }).await;
+                match result {
+                    Ok(choices) => ([("cache-control", "no-store"), ("x-devoption-list-limited", if choices.limited { "true" } else { "false" })], choices.paths.join("\n")).into_response(),
+                    Err(_) => (StatusCode::SERVICE_UNAVAILABLE, [(CACHE_CONTROL, "no-store")], "Checkouts could not be loaded.").into_response(),
+                }
+            }),
+        )
         .route(
             "/projects",
             get(move || async move {
