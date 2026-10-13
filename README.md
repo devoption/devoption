@@ -176,12 +176,13 @@ browser installation is deferred. The preview exposes no first-owner setup route
 Start with an [issue](https://github.com/devoption/devoption/issues/new/choose)
 and read the [contribution guide](CONTRIBUTING.md).
 
-The Rust workspace has four crates. The running service uses
+The Rust workspace has five crates. The running service uses
 `devoption-cli` → `devoption-server`, which composes `devoption-projects` and
 `devoption-ui`. The project domain core is independent of those delivery layers:
 
 | Crate | Responsibility |
 | --- | --- |
+| `devoption-builds` | Immutable Unix build-plan metadata and structural validation, with no approval or execution |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
@@ -196,7 +197,10 @@ attachment tested using temporary fixtures. The server validates the catalog at
 startup, then rereads it for each authenticated Projects GET/HEAD request and supplies
 current display summaries to the UI. Project creation and repository attachment
 use the domain's locked, durable save operations. Executable integration tests stay with the CLI; domain
-logic remains in the project crate.
+logic remains in the project crate. The separate [build-plan model](docs/build-plans.md)
+validates explicit inputs against a catalog snapshot without I/O and has no runtime
+caller. Approval, execution, environment policy and resource enforcement remain
+unimplemented.
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
 packages are required. From the repository folder, run:

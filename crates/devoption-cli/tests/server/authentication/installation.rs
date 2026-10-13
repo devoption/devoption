@@ -5,6 +5,23 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 #[path = "installation/catalog.rs"]
 mod catalog;
 
+// Linux can temporarily reject a copied executable while a concurrent child
+// retains an inherited writable descriptor before exec. Retry only this kernel
+// error, only in copied-binary fixtures, at most 50 times (one second of waits).
+// Permanent failures and every other error still fail the test.
+fn copied_binary_operation<T>(mut operation: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    let mut retries = 0;
+    loop {
+        match operation() {
+            Err(error) if error.kind() == io::ErrorKind::ExecutableFileBusy && retries < 50 => {
+                retries += 1;
+                thread::sleep(Duration::from_millis(20));
+            }
+            result => return result,
+        }
+    }
+}
+
 fn installed_binary(root: &Path) -> PathBuf {
     let binary = root.join("devoption");
     fs::copy(env!("CARGO_BIN_EXE_devoption"), &binary).unwrap();
@@ -25,7 +42,8 @@ fn start_installed(
     if let Some(root) = repository_root {
         command.arg("--repository-root").arg(root);
     }
-    start_command(&mut command)
+    command.stdout(Stdio::piped());
+    started_child(copied_binary_operation(|| command.spawn()).unwrap())
 }
 
 fn guide_copy(operation: &str, source: &Path, destination: &Path) -> std::process::Output {
@@ -72,10 +90,57 @@ fn startup_rejected(binary: &Path, data: &Path, repository_root: Option<&Path>, 
     if let Some(root) = repository_root {
         command.arg("--repository-root").arg(root);
     }
-    let output = command.output().unwrap();
+    let output = copied_binary_operation(|| command.output()).unwrap();
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
     assert!(String::from_utf8(output.stderr).unwrap().contains(expected));
+}
+
+#[test]
+fn copied_binary_retries_are_bounded_and_preserve_other_errors() {
+    let mut attempts = 0;
+    let error = copied_binary_operation::<()>(|| {
+        attempts += 1;
+        Err(io::ErrorKind::ExecutableFileBusy.into())
+    })
+    .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::ExecutableFileBusy);
+    assert_eq!(attempts, 51);
+    for kind in [io::ErrorKind::PermissionDenied, io::ErrorKind::NotFound] {
+        let mut attempts = 0;
+        let error = copied_binary_operation::<()>(|| {
+            attempts += 1;
+            Err(kind.into())
+        })
+        .unwrap_err();
+        assert_eq!(error.kind(), kind);
+        assert_eq!(attempts, 1);
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn copied_binary_launch_recovers_after_writable_descriptor_closes() {
+    let (_temporary, root) = data_directory::fixture();
+    let binary = installed_binary(&root);
+    let mut writer = Some(fs::OpenOptions::new().write(true).open(&binary).unwrap());
+    let mut command = Command::new(&binary);
+    command.arg("--help");
+    let mut attempts = 0;
+    let output = copied_binary_operation(|| {
+        attempts += 1;
+        let result = command.output();
+        if attempts == 1 {
+            assert!(
+                matches!(&result, Err(error) if error.kind() == io::ErrorKind::ExecutableFileBusy)
+            );
+            drop(writer.take());
+        }
+        result
+    })
+    .unwrap();
+    assert!(attempts >= 2);
+    assert!(output.status.success());
 }
 
 #[test]

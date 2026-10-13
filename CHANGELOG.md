@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Copied-binary installation fixtures retry Linux's transient executable-busy
+  launch error within a fixed bound, retaining immediate failures for other
+  errors and covering held writable descriptors and persistent failures
+  ([#118](https://github.com/devoption/devoption/issues/118)).
+
 - Restored Projects pages clear temporary session-check errors after confirmed
   recovery, preserve attachment feedback, and replace interrupted progress with
   a reload warning ([#111](https://github.com/devoption/devoption/issues/111)).
@@ -47,6 +52,12 @@ Entries describe implemented changes, not the roadmap.
   ([#96](https://github.com/devoption/devoption/issues/96)).
 
 ### Added
+
+- A separate Unix build-plan domain validates immutable source, toolchain,
+  command, path, environment and limit metadata against a catalog snapshot.
+  Fixed Cargo arguments and bounded fields have fixture coverage; approval,
+  execution and runtime integration remain unimplemented
+  ([#116](https://github.com/devoption/devoption/issues/116)).
 
 - Catalog-inclusive offline backup/restore instructions and installed-binary
   fixtures cover version-2 repository associations and default checkouts, missing

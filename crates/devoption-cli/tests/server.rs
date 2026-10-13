@@ -23,7 +23,11 @@ fn start() -> (Server, SocketAddr) {
 }
 
 fn start_command(command: &mut Command) -> (Server, SocketAddr) {
-    let mut server = Server(command.stdout(Stdio::piped()).spawn().unwrap());
+    started_child(command.stdout(Stdio::piped()).spawn().unwrap())
+}
+
+fn started_child(child: Child) -> (Server, SocketAddr) {
+    let mut server = Server(child);
     let stdout = server.0.stdout.take().unwrap();
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
