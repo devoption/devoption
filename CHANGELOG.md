@@ -59,6 +59,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- The Projects list filters saved project names in the browser, with match counts,
+  no-results feedback and a clear action that preserves existing row/form state
+  ([#145](https://github.com/devoption/devoption/issues/145)).
+
 - Owners can rename saved projects from their details page, retaining stable
   identities, repository associations and checkout bindings through the existing
   authenticated, atomic catalog write path

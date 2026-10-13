@@ -16,7 +16,7 @@ Use each path below with the fixture's printed origin and port.
 | Page | Path | Capture state | File |
 | --- | --- | --- | --- |
 | Home | `/` | Signed in | `home.jpg` |
-| Projects | `/projects` | Signed in, first attachment form expanded with `tools` selected; 1120 × 1080 | `projects.jpg` |
+| Projects | `/projects` | Signed in, name filter empty, first attachment form expanded with `tools` selected; 1120 × 1200 | `projects.jpg` |
 | Project details | `/projects/{id}` | Signed in, open Example application from Projects, frontend status expanded, rename and attachment collapsed; 1120 × 900 | `project-details.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; rename collapsed, automatic attachment form expanded with `tools` selected; 1120 × 900 | `project-empty.jpg` |
 | About | `/about` | Signed in | `about.jpg` |
@@ -52,7 +52,7 @@ Remove the block and verify recovery without another sign-in after capturing it.
 1. If source or assets changed, rerun the fixture command and use its new URL.
    The HTML, CSS, SVG, and JavaScript are compiled into the executable.
 2. Set the browser content viewport to **1120 × 520 pixels**, at **100% zoom**.
-   For Projects, use **1120 × 1080** and expand the first project's **Attach
+   For Projects, use **1120 × 1200**, leave the name filter empty, and expand the first project's **Attach
    repository** form. Wait for the checkout list and select `tools` without
    submitting, to show the relative path
    alongside both fixture projects and the controls. For Project details, open

@@ -114,7 +114,11 @@ Development checks create owners only in [temporary fixture stores](docs/browser
 
 Projects displays saved names, repository counts and relative default checkout paths from the
 [catalog](docs/project-catalog.md). Open a project name to see its repositories,
-relative default checkout paths, and current build availability at `/projects/{id}`.
+or use **Filter projects by name** to find a case-insensitive name fragment in the
+current list. **Clear filter** restores all rows and focuses the search field.
+Filtering stays in the page; it sends no request and saves no browser preference.
+Without JavaScript, the full list remains visible. Project details show
+relative default checkout paths and current build availability at `/projects/{id}`.
 The details page links back to Projects and supports the same repository attachment
 form; a successful attachment reloads the page you are using. Build execution is
 not available yet. Signed-in owners can create an empty project
