@@ -48,6 +48,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A separate Unix build-plan domain validates immutable source, toolchain,
+  command, path, environment and limit metadata against a catalog snapshot.
+  Fixed Cargo arguments and bounded fields have fixture coverage; approval,
+  execution and runtime integration remain unimplemented
+  ([#116](https://github.com/devoption/devoption/issues/116)).
+
 - Catalog-inclusive offline backup/restore instructions and installed-binary
   fixtures cover version-2 repository associations and default checkouts, missing
   catalogs, rejected old sessions and invalid restores. Only temporary fixture
