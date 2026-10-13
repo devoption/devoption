@@ -53,6 +53,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- A separate Cargo registry contract records immutable locked dependency,
+  original-source, checksum and materialization metadata. Its checked provider
+  handoff rejects mismatched requests without a public-fetch fallback, preserves
+  Cargo package-name case while rejecting case-colliding coordinates, and build
+  plans include every descriptor field in equality. Only fixture providers exist;
+  registry hosting, actual fetching, approval and execution remain unimplemented
+  ([#119](https://github.com/devoption/devoption/issues/119)).
+
 - A separate Unix build-plan domain validates immutable source, toolchain,
   command, path, environment and limit metadata against a catalog snapshot.
   Fixed Cargo arguments and bounded fields have fixture coverage; approval,

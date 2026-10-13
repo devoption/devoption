@@ -6,6 +6,13 @@ of [#15](https://github.com/devoption/devoption/issues/15) and
 [#17](https://github.com/devoption/devoption/issues/17). It has no runtime caller,
 HTTP route, UI, persistence, approval issuer or executor. Builds remain unavailable.
 
+Every plan also carries an immutable [Cargo dependency descriptor](registry-contract.md)
+from the DevOption registry contract added in
+[#119](https://github.com/devoption/devoption/issues/119). The descriptor records
+claimed lockfile/package checksums, original source and serving-registry identity,
+and bundle digest/size. Every field participates in plan equality. No lockfile or
+dependency bytes are read or verified here, and no direct-public-fetch fallback exists.
+
 `BuildPlan::validate` consumes owned `PlanInput` values and reads a supplied
 in-memory catalog snapshot. It requires existing, associated project/repository
 IDs with a registered default checkout. Metadata-only associations are rejected.
@@ -54,9 +61,10 @@ approval, freshness check or durable plan identifier.
 ## Before execution can exist
 
 The future approval/execution layer must verify the source commit and fresh
-catalog binding, create a clean owned work directory without modifying the user's
-checkout, verify toolchain/executable identity, and define an explicit environment
-allowlist and dependency-cache/network policy. A Cargo `--offline` flag does not
+catalog binding, bind and verify the registry descriptor against the committed
+lockfile and actual bundle, create a clean owned work directory without modifying
+the user's checkout, verify toolchain/executable identity, and define an explicit
+environment allowlist and registry access/network policy. A Cargo `--offline` flag does not
 prevent build scripts or compilers from using the network and is not a sandbox.
 
 Approval must bind the complete plan and relevant verified external state to the
@@ -67,6 +75,8 @@ mechanisms are introduced here. The first workflow remains limited to trusted co
 running as an unprivileged OS account; supporting arbitrary untrusted builds would
 require a separate isolation design.
 
-Next product decisions are the allowed environment/toolchain and dependency-cache
-policy, owned work-directory policy, resource caps and approval lifetime. This
-model chooses no production paths, environment permissions or execution defaults.
+The selected architecture acquires dependencies through DevOption's registry/proxy
+before a separately approved isolated offline build. Provider transport, allowed
+environment/toolchain, owned work-directory policy, resource caps and approval
+lifetime remain undecided. This model chooses no production paths, environment
+permissions or execution defaults.

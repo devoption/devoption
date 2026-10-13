@@ -1,6 +1,38 @@
 use super::*;
 use devoption_projects::{CatalogStore, worktree::PermittedRoot};
+use devoption_registry::{
+    CargoDependencyRequest, CargoMaterialization, CargoOrigin, CargoRegistryProvider,
+    LockedPackage, RegistryId, Sha256, prepare_dependencies,
+};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
+
+fn digest(byte: u8) -> Sha256 {
+    Sha256::from_hex(&format!("{byte:02x}").repeat(32)).unwrap()
+}
+
+fn dependencies() -> CargoMaterialization {
+    struct FixtureProvider;
+    impl CargoRegistryProvider for FixtureProvider {
+        fn materialize(
+            &self,
+            request: &CargoDependencyRequest,
+        ) -> Result<CargoMaterialization, devoption_registry::Error> {
+            Ok(CargoMaterialization::new(request.clone(), digest(3), 100))
+        }
+    }
+    let request = CargoDependencyRequest::new(
+        RegistryId::new("local-registry").unwrap(),
+        digest(2),
+        vec![LockedPackage {
+            origin: CargoOrigin::CratesIo,
+            name: "example-dependency".into(),
+            version: "1.0.0".into(),
+            archive_sha256: digest(1),
+        }],
+    )
+    .unwrap();
+    prepare_dependencies(&FixtureProvider, &request).unwrap()
+}
 
 // Synthetic Git metadata only: no Git commands, commits, hooks or build scripts.
 // The directories disappear before validation, demonstrating that it reads only
@@ -45,6 +77,7 @@ fn fixture() -> (Catalog, PlanInput) {
         project,
         repository,
         commit: "0123456789abcdef0123456789abcdef01234567".into(),
+        dependencies: dependencies(),
         rust_version: "1.99.0".into(),
         cargo_executable: "/example/toolchains/1.99.0/bin/cargo".into(),
         work_directory: "/example/jobs/one".into(),
@@ -121,6 +154,72 @@ fn every_reviewed_field_changes_plan_equality() {
     let mut changed = input;
     changed.repository = catalog.repositories()[1].id();
     assert!(BuildPlan::validate(changed, &catalog).unwrap() != original);
+}
+
+#[test]
+fn dependency_provenance_lockfile_packages_and_bundle_identity_change_the_plan() {
+    let (catalog, input) = fixture();
+    let original = BuildPlan::validate(input.clone(), &catalog).unwrap();
+    let snapshot = input.dependencies.clone();
+    let request = snapshot.request();
+    let mut requests = vec![
+        CargoDependencyRequest::new(
+            RegistryId::new("different-provider").unwrap(),
+            request.lockfile_sha256(),
+            request.packages().to_vec(),
+        )
+        .unwrap(),
+        CargoDependencyRequest::new(
+            request.registry().clone(),
+            digest(99),
+            request.packages().to_vec(),
+        )
+        .unwrap(),
+        CargoDependencyRequest::new(
+            request.registry().clone(),
+            request.lockfile_sha256(),
+            Vec::new(),
+        )
+        .unwrap(),
+    ];
+    for change in [
+        (|p: &mut LockedPackage| {
+            p.origin = CargoOrigin::DevOption(RegistryId::new("private").unwrap())
+        }) as fn(&mut LockedPackage),
+        |p| p.name = "other-package".into(),
+        |p| p.version = "2.0.0".into(),
+        |p| p.archive_sha256 = digest(98),
+    ] {
+        let mut packages = request.packages().to_vec();
+        change(&mut packages[0]);
+        requests.push(
+            CargoDependencyRequest::new(
+                request.registry().clone(),
+                request.lockfile_sha256(),
+                packages,
+            )
+            .unwrap(),
+        );
+    }
+    let mut variants: Vec<_> = requests
+        .into_iter()
+        .map(|r| CargoMaterialization::new(r, snapshot.bundle_sha256(), snapshot.bundle_bytes()))
+        .collect();
+    variants.push(CargoMaterialization::new(
+        request.clone(),
+        digest(97),
+        snapshot.bundle_bytes(),
+    ));
+    variants.push(CargoMaterialization::new(
+        request.clone(),
+        snapshot.bundle_sha256(),
+        101,
+    ));
+    for dependencies in variants {
+        let mut changed = input.clone();
+        changed.dependencies = dependencies;
+        assert!(BuildPlan::validate(changed, &catalog).unwrap() != original);
+    }
 }
 
 #[test]
