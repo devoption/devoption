@@ -236,6 +236,17 @@ impl Catalog {
         root: &PermittedRoot,
         path: &Path,
     ) -> Result<RepositoryId, Error> {
+        self.attach_named(project, root, path, None)
+    }
+
+    /// Managed creation keeps its display name separate from its storage key.
+    pub(crate) fn attach_named(
+        &mut self,
+        project: ProjectId,
+        root: &PermittedRoot,
+        path: &Path,
+        display_name: Option<&str>,
+    ) -> Result<RepositoryId, Error> {
         if !self.projects.iter().any(|p| p.id == project) {
             return Err(Error::UnknownProject);
         }
@@ -254,7 +265,7 @@ impl Catalog {
                 .file_name()
                 .and_then(|n| n.to_str())
                 .ok_or(Error::InvalidName)?;
-            let repository = self.create_repository(name)?;
+            let repository = self.create_repository(display_name.unwrap_or(name))?;
             self.bindings.push(RepositoryBinding {
                 repository,
                 common_directory: observed.common_directory,

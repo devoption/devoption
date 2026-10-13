@@ -125,7 +125,11 @@ fn inspection_configuration_does_not_implicitly_grant_creation() {
         ),
         503,
     );
-    assert!(!root.join("must-not-exist").exists());
+    assert!(
+        !root
+            .join(format!("{}--must-not-exist", hex(project)))
+            .exists()
+    );
     assert!(
         read_catalog(&data)
             .unwrap()
@@ -199,10 +203,14 @@ fn managed_mutations_reject_untrusted_transports_input_and_existing_paths() {
         ),
         415,
     );
+    // A pre-existing scoped path is preserved, even without a saved association.
+    let occupied = root.join(format!("{}--occupied", hex(project)));
+    fs::write(&occupied, "preserved").unwrap();
     check(
-        &request(address, &creation(address, &issued, project, "main")),
+        &request(address, &creation(address, &issued, project, "occupied")),
         409,
     );
+    assert_eq!(fs::read(&occupied).unwrap(), b"preserved");
     check(
         &request(
             address,
@@ -211,8 +219,8 @@ fn managed_mutations_reject_untrusted_transports_input_and_existing_paths() {
         404,
     );
     assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
-    assert!(!root.join("service").exists());
-    assert!(!root.join("missing").exists());
+    assert!(!root.join(format!("{}--service", hex(project))).exists());
+    assert!(!root.join(format!("{}--missing", "00".repeat(16))).exists());
     check(&request(address, &raw), 204);
     let saved = fs::read(data.join("projects.bin")).unwrap();
     check(&request(address, &raw), 409);
@@ -260,9 +268,83 @@ fn concurrent_duplicate_requests_create_one_identity_and_failed_writes_remain_in
     );
     fs::set_permissions(&data, fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(fs::read(data.join("projects.bin")).unwrap(), saved);
-    assert!(root.join("unconfirmed/.git/HEAD").is_file());
+    assert!(
+        root.join(format!("{}--unconfirmed/.git/HEAD", hex(project)))
+            .is_file()
+    );
     check(
         &request(address, &creation(address, &issued, project, "unconfirmed")),
         409,
     );
+}
+
+#[test]
+fn cli_managed_projects_can_each_create_ui_and_browse_independent_files_after_restart() {
+    let (_data, data) = configured();
+    let (_root, root) = repositories::root_fixture();
+    let (first, second) = repositories::seed(&data);
+    let existing = fs::read(root.join("main/.git/config")).unwrap();
+    let (server, address) = start_managed(&data, &root);
+    let issued = sign_in(address);
+    let mut locations = Vec::new();
+    for project in [first, second] {
+        let raw = creation(address, &issued, project, "ui");
+        let response = request(address, &raw);
+        check(&response, 204);
+        locations.push(
+            response
+                .split("\r\n")
+                .find_map(|line| line.strip_prefix("location: "))
+                .unwrap()
+                .to_owned(),
+        );
+        check(&request(address, &raw), 409);
+    }
+    let saved = read_catalog(&data).unwrap().unwrap();
+    assert_eq!(saved.repositories().len(), 2);
+    assert!(saved.repositories().iter().all(|r| r.name() == "ui"));
+    assert_ne!(saved.repositories()[0].id(), saved.repositories()[1].id());
+    let contents = ["First project only", "Second project only"];
+    for (checkout, text) in saved.default_checkouts().iter().zip(contents) {
+        let path = root.join(checkout.relative_path());
+        fs::write(path.join("README.md"), text).unwrap();
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .args(["add", "README.md"])
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    fs::write(
+        root.join(saved.default_checkouts()[0].relative_path())
+            .join("note.txt"),
+        "first only",
+    )
+    .unwrap();
+    drop(server);
+    let (_server, address) = start_managed(&data, &root);
+    let issued = sign_in(address);
+    for (index, (location, content)) in locations.iter().zip(contents).enumerate() {
+        let page = read(
+            address,
+            "GET",
+            &format!("{location}/README.md"),
+            Some(&issued),
+        );
+        let page = check(&page, 200);
+        assert!(page.contains(content));
+        assert!(!page.contains(contents[1 - index]));
+        let status = format!("{}/status", location.strip_suffix("/files").unwrap());
+        assert_eq!(
+            check(&read(address, "GET", &status, Some(&issued)), 200),
+            format!("main\n\n1\n0\n{}\n0", usize::from(index == 0))
+        );
+    }
+    let foreign = locations[1].replace(&hex(second), &hex(first));
+    check(&read(address, "GET", &foreign, Some(&issued)), 404);
+    assert_eq!(read_catalog(&data).unwrap().unwrap(), saved);
+    assert_eq!(fs::read(root.join("main/.git/config")).unwrap(), existing);
 }

@@ -39,6 +39,15 @@ impl Fixture {
     fn managed(&self) -> ManagedRoot {
         ManagedRoot::open_absolute(&self.root).unwrap()
     }
+    fn path(&self, name: &str) -> PathBuf {
+        let project: String = self
+            .project
+            .to_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        PathBuf::from(format!("{project}--{name}"))
+    }
     fn bytes(&self) -> Vec<u8> {
         fs::read(self.data.join("projects.bin")).unwrap()
     }
@@ -58,7 +67,7 @@ fn created_repository_has_private_valid_git_metadata_and_persisted_independent_i
     assert_eq!(saved.repositories()[0].name(), "example-app");
     assert_eq!(
         saved.default_checkouts()[0].relative_path(),
-        Path::new("example-app")
+        f.path("example-app")
     );
     let status = saved
         .repository_status(f.project, id, root.permitted())
@@ -73,7 +82,7 @@ fn created_repository_has_private_valid_git_metadata_and_persisted_independent_i
         "example-app/.git/refs",
     ] {
         assert_eq!(
-            fs::metadata(f.root.join(path))
+            fs::metadata(f.root.join(f.path(path)))
                 .unwrap()
                 .permissions()
                 .mode()
@@ -83,7 +92,7 @@ fn created_repository_has_private_valid_git_metadata_and_persisted_independent_i
     }
     for path in ["example-app/.git/HEAD", "example-app/.git/config"] {
         assert_eq!(
-            fs::metadata(f.root.join(path))
+            fs::metadata(f.root.join(f.path(path)))
                 .unwrap()
                 .permissions()
                 .mode()
@@ -91,7 +100,7 @@ fn created_repository_has_private_valid_git_metadata_and_persisted_independent_i
             0o600
         );
     }
-    assert!(!f.root.join("example-app/.git/hooks").exists());
+    assert!(!f.root.join(f.path("example-app/.git/hooks")).exists());
     assert_eq!(
         CatalogStore::open_absolute(&f.data)
             .unwrap()
@@ -102,22 +111,22 @@ fn created_repository_has_private_valid_git_metadata_and_persisted_independent_i
     );
     assert_eq!(
         root.permitted().checkout_options().unwrap().paths,
-        ["example-app"]
+        [f.path("example-app").to_str().unwrap()]
     );
 }
 #[test]
 fn duplicates_and_existing_files_directories_symlinks_never_change_saved_or_existing_data() {
     let f = Fixture::new();
     let root = f.managed();
-    fs::write(f.root.join("file"), "preserved").unwrap();
-    fs::create_dir(f.root.join("directory")).unwrap();
-    symlink("file", f.root.join("link")).unwrap();
+    fs::write(f.root.join(f.path("file")), "preserved").unwrap();
+    fs::create_dir(f.root.join(f.path("directory"))).unwrap();
+    symlink(f.path("file"), f.root.join(f.path("link"))).unwrap();
     let mut store = CatalogStore::open_absolute(&f.data).unwrap();
     store
         .create_managed_repository(f.project, &root, "created")
         .unwrap();
     let before = f.bytes();
-    let original = fs::read(f.root.join("created/.git/config")).unwrap();
+    let original = fs::read(f.root.join(f.path("created/.git/config"))).unwrap();
     for name in ["file", "directory", "link", "created"] {
         assert!(matches!(
             store.create_managed_repository(f.project, &root, name),
@@ -125,11 +134,16 @@ fn duplicates_and_existing_files_directories_symlinks_never_change_saved_or_exis
         ));
         assert_eq!(f.bytes(), before);
     }
-    assert_eq!(fs::read(f.root.join("file")).unwrap(), b"preserved");
-    assert_eq!(fs::read_dir(f.root.join("directory")).unwrap().count(), 0);
-    assert!(f.root.join("link").is_symlink());
+    assert_eq!(fs::read(f.root.join(f.path("file"))).unwrap(), b"preserved");
     assert_eq!(
-        fs::read(f.root.join("created/.git/config")).unwrap(),
+        fs::read_dir(f.root.join(f.path("directory")))
+            .unwrap()
+            .count(),
+        0
+    );
+    assert!(f.root.join(f.path("link")).is_symlink());
+    assert_eq!(
+        fs::read(f.root.join(f.path("created/.git/config"))).unwrap(),
         original
     );
 }
@@ -221,7 +235,7 @@ fn failed_catalog_publication_preserves_unregistered_checkout_for_explicit_recov
     ));
     fs::set_permissions(&f.data, fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(f.bytes(), before);
-    assert!(root.permitted().inspect(Path::new("interrupted")).is_ok());
+    assert!(root.permitted().inspect(&f.path("interrupted")).is_ok());
     assert!(matches!(
         store.create_managed_repository(f.project, &root, "interrupted"),
         Err(Error::RepositoryExists)
@@ -230,7 +244,7 @@ fn failed_catalog_publication_preserves_unregistered_checkout_for_explicit_recov
         .attach_repository(
             f.project,
             &PermittedRoot::open_absolute(&f.root).unwrap(),
-            Path::new("interrupted"),
+            &f.path("interrupted"),
         )
         .unwrap();
     assert_eq!(
@@ -297,7 +311,7 @@ fn encoded_capacity_after_initialization_requires_inspection_before_retry() {
         Err(Error::CreationUncertain)
     ));
     assert_eq!(f.bytes(), before);
-    assert!(root.permitted().inspect(Path::new("new-service")).is_ok());
+    assert!(root.permitted().inspect(&f.path("new-service")).is_ok());
     assert!(matches!(
         store.create_managed_repository(f.project, &root, "new-service"),
         Err(Error::RepositoryExists)
@@ -315,7 +329,7 @@ fn existing_bindings_and_cross_project_associations_survive_new_creation() {
     let other = store.create_project("Other").unwrap();
     assert_eq!(
         store
-            .attach_repository(other, root.permitted(), Path::new("first"))
+            .attach_repository(other, root.permitted(), &f.path("first"))
             .unwrap(),
         first
     );
@@ -345,4 +359,121 @@ fn metadata_depth_limit_is_checked_before_creating_any_checkout() {
             .is_err()
     );
     assert_eq!(fs::read_dir(&path).unwrap().count(), 0);
+}
+
+#[test]
+fn same_name_in_separate_projects_keeps_contents_status_and_paths_independent_after_rename() {
+    let f = Fixture::new();
+    let root = f.managed();
+    let mut store = CatalogStore::open_absolute(&f.data).unwrap();
+    let other = store.create_project("Second project").unwrap();
+    let first = store
+        .create_managed_repository(f.project, &root, "ui")
+        .unwrap();
+    let second = store.create_managed_repository(other, &root, "ui").unwrap();
+    assert_ne!(first, second);
+    let saved = store.load().unwrap().unwrap();
+    assert!(
+        saved
+            .repositories()
+            .iter()
+            .all(|repository| repository.name() == "ui")
+    );
+    let paths: Vec<_> = saved
+        .default_checkouts()
+        .iter()
+        .map(|c| c.relative_path().to_path_buf())
+        .collect();
+    assert_ne!(paths[0], paths[1]);
+    for (path, text) in paths.iter().zip(["first content", "second content"]) {
+        fs::write(f.root.join(path).join("README.md"), text).unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .arg("-C")
+                .arg(f.root.join(path))
+                .args(["add", "README.md"])
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    fs::write(f.root.join(&paths[0]).join("first-only.txt"), "untracked").unwrap();
+    for (project, repository, text, untracked) in [
+        (f.project, first, "first content", 1),
+        (other, second, "second content", 0),
+    ] {
+        let files = saved
+            .repository_files(project, repository, root.permitted(), Some("README.md"))
+            .unwrap();
+        assert!(
+            matches!(files.selected, Some((_, crate::worktree::FileContent::Text(ref value))) if value == text)
+        );
+        let status = saved
+            .repository_status(project, repository, root.permitted())
+            .unwrap();
+        assert_eq!(status.changes.staged, 1);
+        assert_eq!(status.changes.untracked, untracked);
+        assert!(matches!(
+            store.create_managed_repository(project, &root, "ui"),
+            Err(Error::RepositoryExists)
+        ));
+        assert!(matches!(
+            store.create_managed_repository(project, &root, "UI"),
+            Err(Error::RepositoryExists)
+        ));
+    }
+    assert!(matches!(
+        saved.repository_files(f.project, second, root.permitted(), None),
+        Err(Error::UnknownRepository)
+    ));
+    let mut renamed = saved.clone();
+    renamed
+        .rename_project(f.project, "Renamed project")
+        .unwrap();
+    store.save(&renamed).unwrap();
+    drop(store);
+    let reopened = read_catalog(&f.data).unwrap().unwrap();
+    assert_eq!(reopened, renamed);
+    assert_eq!(reopened.default_checkouts(), saved.default_checkouts());
+    for (path, text) in paths.iter().zip(["first content", "second content"]) {
+        assert_eq!(
+            fs::read_to_string(f.root.join(path).join("README.md")).unwrap(),
+            text
+        );
+    }
+    assert_eq!(root.permitted().checkout_options().unwrap().paths.len(), 2);
+}
+
+#[test]
+fn legacy_flat_repositories_keep_their_identity_and_block_same_project_names_only() {
+    let f = Fixture::new();
+    let root = f.managed();
+    let mut store = CatalogStore::open_absolute(&f.data).unwrap();
+    // The pre-181 layout remains supported without any migration.
+    root.initialize("ui").unwrap();
+    fs::write(f.root.join("ui/keep.txt"), "legacy contents").unwrap();
+    let first = store
+        .attach_repository(f.project, root.permitted(), Path::new("ui"))
+        .unwrap();
+    let other = store.create_project("Other").unwrap();
+    let before = store.load().unwrap().unwrap();
+    assert!(matches!(
+        store.create_managed_repository(f.project, &root, "ui"),
+        Err(Error::RepositoryExists)
+    ));
+    assert!(!f.root.join(f.path("ui")).exists());
+    let second = store.create_managed_repository(other, &root, "ui").unwrap();
+    assert_ne!(first, second);
+    let after = store.load().unwrap().unwrap();
+    assert_eq!(after.default_checkouts()[0], before.default_checkouts()[0]);
+    assert_eq!(
+        after.repository_bindings()[0],
+        before.repository_bindings()[0]
+    );
+    assert_eq!(
+        fs::read(f.root.join("ui/keep.txt")).unwrap(),
+        b"legacy contents"
+    );
+    assert_eq!(after.repositories()[0].name(), "ui");
+    assert_eq!(after.repositories()[1].name(), "ui");
 }

@@ -54,7 +54,7 @@
         } else if (response.status === 400 || response.status === 413) {
           message("The repository name was rejected. Check the name and try again.");
         } else if (response.status === 409) {
-          message("That path already exists or the catalog is full. Existing files were not changed. Choose another name or reload Code to inspect saved state.");
+          message("That repository name is already used in this project, its storage path already exists, or the catalog is full. Existing files were not changed. Choose another name or reload Code to inspect saved state.");
           inspectNeeded = true;
         } else if (response.status === 401) {
           verified = false; message("Your session ended. Check your account to continue.");

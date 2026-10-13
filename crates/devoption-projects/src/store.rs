@@ -100,22 +100,33 @@ impl CatalogStore {
             return Err(Error::RootMismatch);
         }
         let mut catalog = self.load()?.unwrap_or_default();
-        if !catalog
+        let selected = catalog
             .projects()
             .iter()
-            .any(|candidate| candidate.id() == project)
-        {
-            return Err(Error::UnknownProject);
+            .find(|candidate| candidate.id() == project)
+            .ok_or(Error::UnknownProject)?;
+        // Include legacy/attached records so a new storage layout cannot create
+        // a second same-named repository in this project. Existing data is unchanged.
+        if catalog.repositories().iter().any(|repository| {
+            selected.repositories().contains(&repository.id())
+                && repository.name().eq_ignore_ascii_case(name)
+        }) {
+            return Err(Error::RepositoryExists);
         }
         if catalog.repositories().len() >= crate::MAX_REPOSITORIES {
             return Err(Error::Capacity);
         }
         catalog.check_repository_root(root.permitted())?;
-        let path = root.initialize(name)?;
+        let project_key: String = project
+            .to_bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let path = root.initialize(&format!("{project_key}--{name}"))?;
         // Initialization has already published filesystem state. Even a capacity
         // failure during catalog encoding now requires inspection before retry.
         let repository = catalog
-            .attach(project, root.permitted(), &path)
+            .attach_named(project, root.permitted(), &path, Some(name))
             .map_err(|_| Error::CreationUncertain)?;
         self.save(&catalog).map_err(|_| Error::CreationUncertain)?;
         Ok(repository)

@@ -20,7 +20,7 @@ pub(super) fn routes(projects: Projects) -> Router {
             Ok(location) => (StatusCode::NO_CONTENT, [(CACHE_CONTROL, "no-store"), (LOCATION, location.as_str())]).into_response(),
             Err(status) => (status, [(CACHE_CONTROL, "no-store")], match status {
                 StatusCode::BAD_REQUEST => "Use a repository name with letters, numbers, hyphens or underscores, starting with a letter or number.",
-                StatusCode::CONFLICT => "That path already exists or the catalog is full. Existing files were not changed. Reload Code to inspect saved state.",
+                StatusCode::CONFLICT => "That repository name is already used in this project, its storage path exists, or the catalog is full. Existing files were not changed. Reload Code to inspect saved state.",
                 StatusCode::NOT_FOUND => "Project does not exist.",
                 StatusCode::PAYLOAD_TOO_LARGE => "Repository name is too long.",
                 StatusCode::UNSUPPORTED_MEDIA_TYPE => "Use one plain UTF-8 repository name.",

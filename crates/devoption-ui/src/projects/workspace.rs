@@ -191,7 +191,7 @@ pub(super) fn repositories(
         html.push_str(&super::dialog("repository-create-dialog", "New repository", &format!(r#"
 <form id="repository-create-form" class="project-form" data-project="{id}" aria-labelledby="repository-create-dialog-title">
 <label for="repository-create-name">Repository name</label>
-<p id="repository-create-hint">Create an empty Git repository on this server. Use 1–64 letters, numbers, hyphens or underscores, starting with a letter or number.</p>
+<p id="repository-create-hint">Create an empty Git repository on this server. Names are unique within this project. Use 1–64 letters, numbers, hyphens or underscores, starting with a letter or number.</p>
 <input id="repository-create-name" name="name" type="text" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="repository-create-hint repository-create-status" disabled>
 <p id="repository-create-status" role="status" aria-live="polite">Checking your session…</p>
 <a id="repository-create-reload" href="/projects/{id}/code" hidden>Reload Code</a>

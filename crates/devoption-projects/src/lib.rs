@@ -61,7 +61,9 @@ impl fmt::Display for Error {
             Self::Capacity => "catalog capacity reached",
             Self::UnknownProject => "project does not exist in this catalog",
             Self::UnknownRepository => "repository does not exist in this catalog",
-            Self::RepositoryExists => "repository path already exists; it was not changed",
+            Self::RepositoryExists => {
+                "repository name or storage path already exists; it was not changed"
+            }
             Self::CreationUncertain => {
                 "repository creation could not be confirmed; inspect storage before retrying"
             }
