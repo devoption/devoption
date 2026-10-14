@@ -15,7 +15,7 @@ Entries describe implemented changes, not the roadmap.
   audience/why, link the MVP phase to its milestone, split the MVP into numbered
   stages with clear “done when” criteria aligned to acceptance checks, add a brief
   Rust-to-Wasm vs containers note, and include a short “How to help” section
-  (docs-only) ([#14](https://github.com/devoption/devoption/issues/14)).
+  (docs-only) ([#188](https://github.com/devoption/devoption/issues/188)).
 
 - Scope newly created repository storage and names to each project, allowing each
   project to have its own `ui` while preserving legacy paths and stable locations
