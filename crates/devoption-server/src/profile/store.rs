@@ -16,6 +16,7 @@ use std::{
 const RECORD: &str = "profile.bin";
 const MAGIC: &[u8; 8] = b"DVPROFIL";
 const HEADER: usize = 25;
+const MAX_READ_ATTEMPTS: usize = 8;
 static NEXT_TEMP: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) struct ProfileStore {
@@ -49,42 +50,63 @@ impl ProfileStore {
     }
 
     pub(crate) fn load(&self, identity: IdentityId) -> Result<DisplayName, Error> {
-        self.check(identity)?;
-        let file = match openat(
-            &self.directory,
-            RECORD,
-            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
-            Mode::empty(),
-        ) {
-            Ok(fd) => File::from(fd),
-            Err(Errno::NOENT) => return Ok(DisplayName::default()),
-            Err(error) => return Err(error.into()),
-        };
-        let metadata = file.metadata()?;
-        if !metadata.is_file()
-            || metadata.nlink() != 1
-            || metadata.uid() != geteuid().as_raw()
-            || metadata.mode() & 0o077 != 0
-            || metadata.len() > (HEADER + MAX_NAME_BYTES) as u64
-        {
-            return Err(Error::InvalidRecord);
-        }
-        let mut bytes = Vec::new();
-        file.take((HEADER + MAX_NAME_BYTES + 1) as u64)
-            .read_to_end(&mut bytes)?;
-        if bytes.len() < HEADER
-            || bytes.len() > HEADER + MAX_NAME_BYTES
-            || &bytes[..8] != MAGIC
-            || bytes[8] != 1
-            || bytes[9..HEADER] != identity.to_bytes()
-        {
-            return Err(Error::InvalidRecord);
-        }
-        let name = std::str::from_utf8(&bytes[HEADER..]).map_err(|_| Error::InvalidRecord)?;
-        DisplayName::new(name).map_err(|_| Error::InvalidRecord)
+        self.load_after_open(identity, || {})
     }
 
-    /// Last completed save wins. An uncertain post-publication sync failure must
+    // Keep the open/metadata boundary testable without timing-dependent sleeps.
+    fn load_after_open(
+        &self,
+        identity: IdentityId,
+        mut after_open: impl FnMut(),
+    ) -> Result<DisplayName, Error> {
+        for attempt in 0..MAX_READ_ATTEMPTS {
+            self.check(identity)?;
+            let file = match openat(
+                &self.directory,
+                RECORD,
+                OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+                Mode::empty(),
+            ) {
+                Ok(fd) => File::from(fd),
+                Err(Errno::NOENT) if attempt == 0 => return Ok(DisplayName::default()),
+                Err(error) => return Err(error.into()),
+            };
+            after_open();
+            let metadata = file.metadata()?;
+            if !metadata.is_file()
+                || metadata.uid() != geteuid().as_raw()
+                || metadata.mode() & 0o077 != 0
+                || metadata.len() > (HEADER + MAX_NAME_BYTES) as u64
+            {
+                return Err(Error::InvalidRecord);
+            }
+            // Atomic replacement can unlink a record after open but before stat.
+            // Never accept that retired handle: reopen the current path and apply
+            // every check again. A disappearing replacement is not an unset name.
+            if metadata.nlink() == 0 {
+                continue;
+            }
+            if metadata.nlink() != 1 {
+                return Err(Error::InvalidRecord);
+            }
+            let mut bytes = Vec::new();
+            file.take((HEADER + MAX_NAME_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)?;
+            if bytes.len() < HEADER
+                || bytes.len() > HEADER + MAX_NAME_BYTES
+                || &bytes[..8] != MAGIC
+                || bytes[8] != 1
+                || bytes[9..HEADER] != identity.to_bytes()
+            {
+                return Err(Error::InvalidRecord);
+            }
+            let name = std::str::from_utf8(&bytes[HEADER..]).map_err(|_| Error::InvalidRecord)?;
+            return DisplayName::new(name).map_err(|_| Error::InvalidRecord);
+        }
+        Err(Errno::AGAIN.into())
+    }
+
+    /// Last atomic replacement wins. An uncertain post-publication sync failure must
     /// be checked with load; never delete/reset an existing record on failure.
     pub(crate) fn save(&self, identity: IdentityId, name: &DisplayName) -> Result<(), Error> {
         self.load(identity)?; // Fail closed on an existing unsafe or invalid record.

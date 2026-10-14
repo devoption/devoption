@@ -97,6 +97,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Retry bounded profile reads when a concurrent atomic save retires the opened
+  record before validation, preserving private-file and identity checks instead
+  of reporting a valid replacement as corrupt. Cover the race deterministically
+  and retain concurrent-save coverage
+  ([#185](https://github.com/devoption/devoption/issues/185)).
+
 - Successful sign-in now opens Overview automatically after confirming the session
   cookie, without requiring an Open workspace click. Failed or unverified attempts
   stay on the authentication page
