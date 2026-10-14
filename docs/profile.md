@@ -29,7 +29,12 @@ regular, singly linked file owned by the service OS user with no group/other acc
 
 Saves use a private temporary file, file sync, atomic rename and directory sync.
 Requests within the server serialize; simultaneous processes use atomic replacement
-with the last completed save winning. A failure after rename may have saved the name,
+with the last published record winning. If replacement unlinks a record between
+opening it and checking metadata, the reader discards that handle and reopens the
+current record, applying all validation again. Reads allow at most eight attempts;
+a missing replacement or continuing contention returns unavailable rather than an
+unset name or unvalidated data. Hard links, unsafe permissions and malformed records
+still fail closed. A failure after rename may have saved the name,
 so clients reload instead of assuming rollback. Invalid existing records fail closed;
 startup stops before binding, and runtime access returns unavailable. Records are
 never reset automatically. This is not a boundary against the owning OS user.

@@ -132,3 +132,128 @@ fn concurrent_saves_publish_only_complete_records() {
     assert!(store.load(ID).unwrap().as_str().starts_with("Fixture "));
     assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
 }
+
+#[test]
+fn replacement_after_open_reads_the_current_complete_record() {
+    let (directory, owner, store) = fixture();
+    let old = DisplayName::new("Previous").unwrap();
+    let current = DisplayName::new("Current 林").unwrap();
+    store.save(ID, &old).unwrap();
+    let writer = ProfileStore::new(&owner, ID).unwrap();
+    let opened = File::open(directory.path().join(RECORD)).unwrap();
+    let mut calls = 0;
+    let result = store.load_after_open(ID, || {
+        calls += 1;
+        if calls == 1 {
+            writer.save(ID, &current).unwrap();
+            assert_eq!(opened.metadata().unwrap().nlink(), 0);
+        }
+    });
+    assert_eq!(result.unwrap(), current);
+    assert_eq!(calls, 2);
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
+
+#[test]
+fn replaced_records_still_require_valid_private_single_linked_owner_data() {
+    for invalid in [
+        "corrupt",
+        "identity",
+        "oversized",
+        "permissions",
+        "hardlink",
+        "symlink",
+        "directory",
+    ] {
+        let (directory, owner, store) = fixture();
+        let name = DisplayName::new("Valid").unwrap();
+        store.save(ID, &name).unwrap();
+        let writer = ProfileStore::new(&owner, ID).unwrap();
+        let path = directory.path().join(RECORD);
+        let alias = directory.path().join("alias");
+        let mut calls = 0;
+        let result = store.load_after_open(ID, || {
+            calls += 1;
+            if calls != 1 {
+                return;
+            }
+            writer.save(ID, &name).unwrap();
+            match invalid {
+                "corrupt" => fs::write(&path, b"invalid").unwrap(),
+                "identity" => {
+                    let mut bytes = fs::read(&path).unwrap();
+                    bytes[9] = 2;
+                    fs::write(&path, bytes).unwrap();
+                }
+                "oversized" => fs::write(&path, [0; HEADER + MAX_NAME_BYTES + 1]).unwrap(),
+                "permissions" => {
+                    fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap()
+                }
+                "hardlink" => fs::hard_link(&path, &alias).unwrap(),
+                "symlink" => {
+                    fs::rename(&path, &alias).unwrap();
+                    symlink(&alias, &path).unwrap();
+                }
+                "directory" => {
+                    fs::remove_file(&path).unwrap();
+                    fs::create_dir(&path).unwrap();
+                }
+                _ => unreachable!(),
+            }
+        });
+        assert!(result.is_err(), "{invalid}");
+        let before = fs::symlink_metadata(&path).unwrap();
+        let bytes = if before.is_dir() {
+            None
+        } else {
+            Some(fs::read(&path).unwrap())
+        };
+        assert!(
+            store
+                .save(ID, &DisplayName::new("Must not replace").unwrap())
+                .is_err(),
+            "{invalid}"
+        );
+        let after = fs::symlink_metadata(&path).unwrap();
+        assert_eq!(
+            (before.ino(), before.mode(), before.nlink()),
+            (after.ino(), after.mode(), after.nlink()),
+            "{invalid}"
+        );
+        if let Some(bytes) = bytes {
+            assert_eq!(fs::read(&path).unwrap(), bytes, "{invalid}");
+        }
+    }
+}
+
+#[test]
+fn disappearing_or_continuously_replaced_records_fail_with_bounded_reads() {
+    let (directory, owner, store) = fixture();
+    let name = DisplayName::new("Valid").unwrap();
+    store.save(ID, &name).unwrap();
+    let mut calls = 0;
+    assert!(
+        store
+            .load_after_open(ID, || {
+                calls += 1;
+                fs::remove_file(directory.path().join(RECORD)).unwrap();
+            })
+            .is_err()
+    );
+    assert_eq!(calls, 1);
+    // A separate ordinary read still treats an initially absent profile as unset.
+    assert_eq!(store.load(ID).unwrap(), DisplayName::default());
+    store.save(ID, &name).unwrap();
+    let writer = ProfileStore::new(&owner, ID).unwrap();
+    calls = 0;
+    let result = store.load_after_open(ID, || {
+        calls += 1;
+        writer.save(ID, &name).unwrap();
+    });
+    assert!(
+        matches!(result, Err(Error::Io(ref error)) if error.kind() == std::io::ErrorKind::WouldBlock)
+    );
+    assert_eq!(calls, MAX_READ_ATTEMPTS);
+    assert_eq!(store.load(ID).unwrap(), name);
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+}
