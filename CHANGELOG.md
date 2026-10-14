@@ -10,6 +10,12 @@ Entries describe implemented changes, not the roadmap.
 - Document the platform roadmap, separating current capabilities from planned
   Rust-to-Wasm builds, deployment, optional MCP and later team/platform features;
   link it from the README ([#183](https://github.com/devoption/devoption/issues/183)).
+  
+- Improve `ROADMAP.md` to better land with funders and early users: lead with
+  audience/why, link the MVP phase to its milestone, split the MVP into numbered
+  stages with clear “done when” criteria aligned to acceptance checks, add a brief
+  Rust-to-Wasm vs containers note, and include a short “How to help” section
+  (docs-only) ([#14](https://github.com/devoption/devoption/issues/14)).
 
 - Scope newly created repository storage and names to each project, allowing each
   project to have its own `ui` while preserving legacy paths and stable locations

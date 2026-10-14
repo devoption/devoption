@@ -4,6 +4,13 @@ DevOption is being built as a self-hosted software factory for individuals and
 teams: a connected path from source to a running application. This roadmap covers
 platform capabilities, not company milestones or projects built with DevOption.
 
+DevOption is for developers and small teams who want a local, auditable path from
+reviewed source to a running service without relying on hosted CI/CD or container
+orchestration. The focus is explicit review and approval, immutable provenance for
+artifacts, and a capability-scoped runtime on one server. It aims to connect the
+steps you already trust — source, checks, build, and deploy — without adding new
+promises beyond what is implemented and validated here.
+
 The sequence below expresses direction, not delivery dates or release promises.
 GitHub issues define individual changes; existing milestone definitions and release
 gates remain unchanged.
@@ -30,32 +37,49 @@ fixture checks are groundwork for native Rust binaries. They do not provide a
 usable application build service or implemented Rust-to-Wasm builds. Those
 contracts must evolve to describe Wasm targets, artifacts and runtime requirements.
 
-## Next: a usable single-server MVP
+## Next: a usable single-server MVP — [Milestone: v0.1.0 — Local factory MVP](https://github.com/devoption/devoption/milestone/1)
 
 The first complete workflow should let one owner take one trusted Rust application
 from a reviewed source revision to a verified artifact and an explicitly approved
 deployment on one Linux server.
 
-- **Rust-to-Wasm builds.** Pin source, dependencies and toolchain; define the
-  supported WebAssembly (Wasm) target and host interfaces; evolve the native build
-  contracts accordingly. Add approved jobs with bounded resources, useful logs,
-  cancellation and recoverable status. Build-time access needs its own controls;
-  Wasm runtime restrictions do not isolate the compiler or dependency build scripts.
-- **Verified artifacts.** Preserve immutable outputs with checksums and provenance
-  tying them to reviewed source and build inputs. Verify the exact artifact before
-  promotion or execution, and retain previous versions for rollback.
-- **A capability-scoped Wasm runtime.** Run applications with explicit grants for
-  filesystem, network, configuration and other host services, plus resource limits
-  and reliable stop/restart behavior. Define and test the supported execution
-  boundary before making isolation claims.
-- **Application deployment and operations.** Select a verified artifact and its
-  permissions, approve deployment, and observe health and logs. Add routing, domain
-  configuration and TLS as explicit deployment capabilities, with controlled
-  updates, failure handling and rollback to a previous verified version.
-- **Installation, upgrades and recovery.** Make single-server setup repeatable,
-  preserve application and platform data through upgrades, and test backups,
-  compatible rollback and recovery after interruption. Publish supported operating
-  limits and recovery instructions alongside release checks.
+1. **Rust-to-Wasm builds.** Pin source, dependencies and toolchain; define the
+   supported WebAssembly (Wasm) target and host interfaces; evolve the native build
+   contracts accordingly. Add approved jobs with bounded resources, useful logs,
+   cancellation and recoverable status. Build-time access needs its own controls;
+   Wasm runtime restrictions do not isolate the compiler or dependency build scripts.  
+   Done when: one trusted Rust HTTP service builds from a reviewed commit into a Wasm
+   artifact with pinned toolchain/dependencies, bounded job execution (resources,
+   logs, cancellation), and separate controls for build-time access.
+   Note: Rust-to-Wasm is chosen over containers to target a smaller, capability-scoped
+   execution boundary with explicit host interfaces; this does not isolate the compiler
+   or dependency build scripts, and no sandbox claim is made beyond the defined runtime.
+2. **Verified artifacts.** Preserve immutable outputs with checksums and provenance
+   tying them to reviewed source and build inputs. Verify the exact artifact before
+   promotion or execution, and retain previous versions for rollback.  
+   Done when: the exact artifact is verifiably bound to its reviewed inputs, checked
+   again before promotion/execution, and prior versions are retained for rollback.
+3. **A capability-scoped Wasm runtime.** Run applications with explicit grants for
+   filesystem, network, configuration and other host services, plus resource limits
+   and reliable stop/restart behavior. Define and test the supported execution
+   boundary before making isolation claims.  
+   Done when: the runtime enforces explicit capabilities and resource limits with
+   reliable start/stop/restart, and the execution boundary is defined and tested
+   without broader isolation claims.
+4. **Application deployment and operations.** Select a verified artifact and its
+   permissions, approve deployment, and observe health and logs. Add routing, domain
+   configuration and TLS as explicit deployment capabilities, with controlled
+   updates, failure handling and rollback to a previous verified version.  
+   Done when: an owner can approve deployment of a verified artifact to a loopback
+   port on the same host, observe health/logs, configure routing/domain/TLS explicitly,
+   update safely, and roll back to the last verified version.
+5. **Installation, upgrades and recovery.** Make single-server setup repeatable,
+   preserve application and platform data through upgrades, and test backups,
+   compatible rollback and recovery after interruption. Publish supported operating
+   limits and recovery instructions alongside release checks.  
+   Done when: a clean supported host can follow documented steps to install, upgrade
+   with preserved data, back up and restore, and recover after interruption, with
+   published operating limits and verified release checks.
 
 A usable path includes human review and security gates before builds, artifact
 promotion and deployment. The initial scope is trusted code and one server;
@@ -100,3 +124,11 @@ Once the single-server path is usable, extend the platform around it:
 Progress is tracked through [repository issues](https://github.com/devoption/devoption/issues)
 and the [changelog](CHANGELOG.md). Implemented behavior belongs in the user guide;
 planned capabilities stay here until they are available and validated.
+
+## How to help
+
+- Start with open issues labeled
+  [good first issue](https://github.com/devoption/devoption/issues?q=is%3Aopen+label%3A%22good%20first%20issue%22)
+  or
+  [help wanted](https://github.com/devoption/devoption/issues?q=is%3Aopen+label%3A%22help%20wanted%22).
+- Support development via [GitHub Sponsors](https://github.com/sponsors/devoption).
