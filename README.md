@@ -40,6 +40,7 @@ Run `cargo run --locked --offline -- --help` for command options.
 
 ## Documentation
 
+- [Platform roadmap](ROADMAP.md) — current capabilities and planned direction
 - [User guide](docs/using-devoption.md) — setup, sign-in, projects and repositories
 - [Install, back up and restore](docs/private-linux-install.md) — private Ubuntu preview
 - [Development and checks](docs/development.md) — architecture and validation commands

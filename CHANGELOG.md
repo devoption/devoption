@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Document the platform roadmap, separating current capabilities from planned
+  Rust-to-Wasm builds, deployment, optional MCP and later team/platform features;
+  link it from the README ([#183](https://github.com/devoption/devoption/issues/183)).
+
 - Scope newly created repository storage and names to each project, allowing each
   project to have its own `ui` while preserving legacy paths and stable locations
   after project renames ([#181](https://github.com/devoption/devoption/issues/181)).
