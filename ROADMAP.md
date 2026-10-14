@@ -4,10 +4,10 @@ DevOption is being built as a self-hosted software factory for individuals and
 teams: a connected path from source to a running application. This roadmap covers
 platform capabilities, not company milestones or projects built with DevOption.
 
-DevOption is for developers and small teams who want a local, auditable path from
-reviewed source to a running service without relying on hosted CI/CD or container
-orchestration. The focus is explicit review and approval, immutable provenance for
-artifacts, and a capability-scoped runtime on one server. It aims to connect the
+DevOption is for developers and small teams who want a self-hosted, auditable path
+from reviewed source to a running service on their own servers, without relying on
+hosted CI/CD or container orchestration. The focus is explicit review and approval,
+immutable provenance for artifacts, and a capability-scoped runtime. It aims to connect the
 steps you already trust — source, checks, build, and deploy — without adding new
 promises beyond what is implemented and validated here.
 
