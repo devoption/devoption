@@ -7,10 +7,13 @@ deployments or production hosting are already available.
 
 ## Use and contribute
 
+- [Shared context entry point](../AGENTS.md), [product](product.md),
+  [architecture](architecture.md), [decisions](decisions/README.md) and
+  [task/handoff template](task-template.md); [priorities](../ROADMAP.md)
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)
 - [Private Ubuntu installation, backup and recovery](private-linux-install.md)
-- [Development architecture and checks](development.md)
+- [Development setup and checks](development.md)
 - [Screenshot gallery](screenshots/gallery.md) and [capture guide](screenshots/README.md)
 - [Contribution guide](../CONTRIBUTING.md) and [maintainer checklist](maintainers.md)
 - [Release process and approval gates](releases.md)
