@@ -1,6 +1,8 @@
 //! Structurally checked external review metadata. No filesystem or process I/O.
 //! Digests and inode observations are supplied claims, not verification evidence.
 
+mod policy;
+
 use crate::{BuildPlan, absolute_path};
 use devoption_registry::Sha256;
 use std::{collections::HashSet, fmt};
@@ -103,8 +105,11 @@ impl ReviewContext {
             }
         }
         let context = Self(input);
-        if !context.matches_plan(plan) {
+        if !context.matches_plan_metadata(plan) {
             return Err(Error::PlanMismatch);
+        }
+        if !policy::permits(plan, &context.0) {
+            return Err(Error::Policy);
         }
         Ok(context)
     }
@@ -119,6 +124,10 @@ impl ReviewContext {
     }
 
     pub(crate) fn matches_plan(&self, plan: &BuildPlan) -> bool {
+        self.matches_plan_metadata(plan) && policy::permits(plan, &self.0)
+    }
+
+    fn matches_plan_metadata(&self, plan: &BuildPlan) -> bool {
         let p = plan.details();
         self.0.rust_version == p.rust_version
             && self.0.cargo.path == p.cargo_executable
@@ -174,6 +183,7 @@ pub enum Error {
     Identity,
     Directories,
     PlanMismatch,
+    Policy,
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -182,6 +192,7 @@ impl fmt::Display for Error {
             Self::Identity => "review requires an unprivileged execution identity",
             Self::Directories => "invalid review directory metadata",
             Self::PlanMismatch => "review context does not match the plan",
+            Self::Policy => "proposed build settings violate review policy",
         })
     }
 }

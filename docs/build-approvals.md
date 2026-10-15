@@ -22,7 +22,9 @@ crate does not depend on server authentication types. No credential is generated
 
 The typed context binds external metadata not fully represented by BuildPlan and
 provides a deterministic, versioned fingerprint. It checks structural bounds and
-matching plan fields, not whether supplied observations are true. The future
+matching plan fields and the initial environment/time/log policy, not whether
+supplied observations are true or OS limits are enforced. Issuance repeats policy
+validation against the queued plan. The future
 adapter must present and freshly verify the complete record and its underlying
 manifests. See the [context reference](review-context.md) for fields, encoding and
 verification gaps. A hash or context value alone cannot confer execution authority.

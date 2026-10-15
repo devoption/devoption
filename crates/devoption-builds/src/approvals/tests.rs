@@ -12,10 +12,9 @@ fn context() -> ReviewContext {
     .unwrap()
 }
 fn job() -> BuildJob {
-    let (catalog, input) = crate::tests::fixture();
     BuildJob::queued(
         JobId::from_bytes([1; 16]),
-        BuildPlan::validate(input, &catalog).unwrap(),
+        crate::review_context::tests::plan(),
     )
 }
 

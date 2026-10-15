@@ -1,7 +1,27 @@
 use super::*;
 
-fn plan() -> BuildPlan {
-    let (catalog, input) = crate::tests::fixture();
+pub(crate) fn plan() -> BuildPlan {
+    let (catalog, mut input) = crate::tests::fixture();
+    input.environment = [
+        ("PATH", "/example/toolchains/1.99.0/bin:/usr/bin"),
+        ("RUSTC", "/example/toolchains/1.99.0/bin/rustc"),
+        ("HOME", "/example/jobs/one/role-2"),
+        ("CARGO_HOME", "/example/jobs/one/role-3"),
+        ("CARGO_TARGET_DIR", "/example/jobs/one/role-4"),
+        ("TMPDIR", "/example/jobs/one/role-5"),
+        ("LANG", "C.UTF-8"),
+        ("CARGO_NET_OFFLINE", "true"),
+        ("CARGO_INCREMENTAL", "0"),
+        ("CARGO_BUILD_JOBS", "1"),
+        ("RUSTC_WRAPPER", ""),
+        ("RUSTC_WORKSPACE_WRAPPER", ""),
+    ]
+    .into_iter()
+    .map(|(name, value)| crate::EnvironmentEntry {
+        name: name.into(),
+        value: value.into(),
+    })
+    .collect();
     BuildPlan::validate(input, &catalog).unwrap()
 }
 
@@ -148,7 +168,25 @@ fn every_external_field_changes_the_binding() {
             6 => data.execution_uid += 1,
             _ => data.directories[1].path.push_str("-changed"),
         }
-        let changed = ReviewContext::validate(&plan, data).unwrap();
+        let mut candidate = plan.clone();
+        if case == 1 {
+            candidate
+                .0
+                .environment
+                .iter_mut()
+                .find(|e| e.name == "RUSTC")
+                .unwrap()
+                .value = data.rustc.path.clone();
+            candidate
+                .0
+                .environment
+                .iter_mut()
+                .find(|e| e.name == "PATH")
+                .unwrap()
+                .value
+                .push_str(":/another");
+        }
+        let changed = ReviewContext::validate(&candidate, data).unwrap();
         assert!(changed != original);
         assert!(changed.sha256() != original.sha256());
     }

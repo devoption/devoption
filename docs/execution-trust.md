@@ -144,8 +144,11 @@ flags or caller-selected additional names. Controlled Cargo configuration and
 read-only dependency materialization must also be verified; environment filtering
 alone cannot neutralize repository/toolchain configuration. Reject unsupported
 configuration rather than silently enabling wrappers or fetching dependencies.
-The current EnvironmentEntry validator checks syntax only and does not enforce
-this allowlist. Expanding it requires a reviewed policy change and new approval.
+BuildPlan's EnvironmentEntry validator checks syntax only. The separate
+[review-context policy gate](review-context.md#initialbuildv1-proposed-settings-gate)
+requires this complete explicit allowlist and checks proposed time/log caps before
+approval issuance. It does not apply the environment or enforce OS limits.
+Expanding the allowlist requires a reviewed policy change and new approval.
 
 The first production build policy has one active job, at most one CPU quota,
 512 MiB memory, no swap, 64 processes, 256 MiB job filesystem including staging,
