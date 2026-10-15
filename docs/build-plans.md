@@ -6,7 +6,8 @@ of [#15](https://github.com/devoption/devoption/issues/15) and
 [#17](https://github.com/devoption/devoption/issues/17). The plan model has no runtime caller,
 persistence, production approval issuer or executor. The separate
 [approval lifecycle](build-approvals.md) binds a supplied review action to the exact
-plan and external-context digest; it neither verifies that context nor executes. Build execution remains unavailable.
+plan and typed external [review context](review-context.md); it neither verifies
+external state nor executes. Build execution remains unavailable.
 The crate also provides a separate [source preparation flow](build-preparation.md)
 used by project Builds; those current working-tree observations neither construct
 a BuildPlan nor grant approval.

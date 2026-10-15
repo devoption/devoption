@@ -11,6 +11,7 @@ pub mod approvals;
 pub mod cargo_source;
 pub mod jobs;
 pub mod preparation;
+pub mod review_context;
 pub mod source_snapshot;
 
 use devoption_projects::{Catalog, ProjectId, RepositoryId};
