@@ -20,6 +20,7 @@ deployments or production hosting are already available.
 
 ## Implementation references
 
+- [Local mutation and execution trust contract](execution-trust.md)
 - [Owner setup and deferred browser enrollment](local-enrollment.md)
 - [Display-name Profile page](profile.md)
 - [Browser session validation](browser-session-check.md)

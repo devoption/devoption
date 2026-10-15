@@ -107,8 +107,8 @@ mechanisms are introduced here. The first workflow remains limited to trusted co
 running as an unprivileged OS account; supporting arbitrary untrusted builds would
 require a separate isolation design.
 
-The selected architecture acquires dependencies through DevOption's registry/proxy
-before a separately approved isolated offline build. Provider transport, allowed
-environment/toolchain, owned work-directory policy, resource caps and approval
-lifetime remain undecided. This model chooses no production paths, environment
-permissions or execution defaults.
+The [execution trust contract](execution-trust.md) defines the review and approval
+lifecycle, environment allowlist, owned directory policy, resource caps and output
+rules required of dependent implementation. These are policy requirements; this
+pure model does not enforce them or select production paths. Provider transport,
+runner enforcement and approval integration remain unimplemented.
