@@ -40,6 +40,8 @@ Use focused references for details rather than loading every subsystem:
   [artifact handoff](artifact-handoff.md) provide bounded evidence, not production
   execution or isolation guarantees. The [documentation index](README.md#validation-evidence)
   links rehearsal results and their limits.
+- [Reviewed-directory verification](reviewed-directories.md) opens and rechecks
+  private directory identities without provisioning, execution or approval integration.
 
 ## Implemented data flow
 
