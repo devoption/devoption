@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add bounded in-memory build approval records with exact owner/job/plan/context
+  binding, five-minute expiry, single consumption, revocation and restart-invalid
+  handles; no production approval adapter or process execution
+  ([#192](https://github.com/devoption/devoption/issues/192)).
+
 - Define the local mutation and future execution trust contract, including explicit
   approval invalidation, environment permissions, owned storage, resource/output
   limits and the review gate; distinguish existing HTTP protections from dependent

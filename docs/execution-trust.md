@@ -2,8 +2,10 @@
 
 Review gate: policy tracked under [#15](https://github.com/devoption/devoption/issues/15).
 Merging this contract accepts requirements for dependent work; it does not enable
-execution or authorize a workload. The HTTP controls below exist today. Job
-approval, production work/artifact storage and resource enforcement do not.
+execution or authorize a workload. The HTTP controls below exist today. Production job
+approval, work/artifact storage and resource enforcement do not. A separate
+[in-memory approval lifecycle](build-approvals.md) models single-use review records
+without an authenticated production adapter or execution capability.
 
 ## Trust and authority
 

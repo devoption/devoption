@@ -7,6 +7,7 @@
 
 #![cfg(unix)]
 
+pub mod approvals;
 pub mod cargo_source;
 pub mod jobs;
 pub mod preparation;
