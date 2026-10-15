@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Define the local mutation and future execution trust contract, including explicit
+  approval invalidation, environment permissions, owned storage, resource/output
+  limits and the review gate; distinguish existing HTTP protections from dependent
+  runner work ([#15](https://github.com/devoption/devoption/issues/15)).
+
 - Add a concise shared-context handbook for scoped engineering tasks, with product
   context, architecture, accepted decisions and a portable task/handoff template;
   link existing guides rather than duplicate them

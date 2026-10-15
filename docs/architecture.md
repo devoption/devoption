@@ -64,6 +64,10 @@ Use focused references for details rather than loading every subsystem:
 
 ## Planned flow and unresolved boundaries
 
+The [execution trust contract](execution-trust.md) owns the required approval,
+environment, storage, resource and output policy. Its future requirements are not
+implemented runner guarantees.
+
 The [roadmap](../ROADMAP.md) owns the intended
 reviewed-source → approved build → verified artifact → approved deployment →
 observable application sequence. Connecting those stages requires explicit
