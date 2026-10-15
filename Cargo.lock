@@ -149,6 +149,7 @@ dependencies = [
  "devoption-registry",
  "rustix",
  "sha1collisiondetection",
+ "sha2",
  "tempfile",
 ]
 

@@ -42,6 +42,8 @@ Use focused references for details rather than loading every subsystem:
   links rehearsal results and their limits.
 - [Reviewed-directory verification](reviewed-directories.md) opens and rechecks
   private directory identities without provisioning, execution or approval integration.
+  [Reviewed-executable verification](reviewed-executables.md) separately retains
+  and hashes the two reviewed tool files without launching them.
 
 ## Implemented data flow
 
