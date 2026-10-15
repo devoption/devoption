@@ -3,64 +3,11 @@
 Follow the [contribution guide](../CONTRIBUTING.md) and install the
 [quick-start prerequisites](../README.md#quick-start) first.
 
-## Current architecture
+## Architecture
 
-The Rust workspace has six crates. The running service uses
-`devoption-cli` → `devoption-server`, which composes `devoption-projects`,
-`devoption-builds` and `devoption-ui`. The project domain core is independent of those delivery layers:
-
-| Crate | Responsibility |
-| --- | --- |
-| `devoption-builds` | Source preparation observations, immutable Unix build plans, in-memory job lifecycle records and bounded Cargo source membership proofs; no approval or execution |
-| `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
-| `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
-| `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
-| `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
-| `devoption-ui` | HTML rendering and browser assets |
-
-Server APIs live under `devoption_server`; the CLI is a binary without a library
-facade. Authentication and owner storage remain server modules. The
-[project catalog core](project-catalog.md) has its own model and storage
-tests. Its separate [worktree inspector](worktree-validation.md) accepts
-bounded candidates under an explicit trusted local root, with opt-in backend
-attachment tested using temporary fixtures. The server validates the catalog through
-the same opened directory as owner storage at startup, then rereads it for each
-authenticated Projects GET/HEAD request and supplies
-current display summaries to the UI. Project creation, managed repository creation and repository attachment
-use the domain's locked, durable save operations. Executable integration tests stay with the CLI; domain
-logic remains in the project crate. The separate [build-plan model](build-plans.md)
-validates explicit inputs against a catalog snapshot without I/O and has no runtime
-caller. The separate [source preparation flow](build-preparation.md) calls existing
-project inspection and Cargo input validation to report current observations in
-Builds or the CLI's explicit Unix `check-source` command, without constructing a
-plan or job. The CLI opens a read-only private catalog capability and validates
-the selected inspection root without reading owner credentials or starting HTTP.
-The plan model includes the [registry dependency descriptor](registry-contract.md):
-the [supplied-byte Cargo adapter](cargo-inputs.md) validates a strict standalone
-manifest/lockfile subset and binds exact input hashes without reading a repository.
-The separate [root source verifier](cargo-source-proof.md) checks a bounded
-supplied Git object chain linking those bytes to a selected commit ID. It does not
-establish trusted revision selection, complete source context or build permission.
-Plans now retain a [complete source snapshot](source-snapshots.md) containing that
-proof and every supported source file's owned bytes. They reject mismatched commit,
-dependency request or conventional binary target. Snapshot verification consumes
-supplied objects. A separate registered adapter collects a selected current HEAD's
-objects through the inspection root and compares every verified file's exact
-checkout bytes. It has no HTTP/CLI integration; authenticated revision selection,
-controlled extraction and execution are absent.
-DevOption-mediated acquisition and isolated offline builds are the selected
-architecture, while registry hosting, fetching, approval, execution, environment
-policy and resource enforcement remain unimplemented.
-The [offline fixture proof](offline-fixture-build.md) uses a concrete local
-seed provider and real Cargo in Linux tests. This does not enable application builds
-or establish production execution/isolation permissions.
-The [artifact handoff](artifact-handoff.md) is fixture-tested; stopped-runner
-integration and VM validation remain pending. See the [documentation index](README.md)
-for bounded rehearsal results and execution limits.
-The [job lifecycle model](build-jobs.md) binds records to an exact plan and
-attempt and rejects invalid transitions. Starting a job and recording runner
-outcomes require sealed events; queued cancellation is local. No production event
-issuer, persistent jobs or runtime integration exists yet.
+See the [architecture map](architecture.md) for crate responsibilities, implemented
+data flow and planned boundaries. Focused references are in the
+[documentation index](README.md).
 
 ## Checks
 

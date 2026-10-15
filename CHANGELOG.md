@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a concise shared-context handbook for scoped engineering tasks, with product
+  context, architecture, accepted decisions and a portable task/handoff template;
+  link existing guides rather than duplicate them
+  ([#189](https://github.com/devoption/devoption/issues/189)).
+
 - Document the platform roadmap, separating current capabilities from planned
   Rust-to-Wasm builds, deployment, optional MCP and later team/platform features;
   link it from the README ([#183](https://github.com/devoption/devoption/issues/183)).
