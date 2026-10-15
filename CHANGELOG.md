@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add bounded read-only SHA-256 verification and retained handles for reviewed
+  Cargo/rustc files, with no-follow traversal and mutation/replacement rechecks;
+  no tool launch or approval integration
+  ([#200](https://github.com/devoption/devoption/issues/200)).
+
 - Add read-only verification and retained handles for reviewed private job-directory
   identities, with no-follow traversal and replacement/permission rechecks; no
   directory creation, cleanup or process execution

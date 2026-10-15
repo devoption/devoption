@@ -115,7 +115,10 @@ permissions and writable access need separate verification. The
 [read-only directory verifier](reviewed-directories.md) now checks retained handles
 and path bindings for one private same-account Work tree. It is not called by
 context validation or approval issuance, and it does not verify ACLs, mounts,
-content or the other context fields.
+content or the other context fields. The separate
+[executable verifier](reviewed-executables.md) hashes retained Cargo/rustc handles
+and checks current path bindings; it also has no context-validation or approval
+integration and does not verify the complete toolchain manifest.
 
 The future producer must define and verify the underlying toolchain, catalog and
 configuration manifests; their internal byte formats are not specified here.

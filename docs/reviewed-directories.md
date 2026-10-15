@@ -74,8 +74,10 @@ device number. A future supported runner must validate its actual mount layout.
 Directory-only syscalls avoid reading special files but there is no filesystem I/O
 deadline or protection from a stalled filesystem.
 
-The verifier does not check executable hashes, original repository exclusion,
-dependency contents, Cargo configuration, environment application, available disk
+The separate [executable verifier](reviewed-executables.md) checks the two reviewed
+tool hashes. This directory verifier does not check executable hashes, original
+repository exclusion, dependency contents, Cargo configuration, environment
+application, available disk
 space or resource enforcement. Source mode `0500` is not a substitute for read-only
 mounts. Those requirements remain in the [execution trust contract](execution-trust.md).
 No authenticated review producer, approval/admission transaction or runner is added.
