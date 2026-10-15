@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Bind approval records to a bounded typed review context with deterministic,
+  versioned hashing and plan/path/identity checks; retain the distinction between
+  supplied metadata and verified execution state
+  ([#194](https://github.com/devoption/devoption/issues/194)).
+
 - Add bounded in-memory build approval records with exact owner/job/plan/context
   binding, five-minute expiry, single consumption, revocation and restart-invalid
   handles; no production approval adapter or process execution

@@ -1,9 +1,15 @@
 use super::*;
+use devoption_registry::Sha256;
 use std::sync::Barrier;
 
 const OWNER: OwnerId = OwnerId::from_bytes([1; 16]);
-fn context() -> Sha256 {
-    Sha256::from_hex(&"ab".repeat(32)).unwrap()
+fn context() -> ReviewContext {
+    let plan = job();
+    ReviewContext::validate(
+        plan.plan(),
+        crate::review_context::tests::input(plan.plan()),
+    )
+    .unwrap()
 }
 fn job() -> BuildJob {
     let (catalog, input) = crate::tests::fixture();
@@ -124,7 +130,11 @@ fn changing_any_plan_field_or_external_context_permanently_invalidates() {
             _ => {}
         }
         let digest = if index == 13 {
-            Sha256::from_hex(&"cd".repeat(32)).unwrap()
+            {
+                let mut input = context().details().clone();
+                input.configuration = Sha256::digest(b"changed configuration");
+                ReviewContext::validate(original.plan(), input).unwrap()
+            }
         } else {
             context()
         };
@@ -318,4 +328,18 @@ fn clock_is_sampled_under_lock_and_status_observes_expiry_without_renewal() {
         registry.approve(OWNER, &job, context()),
         Err(Error::AlreadyReviewed)
     ));
+}
+
+#[test]
+fn issuance_rejects_context_for_another_plan_without_reserving_attempt() {
+    let registry = Approvals::default();
+    let original = job();
+    let mut changed = original.plan().clone();
+    changed.0.work_directory = "/different/work".into();
+    let different = BuildJob::queued(original.id(), changed);
+    assert!(matches!(
+        registry.approve(OWNER, &different, context()),
+        Err(Error::ReviewChanged)
+    ));
+    assert!(registry.approve(OWNER, &original, context()).is_ok());
 }

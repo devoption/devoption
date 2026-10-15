@@ -4,11 +4,11 @@
 //! full review context before recording or consuming approval. This module does
 //! neither, and has no runner-event issuer, persistence, HTTP or process I/O.
 
+use crate::review_context::ReviewContext;
 use crate::{
     BuildPlan,
     jobs::{BuildJob, JobId, State as JobState},
 };
-use devoption_registry::Sha256;
 use std::{
     collections::HashMap,
     fmt,
@@ -52,7 +52,7 @@ pub enum Status {
 
 struct Review {
     plan: BuildPlan,
-    context: Sha256,
+    context: ReviewContext,
 }
 struct Entry {
     owner: OwnerId,
@@ -90,14 +90,14 @@ pub struct Approvals {
 
 impl Approvals {
     /// Record an explicit review action supplied by a trusted adapter.
-    /// `context` must identify the complete external review record described in
-    /// docs/build-approvals.md; a caller-chosen digest does not verify that record.
+    /// `context` is structurally checked review metadata, not proof of verification.
+    /// The trusted caller must freshly verify its claims; see docs/build-approvals.md.
     /// No clock, lifetime override, approval flag or execution callback is accepted.
     pub fn approve(
         &self,
         owner: OwnerId,
         job: &BuildJob,
-        context: Sha256,
+        context: ReviewContext,
     ) -> Result<Approval, Error> {
         self.approve_with_clock(owner, job, context, Instant::now)
     }
@@ -106,7 +106,7 @@ impl Approvals {
         &self,
         owner: OwnerId,
         job: &BuildJob,
-        context: Sha256,
+        context: ReviewContext,
         clock: impl FnOnce() -> Instant,
     ) -> Result<Approval, Error> {
         let mut records = self.records.lock().map_err(|_| Error::Unavailable)?;
@@ -122,6 +122,9 @@ impl Approvals {
         }
         if job.state() != &JobState::Queued {
             return Err(Error::NotQueued);
+        }
+        if !context.matches_plan(job.plan()) {
+            return Err(Error::ReviewChanged);
         }
         records.entries.insert(
             job.id(),
@@ -151,7 +154,7 @@ impl Approvals {
         approval: &Approval,
         owner: OwnerId,
         job: &BuildJob,
-        context: &Sha256,
+        context: &ReviewContext,
     ) -> Result<(), Error> {
         self.consume_with_clock(approval, owner, job, context, Instant::now)
     }
@@ -161,7 +164,7 @@ impl Approvals {
         approval: &Approval,
         owner: OwnerId,
         job: &BuildJob,
-        context: &Sha256,
+        context: &ReviewContext,
         clock: impl FnOnce() -> Instant,
     ) -> Result<(), Error> {
         self.with_entry(approval, owner, clock, |entry| {

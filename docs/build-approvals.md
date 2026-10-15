@@ -14,25 +14,23 @@ anything or that supplied metadata is true.
 
 ## Binding and trusted caller
 
-`Approvals::approve` accepts an `OwnerId`, a queued `BuildJob` and a SHA-256 review
-context digest. It retains the owner, JobId, complete immutable BuildPlan value,
-digest and a monotonic issuance time. `OwnerId` wraps the server-assigned identity
+`Approvals::approve` accepts an `OwnerId`, a queued `BuildJob` and a typed immutable
+[review context](review-context.md). It retains the owner, JobId, complete immutable BuildPlan value,
+context and a monotonic issuance time. `OwnerId` wraps the server-assigned identity
 bytes; it is not an account, password, session or proof of permission. The build
 crate does not depend on server authentication types. No credential is generated.
 
-The digest is a required binding to external review context not fully represented
-by BuildPlan: verified toolchain/executable identity, fresh catalog/source binding,
-verified dependency contents, execution account, owned path identities, effective
-environment/configuration, network policy, resource caps, output/retention policy
-and policy version. The future adapter must present and verify this complete
-record and use a deterministic unambiguous encoding before hashing it. No such
-encoding or verifier is implemented here. A caller-selected hash, constant digest
-or BuildPlan equality alone cannot prove verification or confer execution authority.
+The typed context binds external metadata not fully represented by BuildPlan and
+provides a deterministic, versioned fingerprint. It checks structural bounds and
+matching plan fields, not whether supplied observations are true. The future
+adapter must present and freshly verify the complete record and its underlying
+manifests. See the [context reference](review-context.md) for fields, encoding and
+verification gaps. A hash or context value alone cannot confer execution authority.
 
 Before recording approval, the adapter must authenticate the explicit owner action
 through the protected mutation boundary and bind it to exactly the displayed record.
-Before consumption, it must freshly verify all external state, compute the current
-context digest, and serialize admission with job cancellation and state updates.
+Before consumption, it must freshly verify all external state, construct the current
+typed context, and serialize admission with job cancellation and state updates.
 It must revoke approval on failed verification instead of passing stale metadata.
 The model cannot detect a file change, failed external check, or cancellation made
 to some other copy of a job. Rust field privacy is not a security boundary against
