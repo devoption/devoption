@@ -4,7 +4,9 @@
 [#116](https://github.com/devoption/devoption/issues/116), an initial domain slice
 of [#15](https://github.com/devoption/devoption/issues/15) and
 [#17](https://github.com/devoption/devoption/issues/17). The plan model has no runtime caller,
-persistence, approval issuer or executor. Build execution remains unavailable.
+persistence, production approval issuer or executor. The separate
+[approval lifecycle](build-approvals.md) binds a supplied review action to the exact
+plan and external-context digest; it neither verifies that context nor executes. Build execution remains unavailable.
 The crate also provides a separate [source preparation flow](build-preparation.md)
 used by project Builds; those current working-tree observations neither construct
 a BuildPlan nor grant approval.
