@@ -111,7 +111,11 @@ Validation never opens files, resolves symlinks, hashes an installed executable,
 checks ACLs or current ownership, or verifies dependency archives. A structurally
 valid record can still lie. Its digest establishes only deterministic metadata
 identity. Cross-role ancestry, mount containment, directory freshness, actual
-permissions and writable access still need retained-descriptor verification.
+permissions and writable access need separate verification. The
+[read-only directory verifier](reviewed-directories.md) now checks retained handles
+and path bindings for one private same-account Work tree. It is not called by
+context validation or approval issuance, and it does not verify ACLs, mounts,
+content or the other context fields.
 
 The future producer must define and verify the underlying toolchain, catalog and
 configuration manifests; their internal byte formats are not specified here.

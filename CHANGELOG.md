@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add read-only verification and retained handles for reviewed private job-directory
+  identities, with no-follow traversal and replacement/permission rechecks; no
+  directory creation, cleanup or process execution
+  ([#198](https://github.com/devoption/devoption/issues/198)).
+
 - Enforce the initial explicit environment allowlist, reviewed path bindings and
   proposed time/log caps when validating build review contexts and issuing approval;
   no inherited environment or process execution

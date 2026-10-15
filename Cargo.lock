@@ -147,6 +147,7 @@ version = "0.1.0-dev"
 dependencies = [
  "devoption-projects",
  "devoption-registry",
+ "rustix",
  "sha1collisiondetection",
  "tempfile",
 ]
