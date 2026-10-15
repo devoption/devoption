@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Enforce the initial explicit environment allowlist, reviewed path bindings and
+  proposed time/log caps when validating build review contexts and issuing approval;
+  no inherited environment or process execution
+  ([#196](https://github.com/devoption/devoption/issues/196)).
+
 - Bind approval records to a bounded typed review context with deterministic,
   versioned hashing and plan/path/identity checks; retain the distinction between
   supplied metadata and verified execution state

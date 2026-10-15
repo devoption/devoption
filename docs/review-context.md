@@ -27,6 +27,11 @@ normalized context by value. A raw SHA-256 no longer satisfies either API. The
 context's fingerprint is available for later display/provenance, not used as a
 substitute for value equality in this process.
 
+Under [#196](https://github.com/devoption/devoption/issues/196), context validation
+also applies the InitialBuildV1 proposed-settings gate below. Issuance repeats that
+gate against the actual queued plan, so a context created for a compliant plan
+cannot be reused to approve different, out-of-policy environment/limit settings.
+
 Paths must be absolute normalized Unix strings of at most 4096 UTF-8 bytes, without
 empty/dot/parent components or controls; `/` is rejected. Cargo is bound to the
 validated plan's executable; rustc must end in `/rustc`, and the two paths differ.
@@ -42,6 +47,33 @@ to the complete typed input for later review. Caller edits to its original copy
 cannot change the retained value. Types containing paths and digests deliberately
 omit Debug; fixed validation errors contain none of the input values. No credentials,
 passwords, tokens, filesystem descriptors or executable byte buffers are stored.
+
+## InitialBuildV1 proposed-settings gate
+
+The plan must explicitly contain all twelve environment entries in the
+[trust-contract allowlist](execution-trust.md#environment-resources-and-output),
+with no additional, duplicate or case-substituted names. Fixed values match exactly,
+including empty compiler wrappers. `RUSTC` equals the reviewed compiler path;
+`HOME`, `CARGO_HOME`, `CARGO_TARGET_DIR` and `TMPDIR` equal the corresponding
+reviewed directory paths. No value is synthesized from the service environment.
+Input ordering does not affect policy validation, although exact plan equality
+continues to include environment ordering and therefore invalidates a changed plan.
+
+`PATH` is at most 1024 bytes and consists of distinct, absolute normalized components.
+It includes the exact parent directories of both reviewed executable paths. Empty,
+relative, dot/parent and duplicate components are rejected. A component cannot be
+an owned directory, its descendant or its ancestor; comparisons use path-component
+boundaries so a disjoint sibling such as `one-tools` is not confused with `one`.
+This conservative lexical rule does not inspect symlinks or case/filesystem aliases,
+prove a search directory trusted, or exclude the original user checkout (which is
+not represented by these job-directory observations). Those remain external checks.
+
+Proposed elapsed time must be 1–60 seconds and retained log bytes 1–1,048,576,
+inclusive. Lower limits are allowed and remain visible in the plan. Other fixed
+policy requirements such as CPU, memory, process/filesystem caps, network denial
+and child cleanup still need an enforcing runner. Passing this gate is never proof
+that OS limits or environment isolation have been applied. BuildPlan itself retains
+its broader structural validation; only reviewed/approved settings pass this gate.
 
 ## Encoding version 1
 
@@ -85,8 +117,9 @@ The future producer must define and verify the underlying toolchain, catalog and
 configuration manifests; their internal byte formats are not specified here.
 Configuration must cover the controlled Cargo/dependency layout and effective
 allowlisted environment, not an unexplained caller-chosen constant. The plan
-already retains environment entries and source/dependency metadata; neither that
-syntax validation nor this context checks all executable-policy constraints.
+already retains environment entries and source/dependency metadata. Its syntax
+validation is broader than this context's initial-policy gate; neither verifies
+installed binaries or controlled Cargo configuration.
 Policy tagging describes required limits, not evidence that a runner enforces them.
 
 A human review UI must show the relevant manifest contents and effective settings,
