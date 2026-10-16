@@ -16,6 +16,7 @@ use tokio::sync::Mutex;
 
 mod builds;
 mod files;
+mod history;
 mod managed;
 mod pages;
 
@@ -25,6 +26,7 @@ mod startup_tests;
 #[derive(Clone)]
 pub(super) struct Projects {
     directory: Arc<CatalogDirectory>,
+    history: Option<Arc<Mutex<devoption_builds::history::History>>>,
     gate: Arc<Mutex<()>>,
     root: Option<Arc<PermittedRoot>>,
     managed: Option<Arc<devoption_projects::worktree::ManagedRoot>>,
@@ -59,10 +61,16 @@ impl Projects {
         }
         Ok(Self {
             directory: Arc::new(directory),
+            history: None,
             gate: Arc::new(Mutex::new(())),
             root: root.map(Arc::new),
             managed: None,
         })
+    }
+
+    pub(super) fn with_history(mut self, history: devoption_builds::history::History) -> Self {
+        self.history = Some(Arc::new(Mutex::new(history)));
+        self
     }
 
     /// Startup-only: no HTTP requests run yet. Hold the cooperating catalog
@@ -131,6 +139,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         .merge(pages::routes(projects.clone()))
         .merge(files::routes(projects.clone()))
         .merge(builds::routes(projects.clone()))
+        .merge(history::routes(projects.clone()))
         .merge(creation)
         .route(
             "/projects/{project}/name",

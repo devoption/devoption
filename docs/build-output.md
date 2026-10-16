@@ -3,7 +3,8 @@
 [#202](https://github.com/devoption/devoption/issues/202) adds
 `devoption_builds::output::BuildOutput`, a collector for caller-supplied stdout and
 stderr bytes. It is a prerequisite of [the build workflow](build-jobs.md), with no
-production caller, process readers, HTTP/UI route or job-state changes.
+process readers or job-state changes. Authenticated history pages display saved
+checkpoints through the private store.
 The [private history store](build-history.md#output-checkpoints) can persist bounded
 output snapshots for known attempts.
 Supplied output is not proof that a build ran or succeeded.
@@ -57,14 +58,17 @@ Rendered text is at most six times the retained byte count per stream (at most
 decoding can additionally allocate up to three times that stream's retained bytes.
 Callers must avoid retaining an unbounded history of rendered snapshots. Returned
 text is not safe for HTML attributes, script contexts or terminal interpretation.
-A future UI must display the cap/truncation status separately and use this content
-in the documented text context; this slice adds no UI or truncation banner.
+The history detail page displays cap/truncation status separately. Its adapter uses
+`display_text(Stream)` for control/bidi-neutralized Unicode text with literal HTML
+metacharacters; the UI HTML-escapes it exactly once at the final sink. This method
+is not raw bytes and is not safe markup on its own. `escaped_text` remains available
+for callers inserting directly into the documented HTML text context.
 
 ## Integration limits and validation
 
 There is no raw-byte accessor or Debug implementation for the collector. Output
 can still contain secrets or private paths: escaping is not redaction. The history store enforces private permissions and bounded snapshots; future
-delivery and retention must enforce owner access and expiry. Drop releases memory; it does not securely erase bytes.
+retention must enforce expiry; current delivery requires the owner session. Drop releases memory; it does not securely erase bytes.
 
 The separate [supervision policy](build-supervision.md) owns this collector and
 combines cap notifications with elapsed-time/cancellation decisions. It does not

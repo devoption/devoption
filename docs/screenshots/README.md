@@ -16,7 +16,9 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Project code | `/projects/{id}/code` | Immediate frontend file list; managed creation enabled; status read below files; 1280 × 900 | `project-code.jpg` |
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |
-| Project builds | `/projects/{id}/builds` | Repository source-check choices | `project-builds.jpg` |
+| Project builds | `/projects/{id}/builds` | Synthetic saved attempts and source-check choices; 1280 × 1200 | `project-builds.jpg` |
+| Build attempt | `/projects/{id}/builds/attempts/{id}` | Interrupted synthetic record, saved streams, source details collapsed; 1280 × 1200 | `build-attempt.jpg` |
+| Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
 | Source checks | `/projects/{id}/builds/{repository}` | backend, clean committed fixture; 1280 × 1400 | `build-source-checks.jpg` |
 | Source changes | `/projects/{id}/builds/{repository}` | backend, one modified source file; 1280 × 1400 | `build-source-changes.jpg` |
 | Project releases | `/projects/{id}/releases` | Unavailable state | `project-releases.jpg` |
@@ -121,3 +123,13 @@ Commit refreshed images in the same commit as visible UI changes. Shared layout
 changes require every main page and affected variants. Non-UI changes retain
 existing files. Add a capture and [gallery](gallery.md) entry for each new main page.
 No screenshot runner or visual regression service is installed by the repository.
+
+For saved history captures, also set `DEVOPTION_BROWSER_HISTORY=1`. This seeds
+synthetic Interrupted (recovered from Queued), Failed and Succeeded records for
+Example application and a separate Cancelled record for Example documentation.
+These are **historical display fixtures, not executed builds**. No artifact is
+served. Capture Builds, open the Interrupted attempt for `build-attempt.jpg`,
+and open Failed for `build-output-truncated.jpg`. Keep source details collapsed
+in the captures, but verify expansion and exact identifiers separately. Confirm
+truncated script/control/bidi text remains inert and no horizontal overflow at
+320, 375, 768, 800 and 1280 pixels. Source checks retain their existing captures.

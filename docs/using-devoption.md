@@ -204,3 +204,17 @@ failure prevents startup. Omit the option to leave history untouched.
 This does not enable builds or reconcile leftover processes. See the
 [history startup contract](build-history.md#explicit-server-startup) for storage,
 checkpoint and recovery limits.
+
+## Saved build attempts
+
+When build history is configured, open a project → **Builds** to inspect its saved
+attempts. **View attempt** opens the recorded state, source identifiers and last
+stdout/stderr checkpoint. **Source and attempt details** expands exact identities;
+**Refresh history** and **Reload saved attempt** perform fresh reads.
+
+These are saved records, not live process status. Interrupted attempts will not
+resume. Logs show retained bytes and truncation separately; missing checkpoints
+and failed reads have distinct messages. No artifact download is offered.
+The server still cannot start or approve a build. Source checks remain available
+below the history list. See the [history contract](build-history.md#authenticated-project-history)
+for authentication, bounds and remaining integration work.

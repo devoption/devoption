@@ -151,3 +151,18 @@ fn arbitrary_bytes_and_maximum_input_respect_storage_and_render_bounds() {
     );
     assert!(output.truncated());
 }
+
+#[test]
+fn display_text_keeps_markup_literal_but_neutralizes_controls() {
+    let mut output = BuildOutput::new(128).unwrap();
+    output.append(Stream::Stdout, "<script>&\"'\\\u{1b}\u{202e}\n".as_bytes());
+    assert_eq!(
+        output.display_text(Stream::Stdout),
+        "<script>&\"'\\\\\\u{1b}\\u{202e}\n"
+    );
+    assert!(
+        output
+            .escaped_text(Stream::Stdout)
+            .starts_with("&lt;script&gt;&amp;&quot;&#39;")
+    );
+}

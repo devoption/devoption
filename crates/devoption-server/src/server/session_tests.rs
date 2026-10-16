@@ -18,6 +18,8 @@ use tower::ServiceExt;
 #[cfg(unix)]
 mod browser;
 #[cfg(unix)]
+mod history;
+#[cfg(unix)]
 mod pages;
 #[cfg(unix)]
 mod preauth;

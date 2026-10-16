@@ -130,7 +130,8 @@ cannot complete a job or prove that a runner was stopped.
 ## Remaining delivery for issue #17
 
 The domain helpers are implemented, but there is no production end-to-end build.
-The server/CLI do not instantiate the approval, job, output or supervision models.
+The server displays stored summaries/output and recovers interrupted history, but
+does not instantiate live approval, job execution or supervision services.
 These are the remaining integration groups, not claims that the acceptance rows
 are complete:
 
@@ -139,7 +140,7 @@ are complete:
 | Review and admission | [Plans](build-plans.md), [typed contexts](review-context.md), [approval lifecycle](build-approvals.md) | Present the complete verified record in an authenticated review UI; approve/cancel routes; fresh catalog/source/context verification; serialize single-use consumption with cancellation and single-job admission |
 | Prepared inputs | [Complete source capture](source-snapshots.md), [directory](reviewed-directories.md) and [executable](reviewed-executables.md) checks | Fresh owned work/source/dependency materialization outside checkouts; verified dependency archives/bundle and complete toolchain/configuration manifests; enforce trusted paths, ACL/mount and read-only layout requirements |
 | Runner and cleanup | [Output collector](build-output.md), [supervision decisions](build-supervision.md), [real leaf-process tests](process-supervision-fixtures.md), separate [fixture evidence](offline-fixture-build.md) | Select and implement the supported runner/target profile; enforce unprivileged identity, clean environment, network/filesystem isolation and CPU/memory/process/disk caps; launch one job; deliver signals, reap all children and verify cleanup through handoff |
-| Durable history and UI | In-memory lifecycle, [private summaries, output checkpoints and explicit recovery](build-history.md) | Leftover reconciliation, fresh catalog checks at admission/read time, admission using allocated attempt IDs, log checkpoint integration and retention; project-page states/logs and cancellation feedback |
+| Durable history and UI | In-memory lifecycle, [private summaries, output checkpoints, startup recovery and authenticated project pages](build-history.md) | Leftover reconciliation, fresh catalog checks at admission time, admission using allocated attempt IDs, automatic log checkpoints and retention; live cancellation feedback |
 | Artifact and provenance | Source/toolchain/command metadata; separate [handoff fixture](artifact-handoff.md) | Connect successful exit and verified cleanup to bounded collection of only the reviewed artifact; record durable provenance; expose independently staged verified bytes only for successful jobs |
 | Closure tests | Unit/rejection tests and separately approved offline fixtures | Integrated successful HTTP-service build, nonzero exit, timeout, cancellation, stale review, truncation/escaping, restart, artifact rejection and preservation of the original repository |
 
