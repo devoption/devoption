@@ -2,7 +2,7 @@
 
 DevOption is a deployable software factory intended for individuals and teams.
 The current implementation is an owner-only development preview with loopback HTTP
-access. Product direction does not imply that team accounts, application builds,
+access and an explicit [HTTPS proxy mode](public-linux-install.md) awaiting cloud validation. Product direction does not imply that team accounts, application builds,
 deployments or production hosting are already available.
 
 ## Use and contribute
@@ -13,6 +13,7 @@ deployments or production hosting are already available.
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)
 - [Private Ubuntu installation, backup and recovery](private-linux-install.md)
+- [Public-origin HTTPS installation and validation limits](public-linux-install.md)
 - [Development setup and checks](development.md)
 - [Screenshot gallery](screenshots/gallery.md) and [capture guide](screenshots/README.md)
 - [Contribution guide](../CONTRIBUTING.md) and [maintainer checklist](maintainers.md)

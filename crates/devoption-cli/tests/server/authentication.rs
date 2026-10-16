@@ -9,6 +9,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "authentication/public_origin.rs"]
+mod public_origin;
+
 const PASSWORD: &str = "existing owner fixture only";
 
 #[path = "authentication/builds.rs"]

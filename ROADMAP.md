@@ -29,9 +29,10 @@ The development preview supports:
 - Authenticated project build-history and log views, with selected history recovery
   at server startup; these views do not run builds.
 
-The preview binds to loopback. There is no published release, supported public
-hosting configuration, application build/deployment service, Wasm runtime, MCP
-interface or team access yet. See the [current user guide](docs/using-devoption.md)
+The preview binds to loopback and has an explicit HTTPS proxy mode with a
+[public installation guide](docs/public-linux-install.md); real cloud DNS/ACME and
+reboot validation remain pending. There is no published release, application
+build/deployment service, Wasm runtime, MCP interface or team access yet. See the [current user guide](docs/using-devoption.md)
 for supported operations.
 
 Existing [build contracts](docs/build-plans.md), immutable source verification and

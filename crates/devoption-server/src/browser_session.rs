@@ -1,11 +1,12 @@
-//! Cookie transport for the loopback browser session.
+//! Cookie transport for the browser session behind a validated origin.
 //!
 //! HTTP callers must first validate Host. Browser mutations also require matching
 //! Origin and an explicitly submitted CSRF header with the HttpOnly session cookie. This
 //! does not protect pre-authentication flows or authorize first-owner enrollment.
 //!
 //! Secure cookies require browser support for secure loopback contexts; never
-//! remove Secure to accommodate a browser. There is no TLS here. Cookies are not
+//! remove Secure to accommodate a browser. Explicit public mode terminates TLS at
+//! the configured local proxy; this adapter does not infer proxy trust. Cookies are not
 //! isolated by port, so other services on the same host remain in the trust boundary.
 //! Existing-owner HTTP sign-in and sign-out use this adapter.
 

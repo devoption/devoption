@@ -15,6 +15,10 @@ use axum::{
 use devoption_ui::Page;
 use tokio::{net::TcpListener, runtime::Builder};
 
+mod origin;
+pub use origin::PublicOrigin;
+use origin::RequestOrigin;
+
 type SharedSession = Arc<SessionSlot>;
 
 #[cfg(unix)]
@@ -42,7 +46,7 @@ pub fn run_with_repository_root(
     data_directory: Option<&Path>,
     repository_root: Option<&Path>,
 ) -> io::Result<()> {
-    run_with_roots(port, data_directory, repository_root, false, None)
+    run_with_roots(port, data_directory, repository_root, false, None, None)
 }
 
 /// Explicit creation capability in a selected private repository root. Existing
@@ -52,7 +56,14 @@ pub fn run_with_managed_repository_root(
     data_directory: Option<&Path>,
     repository_root: &Path,
 ) -> io::Result<()> {
-    run_with_roots(port, data_directory, Some(repository_root), true, None)
+    run_with_roots(
+        port,
+        data_directory,
+        Some(repository_root),
+        true,
+        None,
+        None,
+    )
 }
 
 /// Recover explicitly selected history before listening, retaining its writer lock.
@@ -73,6 +84,30 @@ pub fn run_with_build_history(
         repository_root,
         managed,
         Some(history_directory),
+        None,
+    )
+}
+
+/// Serve one explicitly configured HTTPS origin behind a local TLS proxy.
+/// The listener remains loopback-only and an existing owner is mandatory.
+pub fn run_with_public_origin(
+    port: u16,
+    data_directory: &Path,
+    repository_root: Option<&Path>,
+    managed: bool,
+    history_directory: Option<&Path>,
+    origin: PublicOrigin,
+) -> io::Result<()> {
+    if managed && repository_root.is_none() {
+        return Err(io::Error::other("managed repository mode requires a root"));
+    }
+    run_with_roots(
+        port,
+        Some(data_directory),
+        repository_root,
+        managed,
+        history_directory,
+        Some(origin),
     )
 }
 
@@ -82,6 +117,7 @@ fn run_with_roots(
     repository_root: Option<&Path>,
     managed: bool,
     history_directory: Option<&Path>,
+    public_origin: Option<PublicOrigin>,
 ) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
@@ -104,10 +140,20 @@ fn run_with_roots(
         .flatten();
     #[cfg(unix)]
     let configured = owner_identity.is_some();
+    #[cfg(unix)]
+    if public_origin.is_some() && !configured {
+        return Err(io::Error::other(
+            "public origin requires an existing configured owner",
+        ));
+    }
     #[cfg(not(unix))]
     let _ = managed;
     #[cfg(not(unix))]
-    if data_directory.is_some() || repository_root.is_some() || history_directory.is_some() {
+    if data_directory.is_some()
+        || repository_root.is_some()
+        || history_directory.is_some()
+        || public_origin.is_some()
+    {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "data-directory storage requires Unix",
@@ -202,13 +248,16 @@ fn run_with_roots(
             #[cfg(not(unix))]
             let project_routes = Router::new();
             let app = page_routes(configured, Arc::clone(&session), project_routes);
-            let app = protect(app, address.port(), Arc::clone(&session));
+            let origin = public_origin
+                .map(RequestOrigin::Public)
+                .unwrap_or(RequestOrigin::Local(address.port()));
+            let app = protect(app, origin.clone(), Arc::clone(&session));
             #[cfg(unix)]
             let app = match &owner_auth {
                 Some((auth, true)) => {
                     // Merge the protected router last so its guarded fallback
                     // still handles unknown paths, including absent setup routes.
-                    auth::routes(auth.clone(), address.port(), session).merge(app)
+                    auth::routes(auth.clone(), origin, session).merge(app)
                 }
                 // Unconfigured storage never opens first-visitor enrollment.
                 _ => app,
@@ -283,7 +332,7 @@ fn page_identity(headers: &HeaderMap, session: &SharedSession) -> Option<Identit
     }
 }
 
-fn protect(app: Router, port: u16, session: SharedSession) -> Router {
+fn protect(app: Router, origin: impl Into<RequestOrigin>, session: SharedSession) -> Router {
     let app = app.layer(middleware::from_fn(
         move |mut request: Request, next: Next| {
             let session = Arc::clone(&session);
@@ -302,23 +351,22 @@ fn protect(app: Router, port: u16, session: SharedSession) -> Router {
         },
     ));
     // The outer guard always runs before session validation or the handler.
-    protect_origin(app, port)
+    protect_origin(app, origin)
 }
 
 // Also shared by pre-authentication routes, which cannot require an
 // authenticated session. They must enforce their own CSRF/enrollment boundary.
-fn protect_origin(app: Router, port: u16) -> Router {
-    app.layer(middleware::from_fn(
-        move |request: Request, next: Next| async move {
-            let Some(host) = validated_host(&request, port) else {
-                return StatusCode::BAD_REQUEST.into_response();
-            };
-            if !safe_method(request.method()) && !same_origin(&request, host, port) {
-                return StatusCode::FORBIDDEN.into_response();
+fn protect_origin(app: Router, origin: impl Into<RequestOrigin>) -> Router {
+    let origin = origin.into();
+    app.layer(middleware::from_fn(move |request: Request, next: Next| {
+        let result = origin.check(&request);
+        async move {
+            if let Err(status) = result {
+                return (status, [(CACHE_CONTROL, "no-store")]).into_response();
             }
             next.run(request).await
-        },
-    ))
+        }
+    }))
 }
 
 fn safe_method(method: &Method) -> bool {

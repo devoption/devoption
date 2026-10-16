@@ -51,6 +51,7 @@ fn help_explains_the_actual_scope() {
         let text = String::from_utf8(output.stdout).unwrap();
         assert!(text.contains("Usage: devoption"));
         assert!(text.contains("--data-dir ABSOLUTE_PATH"));
+        assert!(text.contains("--public-origin HTTPS_ORIGIN"));
         assert!(text.contains("--repository-root ABSOLUTE_PATH"));
         assert!(text.contains("--managed-repository-root ABSOLUTE_PATH"));
         assert!(text.contains("devoption setup --data-dir ABSOLUTE_PATH"));
@@ -100,6 +101,31 @@ fn invalid_commands_fail_without_success_output() {
         vec!["setup", "--data-dir", "/unused", "--data-dir", "/unused"],
         vec!["--help", "start"],
         vec!["--version", "-V"],
+        vec!["serve", "--public-origin"],
+        vec!["serve", "--public-origin", "https://platform.example.test"],
+        vec![
+            "serve",
+            "--data-dir",
+            "/unused",
+            "--public-origin",
+            "http://platform.example.test",
+        ],
+        vec![
+            "serve",
+            "--data-dir",
+            "/unused",
+            "--public-origin",
+            "https://platform.example.test/",
+        ],
+        vec![
+            "serve",
+            "--data-dir",
+            "/unused",
+            "--public-origin",
+            "https://platform.example.test",
+            "--public-origin",
+            "https://other.example.test",
+        ],
         vec!["serve", "--port"],
         vec!["serve", "--port", "abc"],
         vec!["serve", "--port", "65536"],

@@ -17,11 +17,13 @@ loopback binding and Cargo `--locked --offline` are neither a sandbox nor a
 filesystem/network boundary. Browser extensions and other processes under that
 account are inside the trust boundary. Do not put credentials in job inputs.
 
-The control listener remains loopback-only. Any future application runtime
+The control listener remains loopback-only. The explicit
+[HTTPS proxy mode](public-linux-install.md) under #230 adds a configured public
+origin for platform access without changing that bind address. Any future application runtime
 listener must also remain loopback-only until a separately reviewed exposure
-policy supersedes this contract. There is no runtime listener today. No public
-exposure, multi-user login, repository secrets or general shell endpoint is
-introduced here. Registration, inspection and source capture never run repository
+policy supersedes this contract. There is no application runtime listener today. Multi-user login, repository
+secrets and general shell execution remain outside this contract. The linked
+#230 mode defines platform HTTPS exposure only. Registration, inspection and source capture never run repository
 code, hooks, dependency installation or builds. Selecting a root grants only the
 explicit documented filesystem operations, never execution permission.
 

@@ -1,7 +1,9 @@
 # Using the current preview
 
 DevOption is intended to be a deployable software factory for individuals and teams.
-The current preview supports one owner and loopback HTTP access. Start with the
+The current preview supports one owner and a loopback HTTP listener. An explicit
+[HTTPS proxy mode](public-linux-install.md) supports one public origin; real cloud
+DNS/ACME and reboot validation remain pending. Start with the
 [quick start](../README.md#quick-start) or the [private Ubuntu installation guide](private-linux-install.md).
 
 On Unix, `serve --data-dir /absolute/private/directory` optionally validates an
@@ -68,8 +70,9 @@ invalid or expired sessions receive a non-cacheable redirect to `/sign-in` witho
 page content. Sign in stays public; the unconfigured preview stays public. This
 startup choice cannot be changed by a request or by removing the owner record from
 a running server. Page reads never renew sessions and do not replace the CSRF
-requirement on mutations. There is no TLS or supported public deployment
-configuration. Do not expose it publicly.
+requirement on mutations. TLS is not implemented in the backend. Use only the explicit
+[public-origin proxy configuration](public-linux-install.md) for HTTPS access;
+never expose the HTTP listener itself.
 
 For an existing owner, `POST /auth/challenge` issues an HttpOnly pre-session cookie
 and a separate `X-CSRF-Token` header. `POST /auth/sign-in` requires that matching
@@ -218,3 +221,25 @@ and failed reads have distinct messages. No artifact download is offered.
 The server still cannot start or approve a build. Source checks remain available
 below the history list. See the [history contract](build-history.md#authenticated-project-history)
 for authentication, bounds and remaining integration work.
+
+
+## Explicit HTTPS proxy mode
+
+`serve --public-origin https://platform.example.com --data-dir ABSOLUTE_PATH`
+requires an existing owner and accepts only that configured DNS authority (default
+HTTPS port 443). Configuration is lowercase ASCII with no port/path/query/fragment;
+requests may spell the same authority with explicit `:443`. The backend stays on
+127.0.0.1. All routes validate Host; unsafe methods require the configured HTTPS
+Origin in addition to their existing session/CSRF or preauthentication checks.
+Absolute-form targets must agree with the configured HTTPS authority.
+
+Public mode rejects Forwarded, every X-Forwarded-* header and X-Real-IP at the
+backend. The local proxy must remove its own and incoming forwarding metadata,
+preserve Host/Origin, and terminate TLS. There is no inferred scheme, trusted IP
+header, CORS bypass or unauthenticated enrollment. Cookies remain host-only Secure,
+HttpOnly and SameSite=Strict. Restart discards sessions but retains validated owner
+and project data. The existing shared sign-in rate limits are unchanged.
+
+Follow the [public installation guide](public-linux-install.md) for the dedicated
+service account, exact proxy example, checks and unverified cloud-hosting limits.
+Omitting `--public-origin` preserves the existing private Host/Origin policy.
