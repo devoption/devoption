@@ -14,6 +14,7 @@ deployments or production hosting are already available.
 - [Current preview user guide](using-devoption.md)
 - [Private Ubuntu installation, backup and recovery](private-linux-install.md)
 - [Public-origin HTTPS installation and validation limits](public-linux-install.md)
+- [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)
 - [Development setup and checks](development.md)
 - [Screenshot gallery](screenshots/gallery.md) and [capture guide](screenshots/README.md)
 - [Contribution guide](../CONTRIBUTING.md) and [maintainer checklist](maintainers.md)
