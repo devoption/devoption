@@ -17,10 +17,12 @@ snapshot, including owned file bytes and the root Cargo proof. A different verif
 source revision or source bytes cannot start or complete the original
 attempt. This equality is an in-memory
 identity check, not a stable serialized plan digest or authorization. It does not
-recheck external state or authenticate source selection. A future store must
-allocate unique IDs, reject duplicates, and give every retry a new ID. The model does not enforce uniqueness across separately created records. The
-separate [history store](build-history.md) rejects duplicate identity changes in
-one bounded store but is not a global attempt-ID allocator.
+recheck external state or authenticate source selection. The model does not enforce
+uniqueness across separately created records. The
+separate [history store](build-history.md) allocates random attempt IDs, rejects
+collisions with retained history and persists Queued before returning each fresh
+attempt. Its update API rejects unknown IDs. It is not a global identity registry
+or an execution-admission transaction.
 
 The plan and state have read-only accessors. `State::Succeeded` carries
 `ArtifactMetadata` for the plan's single binary: a SHA-256 claim and nonzero byte
@@ -71,7 +73,8 @@ Consuming against an interrupted record fails as NotQueued and permanently
 invalidates that approval; a new registry also refuses to approve that record.
 Creating a new registry after restart invalidates old handles, but this model alone
 does not prevent callers constructing separate queued records with reused IDs.
-Durable attempt uniqueness remains a future store responsibility.
+Use the history store allocator for new persisted attempts; its guarantees and
+cross-store limits are described in the [history guide](build-history.md).
 
 An interrupted label cannot release a runner slot or justify deleting job storage.
 Surviving children/writers must be reconciled and cleanup verified before admitting
@@ -134,7 +137,7 @@ are complete:
 | Review and admission | [Plans](build-plans.md), [typed contexts](review-context.md), [approval lifecycle](build-approvals.md) | Present the complete verified record in an authenticated review UI; approve/cancel routes; fresh catalog/source/context verification; serialize single-use consumption with cancellation and single-job admission |
 | Prepared inputs | [Complete source capture](source-snapshots.md), [directory](reviewed-directories.md) and [executable](reviewed-executables.md) checks | Fresh owned work/source/dependency materialization outside checkouts; verified dependency archives/bundle and complete toolchain/configuration manifests; enforce trusted paths, ACL/mount and read-only layout requirements |
 | Runner and cleanup | [Output collector](build-output.md), [supervision decisions](build-supervision.md), [real leaf-process tests](process-supervision-fixtures.md), separate [fixture evidence](offline-fixture-build.md) | Select and implement the supported runner/target profile; enforce unprivileged identity, clean environment, network/filesystem isolation and CPU/memory/process/disk caps; launch one job; deliver signals, reap all children and verify cleanup through handoff |
-| Durable history and UI | In-memory lifecycle, [private summary storage and explicit recovery](build-history.md), escaped bounded output | Startup recovery integration, leftover reconciliation, unique attempt IDs, durable logs and retention; project-page states/logs and cancellation feedback |
+| Durable history and UI | In-memory lifecycle, [private summary storage and explicit recovery](build-history.md), escaped bounded output | Startup recovery integration, leftover reconciliation, admission using allocated attempt IDs, durable logs and retention; project-page states/logs and cancellation feedback |
 | Artifact and provenance | Source/toolchain/command metadata; separate [handoff fixture](artifact-handoff.md) | Connect successful exit and verified cleanup to bounded collection of only the reviewed artifact; record durable provenance; expose independently staged verified bytes only for successful jobs |
 | Closure tests | Unit/rejection tests and separately approved offline fixtures | Integrated successful HTTP-service build, nonzero exit, timeout, cancellation, stale review, truncation/escaping, restart, artifact rejection and preservation of the original repository |
 

@@ -24,7 +24,7 @@ fn queued_history_survives_reopen_and_recovers_without_authority() {
     let (_temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
     assert!(store.load().unwrap().is_empty());
-    store.record(&job).unwrap();
+    let job = store.queue(job.plan().clone()).unwrap();
     store.record(&job).unwrap();
     drop(store);
     let mut store = History::open(&path).unwrap();
@@ -44,9 +44,9 @@ fn queued_history_survives_reopen_and_recovers_without_authority() {
 }
 #[test]
 fn cancelled_history_is_terminal_and_identity_changes_are_rejected() {
-    let (_temp, path, mut job) = fixture();
+    let (_temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
-    store.record(&job).unwrap();
+    let mut job = store.queue(job.plan().clone()).unwrap();
     job.cancel_queued().unwrap();
     store.record(&job).unwrap();
     assert_eq!(store.recover_interrupted(), Ok(0));
@@ -65,7 +65,7 @@ fn exclusive_writer_and_directory_or_lock_rebinding_fail_closed() {
     let (temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
     assert!(matches!(History::open(&path), Err(Error::Busy)));
-    store.record(&job).unwrap();
+    let job = store.queue(job.plan().clone()).unwrap();
     fs::rename(temp.path().join(LOCK), temp.path().join("preserved-lock")).unwrap();
     fs::write(temp.path().join(LOCK), b"").unwrap();
     fs::set_permissions(temp.path().join(LOCK), fs::Permissions::from_mode(0o600)).unwrap();
@@ -79,9 +79,9 @@ fn exclusive_writer_and_directory_or_lock_rebinding_fail_closed() {
 }
 #[test]
 fn stale_pending_is_preserved_and_poisons_writer_without_replacing_history() {
-    let (temp, path, mut job) = fixture();
+    let (temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
-    store.record(&job).unwrap();
+    let mut job = store.queue(job.plan().clone()).unwrap();
     let before = fs::read(temp.path().join(RECORD)).unwrap();
     fs::write(temp.path().join(PENDING), b"preserved").unwrap();
     job.cancel_queued().unwrap();
@@ -100,7 +100,7 @@ fn unsafe_files_corruption_and_oversize_are_never_reset() {
     for case in 0..6 {
         let (temp, path, job) = fixture();
         let mut store = History::open(&path).unwrap();
-        store.record(&job).unwrap();
+        store.queue(job.plan().clone()).unwrap();
         drop(store);
         let record = temp.path().join(RECORD);
         match case {
@@ -125,22 +125,20 @@ fn unsafe_files_corruption_and_oversize_are_never_reset() {
 fn ten_attempt_bound_never_evicts_or_overwrites() {
     let (temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
-    for id in 0..MAX_JOBS {
-        store
-            .record(&BuildJob::queued(
-                JobId::from_bytes([id as u8; 16]),
-                job.plan().clone(),
-            ))
-            .unwrap();
+    for _ in 0..MAX_JOBS {
+        store.queue(job.plan().clone()).unwrap();
     }
     let before = fs::read(temp.path().join(RECORD)).unwrap();
-    assert_eq!(
-        store.record(&BuildJob::queued(
-            JobId::from_bytes([99; 16]),
-            job.plan().clone()
+    assert!(matches!(
+        store.queue(job.plan().clone()),
+        Err(Error::Capacity)
+    ));
+    assert!(matches!(
+        store.queue_using(job.plan().clone(), |_| panic!(
+            "capacity must precede entropy"
         )),
         Err(Error::Capacity)
-    );
+    ));
     assert_eq!(fs::read(temp.path().join(RECORD)).unwrap(), before);
 }
 #[test]
@@ -209,7 +207,7 @@ fn paths_and_directory_permissions_are_checked_without_repair() {
 fn interrupted_write_preserves_old_snapshot_and_leaves_pending_for_inspection() {
     let (temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
-    store.record(&job).unwrap();
+    let job = store.queue(job.plan().clone()).unwrap();
     let before = fs::read(temp.path().join(RECORD)).unwrap();
     let mut record = Record::from_job(&job);
     record.state = State::Interrupted;
@@ -249,4 +247,96 @@ fn fifo_record_is_rejected_without_blocking_or_removal() {
     .unwrap();
     assert!(matches!(History::open(&path), Err(Error::Unsafe)));
     assert!(temp.path().join(RECORD).exists());
+}
+
+#[test]
+fn allocation_rejects_collisions_across_recovery_and_reopen() {
+    let (_temp, path, original) = fixture();
+    let plan = original.plan().clone();
+    let mut store = History::open(&path).unwrap();
+    let first = store
+        .queue_using(plan.clone(), |bytes| {
+            *bytes = [7; 16];
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(first.state(), &State::Queued);
+    assert!(first.plan() == &plan);
+    assert_eq!(store.load().unwrap()[0].id(), first.id());
+    drop(store);
+    let mut store = History::open(&path).unwrap();
+    store.recover_interrupted().unwrap();
+    let mut calls = 0;
+    let retry = store
+        .queue_using(plan.clone(), |bytes| {
+            calls += 1;
+            *bytes = if calls == 1 { [7; 16] } else { [8; 16] };
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(calls, 2);
+    assert_ne!(retry.id(), first.id());
+    let records = store.load().unwrap();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0].state(), &State::Interrupted);
+    assert_eq!(records[1].state(), &State::Queued);
+    assert_eq!(store.record(&first), Err(Error::Transition));
+}
+
+#[test]
+fn entropy_failure_and_collision_exhaustion_preserve_history() {
+    let (temp, path, job) = fixture();
+    let mut store = History::open(&path).unwrap();
+    let first = store.queue(job.plan().clone()).unwrap();
+    let before = fs::read(temp.path().join(RECORD)).unwrap();
+    assert!(matches!(
+        store.queue_using(job.plan().clone(), |_| Err(Error::Randomness)),
+        Err(Error::Randomness)
+    ));
+    let mut calls = 0;
+    assert!(matches!(
+        store.queue_using(job.plan().clone(), |bytes| {
+            calls += 1;
+            *bytes = first.id().to_bytes();
+            Ok(())
+        }),
+        Err(Error::Randomness)
+    ));
+    assert_eq!(calls, 16);
+    assert_eq!(fs::read(temp.path().join(RECORD)).unwrap(), before);
+    assert!(!temp.path().join(PENDING).exists());
+    // Entropy failure does not poison an otherwise healthy writer.
+    store.queue(job.plan().clone()).unwrap();
+}
+
+#[test]
+fn unknown_updates_cannot_insert_attempts() {
+    let (temp, path, mut job) = fixture();
+    let mut store = History::open(&path).unwrap();
+    assert_eq!(store.record(&job), Err(Error::UnknownAttempt));
+    job.cancel_queued().unwrap();
+    assert_eq!(store.record(&job), Err(Error::UnknownAttempt));
+    assert!(store.load().unwrap().is_empty());
+    assert!(!temp.path().join(RECORD).exists());
+}
+
+#[test]
+fn failed_queue_returns_no_attempt_and_preserves_existing_history() {
+    let (temp, path, job) = fixture();
+    let mut store = History::open(&path).unwrap();
+    store.queue(job.plan().clone()).unwrap();
+    let before = fs::read(temp.path().join(RECORD)).unwrap();
+    fs::write(temp.path().join(PENDING), b"inspect me").unwrap();
+    assert!(matches!(
+        store.queue(job.plan().clone()),
+        Err(Error::Unavailable)
+    ));
+    assert!(matches!(
+        store.queue(job.plan().clone()),
+        Err(Error::Unavailable)
+    ));
+    assert_eq!(fs::read(temp.path().join(RECORD)).unwrap(), before);
+    assert_eq!(fs::read(temp.path().join(PENDING)).unwrap(), b"inspect me");
+    drop(store);
+    assert_eq!(History::open(&path).unwrap().load().unwrap().len(), 1);
 }

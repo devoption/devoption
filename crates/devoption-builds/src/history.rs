@@ -1,6 +1,6 @@
 //! Private bounded history, never restored execution or artifact authority.
 use crate::{
-    absolute_path,
+    BuildPlan, absolute_path,
     jobs::{BuildJob, JobId, State},
 };
 use rustix::{
@@ -173,31 +173,56 @@ impl History {
         self.check()?;
         codec::decode(&bytes)
     }
-    /// Persist queued first. Exact duplicate observations are harmless; all other
-    /// updates require matching summary identity and a permitted lifecycle edge.
+    /// Allocate and durably save a fresh queued attempt before returning it.
+    /// This does not approve a plan, reserve a runner or establish child cleanup.
+    pub fn queue(&mut self, plan: BuildPlan) -> Result<BuildJob, Error> {
+        self.queue_using(plan, |bytes| {
+            getrandom::fill(bytes).map_err(|_| Error::Randomness)
+        })
+    }
+    fn queue_using(
+        &mut self,
+        plan: BuildPlan,
+        mut random: impl FnMut(&mut [u8; 16]) -> Result<(), Error>,
+    ) -> Result<BuildJob, Error> {
+        let mut records = self.load()?;
+        if records.len() == MAX_JOBS {
+            return Err(Error::Capacity);
+        }
+        // Bounded even if the entropy source repeatedly returns a retained ID.
+        for _ in 0..16 {
+            let mut bytes = [0; 16];
+            random(&mut bytes)?;
+            let id = JobId::from_bytes(bytes);
+            if records.iter().any(|record| record.id == id) {
+                continue;
+            }
+            let job = BuildJob::queued(id, plan);
+            records.push(Record::from_job(&job));
+            self.publish(&records)?;
+            return Ok(job);
+        }
+        Err(Error::Randomness)
+    }
+    /// Update an already persisted attempt. Exact duplicate observations are
+    /// harmless; other updates need matching identity and a legal lifecycle edge.
     pub fn record(&mut self, job: &BuildJob) -> Result<(), Error> {
         let mut records = self.load()?;
         let next = Record::from_job(job);
-        if let Some(old) = records.iter_mut().find(|r| r.id == next.id) {
-            if !old.same_identity(&next) {
-                return Err(Error::Changed);
-            }
-            if *old == next {
-                return Ok(());
-            }
-            if !transition(&old.state, &next.state) {
-                return Err(Error::Transition);
-            }
-            *old = next;
-        } else {
-            if next.state != State::Queued {
-                return Err(Error::Transition);
-            }
-            if records.len() == MAX_JOBS {
-                return Err(Error::Capacity);
-            }
-            records.push(next);
+        let old = records
+            .iter_mut()
+            .find(|r| r.id == next.id)
+            .ok_or(Error::UnknownAttempt)?;
+        if !old.same_identity(&next) {
+            return Err(Error::Changed);
         }
+        if *old == next {
+            return Ok(());
+        }
+        if !transition(&old.state, &next.state) {
+            return Err(Error::Transition);
+        }
+        *old = next;
         self.publish(&records)
     }
     /// Persist interruption only. Never resumes work or establishes child cleanup.
@@ -332,6 +357,8 @@ pub enum Error {
     Corrupt,
     Capacity,
     Transition,
+    Randomness,
+    UnknownAttempt,
 }
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -342,6 +369,8 @@ impl fmt::Display for Error {
             Self::Changed => "build history identity changed",
             Self::Corrupt => "invalid build history record",
             Self::Capacity => "build history capacity reached",
+            Self::Randomness => "fresh build attempt identity unavailable",
+            Self::UnknownAttempt => "build attempt is not in history",
             Self::Transition => "build history transition rejected",
         })
     }
