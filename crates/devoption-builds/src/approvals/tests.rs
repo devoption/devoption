@@ -342,3 +342,33 @@ fn issuance_rejects_context_for_another_plan_without_reserving_attempt() {
     ));
     assert!(registry.approve(OWNER, &original, context()).is_ok());
 }
+
+#[test]
+fn interrupted_and_recovered_records_cannot_consume_or_receive_approval() {
+    for recovered in [false, true] {
+        let registry = Approvals::default();
+        let mut job = job();
+        let context = context();
+        let approval = registry.approve(OWNER, &job, context.clone()).unwrap();
+        if recovered {
+            job = BuildJob::recover_interrupted(job.id(), job.plan().clone());
+        } else {
+            job.interrupt().unwrap();
+        }
+        assert_eq!(
+            registry.consume(&approval, OWNER, &job, &context),
+            Err(Error::NotQueued)
+        );
+        assert_eq!(registry.status(&approval, OWNER), Ok(Status::Invalidated));
+        assert_eq!(
+            registry.consume(&approval, OWNER, &job, &context),
+            Err(Error::Inactive(Status::Invalidated))
+        );
+        // Even a new registry cannot approve this interrupted record.
+        assert!(matches!(
+            Approvals::default().approve(OWNER, &job, context),
+            Err(Error::NotQueued)
+        ));
+        assert_eq!(job.state(), &JobState::Interrupted);
+    }
+}

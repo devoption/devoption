@@ -73,6 +73,8 @@ pub enum State {
     Succeeded(ArtifactMetadata),
     Failed(Failure),
     Cancelled,
+    /// Supervisor continuity was lost; process termination is not established.
+    Interrupted,
 }
 
 /// Sealed handoff from a future trusted runner. There is deliberately no public
@@ -118,6 +120,29 @@ impl BuildJob {
             plan,
             state: State::Queued,
         }
+    }
+
+    /// Reconstruct an unfinished historical attempt only as interrupted. This
+    /// never restores approval, live runner state, success or artifact authority.
+    /// A future store must validate the saved identity/plan and reconcile any
+    /// surviving children before admitting new work.
+    pub fn recover_interrupted(id: JobId, plan: BuildPlan) -> Self {
+        Self {
+            id,
+            plan,
+            state: State::Interrupted,
+        }
+    }
+
+    /// Record lost supervisor continuity without claiming cancellation or cleanup.
+    /// The caller must separately revoke pending approval and reconcile children.
+    /// Terminal records remain immutable; retries require a fresh attempt.
+    pub fn interrupt(&mut self) -> Result<(), Error> {
+        if !matches!(self.state, State::Queued | State::Running) {
+            return Err(Error::InvalidTransition);
+        }
+        self.state = State::Interrupted;
+        Ok(())
     }
 
     pub fn id(&self) -> JobId {

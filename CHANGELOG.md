@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add terminal Interrupted build records and a recovery constructor that cannot
+  restore running state, success or approval; document remaining build integration
+  ([#208](https://github.com/devoption/devoption/issues/208)).
+
 - Add monotonic build supervision decisions for timeout, cancellation and bounded
   output, with sticky stop reasons and a five-second termination grace; no process
   launch, signaling or cleanup claims
