@@ -80,6 +80,10 @@ count. It does not select a registry or manufacture materialization metadata.
 `src/main.rs` is checked for tracked text presence only. Its Rust syntax, target
 semantics and buildability are not checked. Tests deliberately use invalid Rust
 text to establish that this check does not invoke a compiler.
+The Cargo adapter and [immutable snapshot verifier](source-snapshots.md) also
+admit a narrow `cdylib` source shape under #231, but this working-tree report still
+checks `src/main.rs`. Library-target preparation and build controls are not yet
+connected to the project interface.
 
 ## Bounds and trust
 

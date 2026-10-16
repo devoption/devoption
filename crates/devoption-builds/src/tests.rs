@@ -464,3 +464,16 @@ fn required_limits_and_metadata_boundaries_have_no_execution_defaults() {
     };
     assert!(BuildPlan::validate(input, &catalog).is_ok());
 }
+
+#[test]
+fn cdylib_snapshot_cannot_enter_the_native_plan_or_approval_path() {
+    let (catalog, mut input) = fixture();
+    input.source = source_snapshot::tests::ProofFixture::cdylib()
+        .verify()
+        .unwrap();
+    input.commit = input.source.commit().into();
+    input.dependencies = dependencies(&input.source);
+    input.package = input.source.package().into();
+    input.binary = input.source.package().into();
+    rejected(&catalog, input, Error::TargetMismatch);
+}

@@ -411,3 +411,68 @@ fn inspection_preserves_adapter_results_without_selecting_a_registry() {
         assert_eq!(inspect(manifest, lock).err(), check(manifest, lock).err());
     }
 }
+
+#[test]
+fn cdylib_requires_one_conventional_named_library() {
+    let manifest = format!(
+        "{}\n[lib]\nname = 'ExampleService'\ncrate-type = ['cdylib']\n",
+        text(MANIFEST)
+    );
+    let inputs = inspect(manifest.as_bytes(), LOCK).unwrap();
+    assert_eq!(
+        inputs.target(),
+        &SourceTarget::Cdylib {
+            name: "ExampleService".into()
+        }
+    );
+    assert_eq!(inputs.target().path(), "src/lib.rs");
+    assert_eq!(
+        inspect(MANIFEST, LOCK).unwrap().target(),
+        &SourceTarget::Binary
+    );
+    for changed in [
+        manifest.replace("name = 'ExampleService'", "name = 'different'"),
+        manifest.replace("crate-type = ['cdylib']", "crate-type = ['cdylib', 'rlib']"),
+        manifest.replace("crate-type = ['cdylib']", "crate-type = ['rlib']"),
+        manifest.replace("crate-type = ['cdylib']", "crate-type = []"),
+        manifest.replace("crate-type = ['cdylib']", "crate-type = 'cdylib'"),
+        manifest.replace("crate-type = ['cdylib']", ""),
+        format!("{manifest}path = 'other.rs'\n"),
+        format!("{manifest}proc-macro = true\n"),
+        format!("{manifest}[[bin]]\nname = 'extra'\n"),
+    ] {
+        assert!(inspect(changed.as_bytes(), LOCK).is_err());
+    }
+}
+
+#[test]
+fn exact_requirements_ignore_only_build_metadata_and_keep_full_locked_identity() {
+    for (pin, locked, accepted) in [
+        ("1.2.3", "1.2.3+wasi-0.2.4", true),
+        ("1.2.3+declared", "1.2.3+locked", true),
+        ("1.2.3-alpha.1", "1.2.3-alpha.1+locked", true),
+        ("1.2.3", "1.2.4+locked", false),
+        ("1.2.3", "1.2.3-alpha.1+locked", false),
+        ("1.2.3-alpha.1", "1.2.3-alpha.2+locked", false),
+        ("1.2.3-alpha.1", "1.2.3+locked", false),
+    ] {
+        let manifest = text(MANIFEST).replace("=1.2.3", &format!("={pin}"));
+        let lock = text(LOCK).replace("1.2.3", locked);
+        let result = check(manifest.as_bytes(), lock.as_bytes());
+        if accepted {
+            let request = result.unwrap();
+            assert_eq!(
+                request
+                    .packages()
+                    .iter()
+                    .find(|p| p.name == "http")
+                    .unwrap()
+                    .version,
+                locked
+            );
+            assert!(request != check(MANIFEST, LOCK).unwrap());
+        } else {
+            assert_eq!(result.err(), Some(Error::DependencyMismatch));
+        }
+    }
+}

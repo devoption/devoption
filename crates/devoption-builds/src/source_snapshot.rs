@@ -55,13 +55,14 @@ impl SourceFile {
 }
 
 /// The entire supported commit tree, with exact bytes and the sole conventional
-/// binary target. Immutable ownership is not filesystem isolation or permission.
+/// source target. Immutable ownership is not filesystem isolation or permission.
 #[derive(Clone, PartialEq, Eq)]
 pub struct SourceSnapshot {
     cargo: RootCargoSource,
     files: Vec<SourceFile>,
     package: String,
     version: String,
+    target: cargo_inputs::SourceTarget,
     sha256: Sha256,
 }
 
@@ -87,11 +88,17 @@ impl SourceSnapshot {
     pub fn version(&self) -> &str {
         &self.version
     }
-    pub fn binary(&self) -> &str {
-        &self.package
+    pub fn binary(&self) -> Option<&str> {
+        match self.target {
+            cargo_inputs::SourceTarget::Binary => Some(&self.package),
+            cargo_inputs::SourceTarget::Cdylib { .. } => None,
+        }
+    }
+    pub fn target(&self) -> &cargo_inputs::SourceTarget {
+        &self.target
     }
     pub fn target_path(&self) -> &'static str {
-        "src/main.rs"
+        self.target.path()
     }
     /// Versioned, length-framed identity of the commit and all source paths/bytes.
     /// Registry policy stays separately bound through request() and plan equality.
@@ -170,10 +177,6 @@ pub fn verify(
     };
     let manifest = file("Cargo.toml")?;
     let lockfile = file("Cargo.lock")?;
-    let main = file("src/main.rs")?;
-    if std::str::from_utf8(main).map_or(true, |text| text.trim().is_empty()) {
-        return Err(Error::UnsupportedTarget);
-    }
     let cargo = cargo_source::verify_root(
         registry,
         selected_commit,
@@ -189,7 +192,25 @@ pub fn verify(
     if !crate::target_name(inputs.package()) {
         return Err(Error::UnsupportedTarget);
     }
-    let mut identity = b"devoption-source-snapshot-v1\0".to_vec();
+    let target = inputs.target();
+    let source = file(target.path())?;
+    if std::str::from_utf8(source).map_or(true, |text| text.trim().is_empty()) {
+        return Err(Error::UnsupportedTarget);
+    }
+    let excluded = match target {
+        cargo_inputs::SourceTarget::Binary => "src/lib.rs",
+        cargo_inputs::SourceTarget::Cdylib { .. } => "src/main.rs",
+    };
+    if files.iter().any(|file| {
+        file.path.eq_ignore_ascii_case(excluded)
+            || file
+                .path
+                .to_ascii_lowercase()
+                .starts_with(&format!("{excluded}/"))
+    }) {
+        return Err(Error::UnsupportedTarget);
+    }
+    let mut identity = b"devoption-source-snapshot-v2\0".to_vec();
     frame(&mut identity, selected_commit.as_bytes());
     frame(&mut identity, cargo.commit_sha256().bytes());
     frame(&mut identity, cargo.tree_sha256().bytes());
@@ -203,6 +224,7 @@ pub fn verify(
         files,
         package: inputs.package().into(),
         version: inputs.version().into(),
+        target: inputs.target().clone(),
     })
 }
 
@@ -249,13 +271,12 @@ impl Traversal<'_> {
             if path.len() > MAX_PATH_BYTES {
                 return Err(Error::Capacity);
             }
-            // The supported manifest has no explicit target definitions. Exclude
-            // Cargo's other automatic target locations; nested package manifests
-            // and configuration are outside this first standalone binary shape.
+            // Exclude extra automatic targets, nested packages and configuration.
+            // The selected main/lib source is checked after manifest inspection.
             let folded = path.to_ascii_lowercase();
             if matches!(
                 folded.as_str(),
-                "build.rs" | "src/lib.rs" | "src/bin" | "tests" | "examples" | "benches"
+                "build.rs" | "src/bin" | "tests" | "examples" | "benches"
             ) || (depth > 0
                 && matches!(
                     entry.name.to_ascii_lowercase().as_str(),
@@ -319,7 +340,7 @@ impl fmt::Display for Error {
             Self::DuplicateObject => "source snapshot supplies a duplicate object",
             Self::ExtraObject => "source snapshot supplies an unreferenced object",
             Self::UnsupportedTarget => {
-                "source snapshot requires one standalone conventional Rust binary"
+                "source snapshot requires one standalone conventional Rust binary or cdylib"
             }
             Self::UnsupportedMode => "source snapshot supports only regular non-executable files",
             Self::EmptyTree => "source snapshot contains an empty tree",

@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Admit the selected web-app's narrow `cdylib` manifest and complete library source
+  snapshot, with Cargo-compatible exact dependency matching that retains full
+  locked version/checksum identity. Reject mixed targets and keep library snapshots
+  out of the native-only build planner; Wasm execution and UI integration remain
+  pending ([#231](https://github.com/devoption/devoption/issues/231)).
+
 - Add explicit HTTPS public-origin serving behind a local proxy, requiring an
   existing owner and strict Host/Origin checks while retaining loopback binding,
   Secure host-only cookies and CSRF protection. Add dedicated systemd/Caddy
