@@ -114,3 +114,6 @@ impl std::error::Error for InvalidLimits {}
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod process_tests;

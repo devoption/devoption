@@ -23,6 +23,10 @@ python3 -m unittest discover -s scripts -p 'test_*.py'
 node --test scripts/test_*.cjs
 ```
 
+Workspace tests include [trusted leaf subprocess fixtures](process-supervision-fixtures.md)
+on Unix and require `/usr/bin/python3`; these exercise real TERM/KILL handling
+without launching repository workloads.
+
 On Linux, also run the explicit trusted fixture build (GNU `timeout` and the
 installed Rust toolchain/linker are required):
 
