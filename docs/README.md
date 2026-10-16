@@ -25,6 +25,7 @@ deployments or production hosting are already available.
 - [Display-name Profile page](profile.md)
 - [Browser session validation](browser-session-check.md)
 - [Create server-managed repositories](managed-repositories.md)
+- [Review and recover changed repository device bindings](repository-recovery.md)
 - [Project catalog and HTTP operations](project-catalog.md)
 - [Browse tracked repository files](repository-files.md)
 - [Worktree validation](worktree-validation.md)

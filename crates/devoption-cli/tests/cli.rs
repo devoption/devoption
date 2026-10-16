@@ -1,6 +1,45 @@
 use std::process::Command;
 
 #[test]
+fn repository_recovery_rejects_invalid_or_duplicate_options() {
+    for args in [
+        vec![],
+        vec!["--data-dir", "relative", "--repository-root", "/missing"],
+        vec![
+            "--data-dir",
+            "/missing",
+            "--repository-root",
+            "/missing",
+            "--approve-device-rebind",
+            "not-a-review",
+        ],
+        vec![
+            "--data-dir",
+            "/missing",
+            "--data-dir",
+            "/other",
+            "--repository-root",
+            "/missing",
+        ],
+        vec![
+            "--data-dir",
+            "/missing",
+            "--repository-root",
+            "/missing",
+            "--force",
+        ],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_devoption"))
+            .arg("recover-repositories")
+            .args(args)
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(2));
+        assert!(output.stdout.is_empty());
+    }
+}
+
+#[test]
 fn help_explains_the_actual_scope() {
     for args in [vec![], vec!["--help"], vec!["-h"]] {
         let output = Command::new(env!("CARGO_BIN_EXE_devoption"))

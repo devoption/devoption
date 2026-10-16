@@ -1,6 +1,8 @@
 use std::{env, ffi::OsString, path::PathBuf, process::ExitCode};
 
 #[cfg(unix)]
+mod recovery;
+#[cfg(unix)]
 mod setup;
 #[cfg(unix)]
 mod source_check;
@@ -11,12 +13,14 @@ Usage: devoption [--help | --version]
        devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
+       devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
 
   -h, --help     Show this help
   -V, --version  Show the development version
   serve         Start HTTP on 127.0.0.1:3000; Ctrl+C stops the process
   setup         Create the first owner using hidden terminal prompts (Unix/local/SSH)
   check-source  Read saved repository source checks (Unix/local/SSH); no build runs
+  recover-repositories  Review changed device bindings; explicit approval required to apply (Unix)
   --port PORT   Override the port (0 chooses a free port)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
   --repository-root  Explicit trusted checkout root for inspection/attachment
@@ -30,6 +34,16 @@ Source checks require all four options and saved 32-character hexadecimal IDs fr
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
     let options = match args.as_slice() {
+        [command, options @ ..] if command == "recover-repositories" => {
+            #[cfg(unix)]
+            return recovery::run(options);
+            #[cfg(not(unix))]
+            {
+                let _ = options;
+                eprintln!("error: repository recovery requires Unix");
+                return ExitCode::from(2);
+            }
+        }
         [] => None,
         [flag] if flag == "--help" || flag == "-h" => None,
         [flag] if flag == "--version" || flag == "-V" => {

@@ -2,6 +2,143 @@ use super::profile::{check, read};
 use super::*;
 use devoption_projects::{ProjectId, read_catalog};
 use std::os::unix::fs::PermissionsExt;
+
+// Model a device-number change in a disposable version-2 fixture only. Keep all
+// paths, inodes, IDs and bytes outside these identity fields unchanged.
+fn retired_device_record(bytes: &mut [u8]) {
+    fn count(bytes: &[u8], offset: &mut usize) -> usize {
+        let result = u16::from_le_bytes(bytes[*offset..*offset + 2].try_into().unwrap()) as usize;
+        *offset += 2;
+        result
+    }
+    fn string(bytes: &[u8], offset: &mut usize) {
+        let len = count(bytes, offset);
+        *offset += len;
+    }
+    fn identity(bytes: &mut [u8], offset: &mut usize) {
+        bytes[*offset + 4] ^= 1;
+        *offset += 16;
+    }
+    assert_eq!(&bytes[..9], b"DVPROJS\0\x02");
+    let mut offset = 9;
+    for _ in 0..count(bytes, &mut offset) {
+        offset += 16;
+        string(bytes, &mut offset);
+    }
+    for _ in 0..count(bytes, &mut offset) {
+        offset += 16;
+        string(bytes, &mut offset);
+        offset += 16 * count(bytes, &mut offset);
+    }
+    string(bytes, &mut offset);
+    identity(bytes, &mut offset);
+    for _ in 0..count(bytes, &mut offset) {
+        offset += 16;
+        identity(bytes, &mut offset);
+    }
+    for _ in 0..count(bytes, &mut offset) {
+        offset += 32;
+        string(bytes, &mut offset);
+        identity(bytes, &mut offset);
+        identity(bytes, &mut offset);
+    }
+    assert_eq!(offset, bytes.len());
+}
+
+#[test]
+fn reviewed_device_recovery_restores_managed_service_without_changing_owner_or_source() {
+    let (_data, data) = configured();
+    let (_root, root) = repositories::root_fixture();
+    let (project, _) = repositories::seed(&data);
+    let permitted = devoption_projects::worktree::PermittedRoot::open_absolute(&root).unwrap();
+    devoption_projects::CatalogStore::open_absolute(&data)
+        .unwrap()
+        .attach_repository(project, &permitted, Path::new("main"))
+        .unwrap();
+    let owner = fs::read(data.join("owner.bin")).unwrap();
+    let source = fs::read(root.join("main/.git/HEAD")).unwrap();
+    let mut retired = fs::read(data.join("projects.bin")).unwrap();
+    retired_device_record(&mut retired);
+    fs::write(data.join("projects.bin"), &retired).unwrap();
+    let blocked = Command::new(env!("CARGO_BIN_EXE_devoption"))
+        .args(["serve", "--port", "0", "--data-dir"])
+        .arg(&data)
+        .arg("--managed-repository-root")
+        .arg(&root)
+        .output()
+        .unwrap();
+    assert_eq!(blocked.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&blocked.stderr).contains("repository root does not match"));
+    let recover = |approval: Option<&str>| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_devoption"));
+        command
+            .args(["recover-repositories", "--data-dir"])
+            .arg(&data)
+            .arg("--repository-root")
+            .arg(&root);
+        if let Some(approval) = approval {
+            command.args(["--approve-device-rebind", approval]);
+        }
+        command.output().unwrap()
+    };
+    let reviewed = recover(None);
+    assert!(reviewed.status.success(), "{:?}", reviewed);
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), retired);
+    let text = String::from_utf8(reviewed.stdout).unwrap();
+    let fingerprint = text
+        .lines()
+        .find_map(|s| s.strip_prefix("Review fingerprint: "))
+        .unwrap();
+    assert!(text.contains("do NOT prove the same filesystem"));
+    assert_eq!(recover(Some(&"0".repeat(64))).status.code(), Some(1));
+    assert!(recover(Some(fingerprint)).status.success());
+    let backup = data.join(format!("projects.before-rebind-{fingerprint}.bin"));
+    assert_eq!(fs::read(backup).unwrap(), retired);
+    assert_eq!(fs::read(data.join("owner.bin")).unwrap(), owner);
+    assert_eq!(fs::read(root.join("main/.git/HEAD")).unwrap(), source);
+    let (server, address) = start_managed(&data, &root);
+    assert!(check(&read(address, "GET", "/sign-in", None), 200).contains("password"));
+    let session = sign_in(address);
+    assert!(
+        check(
+            &read(
+                address,
+                "GET",
+                &format!("/projects/{}/code", hex(project)),
+                Some(&session)
+            ),
+            200
+        )
+        .contains("main")
+    );
+    assert_eq!(
+        check(
+            &request(
+                address,
+                &creation(address, &session, project, "after-recovery")
+            ),
+            204
+        ),
+        ""
+    );
+    let saved = read_catalog(&data).unwrap().unwrap();
+    drop(server);
+    let (_server, address) = start_managed(&data, &root);
+    let session = sign_in(address);
+    assert!(
+        check(
+            &read(
+                address,
+                "GET",
+                &format!("/projects/{}/code", hex(project)),
+                Some(&session)
+            ),
+            200
+        )
+        .contains("after-recovery")
+    );
+    assert_eq!(read_catalog(&data).unwrap().unwrap(), saved);
+}
 fn hex(id: ProjectId) -> String {
     id.to_bytes()
         .iter()

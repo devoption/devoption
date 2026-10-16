@@ -98,6 +98,10 @@ reload before retrying, and never infer success from the edited field alone.
 
 ## Domain boundary
 
+Saved device numbers are not permanent volume identifiers. Startup remains closed
+on mismatch; [explicit device-binding recovery](repository-recovery.md) provides a
+local reviewed, backed-up update without resetting IDs or trusting paths alone.
+
 The crate owns this cohesive domain independently of CLI, HTTP, rendering and
 authentication. It depends on existing pinned randomness and filesystem
 libraries, not `devoption-server` or `devoption-ui`. The server adapts catalog
