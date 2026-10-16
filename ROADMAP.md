@@ -12,8 +12,8 @@ steps you already trust — source, checks, build, and deploy — without adding
 promises beyond what is implemented and validated here.
 
 The sequence below expresses direction, not delivery dates or release promises.
-GitHub issues define individual changes; existing milestone definitions and release
-gates remain unchanged.
+GitHub issues define individual changes. The immediate functional delivery track
+below takes priority; product release approval remains a separate gate.
 
 ## Available today
 
@@ -26,6 +26,8 @@ The development preview supports:
   projects can each have a repository with the same name.
 - Read-only source preparation checks in Builds and the CLI, plus documented
   private Ubuntu source installation, backup and recovery procedures.
+- Authenticated project build-history and log views, with selected history recovery
+  at server startup; these views do not run builds.
 
 The preview binds to loopback. There is no published release, supported public
 hosting configuration, application build/deployment service, Wasm runtime, MCP
@@ -37,53 +39,74 @@ fixture checks are groundwork for native Rust binaries. They do not provide a
 usable application build service or implemented Rust-to-Wasm builds. Those
 contracts must evolve to describe Wasm targets, artifacts and runtime requirements.
 
-## Next: a usable single-server MVP — [Milestone: v0.1.0 — Local factory MVP](https://github.com/devoption/devoption/milestone/1)
+## Immediate priority: one VM, platform DNS, deployed web-app DNS
 
-The first complete workflow should let one owner take one trusted Rust application
-from a reviewed source revision to a verified artifact and an explicitly approved
-deployment on one Linux server.
+The next functional milestone is the owner's complete single-node path, tracked
+in [#228](https://github.com/devoption/devoption/issues/228):
 
-1. **Rust-to-Wasm builds.** Pin source, dependencies and toolchain; define the
-   supported WebAssembly (Wasm) target and host interfaces; evolve the native build
-   contracts accordingly. Add approved jobs with bounded resources, useful logs,
-   cancellation and recoverable status. Build-time access needs its own controls;
-   Wasm runtime restrictions do not isolate the compiler or dependency build scripts.  
-   Done when: one trusted Rust HTTP service builds from a reviewed commit into a Wasm
-   artifact with pinned toolchain/dependencies, bounded job execution (resources,
-   logs, cancellation), and separate controls for build-time access.
-   Note: Rust-to-Wasm is chosen over containers to target a smaller, capability-scoped
-   execution boundary with explicit host interfaces; this does not isolate the compiler
-   or dependency build scripts, and no sandbox claim is made beyond the defined runtime.
-2. **Verified artifacts.** Preserve immutable outputs with checksums and provenance
-   tying them to reviewed source and build inputs. Verify the exact artifact before
-   promotion or execution, and retain previous versions for rollback.  
-   Done when: the exact artifact is verifiably bound to its reviewed inputs, checked
-   again before promotion/execution, and prior versions are retained for rollback.
-3. **A capability-scoped Wasm runtime.** Run applications with explicit grants for
-   filesystem, network, configuration and other host services, plus resource limits
-   and reliable stop/restart behavior. Define and test the supported execution
-   boundary before making isolation claims.  
-   Done when: the runtime enforces explicit capabilities and resource limits with
-   reliable start/stop/restart, and the execution boundary is defined and tested
-   without broader isolation claims.
-4. **Application deployment and operations.** Select a verified artifact and its
-   permissions, approve deployment, and observe health and logs. Add routing, domain
-   configuration and TLS as explicit deployment capabilities, with controlled
-   updates, failure handling and rollback to a previous verified version.  
-   Done when: an owner can approve deployment of a verified artifact to a loopback
-   port on the same host, observe health/logs, configure routing/domain/TLS explicitly,
-   update safely, and roll back to the last verified version.
-5. **Installation, upgrades and recovery.** Make single-server setup repeatable,
-   preserve application and platform data through upgrades, and test backups,
-   compatible rollback and recovery after interruption. Publish supported operating
-   limits and recovery instructions alongside release checks.  
-   Done when: a clean supported host can follow documented steps to install, upgrade
-   with preserved data, back up and restore, and recover after interruption, with
-   published operating limits and verified release checks.
+1. Create a cloud VM and install DevOption.
+2. Point a platform DNS name at the server and log into DevOption over HTTPS.
+3. Create a project for a web app and supply its source.
+4. Build and deploy that app to the same node through the platform interface.
+5. Point a second DNS name at the same server and route it to the app.
+6. Access the app through that name, deploy an update, and keep it usable after restart.
 
-A usable path includes human review and security gates before builds, artifact
-promotion and deployment. The initial scope is trusted code and one server;
-public exposure and broader workload support need their own verified boundaries.
+This path now takes priority over broader platform expansion and optional
+maintenance. Each implementation task must advance one of these steps or remove
+an evidenced blocker to it. Prefer connecting existing components over adding
+more standalone contracts. Keep individual PRs reviewable, but complete each
+user-visible capability before moving to optional improvements.
+
+### Delivery sequence
+
+| Task | Observable completion | Dependencies |
+| --- | --- | --- |
+| [#229: Minimum web-app contract](https://github.com/devoption/devoption/issues/229) | Select one Wasm runtime, target/ABI and HTTP interface, plus a tiny Rust web app and exact source/dependency preparation path. Reconcile existing native build assumptions. | First implementation-enabling decision |
+| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Fresh Ubuntu VM, persistent platform service, configured public origin, HTTPS ingress, owner setup and working authenticated project creation. | Can proceed independently of the runtime choice |
+| [#231: Build from the project interface](https://github.com/devoption/devoption/issues/231) | Review and approve a real build of the selected app; see durable outcomes/logs and obtain the verified Wasm output. | #229; #230 for public UI validation |
+| [#232: Release and deploy on the node](https://github.com/devoption/devoption/issues/232) | Promote a verified artifact, deploy it, inspect health/logs, stop it, update it and recover the prior version; reconcile after restart. | #229 and #231 |
+| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | A second hostname reaches the app on the same VM, stays stable through updates/restart, and remains separate from platform control. | #230 and #232 |
+| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | One repeatable runbook and real evidence for all six steps, a second revision, failure recovery, reboot and backup/restore. | #230–#233 |
+
+The series integrates the existing build [#17](https://github.com/devoption/devoption/issues/17),
+artifact [#18](https://github.com/devoption/devoption/issues/18), deployment
+[#19](https://github.com/devoption/devoption/issues/19) and installation/recovery
+[#20](https://github.com/devoption/devoption/issues/20) work. It does not restart
+those implementations. For this track, #229 resolves their native-only assumptions
+against the accepted [Wasm-first direction](docs/decisions/0001-platform-boundaries.md),
+and #230/#233 explicitly add public hosting beyond their earlier local-only scope.
+Unaffected integrity, authorization and recovery criteria remain applicable.
+
+### Keep the first path small
+
+Start with one owner, one Ubuntu 24.04 x86_64 VM and one trusted Rust HTTP web app.
+The exact Wasm contract is the first task, not an already supported runtime.
+A minimal app serving HTML and a health endpoint is enough to establish the path;
+arbitrary web frameworks, databases and untrusted workloads are not prerequisites.
+The owner may create the VM and DNS records manually and stage the source checkout
+over SSH. Reuse project creation and repository attachment rather than requiring
+an editor, Git hosting, cloud provisioning API or registry service first.
+
+Use one explicit reverse-proxy/TLS setup for the two hostnames. Keep platform and
+app upstreams private; expose the documented HTTPS entry points. Automated domain
+management may follow a working operator-managed setup. Public-origin request
+validation, authenticated control, HTTPS, bounded builds/runtime and artifact
+integrity belong in this first path. Broader hardening and scale work can follow;
+a loopback-only demonstration does not satisfy the requested outcome.
+
+Completion means the platform and app are reachable by their separate DNS names,
+the owner can deploy a changed revision at the same app URL, and reboot/recovery
+behavior has been demonstrated. Source installation is sufficient: this does not
+wait for product package publication, and it does not claim general production
+readiness. The provisional [v0.1.0 milestone](https://github.com/devoption/devoption/milestone/1)
+and [release approval gate #21](https://github.com/devoption/devoption/issues/21)
+remain separate from functional acceptance.
+
+Themes, UI refactoring, optional authentication maintenance, MCP, package hosting,
+teams, configurable workflow engines and multi-server orchestration are deferred
+unless a concrete blocker to this path is established. Creating the task series
+is not permission to spend money, create credentials, change DNS or repository
+security, execute real workloads, merge changes or publish releases.
 
 ## Optional MCP, across the platform
 

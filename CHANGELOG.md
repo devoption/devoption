@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Prioritize a six-task single-node delivery track from a fresh VM and authenticated
+  platform DNS to a deployed web app on its own HTTPS hostname, with update/restart
+  acceptance and explicit deferral of broader platform work; this is planning,
+  not newly available hosting behavior
+  ([#228](https://github.com/devoption/devoption/issues/228)).
+
 - Show authenticated project build history and attempt details with saved outcomes,
   expandable source identities, escaped stdout/stderr and truncation/recovery states;
   scope fresh reads to current catalog associations while execution remains unavailable
