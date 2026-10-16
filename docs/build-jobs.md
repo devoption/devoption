@@ -70,7 +70,9 @@ queued cancellation versus a late start, terminal replay and nonempty artifact
 metadata are covered. Synthetic successful records make no real-build claim.
 
 Persisted records, restart recovery, real approval/runner integration, cancellation
-delivery, bounded logs, artifact retention and execution limits remain future work.
+delivery, durable logs, artifact retention and execution limits remain future work.
+The separate [bounded output collector](build-output.md) retains caller-supplied
+bytes and renders escaped text, but has no runner readers, persistence or job integration.
 The [disposable runner profile](disposable-runner-proposal.md) received separate
 approval for an initial temporary fixture attempt and one diagnostic repeat.
 The [initial result](disposable-build-rehearsal.md) and [repeat result](disposable-build-repeat.md)

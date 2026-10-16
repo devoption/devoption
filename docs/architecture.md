@@ -31,8 +31,9 @@ Use focused references for details rather than loading every subsystem:
 - [Source preparation](build-preparation.md) reports observations without creating
   a plan or job. The explicit CLI check does not read owner credentials or start HTTP.
 - [Plans](build-plans.md) and [job lifecycle](build-jobs.md) are contracts, not an
-  execution service. [Complete snapshots](source-snapshots.md) retain verified
-  source bytes; the registered collector has no HTTP/CLI integration.
+  execution service. [Bounded output](build-output.md) collects supplied bytes and
+  renders escaped text without process readers or job integration.
+  [Complete snapshots](source-snapshots.md) retain verified source bytes; the registered collector has no HTTP/CLI integration.
 - [Registry contracts](registry-contract.md), [Cargo inputs](cargo-inputs.md) and
   [source proofs](cargo-source-proof.md) validate supplied data; they do not provide
   acquisition, registry hosting or build permission.

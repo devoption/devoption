@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add an in-memory build-output collector with a combined stdout/stderr byte cap,
+  sticky truncation and escaped text rendering; no process readers or execution
+  ([#202](https://github.com/devoption/devoption/issues/202)).
+
 - Add bounded read-only SHA-256 verification and retained handles for reviewed
   Cargo/rustc files, with no-follow traversal and mutation/replacement rechecks;
   no tool launch or approval integration

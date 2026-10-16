@@ -10,6 +10,7 @@
 pub mod approvals;
 pub mod cargo_source;
 pub mod jobs;
+pub mod output;
 pub mod preparation;
 pub mod review_context;
 pub mod reviewed_directories;
