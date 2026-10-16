@@ -245,8 +245,9 @@ listener and temporary CA, verifies TLS against that CA, tests login/project
 creation/logout and proxy-header stripping, and removes its files. It installs
 no trust root, calls no public ACME service and changes no DNS or system service.
 It passed locally on macOS with the upstream arm64 archive verified against its
-published SHA-512. The new Ubuntu system units, public ACME and reboot remain
-unverified until the operator rehearsal; #230 must remain open for that evidence.
+published SHA-512. The [Ubuntu system-service rehearsal](public-linux-rehearsal.md)
+also verified local-CA HTTPS, service restart and startup before login after reboot. Actual cloud
+DNS, public ACME and fresh-host validation remain pending; #230 stays open.
 
 Upstream references: [Caddy reverse-proxy headers](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#headers),
 [automatic HTTPS](https://caddyserver.com/docs/automatic-https),
