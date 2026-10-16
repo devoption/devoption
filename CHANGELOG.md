@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Show authenticated project build history and attempt details with saved outcomes,
+  expandable source identities, escaped stdout/stderr and truncation/recovery states;
+  scope fresh reads to current catalog associations while execution remains unavailable
+  ([#226](https://github.com/devoption/devoption/issues/226)).
+
 - Validate all saved build-history project/repository associations under the catalog
   lock before startup recovery; reject foreign history without rewriting it
   ([#224](https://github.com/devoption/devoption/issues/224)).

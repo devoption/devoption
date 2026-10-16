@@ -16,7 +16,8 @@ pub struct PreparationView<'a> {
     pub unavailable: Option<&'a str>,
 }
 
-const LIMITATION: &str = "Build execution and build history are not available yet. Source checks do not approve or run a build.";
+const LIMITATION: &str =
+    "Build execution is not available yet. Source checks do not approve or run a build.";
 
 pub(super) fn list(project: &ProjectSummary<'_>, available: bool) -> String {
     let mut html = String::from(

@@ -88,6 +88,16 @@ impl BuildOutput {
     /// Invalid/incomplete sequences become U+FFFD; an incomplete live suffix may
     /// therefore display differently after a later append completes it.
     pub fn escaped_text(&self, stream: Stream) -> String {
+        self.render_text(stream, true)
+    }
+
+    /// Human-readable text with controls/bidi escaped, but HTML metacharacters
+    /// left literal. Use a text node or HTML-escape at the final sink. Not raw bytes.
+    pub fn display_text(&self, stream: Stream) -> String {
+        self.render_text(stream, false)
+    }
+
+    fn render_text(&self, stream: Stream, html: bool) -> String {
         let bytes = match stream {
             Stream::Stdout => &self.stdout,
             Stream::Stderr => &self.stderr,
@@ -95,11 +105,11 @@ impl BuildOutput {
         let mut result = String::with_capacity(bytes.len() * 6);
         for character in String::from_utf8_lossy(bytes).chars() {
             match character {
-                '&' => result.push_str("&amp;"),
-                '<' => result.push_str("&lt;"),
-                '>' => result.push_str("&gt;"),
-                '"' => result.push_str("&quot;"),
-                '\'' => result.push_str("&#39;"),
+                '&' if html => result.push_str("&amp;"),
+                '<' if html => result.push_str("&lt;"),
+                '>' if html => result.push_str("&gt;"),
+                '"' if html => result.push_str("&quot;"),
+                '\'' if html => result.push_str("&#39;"),
                 '\\' => result.push_str("\\\\"),
                 '\n' | '\t' => result.push(character),
                 c if c.is_control() || bidi_format(c) => {

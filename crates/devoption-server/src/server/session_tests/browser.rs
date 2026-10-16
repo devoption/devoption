@@ -320,11 +320,35 @@ fn manual_cookie_browser_fixture() {
     }
     let enabled = std::env::var_os("DEVOPTION_BROWSER_ROOT_DISABLED").is_none();
     let store = crate::owner_store::OwnerStore::open_absolute(&data).unwrap();
-    let projects = if enabled && std::env::var_os("DEVOPTION_BROWSER_MANAGED_ROOT").is_some() {
+    let mut projects = if enabled && std::env::var_os("DEVOPTION_BROWSER_MANAGED_ROOT").is_some() {
         projects::Projects::open_with_managed_root(&store, &root).unwrap()
     } else {
         projects::Projects::open_with_root(&store, enabled.then_some(root.as_path())).unwrap()
     };
+    if std::env::var_os("DEVOPTION_BROWSER_HISTORY").is_some() {
+        let catalog = devoption_projects::read_catalog(&data).unwrap().unwrap();
+        let repo = catalog
+            .projects()
+            .iter()
+            .find(|p| p.id() == project)
+            .unwrap()
+            .repositories()[1];
+        let other_repo = catalog
+            .projects()
+            .iter()
+            .find(|p| p.id() == docs)
+            .unwrap()
+            .repositories()[0];
+        let mut history = super::history::seed(
+            &data.join("build-history"),
+            project.to_bytes(),
+            repo.to_bytes(),
+            docs.to_bytes(),
+            other_repo.to_bytes(),
+        );
+        projects.recover_build_history(&mut history).unwrap();
+        projects = projects.with_history(history);
+    }
     let profile = crate::profile::ProfileStore::new(&store, identity).unwrap();
     println!("Browser fixture root: {}", root.display());
     Builder::new_current_thread()

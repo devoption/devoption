@@ -2,7 +2,8 @@
 
 [#216](https://github.com/devoption/devoption/issues/216) adds
 `devoption_builds::history::History`, a Unix store for job summaries. It has no
-HTTP route, scheduler or artifact-byte access. Explicit server startup can open
+scheduler or artifact-byte access. Authenticated project pages can read saved
+summaries and output through the adapter below. Explicit server startup can open
 and recover the store as described below.
 Persisted records are historical claims, never restored approval or execution
 capabilities. The application never creates its directory.
@@ -123,8 +124,7 @@ managed log data is bounded to approximately 10 MiB plus one pending snapshot;
 unrelated entries or same-account modifications are outside that bound.
 
 Raw stored logs can contain secrets or private paths. Private filesystem modes
-are not redaction or secure deletion. There is no HTTP delivery, runner reader,
-automatic checkpoint schedule or retention expiry yet.
+are not redaction or secure deletion. There is no runner reader, automatic checkpoint schedule or retention expiry yet.
 
 ## Explicit restart recovery
 
@@ -136,7 +136,7 @@ historical identities, and reconcile surviving processes/writers.
 
 Recovery cannot reconstruct a BuildJob, RunnerEvent or approval, restart a process,
 prove child cleanup, or authorize serving a saved artifact hash. Completed history
-may be displayed only through an authenticated future UI; actual artifact access
+are displayed through authenticated project pages; actual artifact access
 still requires independent provenance and retained-byte verification.
 
 ## Explicit server startup
@@ -162,24 +162,60 @@ cooperating writer lock is held through validation and recovery, then released
 before serving; lock acquisition failure prevents startup. History is locked
 first, then the catalog. Empty history is valid with an absent/empty catalog;
 nonempty history is not. Invalid membership leaves history and logs untouched.
-These are startup membership checks only; future routes/admission must check a
-fresh catalog snapshot. They do not authenticate historical claims or establish
-source freshness, current checkout binding or a complete approved plan. It
-holds the history writer lock until the service exits, even though no routes use
-that store yet. Another cooperating writer/server fails startup. Unsafe, corrupt
+These are startup membership checks only; page reads independently check a fresh
+catalog snapshot, and future admission must do so too. These checks do not
+authenticate historical claims or establish source freshness, current checkout
+binding or a complete approved plan. The server holds the shared history writer
+capability until it exits. Another cooperating writer/server fails startup. Unsafe, corrupt
 or busy summary storage and failed recovery publication fail startup without
 resetting data. Output files are preserved, not eagerly scanned or validated;
-future reads must use `load_output` checks. Existing pending files are preserved
+detail-page reads use `load_output` checks. Existing pending files are preserved
 and block any needed recovery write. A bind failure after recovery can leave the
 interrupted summaries saved; recovery is intentionally not rolled back.
 
 Opening/recovery does not restore approvals, inspect/kill surviving processes,
-delete job directories or
-release a runner slot. **Builds remain unavailable.** Before adding execution
+delete job directories or release a runner slot. **Builds remain unavailable.** Before adding execution
 admission, leftover reconciliation and fresh approval checks must be implemented.
 An Interrupted label only records lost supervisor continuity. With no current
 runner or approval registry instantiated by the server, there is no restored
 execution authority on this path.
+
+## Authenticated project history
+
+[#226](https://github.com/devoption/devoption/issues/226) connects the configured
+store to `/projects/{project}/builds` and
+`/projects/{project}/builds/attempts/{attempt}`. The owner must sign in; existing
+session, Host/Origin and method protections apply. Responses use `Cache-Control:
+no-store`. No mutation, raw-log download, approval, cancellation or artifact route
+is added.
+
+The list shows only that project's saved attempts in reverse allocation order,
+with repository name, exact commit and recorded state. No timestamp, elapsed-time
+or live-process claim is invented. Unconfigured storage, empty history and read
+failure are distinct. Existing source checks remain below history.
+
+Detail shows recorded outcome and explanation, expandable attempt/commit/source
+identities, and the last stdout/stderr checkpoint. Missing output differs from an
+empty saved stream or unavailable/corrupt output. Byte count, truncation and exact
+limit-fill states remain visible. Interrupted never means verified cleanup;
+Succeeded is a historical claim and does not expose an artifact.
+
+Each request reads a fresh catalog through its retained directory, checks the
+project and every displayed repository association, and filters records by project
+before selecting an attempt or opening its output. A cross-project/unknown attempt
+returns 404 without log content; unavailable storage or stale associations return
+503 without mutation. Association checks use one fresh snapshot, not a transaction
+against malicious same-user edits. Future execution admission still needs its own
+fresh authorization/verification transaction.
+
+The adapter serializes on the shared history capability and catalog gate, in that
+order, and moves guards into a blocking task for disk reads, decoding and rendering.
+Disconnecting a request does not prematurely release those guards. At most ten
+summary rows and one bounded output checkpoint are rendered per request. Large
+logs have a bounded scroll area and wrap within it. No automatic polling or live
+streaming is implemented. Controls/bidi become visible escapes via `display_text`;
+the UI then HTML-escapes all text at the final sink, including names and log markup.
+Escaping is not redaction: authenticated owners can read secrets printed into logs.
 
 ## Validation
 
@@ -199,3 +235,9 @@ disposable loopback servers. It checks recovery before listen, lock lifetime,
 restart idempotence, preserved logs/terminal records, omission and rejected startup.
 Catalog tests cover unknown/unassociated identities, mixed valid/invalid history,
 terminal foreign records, busy/corrupt/missing catalogs and empty-history startup.
+
+`cargo test -p devoption-server --lib --locked --offline session_tests::history`
+covers authentication/logout, project scoping, stale catalog associations, invalid
+IDs, missing/corrupt logs, unsafe Host/mutation methods, HEAD and output escaping.
+The [screenshot guide](screenshots/README.md) describes synthetic history fixtures;
+those records are display tests, not evidence of successful builds.

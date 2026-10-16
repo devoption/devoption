@@ -1,3 +1,6 @@
+mod history;
+pub(super) use history::content as history_content;
+pub use history::{BuildAttemptView, BuildHistoryView, BuildLogView, HistoryAvailability};
 mod builds;
 pub(super) use builds::content as preparation_content;
 pub use builds::{PreparationCheck, PreparationView};

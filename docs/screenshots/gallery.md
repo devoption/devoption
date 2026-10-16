@@ -111,3 +111,9 @@ for dimensions, states and refresh instructions.
 ## Account recovery
 
 ![Check account after interrupted verification](sign-in-check.jpg)
+
+**Saved build history (synthetic records, not executed builds)**
+
+![Interrupted attempt and last saved stdout/stderr](build-attempt.jpg)
+
+![Truncated output with inert script and control characters](build-output-truncated.jpg)

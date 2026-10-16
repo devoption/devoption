@@ -114,7 +114,7 @@ fn run_with_roots(
         ));
     }
     #[cfg(unix)]
-    let projects = if configured {
+    let mut projects = if configured {
         Some(
             if managed {
                 projects::Projects::open_with_managed_root(
@@ -175,17 +175,15 @@ fn run_with_roots(
         .enable_all()
         .build()?
         .block_on(async {
-            // Hold this capability inside the serving future until shutdown.
+            // Recovery precedes routes/listening; routes retain the shared writer.
             #[cfg(unix)]
-            let _history_guard = {
-                if let Some(history) = build_history.as_mut() {
-                    projects
-                        .as_ref()
-                        .expect("history requires configured projects")
-                        .recover_build_history(history)?;
-                }
-                build_history
-            };
+            if let Some(mut history) = build_history.take() {
+                let configured_projects = projects
+                    .take()
+                    .expect("history requires configured projects");
+                configured_projects.recover_build_history(&mut history)?;
+                projects = Some(configured_projects.with_history(history));
+            }
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await?;
             let address = listener.local_addr()?;
             println!("Listening on http://{address} (Ctrl+C to stop)");

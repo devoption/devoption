@@ -45,6 +45,9 @@ async fn show(
     if section == ProjectSection::Code {
         return super::files::code(projects, id).await;
     }
+    if section == ProjectSection::Builds {
+        return super::history::show(projects, id, None).await;
+    }
     let available = projects.root.is_some();
     let creation = projects.managed.is_some();
     match projects

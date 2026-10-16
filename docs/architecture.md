@@ -34,7 +34,8 @@ Use focused references for details rather than loading every subsystem:
   execution service. [Private history](build-history.md) persists bounded summaries
   and per-attempt output checkpoints without restoring execution authority.
   Explicit server startup can recover selected history before listening. [Bounded output](build-output.md) collects supplied bytes and
-  renders escaped text without process readers or job integration.
+  renders escaped text without process readers. Authenticated project pages read
+  saved attempts and bounded checkpoints through fresh catalog scoping checks.
   [Supervision decisions](build-supervision.md) track stop reasons and grace
   without delivering signals or asserting cleanup.
   [Complete snapshots](source-snapshots.md) retain verified source bytes; the registered collector has no HTTP/CLI integration.
