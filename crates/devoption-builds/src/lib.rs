@@ -9,6 +9,7 @@
 
 pub mod approvals;
 pub mod cargo_source;
+pub mod history;
 pub mod jobs;
 pub mod output;
 pub mod preparation;

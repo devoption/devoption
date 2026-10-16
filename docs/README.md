@@ -35,7 +35,7 @@ deployments or production hosting are already available.
 - [Real leaf-process supervision fixtures](process-supervision-fixtures.md) and
   [Linux orphan cleanup evidence](descendant-supervision-fixture.md)
 - [Build plans](build-plans.md), [approval lifecycle](build-approvals.md), [job lifecycle](build-jobs.md)
-  with [bounded output](build-output.md) and [supervision decisions](build-supervision.md)
+  with [private history](build-history.md), [bounded output](build-output.md) and [supervision decisions](build-supervision.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)
