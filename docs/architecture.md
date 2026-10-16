@@ -33,6 +33,8 @@ Use focused references for details rather than loading every subsystem:
 - [Plans](build-plans.md) and [job lifecycle](build-jobs.md) are contracts, not an
   execution service. [Bounded output](build-output.md) collects supplied bytes and
   renders escaped text without process readers or job integration.
+  [Supervision decisions](build-supervision.md) track stop reasons and grace
+  without delivering signals or asserting cleanup.
   [Complete snapshots](source-snapshots.md) retain verified source bytes; the registered collector has no HTTP/CLI integration.
 - [Registry contracts](registry-contract.md), [Cargo inputs](cargo-inputs.md) and
   [source proofs](cargo-source-proof.md) validate supplied data; they do not provide

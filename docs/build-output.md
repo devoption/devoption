@@ -65,6 +65,10 @@ can still contain secrets or private paths: escaping is not redaction. Future
 persistence and delivery must enforce owner access, private permissions and bounded
 retention. Drop releases memory; it does not securely erase bytes.
 
+The separate [supervision policy](build-supervision.md) owns this collector and
+combines cap notifications with elapsed-time/cancellation decisions. It does not
+perform termination or prove cleanup.
+
 A future runner must serialize collection across its stdout/stderr readers,
 associate the collector with the exact job, bound reader buffers, enforce time and
 resource caps, and stop on the limit notification. Log collection alone does not

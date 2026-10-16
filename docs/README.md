@@ -32,7 +32,7 @@ deployments or production hosting are already available.
 - [Typed review context](review-context.md), [read-only directory verification](reviewed-directories.md)
   and [reviewed executable verification](reviewed-executables.md)
 - [Build plans](build-plans.md), [approval lifecycle](build-approvals.md), [job lifecycle](build-jobs.md)
-  and [bounded build output](build-output.md)
+  with [bounded output](build-output.md) and [supervision decisions](build-supervision.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)
