@@ -153,7 +153,18 @@ with either repository-root mode. Omitting it leaves history untouched; there is
 no inferred/default path, directory creation or permission repair.
 
 Startup validates owner/catalog/profile storage, opens the selected history and
-recovers unfinished summaries before binding HTTP or announcing a listener. It
+recovers unfinished summaries before binding HTTP or announcing a listener.
+Under [#224](https://github.com/devoption/devoption/issues/224), it checks every
+summary, including terminal records, against the current catalog: the project and
+repository must exist and the repository must be associated with that project.
+All records validate before any recovery write. The retained catalog directory's
+cooperating writer lock is held through validation and recovery, then released
+before serving; lock acquisition failure prevents startup. History is locked
+first, then the catalog. Empty history is valid with an absent/empty catalog;
+nonempty history is not. Invalid membership leaves history and logs untouched.
+These are startup membership checks only; future routes/admission must check a
+fresh catalog snapshot. They do not authenticate historical claims or establish
+source freshness, current checkout binding or a complete approved plan. It
 holds the history writer lock until the service exits, even though no routes use
 that store yet. Another cooperating writer/server fails startup. Unsafe, corrupt
 or busy summary storage and failed recovery publication fail startup without
@@ -162,8 +173,8 @@ future reads must use `load_output` checks. Existing pending files are preserved
 and block any needed recovery write. A bind failure after recovery can leave the
 interrupted summaries saved; recovery is intentionally not rolled back.
 
-Opening/recovery does not validate saved project identities against the catalog,
-restore approvals, inspect/kill surviving processes, delete job directories or
+Opening/recovery does not restore approvals, inspect/kill surviving processes,
+delete job directories or
 release a runner slot. **Builds remain unavailable.** Before adding execution
 admission, leftover reconciliation and fresh approval checks must be implemented.
 An Interrupted label only records lost supervisor continuity. With no current
@@ -186,3 +197,5 @@ evidence. No real instance history or user repository is changed.
 `cargo test -p devoption-cli --test build_history --locked --offline` starts only
 disposable loopback servers. It checks recovery before listen, lock lifetime,
 restart idempotence, preserved logs/terminal records, omission and rejected startup.
+Catalog tests cover unknown/unassociated identities, mixed valid/invalid history,
+terminal foreign records, busy/corrupt/missing catalogs and empty-history startup.

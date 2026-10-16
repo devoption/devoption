@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Validate all saved build-history project/repository associations under the catalog
+  lock before startup recovery; reject foreign history without rewriting it
+  ([#224](https://github.com/devoption/devoption/issues/224)).
+
 - Recover explicitly selected private build history before serving and retain its
   exclusive writer lock for the service lifetime; builds remain unavailable
   ([#222](https://github.com/devoption/devoption/issues/222)).

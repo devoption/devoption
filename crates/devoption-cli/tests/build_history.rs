@@ -11,6 +11,20 @@ fn explicit_history_startup_recovers_before_listen_and_retains_writer() {
     let owner = OwnerStore::open_absolute(&data).unwrap();
     owner_auth::setup(&owner, "public disposable startup fixture phrase").unwrap();
     drop(owner);
+    let mut catalog = devoption_projects::Catalog::default();
+    let project = catalog.create_project("Build fixture").unwrap();
+    let repository = catalog.create_repository("Source fixture").unwrap();
+    let unrelated = catalog.create_repository("Unassociated fixture").unwrap();
+    catalog.associate(project, repository).unwrap();
+    let mut store = devoption_projects::CatalogStore::open_absolute(&data).unwrap();
+    store.save(&catalog).unwrap();
+    drop(store);
+    let hex = |bytes: [u8; 16]| {
+        bytes
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    };
     let output = Command::new("python3")
         .arg(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -18,6 +32,9 @@ fn explicit_history_startup_recovers_before_listen_and_retains_writer() {
         ))
         .arg(env!("CARGO_BIN_EXE_devoption"))
         .arg(root)
+        .arg(hex(project.to_bytes()))
+        .arg(hex(repository.to_bytes()))
+        .arg(hex(unrelated.to_bytes()))
         .output()
         .unwrap();
     assert!(

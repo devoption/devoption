@@ -179,9 +179,10 @@ fn run_with_roots(
             #[cfg(unix)]
             let _history_guard = {
                 if let Some(history) = build_history.as_mut() {
-                    history.recover_interrupted().map_err(|error| {
-                        io::Error::other(format!("build history recovery unavailable: {error}"))
-                    })?;
+                    projects
+                        .as_ref()
+                        .expect("history requires configured projects")
+                        .recover_build_history(history)?;
                 }
                 build_history
             };

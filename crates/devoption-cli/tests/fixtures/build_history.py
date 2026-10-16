@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 binary, root = sys.argv[1], Path(sys.argv[2])
+project, repository, unrelated = (bytes.fromhex(value) for value in sys.argv[3:6])
 owner = root / "owner"
 history = root / "history"
 history.mkdir(mode=0o700)
@@ -16,10 +17,10 @@ def signed(data):
     return data + hashlib.sha256(data).digest()
 
 
-def summary(states):
+def summary(states, project_id=project, repository_id=repository):
     records = b""
     for index, state in enumerate(states):
-        records += bytes([index + 1]) * 16 + b"p" * 16 + b"r" * 16
+        records += bytes([index + 1]) * 16 + project_id + repository_id
         records += b"a" * 40 + b"s" * 32 + bytes([state]) + bytes(40)
     return signed(b"DVHISTRY\x01" + bytes([len(states)]) + records)
 
@@ -86,6 +87,9 @@ for _ in range(2):
     try:
         assert record.read_bytes() == summary([9, 9, 8])
         assert log.read_bytes() == log_bytes
+        # Catalog edits must remain available after startup validation finishes.
+        with (owner / ".projects.lock").open("rb") as catalog_lock:
+            fcntl.flock(catalog_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         with (history / "build-history.lock").open("rb") as lock:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -98,6 +102,49 @@ for _ in range(2):
         stop(process)
     with (history / "build-history.lock").open("rb") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+# Every record is checked before recovery, including terminal foreign history.
+for invalid in [summary([0], project_id=bytes(16)),
+                summary([1], repository_id=bytes(16)),
+                summary([0], repository_id=unrelated),
+                summary([8], project_id=bytes(16))]:
+    private_write(record, invalid)
+    rejected(args())
+    assert record.read_bytes() == invalid
+    assert log.read_bytes() == log_bytes
+
+# A valid unfinished record must not be rewritten before later records validate.
+valid = summary([0])
+foreign = summary([8], project_id=bytes(16))
+second = b"\x02" * 16 + foreign[26:-32]
+mixed = signed(b"DVHISTRY\x01\x02" + valid[10:-32] + second)
+private_write(record, mixed)
+rejected(args())
+assert record.read_bytes() == mixed
+
+private_write(record, summary([0]))
+with (owner / ".projects.lock").open("rb") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    rejected(args())
+assert record.read_bytes() == summary([0])
+catalog = owner / "projects.bin"
+original_catalog = catalog.read_bytes()
+private_write(catalog, b"corrupt catalog")
+rejected(args())
+assert record.read_bytes() == summary([0])
+private_write(catalog, original_catalog)
+# Missing catalog cannot match nonempty history.
+catalog.rename(owner / "saved-catalog")
+rejected(args())
+assert record.read_bytes() == summary([0])
+# Empty history has no catalog identities to validate.
+private_write(record, summary([]))
+process = start()
+try:
+    assert record.read_bytes() == summary([])
+finally:
+    stop(process)
+(owner / "saved-catalog").rename(catalog)
 
 # Failures never silently reset history or announce a listener.
 private_write(record, b"corrupt")
