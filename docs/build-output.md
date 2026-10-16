@@ -3,7 +3,9 @@
 [#202](https://github.com/devoption/devoption/issues/202) adds
 `devoption_builds::output::BuildOutput`, a collector for caller-supplied stdout and
 stderr bytes. It is a prerequisite of [the build workflow](build-jobs.md), with no
-production caller, process readers, persistence, HTTP/UI route or job-state changes.
+production caller, process readers, HTTP/UI route or job-state changes.
+The [private history store](build-history.md#output-checkpoints) can persist bounded
+output snapshots for known attempts.
 Supplied output is not proof that a build ran or succeeded.
 
 ## Collection and bounds
@@ -61,9 +63,8 @@ in the documented text context; this slice adds no UI or truncation banner.
 ## Integration limits and validation
 
 There is no raw-byte accessor or Debug implementation for the collector. Output
-can still contain secrets or private paths: escaping is not redaction. Future
-persistence and delivery must enforce owner access, private permissions and bounded
-retention. Drop releases memory; it does not securely erase bytes.
+can still contain secrets or private paths: escaping is not redaction. The history store enforces private permissions and bounded snapshots; future
+delivery and retention must enforce owner access and expiry. Drop releases memory; it does not securely erase bytes.
 
 The separate [supervision policy](build-supervision.md) owns this collector and
 combines cap notifications with elapsed-time/cancellation decisions. It does not

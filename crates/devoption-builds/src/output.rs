@@ -1,8 +1,12 @@
 //! Bounded in-memory output supplied by a caller, not evidence of execution.
-//! No process readers, persistence, secret redaction or job-state transitions.
+//! No process readers, secret redaction or job-state transitions.
+//! The private history store can persist bounded snapshots.
 
 use crate::BuildPlan;
 use std::{fmt, fmt::Write};
+
+#[cfg(unix)]
+pub(crate) mod persistence;
 
 pub const MAX_BYTES: usize = 1_048_576;
 

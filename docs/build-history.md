@@ -2,7 +2,7 @@
 
 [#216](https://github.com/devoption/devoption/issues/216) adds
 `devoption_builds::history::History`, a Unix store for job summaries. It has no
-production caller, HTTP route, scheduler, log storage or artifact-byte access.
+production caller, HTTP route, scheduler or artifact-byte access.
 Persisted records are historical claims, never restored approval or execution
 capabilities. The application does not yet create this store.
 
@@ -70,13 +70,13 @@ Duplicate IDs, malformed/unknown fields, truncation, oversized or trailing data 
 checksum mismatches fail; they never trigger an empty reset. Missing record alone
 means empty history. The checksum detects accidental corruption, not malicious
 same-account rewriting. There are no credentials, absolute source/tool paths, source
-bytes, executable plans, approvals or logs in this format. Records omit Debug.
+bytes, executable plans, approvals or logs in this summary format. Records omit Debug.
 
 Reads are bounded and compare device/inode, size, owner/group, mode, link count and
 change/modification timestamps before/after reading and against the current name.
 Writes exclusively create `.build-history.pending`, write a complete snapshot,
 sync the file, recheck pending/directory/lock bindings, rename atomically over the
-record and sync the directory. Only the fixed history filename is replaced.
+record and sync the directory. Only the selected internal snapshot filename is replaced.
 
 A publication error poisons that handle. A partial/stale pending file is preserved
 for explicit inspection, never adopted or silently removed. A post-rename directory
@@ -85,6 +85,45 @@ and inspect, do not reset. Reads ignore pending files; a future write refuses to
 replace an existing pending file. These semantics rely on trusted local filesystem
 and cooperative writers, not an atomic defense against malicious same-user races,
 untrusted ACLs, stalled I/O or faulty storage. No filesystem deadline is enforced.
+
+## Output checkpoints
+
+[#220](https://github.com/devoption/devoption/issues/220) adds
+`save_output(&BuildJob, &BuildOutput)` and `load_output(JobId)`. Both require a
+known saved attempt. Writes require an unfinished saved state, matching summary
+identity and the supplied plan's log limit. Subsequent checkpoints must preserve
+the limit, each stream's existing byte prefix and sticky truncation. This compares
+summary identity, not the full approved plan; callers must still bind the collector
+to the actual attempt. It proves neither execution nor authenticity of output.
+
+Load returns `None` for a missing checkpoint, distinct from a saved empty log.
+Output restores the same [escaped-text interface](build-output.md), with no public
+raw-byte accessor. Terminal history remains readable; writes to it are rejected.
+Persist the final checkpoint **before** the terminal summary. These are separate
+atomic publications, not a transaction. A crash can leave an older or missing log;
+neither presence nor absence establishes EOF, completion or successful execution.
+Recovery changes only summaries and preserves the last saved checkpoint.
+
+Each `build-output-<32 lowercase hex attempt ID>.bin` uses `DVOUTPUT` followed by
+version byte `01` (nine bytes total), attempt ID (16 bytes), limit/stdout length/stderr
+length (three big-endian u32 values), truncation byte (0 or 1), stdout bytes,
+stderr bytes, then SHA-256 of everything preceding it. The header is 38 bytes;
+maximum file size is 1,048,646 bytes. Lengths share the saved limit of 1–1,048,576
+bytes; truncation requires a full buffer. Wrong IDs, versions, lengths, flags,
+checksums, trailing bytes and oversized files fail closed. Checksums detect
+corruption, not malicious rewriting. The summary format is unchanged.
+
+Logs use the same retained directory/lock, no-follow bounded reads, metadata/name
+checks, fixed pending filename, atomic replacement and file/directory sync as
+summaries. Corrupt or unsafe existing logs cannot be overwritten. Failed writes
+poison the shared writer, leaving uncertain files for inspection. No directory
+scan, orphan adoption, deletion or eviction is performed. At ten retained attempts,
+managed log data is bounded to approximately 10 MiB plus one pending snapshot;
+unrelated entries or same-account modifications are outside that bound.
+
+Raw stored logs can contain secrets or private paths. Private filesystem modes
+are not redaction or secure deletion. There is no HTTP delivery, runner reader,
+automatic checkpoint schedule, retention expiry or startup integration yet.
 
 ## Explicit restart recovery
 
@@ -107,5 +146,7 @@ interrupted recovery, terminal preservation, writer exclusion, rebinding, unsafe
 files, symlinks/hardlinks, corruption, structural checks with a valid checksum,
 capacity, stale pending files, injected partial-write failure, entropy failure,
 collision exhaustion, fresh retry IDs after recovery and unknown-ID rejection.
-Linux also tests FIFO rejection. Synthetic running/success metadata in codec tests is not execution
+Output tests cover reopen/recovery, escaping, maximum exact fill, append-only
+updates, swapped-attempt rejection and unsafe-file preservation.
+Linux also tests FIFO rejection for summaries and logs. Synthetic running/success metadata in codec tests is not execution
 evidence. No real instance history or user repository is changed.

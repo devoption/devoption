@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Persist bounded output checkpoints for known build attempts with private atomic
+  snapshots, append-only stream checks and preserved escaped rendering after restart
+  ([#220](https://github.com/devoption/devoption/issues/220)).
+
 - Allocate random build-attempt identities and durably save Queued before returning
   a job; reject retained-ID collisions and unknown history updates
   ([#218](https://github.com/devoption/devoption/issues/218)).

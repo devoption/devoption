@@ -14,6 +14,7 @@ use std::{
     os::unix::fs::MetadataExt,
 };
 mod codec;
+mod logs;
 const RECORD: &str = "build-history.bin";
 const LOCK: &str = "build-history.lock";
 const PENDING: &str = ".build-history.pending";
@@ -150,28 +151,34 @@ impl History {
         Ok(())
     }
     pub fn load(&self) -> Result<Vec<Record>, Error> {
+        match self.read_snapshot(RECORD, codec::MAX_BYTES)? {
+            Some(bytes) => codec::decode(&bytes),
+            None => Ok(Vec::new()),
+        }
+    }
+    fn read_snapshot(&self, name: &str, max: usize) -> Result<Option<Vec<u8>>, Error> {
         self.check()?;
-        let file = match openat(&self.directory, RECORD, READ, Mode::empty()) {
+        let file = match openat(&self.directory, name, READ, Mode::empty()) {
             Ok(fd) => File::from(fd),
-            Err(rustix::io::Errno::NOENT) => return Ok(Vec::new()),
+            Err(rustix::io::Errno::NOENT) => return Ok(None),
             Err(_) => return Err(Error::Unavailable),
         };
-        check_file(&file, self.uid, codec::MAX_BYTES as u64)?;
+        check_file(&file, self.uid, max as u64)?;
         let before = observation(&file)?;
         let mut bytes = Vec::new();
         (&file)
-            .take((codec::MAX_BYTES + 1) as u64)
+            .take((max + 1) as u64)
             .read_to_end(&mut bytes)
             .map_err(|_| Error::Unavailable)?;
         let current = File::from(
-            openat(&self.directory, RECORD, READ, Mode::empty()).map_err(|_| Error::Changed)?,
+            openat(&self.directory, name, READ, Mode::empty()).map_err(|_| Error::Changed)?,
         );
-        check_file(&current, self.uid, codec::MAX_BYTES as u64)?;
+        check_file(&current, self.uid, max as u64)?;
         if before != observation(&file)? || before != observation(&current)? {
             return Err(Error::Changed);
         }
         self.check()?;
-        codec::decode(&bytes)
+        Ok(Some(bytes))
     }
     /// Allocate and durably save a fresh queued attempt before returning it.
     /// This does not approve a plan, reserve a runner or establish child cleanup.
@@ -249,6 +256,18 @@ impl History {
         write: impl FnOnce(&mut File, &[u8]) -> std::io::Result<()>,
     ) -> Result<(), Error> {
         let bytes = codec::encode(records)?;
+        self.publish_snapshot(RECORD, &bytes, codec::MAX_BYTES, write)
+    }
+    fn publish_snapshot(
+        &mut self,
+        name: &str,
+        bytes: &[u8],
+        max: usize,
+        write: impl FnOnce(&mut File, &[u8]) -> std::io::Result<()>,
+    ) -> Result<(), Error> {
+        if bytes.len() > max {
+            return Err(Error::Corrupt);
+        }
         self.check()?;
         self.poisoned = true;
         // Leave an uncertain pending file for explicit inspection, never silently
@@ -263,9 +282,9 @@ impl History {
             .map_err(|_| Error::Unavailable)?,
         );
         check_file(&file, self.uid, 0)?;
-        write(&mut file, &bytes).map_err(|_| Error::Unavailable)?;
+        write(&mut file, bytes).map_err(|_| Error::Unavailable)?;
         file.sync_all().map_err(|_| Error::Unavailable)?;
-        check_file(&file, self.uid, codec::MAX_BYTES as u64)?;
+        check_file(&file, self.uid, max as u64)?;
         let current = File::from(
             openat(&self.directory, PENDING, READ, Mode::empty()).map_err(|_| Error::Changed)?,
         );
@@ -274,7 +293,7 @@ impl History {
         }
         // Recheck directory/lock binding immediately before publication.
         self.check_storage()?;
-        renameat(&self.directory, PENDING, &self.directory, RECORD)
+        renameat(&self.directory, PENDING, &self.directory, name)
             .map_err(|_| Error::Unavailable)?;
         self.directory.sync_all().map_err(|_| Error::Unavailable)?;
         self.poisoned = false;
