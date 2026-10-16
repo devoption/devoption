@@ -21,6 +21,8 @@ mod store;
 pub use store::{CatalogDirectory, CatalogStore, read_catalog};
 
 #[cfg(unix)]
+pub mod recovery;
+#[cfg(unix)]
 pub mod registration;
 #[cfg(unix)]
 pub mod worktree;

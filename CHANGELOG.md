@@ -151,6 +151,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Add read-only review and explicit, backed-up local recovery for changed repository
+  device bindings. Revalidate every registered layout and reject stale approvals,
+  replaced/unsafe entries and data overlap; retain normal fail-closed startup
+  ([#210](https://github.com/devoption/devoption/issues/210)).
+
 - Retry bounded profile reads when a concurrent atomic save retires the opened
   record before validation, preserving private-file and identity checks instead
   of reporting a valid replacement as corrupt. Cover the race deterministically
