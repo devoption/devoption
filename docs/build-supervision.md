@@ -67,5 +67,7 @@ Run `cargo test -p devoption-builds --locked --offline supervision` and the
 [workspace checks](development.md#checks). Module-private synthetic-time tests
 cover exact execution/grace boundaries, delayed first polls, repeated observations,
 sticky cancellation/output reasons, timeout precedence, late bounded output, empty
-chunks and policy-limit rejection. Tests do not sleep, launch workloads or signal
-processes. Actual termination and cleanup still require separate integration tests.
+chunks and policy-limit rejection. These synthetic-time tests do not sleep, launch
+workloads or signal processes. Separate [real leaf-process tests](process-supervision-fixtures.md) now exercise
+TERM/KILL and direct-child reaping. Descendant cleanup and production isolation
+still require integration tests.

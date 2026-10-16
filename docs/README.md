@@ -32,6 +32,7 @@ deployments or production hosting are already available.
 - [Project Builds source preparation](build-preparation.md)
 - [Typed review context](review-context.md), [read-only directory verification](reviewed-directories.md)
   and [reviewed executable verification](reviewed-executables.md)
+- [Real leaf-process supervision fixtures](process-supervision-fixtures.md)
 - [Build plans](build-plans.md), [approval lifecycle](build-approvals.md), [job lifecycle](build-jobs.md)
   with [bounded output](build-output.md) and [supervision decisions](build-supervision.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
