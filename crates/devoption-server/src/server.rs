@@ -42,7 +42,7 @@ pub fn run_with_repository_root(
     data_directory: Option<&Path>,
     repository_root: Option<&Path>,
 ) -> io::Result<()> {
-    run_with_roots(port, data_directory, repository_root, false)
+    run_with_roots(port, data_directory, repository_root, false, None)
 }
 
 /// Explicit creation capability in a selected private repository root. Existing
@@ -52,7 +52,28 @@ pub fn run_with_managed_repository_root(
     data_directory: Option<&Path>,
     repository_root: &Path,
 ) -> io::Result<()> {
-    run_with_roots(port, data_directory, Some(repository_root), true)
+    run_with_roots(port, data_directory, Some(repository_root), true, None)
+}
+
+/// Recover explicitly selected history before listening, retaining its writer lock.
+/// This records interrupted supervision, not process cleanup or execution admission.
+pub fn run_with_build_history(
+    port: u16,
+    data_directory: &Path,
+    repository_root: Option<&Path>,
+    managed: bool,
+    history_directory: &Path,
+) -> io::Result<()> {
+    if managed && repository_root.is_none() {
+        return Err(io::Error::other("managed repository mode requires a root"));
+    }
+    run_with_roots(
+        port,
+        Some(data_directory),
+        repository_root,
+        managed,
+        Some(history_directory),
+    )
 }
 
 fn run_with_roots(
@@ -60,6 +81,7 @@ fn run_with_roots(
     data_directory: Option<&Path>,
     repository_root: Option<&Path>,
     managed: bool,
+    history_directory: Option<&Path>,
 ) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
@@ -85,7 +107,7 @@ fn run_with_roots(
     #[cfg(not(unix))]
     let _ = managed;
     #[cfg(not(unix))]
-    if data_directory.is_some() || repository_root.is_some() {
+    if data_directory.is_some() || repository_root.is_some() || history_directory.is_some() {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "data-directory storage requires Unix",
@@ -126,6 +148,23 @@ fn run_with_roots(
         .transpose()
         .map_err(|error| io::Error::other(format!("profile unavailable: {error}")))?;
     #[cfg(unix)]
+    let mut build_history = match history_directory {
+        Some(path) => {
+            if !configured {
+                return Err(io::Error::other(
+                    "build history requires an existing configured owner",
+                ));
+            }
+            let path = path
+                .to_str()
+                .ok_or_else(|| io::Error::other("build history path requires UTF-8"))?;
+            let history = devoption_builds::history::History::open(path)
+                .map_err(|error| io::Error::other(format!("build history unavailable: {error}")))?;
+            Some(history)
+        }
+        None => None,
+    };
+    #[cfg(unix)]
     let owner_auth = owner_store.map(|store| {
         (
             crate::owner_auth::service::OwnerAuthService::new(store),
@@ -136,6 +175,16 @@ fn run_with_roots(
         .enable_all()
         .build()?
         .block_on(async {
+            // Hold this capability inside the serving future until shutdown.
+            #[cfg(unix)]
+            let _history_guard = {
+                if let Some(history) = build_history.as_mut() {
+                    history.recover_interrupted().map_err(|error| {
+                        io::Error::other(format!("build history recovery unavailable: {error}"))
+                    })?;
+                }
+                build_history
+            };
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await?;
             let address = listener.local_addr()?;
             println!("Listening on http://{address} (Ctrl+C to stop)");

@@ -2,9 +2,10 @@
 
 [#216](https://github.com/devoption/devoption/issues/216) adds
 `devoption_builds::history::History`, a Unix store for job summaries. It has no
-production caller, HTTP route, scheduler or artifact-byte access.
+HTTP route, scheduler or artifact-byte access. Explicit server startup can open
+and recover the store as described below.
 Persisted records are historical claims, never restored approval or execution
-capabilities. The application does not yet create this store.
+capabilities. The application never creates its directory.
 
 ## Opening and writing
 
@@ -123,20 +124,51 @@ unrelated entries or same-account modifications are outside that bound.
 
 Raw stored logs can contain secrets or private paths. Private filesystem modes
 are not redaction or secure deletion. There is no HTTP delivery, runner reader,
-automatic checkpoint schedule, retention expiry or startup integration yet.
+automatic checkpoint schedule or retention expiry yet.
 
 ## Explicit restart recovery
 
 `recover_interrupted()` atomically converts all saved Queued/Running summaries to
 Interrupted and returns the count changed. Terminal summaries remain unchanged;
 a second call changes nothing. Opening alone does not recover or rewrite records.
-A future startup adapter must call recovery before admission, invalidate approvals,
-validate historical identities, and reconcile surviving processes/writers.
+Before future execution admission, integration must invalidate approvals, validate
+historical identities, and reconcile surviving processes/writers.
 
 Recovery cannot reconstruct a BuildJob, RunnerEvent or approval, restart a process,
 prove child cleanup, or authorize serving a saved artifact hash. Completed history
 may be displayed only through an authenticated future UI; actual artifact access
 still requires independent provenance and retained-byte verification.
+
+## Explicit server startup
+
+Under [#222](https://github.com/devoption/devoption/issues/222), Unix startup accepts:
+
+```sh
+cargo run --locked --offline -- serve --data-dir /absolute/private/owner-data --build-history-dir /absolute/private/build-history
+```
+
+The history directory must already exist and satisfy the storage rules above.
+The option requires an existing configured owner in `--data-dir`. It is compatible
+with either repository-root mode. Omitting it leaves history untouched; there is
+no inferred/default path, directory creation or permission repair.
+
+Startup validates owner/catalog/profile storage, opens the selected history and
+recovers unfinished summaries before binding HTTP or announcing a listener. It
+holds the history writer lock until the service exits, even though no routes use
+that store yet. Another cooperating writer/server fails startup. Unsafe, corrupt
+or busy summary storage and failed recovery publication fail startup without
+resetting data. Output files are preserved, not eagerly scanned or validated;
+future reads must use `load_output` checks. Existing pending files are preserved
+and block any needed recovery write. A bind failure after recovery can leave the
+interrupted summaries saved; recovery is intentionally not rolled back.
+
+Opening/recovery does not validate saved project identities against the catalog,
+restore approvals, inspect/kill surviving processes, delete job directories or
+release a runner slot. **Builds remain unavailable.** Before adding execution
+admission, leftover reconciliation and fresh approval checks must be implemented.
+An Interrupted label only records lost supervisor continuity. With no current
+runner or approval registry instantiated by the server, there is no restored
+execution authority on this path.
 
 ## Validation
 
@@ -150,3 +182,7 @@ Output tests cover reopen/recovery, escaping, maximum exact fill, append-only
 updates, swapped-attempt rejection and unsafe-file preservation.
 Linux also tests FIFO rejection for summaries and logs. Synthetic running/success metadata in codec tests is not execution
 evidence. No real instance history or user repository is changed.
+
+`cargo test -p devoption-cli --test build_history --locked --offline` starts only
+disposable loopback servers. It checks recovery before listen, lock lifetime,
+restart idempotence, preserved logs/terminal records, omission and rejected startup.

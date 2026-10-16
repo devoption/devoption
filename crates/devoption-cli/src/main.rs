@@ -10,7 +10,7 @@ mod source_check;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
        devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
@@ -23,6 +23,7 @@ Usage: devoption [--help | --version]
   recover-repositories  Review changed device bindings; explicit approval required to apply (Unix)
   --port PORT   Override the port (0 chooses a free port)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
+  --build-history-dir  Recover selected private history before serving; builds remain unavailable
   --repository-root  Explicit trusted checkout root for inspection/attachment
   --managed-repository-root  Explicit private root allowing creation of new repositories
 
@@ -98,9 +99,22 @@ fn main() -> ExitCode {
         data_directory,
         repository_root,
         managed_repository_root,
+        build_history_directory,
     }) = options
     {
-        let result = if let Some(root) = managed_repository_root {
+        let result = if let Some(history) = build_history_directory {
+            devoption_server::run_with_build_history(
+                port,
+                data_directory
+                    .as_deref()
+                    .expect("history requires data directory"),
+                managed_repository_root
+                    .as_deref()
+                    .or(repository_root.as_deref()),
+                managed_repository_root.is_some(),
+                &history,
+            )
+        } else if let Some(root) = managed_repository_root {
             devoption_server::run_with_managed_repository_root(
                 port,
                 data_directory.as_deref(),
@@ -128,6 +142,7 @@ struct ServeOptions {
     data_directory: Option<PathBuf>,
     repository_root: Option<PathBuf>,
     managed_repository_root: Option<PathBuf>,
+    build_history_directory: Option<PathBuf>,
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
@@ -135,6 +150,7 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     let mut data_directory = None;
     let mut repository_root = None;
     let mut managed_repository_root = None;
+    let mut build_history_directory = None;
     while !args.is_empty() {
         let [flag, value, rest @ ..] = args else {
             return Err("serve options require a value");
@@ -152,6 +168,12 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
                 return Err("data directory requires an absolute path");
             }
             data_directory = Some(path);
+        } else if flag == "--build-history-dir" && build_history_directory.is_none() {
+            let path = PathBuf::from(value);
+            if !path.is_absolute() {
+                return Err("build history requires an absolute path");
+            }
+            build_history_directory = Some(path);
         } else if (flag == "--repository-root" || flag == "--managed-repository-root")
             && repository_root.is_none()
             && managed_repository_root.is_none()
@@ -174,10 +196,14 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     {
         return Err("repository root requires --data-dir with an existing configured owner");
     }
+    if build_history_directory.is_some() && data_directory.is_none() {
+        return Err("build history requires --data-dir with an existing configured owner");
+    }
     Ok(ServeOptions {
         port: port.unwrap_or(3000),
         data_directory,
         repository_root,
         managed_repository_root,
+        build_history_directory,
     })
 }

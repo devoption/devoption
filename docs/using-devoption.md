@@ -192,3 +192,15 @@ Open the account menu and choose **Profile** to save a display name or clear it.
 The name and initials appear in the menu across devices and service restarts.
 An unset name uses **Account**; **Owner** is the role. See the [Profile guide](profile.md)
 for validation, session recovery and storage details.
+
+## Optional build-history recovery
+
+`serve --data-dir ABSOLUTE_PATH --build-history-dir ABSOLUTE_PATH` opens an
+explicitly selected existing private history directory and marks unfinished saved
+attempts interrupted before HTTP starts. An existing configured owner is required.
+The server retains its exclusive writer lock; unsafe/busy storage or recovery
+failure prevents startup. Omit the option to leave history untouched.
+
+This does not enable builds or reconcile leftover processes. See the
+[history startup contract](build-history.md#explicit-server-startup) for storage,
+checkpoint and recovery limits.
