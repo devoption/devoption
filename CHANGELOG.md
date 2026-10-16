@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Exercise build supervision against real trusted leaf subprocesses, including
+  nonblocking output, timeout/cancellation, cap-triggered termination and TERM-to-KILL
+  escalation; keep production execution disabled
+  ([#211](https://github.com/devoption/devoption/issues/211)).
+
 - Add terminal Interrupted build records and a recovery constructor that cannot
   restore running state, success or approval; document remaining build integration
   ([#208](https://github.com/devoption/devoption/issues/208)).
