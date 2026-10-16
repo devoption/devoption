@@ -65,6 +65,7 @@ fn transition_matrix_preserves_records_on_every_rejected_edge() {
         State::Failed(Failure::Terminated),
         State::Failed(Failure::ArtifactRejected),
         State::Cancelled,
+        State::Interrupted,
     ];
     // Indices: queued may start, fail preparation or cancel; running may finish.
     let allowed = [
@@ -84,6 +85,7 @@ fn transition_matrix_preserves_records_on_every_rejected_edge() {
             let mut job = job(&plan);
             match before {
                 State::Queued => {}
+                State::Interrupted => job.interrupt().unwrap(),
                 State::Running | State::Cancelled | State::Failed(Failure::Preparation) => {
                     transition(&mut job, before.clone()).unwrap();
                 }
@@ -211,4 +213,64 @@ fn artifact_metadata_rejects_empty_bytes_without_claiming_verification() {
     let job = job(&plan());
     let _claim = State::Succeeded(metadata);
     assert_eq!(job.state(), &State::Queued);
+}
+
+#[test]
+fn interruption_blocks_late_success_cancellation_and_restart() {
+    let plan = plan();
+    for running in [false, true] {
+        let mut job = job(&plan);
+        if running {
+            transition(&mut job, State::Running).unwrap();
+        }
+        let late_success = event(&job, State::Succeeded(artifact()));
+        let late_cancel = event(&job, State::Cancelled);
+        job.interrupt().unwrap();
+        assert_eq!(job.state(), &State::Interrupted);
+        assert_eq!(job.apply(late_success), Err(Error::InvalidTransition));
+        assert_eq!(job.apply(late_cancel), Err(Error::InvalidTransition));
+        assert_eq!(job.cancel_queued(), Err(Error::InvalidTransition));
+        assert_eq!(job.interrupt(), Err(Error::InvalidTransition));
+        assert!(job.plan() == &plan);
+    }
+}
+
+#[test]
+fn interruption_preserves_existing_terminal_outcomes() {
+    let plan = plan();
+    for state in [
+        State::Succeeded(artifact()),
+        State::Failed(Failure::ExitFailure),
+        State::Cancelled,
+    ] {
+        let mut job = job(&plan);
+        transition(&mut job, State::Running).unwrap();
+        transition(&mut job, state.clone()).unwrap();
+        assert_eq!(job.interrupt(), Err(Error::InvalidTransition));
+        assert_eq!(job.state(), &state);
+    }
+}
+
+#[test]
+fn recovery_only_creates_an_interrupted_record_without_an_artifact() {
+    let plan = plan();
+    let id = JobId::from_bytes([42; 16]);
+    let mut recovered = BuildJob::recover_interrupted(id, plan.clone());
+    assert_eq!(recovered.id(), id);
+    assert!(recovered.plan() == &plan);
+    assert_eq!(recovered.state(), &State::Interrupted);
+    for next in [
+        State::Queued,
+        State::Running,
+        State::Succeeded(artifact()),
+        State::Cancelled,
+        State::Interrupted,
+    ] {
+        assert_eq!(
+            transition(&mut recovered, next),
+            Err(Error::InvalidTransition)
+        );
+    }
+    assert_eq!(recovered.cancel_queued(), Err(Error::InvalidTransition));
+    assert_eq!(recovered.interrupt(), Err(Error::InvalidTransition));
 }

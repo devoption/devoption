@@ -36,7 +36,8 @@ Failure categories are fixed; records contain no unbounded logs or arbitrary err
 | Queued | Failed (preparation only) | Matching sealed runner event |
 | Queued | Cancelled | `cancel_queued()` or matching sealed runner event |
 | Running | Succeeded with artifact, Failed, Cancelled | Matching sealed runner event |
-| Succeeded, Failed, Cancelled | None | Terminal records cannot be rewritten |
+| Queued, Running | Interrupted | `interrupt()` records lost supervisor continuity |
+| Succeeded, Failed, Cancelled, Interrupted | None | Terminal records cannot be rewritten |
 
 All other transitions, repeated events and mismatched identities fail without
 changing the record. Queued jobs cannot skip directly to success. Cancelling a
@@ -46,14 +47,44 @@ cancellation request transport is implemented. The first accepted terminal event
 wins; later completion/cancellation events fail. This is a sequential in-memory
 rule, not a concurrency, durable-delivery or crash-recovery guarantee.
 
+## Interruption and recovery boundary
+
+Under [#208](https://github.com/devoption/devoption/issues/208), `interrupt()` moves
+only Queued or Running records to terminal Interrupted. This records loss of
+supervisor continuity, not confirmed cancellation, child termination or cleanup.
+It preserves the exact plan and attempt ID, carries no artifact and rejects every
+later runner event, including late success or cancellation. Existing terminal
+outcomes cannot be overwritten. Retrying requires a fresh attempt and review.
+
+`BuildJob::recover_interrupted(id, plan)` creates only an Interrupted record.
+It accepts no persisted status or artifact and cannot recreate running state,
+approval authority or successful execution. It is a recovery boundary for future
+storage, not a storage implementation. A future loader must validate persisted
+identity/plan data and use this path for unfinished queued/running attempts;
+it must not use `queued()` to silently resume them. Completed-history restoration
+needs its own validated, non-authoritative representation and artifact checks.
+
+Interruption does not automatically notify an approval registry. A future adapter
+must revoke pending approval as part of its serialized interruption handling.
+Consuming against an interrupted record fails as NotQueued and permanently
+invalidates that approval; a new registry also refuses to approve that record.
+Creating a new registry after restart invalidates old handles, but this model alone
+does not prevent callers constructing separate queued records with reused IDs.
+Durable attempt uniqueness remains a future store responsibility.
+
+An interrupted label cannot release a runner slot or justify deleting job storage.
+Surviving children/writers must be reconciled and cleanup verified before admitting
+another job. If that cannot be established, admission must remain blocked.
+No persistence, startup hook, process inspection or automatic recovery is added.
+
 ## Why a status cannot assert success
 
 Public state and metadata values are descriptions, not trusted results. Only
 `RunnerEvent` can drive runner transitions, and its fields are private with no
 public constructor, deserializer or production issuer. Module-local tests alone
 create synthetic events. Compile-fail tests preserve this public boundary and
-prevent direct state assignment. Safe production callers can currently create and
-cancel a queued record, but cannot mark a job running or successful.
+prevent direct state assignment. Safe production callers can create/cancel a queued record or mark an unfinished
+record interrupted, but cannot mark a job running or successful.
 
 A future trusted issuer must be separately implemented and reviewed. Before
 issuing any event it must bind the actual attempt, exact approved plan and process
@@ -85,3 +116,25 @@ does not issue these events or authorize a production runner.
 The [rehearsal artifact handoff](artifact-handoff.md) has disposable filesystem
 tests but no supervisor integration or event issuer. Its hash receipt alone
 cannot complete a job or prove that a runner was stopped.
+
+## Remaining delivery for issue #17
+
+The domain helpers are implemented, but there is no production end-to-end build.
+The server/CLI do not instantiate the approval, job, output or supervision models.
+These are the remaining integration groups, not claims that the acceptance rows
+are complete:
+
+| Area | Existing evidence | Still required |
+| --- | --- | --- |
+| Review and admission | [Plans](build-plans.md), [typed contexts](review-context.md), [approval lifecycle](build-approvals.md) | Present the complete verified record in an authenticated review UI; approve/cancel routes; fresh catalog/source/context verification; serialize single-use consumption with cancellation and single-job admission |
+| Prepared inputs | [Complete source capture](source-snapshots.md), [directory](reviewed-directories.md) and [executable](reviewed-executables.md) checks | Fresh owned work/source/dependency materialization outside checkouts; verified dependency archives/bundle and complete toolchain/configuration manifests; enforce trusted paths, ACL/mount and read-only layout requirements |
+| Runner and cleanup | [Output collector](build-output.md), [supervision decisions](build-supervision.md), separate [fixture evidence](offline-fixture-build.md) | Select and implement the supported runner/target profile; enforce unprivileged identity, clean environment, network/filesystem isolation and CPU/memory/process/disk caps; launch one job; deliver signals, reap all children and verify cleanup through handoff |
+| Durable history and UI | In-memory lifecycle including Interrupted, escaped bounded output | Private atomic job/log storage, unique attempt IDs, interrupted startup recovery and leftover reconciliation; bounded retention; project-page states/logs and cancellation feedback |
+| Artifact and provenance | Source/toolchain/command metadata; separate [handoff fixture](artifact-handoff.md) | Connect successful exit and verified cleanup to bounded collection of only the reviewed artifact; record durable provenance; expose independently staged verified bytes only for successful jobs |
+| Closure tests | Unit/rejection tests and separately approved offline fixtures | Integrated successful HTTP-service build, nonzero exit, timeout, cancellation, stale review, truncation/escaping, restart, artifact rejection and preservation of the original repository |
+
+Do not close #17 based on these helpers alone. Process execution is outside the
+scoped lifecycle/helper issues. The runner requires a separately selected
+implementation scope and must satisfy the
+[trust contract](execution-trust.md); no privileged setup or deployment is implied.
+Release promotion (#18) and service deployment/supervision (#19) remain outside #17.
