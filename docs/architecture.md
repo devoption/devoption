@@ -32,7 +32,8 @@ Use focused references for details rather than loading every subsystem:
   a plan or job. The explicit CLI check does not read owner credentials or start HTTP.
 - [Plans](build-plans.md) and [job lifecycle](build-jobs.md) are contracts, not an
   execution service. [Private history](build-history.md) persists bounded summaries
-  and per-attempt output checkpoints without restoring execution authority. [Bounded output](build-output.md) collects supplied bytes and
+  and per-attempt output checkpoints without restoring execution authority.
+  Explicit server startup can recover selected history before listening. [Bounded output](build-output.md) collects supplied bytes and
   renders escaped text without process readers or job integration.
   [Supervision decisions](build-supervision.md) track stop reasons and grace
   without delivering signals or asserting cleanup.

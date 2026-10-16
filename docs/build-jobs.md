@@ -79,9 +79,9 @@ cross-store limits are described in the [history guide](build-history.md).
 An interrupted label cannot release a runner slot or justify deleting job storage.
 Surviving children/writers must be reconciled and cleanup verified before admitting
 another job. If that cannot be established, admission must remain blocked.
-The lifecycle API adds no persistence, startup hook, process inspection or automatic
-recovery. The separate [history store](build-history.md) provides explicit saved-summary
-recovery without wiring a startup flow.
+The lifecycle API adds no persistence or process inspection. The separate
+[history store](build-history.md#explicit-server-startup) provides explicit
+saved-summary recovery during optionally configured server startup.
 
 ## Why a status cannot assert success
 
@@ -107,8 +107,8 @@ queued cancellation versus a late start, terminal replay and nonempty artifact
 metadata are covered. Synthetic successful records make no real-build claim.
 
 The separate [history store](build-history.md) now persists bounded summaries and
-explicitly marks unfinished history interrupted. Startup recovery integration,
-real approval/runner integration, cancellation delivery, log checkpoint integration, artifact
+explicitly marks unfinished history interrupted, including at opted-in server
+startup. Leftover reconciliation, real approval/runner integration, cancellation delivery, log checkpoint integration, artifact
 retention and execution limits remain future work.
 The separate [bounded output collector](build-output.md) retains caller-supplied
 bytes and renders escaped text. The [history store](build-history.md#output-checkpoints)
@@ -139,7 +139,7 @@ are complete:
 | Review and admission | [Plans](build-plans.md), [typed contexts](review-context.md), [approval lifecycle](build-approvals.md) | Present the complete verified record in an authenticated review UI; approve/cancel routes; fresh catalog/source/context verification; serialize single-use consumption with cancellation and single-job admission |
 | Prepared inputs | [Complete source capture](source-snapshots.md), [directory](reviewed-directories.md) and [executable](reviewed-executables.md) checks | Fresh owned work/source/dependency materialization outside checkouts; verified dependency archives/bundle and complete toolchain/configuration manifests; enforce trusted paths, ACL/mount and read-only layout requirements |
 | Runner and cleanup | [Output collector](build-output.md), [supervision decisions](build-supervision.md), [real leaf-process tests](process-supervision-fixtures.md), separate [fixture evidence](offline-fixture-build.md) | Select and implement the supported runner/target profile; enforce unprivileged identity, clean environment, network/filesystem isolation and CPU/memory/process/disk caps; launch one job; deliver signals, reap all children and verify cleanup through handoff |
-| Durable history and UI | In-memory lifecycle, [private summaries, output checkpoints and explicit recovery](build-history.md) | Startup recovery integration, leftover reconciliation, admission using allocated attempt IDs, log checkpoint integration and retention; project-page states/logs and cancellation feedback |
+| Durable history and UI | In-memory lifecycle, [private summaries, output checkpoints and explicit recovery](build-history.md) | Leftover reconciliation, catalog identity validation, admission using allocated attempt IDs, log checkpoint integration and retention; project-page states/logs and cancellation feedback |
 | Artifact and provenance | Source/toolchain/command metadata; separate [handoff fixture](artifact-handoff.md) | Connect successful exit and verified cleanup to bounded collection of only the reviewed artifact; record durable provenance; expose independently staged verified bytes only for successful jobs |
 | Closure tests | Unit/rejection tests and separately approved offline fixtures | Integrated successful HTTP-service build, nonzero exit, timeout, cancellation, stale review, truncation/escaping, restart, artifact rejection and preservation of the original repository |
 

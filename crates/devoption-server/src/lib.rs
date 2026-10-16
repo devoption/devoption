@@ -8,7 +8,9 @@
 
 mod server;
 
-pub use server::{run, run_with_managed_repository_root, run_with_repository_root};
+pub use server::{
+    run, run_with_build_history, run_with_managed_repository_root, run_with_repository_root,
+};
 
 #[cfg(unix)]
 pub mod browser_session;

@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Recover explicitly selected private build history before serving and retain its
+  exclusive writer lock for the service lifetime; builds remain unavailable
+  ([#222](https://github.com/devoption/devoption/issues/222)).
+
 - Persist bounded output checkpoints for known build attempts with private atomic
   snapshots, append-only stream checks and preserved escaped rendering after restart
   ([#220](https://github.com/devoption/devoption/issues/220)).
