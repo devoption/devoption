@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add monotonic build supervision decisions for timeout, cancellation and bounded
+  output, with sticky stop reasons and a five-second termination grace; no process
+  launch, signaling or cleanup claims
+  ([#204](https://github.com/devoption/devoption/issues/204)).
+
 - Add an in-memory build-output collector with a combined stdout/stderr byte cap,
   sticky truncation and escaped text rendering; no process readers or execution
   ([#202](https://github.com/devoption/devoption/issues/202)).

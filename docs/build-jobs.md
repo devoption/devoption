@@ -73,6 +73,8 @@ Persisted records, restart recovery, real approval/runner integration, cancellat
 delivery, durable logs, artifact retention and execution limits remain future work.
 The separate [bounded output collector](build-output.md) retains caller-supplied
 bytes and renders escaped text, but has no runner readers, persistence or job integration.
+[Supervision decisions](build-supervision.md) combine time/output limits and
+cancellation with a termination grace; they neither signal processes nor issue job events.
 The [disposable runner profile](disposable-runner-proposal.md) received separate
 approval for an initial temporary fixture attempt and one diagnostic repeat.
 The [initial result](disposable-build-rehearsal.md) and [repeat result](disposable-build-repeat.md)
