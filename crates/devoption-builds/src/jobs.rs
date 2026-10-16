@@ -5,8 +5,8 @@ use crate::BuildPlan;
 use devoption_registry::Sha256;
 use std::{fmt, num::NonZeroU64};
 
-/// Identity of one attempt, independent of the plan. A future store must allocate
-/// unique IDs and never reuse them for retries; this type does not ensure uniqueness.
+/// Identity of one attempt, independent of the plan. The history store allocates
+/// fresh persisted IDs; this value type alone does not ensure uniqueness.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct JobId([u8; 16]);
 

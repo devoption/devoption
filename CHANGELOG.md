@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Allocate random build-attempt identities and durably save Queued before returning
+  a job; reject retained-ID collisions and unknown history updates
+  ([#218](https://github.com/devoption/devoption/issues/218)).
+
 - Persist up to ten private build-job summaries with exclusive writer locking,
   bounded checksummed snapshots, atomic replacement and explicit interrupted
   recovery; no restored execution authority or application route

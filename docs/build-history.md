@@ -21,8 +21,18 @@ single-link, current-account-owned `0600` files. Nonblocking no-follow opens rej
 special files before content reads. Directory ancestors' ownership/ACLs are not
 verified; explicit trusted-local selection is required, not an arbitrary HTTP path.
 
-`record(&BuildJob)` persists a queued attempt first. Updates must retain attempt,
-project, repository, commit and source identity and follow the job lifecycle's
+Under [#218](https://github.com/devoption/devoption/issues/218),
+`queue(BuildPlan)` generates a 128-bit attempt ID using OS randomness and saves
+Queued before returning the new `BuildJob`. It checks candidates against every
+retained ID, including terminal attempts, and retries at most sixteen times.
+Entropy failure or collision exhaustion returns Randomness without writing;
+capacity is checked before requesting entropy. Publication failure returns no job
+and retains the poisoned-writer/pending-file behavior described below. If publication
+was visible before a durability error, reopen and inspect the saved summary; never
+reconstruct a queued job from it.
+
+`record(&BuildJob)` updates only an existing attempt; unknown IDs are rejected.
+Updates must retain attempt, project, repository, commit and source identity and follow the job lifecycle's
 permitted edges; Interrupted is terminal. Identical repeated observations are
 idempotent. No terminal outcome can be replaced. A summary does not contain the
 complete plan, so these identity checks cannot replace exact approval-plan binding.
@@ -30,8 +40,17 @@ There is no general public record constructor, state setter or history-to-plan A
 
 At most ten attempts are retained, including unfinished attempts. Capacity rejects
 new IDs without eviction. This first store has no deletion, seven-day expiry,
-completed-job retention policy or cross-store uniqueness allocator; it fails closed
-at capacity. Those remain required before production integration.
+completed-job retention policy; it fails closed at capacity. IDs are guaranteed
+noncolliding only against this store's retained records; random generation makes
+cross-store collisions unlikely but is not a global uniqueness registry. Do not
+reset, roll back or delete history to reuse attempt IDs. Future retention must
+preserve the fresh-attempt invariant.
+
+Allocation does not validate current source/catalog state, consume approval,
+serialize single-job admission, prove process cleanup or perform startup recovery.
+It can queue more than one attempt up to capacity; production admission remains
+separate. The lower-level `BuildJob::queued` constructor is still an in-memory
+model API and cannot insert caller-chosen IDs into this history store.
 
 ## Format and publication
 
@@ -86,6 +105,7 @@ Run `cargo test -p devoption-builds --locked --offline history::tests` and the
 [workspace checks](development.md#checks). Disposable fixtures cover reopen,
 interrupted recovery, terminal preservation, writer exclusion, rebinding, unsafe
 files, symlinks/hardlinks, corruption, structural checks with a valid checksum,
-capacity, stale pending files and injected partial-write failure. Linux also tests
-FIFO rejection. Synthetic running/success metadata in codec tests is not execution
+capacity, stale pending files, injected partial-write failure, entropy failure,
+collision exhaustion, fresh retry IDs after recovery and unknown-ID rejection.
+Linux also tests FIFO rejection. Synthetic running/success metadata in codec tests is not execution
 evidence. No real instance history or user repository is changed.
