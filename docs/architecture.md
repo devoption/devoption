@@ -31,7 +31,8 @@ Use focused references for details rather than loading every subsystem:
 - [Source preparation](build-preparation.md) reports observations without creating
   a plan or job. The explicit CLI check does not read owner credentials or start HTTP.
 - [Plans](build-plans.md) and [job lifecycle](build-jobs.md) are contracts, not an
-  execution service. [Bounded output](build-output.md) collects supplied bytes and
+  execution service. [Private history](build-history.md) persists bounded summaries
+  without restoring execution authority. [Bounded output](build-output.md) collects supplied bytes and
   renders escaped text without process readers or job integration.
   [Supervision decisions](build-supervision.md) track stop reasons and grace
   without delivering signals or asserting cleanup.

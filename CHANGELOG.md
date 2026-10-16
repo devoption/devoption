@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Persist up to ten private build-job summaries with exclusive writer locking,
+  bounded checksummed snapshots, atomic replacement and explicit interrupted
+  recovery; no restored execution authority or application route
+  ([#216](https://github.com/devoption/devoption/issues/216)).
+
 - Test Linux orphan-descendant cleanup through an isolated subreaper, retaining
   the exited leader identity until signaling ends and verifying both child waits
   and pipe closure; no production runner
