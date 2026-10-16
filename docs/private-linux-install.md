@@ -332,6 +332,11 @@ identities. No automatic relocation, restore of repository contents or permissio
 to execute code is provided. See [catalog compatibility](project-catalog.md#version-and-validation)
 and [worktree limitations](worktree-validation.md).
 
+If only device numbers changed while paths/inodes remain, keep startup closed and
+use the separately reviewed [device-binding recovery workflow](repository-recovery.md).
+It requires independent verification and an explicit new repository trust grant;
+an owner-record restore alone does not establish filesystem continuity.
+
 To adopt the restore, point **both** `ExecStartPre` and `ExecStart --data-dir` in
 the user unit at the verified restored directory, and `ExecStart` at the chosen
 compatible binary. If it already has `--repository-root`, retain that exact existing

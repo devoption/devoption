@@ -65,6 +65,22 @@ impl CatalogDirectory {
         directory_valid(&self.directory)?;
         Ok(root.disjoint_directory(&self.directory)?)
     }
+
+    /// Read-only review; creates no lock, backup or catalog file.
+    pub fn review_device_rebind(
+        &self,
+        root: &crate::worktree::PermittedRoot,
+    ) -> Result<crate::recovery::RecoveryReview, Error> {
+        if !self.is_disjoint(root)? {
+            return Err(Error::RootMismatch);
+        }
+        let metadata = self.directory.metadata()?;
+        crate::recovery::review(
+            self.load()?.ok_or(Error::InvalidCatalog)?,
+            root,
+            (metadata.dev(), metadata.ino()),
+        )
+    }
 }
 
 /// An exclusive catalog writer anchored to an existing private directory.
@@ -85,6 +101,102 @@ impl Drop for CatalogStore {
 }
 
 impl CatalogStore {
+    /// Explicit local trust grant after review. Holds the writer lock, checks a
+    /// fresh complete review and retains a durable private backup before publish.
+    /// An error after publication is uncertain; inspect current state before retry.
+    pub fn approve_device_rebind(
+        &mut self,
+        root: &crate::worktree::PermittedRoot,
+        fingerprint: [u8; 32],
+    ) -> Result<String, Error> {
+        self.approve_device_rebind_using(root, fingerprint, || Ok(()))
+    }
+
+    pub(crate) fn approve_device_rebind_using(
+        &mut self,
+        root: &crate::worktree::PermittedRoot,
+        fingerprint: [u8; 32],
+        before_publish: impl FnOnce() -> Result<(), Error>,
+    ) -> Result<String, Error> {
+        self.check()?;
+        let reader = CatalogDirectory::from_directory(self.directory.try_clone()?)?;
+        let reviewed = reader.review_device_rebind(root)?;
+        if reviewed.fingerprint() != fingerprint {
+            return Err(Error::StaleCheckout);
+        }
+        let bytes = codec::encode(&reviewed.original)?;
+        let backup = reviewed.backup_name();
+        let backup_file = match openat(
+            &self.directory,
+            backup.as_str(),
+            OFlags::WRONLY
+                | OFlags::CREATE
+                | OFlags::EXCL
+                | OFlags::NOFOLLOW
+                | OFlags::NONBLOCK
+                | OFlags::CLOEXEC,
+            Mode::RUSR | Mode::WUSR,
+        ) {
+            Ok(fd) => {
+                let mut file = File::from(fd);
+                file_valid(&file)?;
+                file.write_all(&bytes)?;
+                file.sync_all()?;
+                file
+            }
+            Err(Errno::EXIST) => {
+                // An uncertain earlier attempt may already have made this exact
+                // backup. Never overwrite it or accept unsafe/different contents.
+                let mut file = File::from(openat(
+                    &self.directory,
+                    backup.as_str(),
+                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+                    Mode::empty(),
+                )?);
+                file_valid(&file)?;
+                let mut existing = Vec::new();
+                Read::by_ref(&mut file)
+                    .take((codec::MAX_BYTES + 1) as u64)
+                    .read_to_end(&mut existing)?;
+                file.sync_all()?;
+                if existing != bytes {
+                    return Err(Error::InvalidCatalog);
+                }
+                file
+            }
+            Err(error) => return Err(error.into()),
+        };
+        self.directory.sync_all()?;
+        before_publish()?;
+        file_valid(&backup_file)?;
+        let mut current_backup = File::from(openat(
+            &self.directory,
+            backup.as_str(),
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+            Mode::empty(),
+        )?);
+        file_valid(&current_backup)?;
+        let retained = backup_file.metadata()?;
+        let current = current_backup.metadata()?;
+        if (retained.dev(), retained.ino()) != (current.dev(), current.ino()) {
+            return Err(Error::UnsafeFile);
+        }
+        let mut final_bytes = Vec::new();
+        Read::by_ref(&mut current_backup)
+            .take((codec::MAX_BYTES + 1) as u64)
+            .read_to_end(&mut final_bytes)?;
+        file_valid(&current_backup)?;
+        if final_bytes != bytes {
+            return Err(Error::InvalidCatalog);
+        }
+        current_backup.sync_all()?;
+        // Recheck every saved observation after backup and before atomic save.
+        if reader.review_device_rebind(root)?.fingerprint() != fingerprint {
+            return Err(Error::StaleCheckout);
+        }
+        self.save(&reviewed.replacement)?;
+        Ok(backup)
+    }
     /// Create a new empty checkout and publish its identity/association under the
     /// catalog lock. Never reuse an existing path or remove files on failure.
     /// An interrupted initialization/save may leave an unregistered checkout;
