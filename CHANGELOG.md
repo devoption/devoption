@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Select the first Wasm web-app implementation contract: WASIp2 HTTP components,
+  a supervised Wasmtime worker, explicit limits and a bounded fixture validation
+  plan; map native build assumptions to required integration work without adding
+  runtime support ([#229](https://github.com/devoption/devoption/issues/229)).
+
 - Prioritize a six-task single-node delivery track from a fresh VM and authenticated
   platform DNS to a deployed web app on its own HTTPS hostname, with update/restart
   acceptance and explicit deferral of broader platform work; this is planning,

@@ -80,7 +80,8 @@ Unaffected integrity, authorization and recovery criteria remain applicable.
 ### Keep the first path small
 
 Start with one owner, one Ubuntu 24.04 x86_64 VM and one trusted Rust HTTP web app.
-The exact Wasm contract is the first task, not an already supported runtime.
+The first task selects the [Wasm contract](docs/decisions/0004-first-wasm-web-app.md);
+see its review status. It is not an already supported runtime.
 A minimal app serving HTML and a health endpoint is enough to establish the path;
 arbitrary web frameworks, databases and untrusted workloads are not prerequisites.
 The owner may create the VM and DNS records manually and stage the source checkout

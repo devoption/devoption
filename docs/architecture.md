@@ -86,5 +86,7 @@ and contract code does not implement them.
 
 [Product goals](product.md) define optional MCP parity with human operations.
 MCP has no implemented transport here and must not become a permission bypass.
-Wasm runtime/ABI and other unsettled choices remain
-[open questions](decisions/README.md#open-questions), not implied dependencies.
+The first Wasm runtime/ABI and app subset are selected in
+[decision 0004](decisions/0004-first-wasm-web-app.md), subject to its review status;
+its integration map and fixture plan do not imply implemented hosting. Broader
+capabilities remain [open questions](decisions/README.md#open-questions).
