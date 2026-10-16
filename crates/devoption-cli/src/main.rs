@@ -10,7 +10,7 @@ mod source_check;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
        devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
@@ -22,6 +22,7 @@ Usage: devoption [--help | --version]
   check-source  Read saved repository source checks (Unix/local/SSH); no build runs
   recover-repositories  Review changed device bindings; explicit approval required to apply (Unix)
   --port PORT   Override the port (0 chooses a free port)
+  --public-origin  Serve one canonical https://DNS_NAME through a local TLS proxy; requires an existing owner
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
   --build-history-dir  Recover selected private history before serving; builds remain unavailable
   --repository-root  Explicit trusted checkout root for inspection/attachment
@@ -100,9 +101,23 @@ fn main() -> ExitCode {
         repository_root,
         managed_repository_root,
         build_history_directory,
+        public_origin,
     }) = options
     {
-        let result = if let Some(history) = build_history_directory {
+        let result = if let Some(origin) = public_origin {
+            devoption_server::run_with_public_origin(
+                port,
+                data_directory
+                    .as_deref()
+                    .expect("public origin requires data directory"),
+                managed_repository_root
+                    .as_deref()
+                    .or(repository_root.as_deref()),
+                managed_repository_root.is_some(),
+                build_history_directory.as_deref(),
+                origin,
+            )
+        } else if let Some(history) = build_history_directory {
             devoption_server::run_with_build_history(
                 port,
                 data_directory
@@ -143,9 +158,11 @@ struct ServeOptions {
     repository_root: Option<PathBuf>,
     managed_repository_root: Option<PathBuf>,
     build_history_directory: Option<PathBuf>,
+    public_origin: Option<devoption_server::PublicOrigin>,
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
+    let mut public_origin = None;
     let mut port = None;
     let mut data_directory = None;
     let mut repository_root = None;
@@ -162,6 +179,10 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
                     .and_then(|value| value.parse::<u16>().ok())
                     .ok_or("port must be an integer from 0 to 65535")?,
             );
+        } else if flag == "--public-origin" && public_origin.is_none() {
+            public_origin = Some(devoption_server::PublicOrigin::parse(
+                value.to_str().ok_or("public origin must be UTF-8")?,
+            )?);
         } else if flag == "--data-dir" && data_directory.is_none() {
             let path = PathBuf::from(value);
             if !path.is_absolute() {
@@ -199,7 +220,11 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     if build_history_directory.is_some() && data_directory.is_none() {
         return Err("build history requires --data-dir with an existing configured owner");
     }
+    if public_origin.is_some() && data_directory.is_none() {
+        return Err("public origin requires --data-dir with an existing configured owner");
+    }
     Ok(ServeOptions {
+        public_origin,
         port: port.unwrap_or(3000),
         data_directory,
         repository_root,

@@ -1,6 +1,8 @@
-"""Statically verify the user-unit example in a temporary home, without starting it."""
+"""Statically verify installation unit examples in temporary paths, without starting them."""
 
 import os
+import pwd
+import grp
 from pathlib import Path
 import shlex
 import shutil
@@ -49,4 +51,25 @@ with tempfile.TemporaryDirectory(prefix="devoption-unit-") as directory:
         result = subprocess.run(command, timeout=5)
         assert (result.returncode == 0) == bool(payload)
 
-print("User unit: static verification and missing/empty owner preflight passed; no service started")
+    # Static system-unit verification only: substitute disposable paths and the
+    # current account. No user creation, service installation or start occurs.
+    examples = source.parent
+    for filename in ["devoption-public.service", "caddy-devoption.service"]:
+        content = (examples / filename).read_text()
+        content = content.replace("/opt/devoption/devoption", str(installed))
+        content = content.replace("/var/lib/devoption", str(root))
+        content = content.replace("/var/lib/caddy", str(root / "caddy"))
+        content = content.replace("/etc/caddy/Caddyfile", str(root / "Caddyfile"))
+        # The verifier checks ExecStart existence; this does not validate Caddy.
+        content = content.replace("/usr/local/bin/caddy", "/usr/bin/true")
+        for account in ["devoption", "caddy"]:
+            content = content.replace("User=" + account, "User=" + pwd.getpwuid(os.getuid()).pw_name)
+            content = content.replace("Group=" + account, "Group=" + grp.getgrgid(os.getgid()).gr_name)
+        system_unit = root / filename
+        system_unit.write_text(content)
+        subprocess.run(
+            ["systemd-analyze", "--man=no", "--recursive-errors=no", "verify", str(system_unit)],
+            env=environment, check=True, timeout=30,
+        )
+
+print("User and public system units: static verification passed; private owner preflight passed; no service started")

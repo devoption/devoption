@@ -9,7 +9,8 @@ and Git status inspection,
 [source preparation checks](docs/build-preparation.md) in Builds or the CLI,
 owner sign-in, and appearance preferences. **Builds and deployments are not available yet.** Authentication
 currently supports one owner; team accounts are planned, not implemented.
-There is no published release or supported public deployment configuration.
+There is no published release. An explicit [HTTPS proxy setup](docs/public-linux-install.md)
+is available for validation; cloud DNS/ACME and reboot evidence remain pending.
 
 ## Quick start
 
@@ -27,7 +28,8 @@ Open [127.0.0.1:3000](http://127.0.0.1:3000/); press **Ctrl+C** to stop.
 This starts an unconfigured development preview. For saved projects and optional
 existing-repository inspection, follow [owner setup and usage](docs/using-devoption.md) or the
 [private Ubuntu installation guide](docs/private-linux-install.md).
-The server currently binds to loopback; **do not expose this preview publicly**.
+The server binds to loopback. Use the explicit [HTTPS proxy setup](docs/public-linux-install.md)
+for public-origin validation; never expose the backend HTTP port.
 Run `cargo run --locked --offline -- --help` for command options.
 
 ## Preview

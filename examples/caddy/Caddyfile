@@ -1,0 +1,22 @@
+{
+	admin off
+	servers {
+		strict_sni_host on
+	}
+}
+
+platform.example.com {
+	request_body {
+		max_size 64KB
+	}
+	reverse_proxy 127.0.0.1:3000 {
+		# Preserve Host and Origin. DevOption trusts only its configured origin.
+		header_up -Forwarded
+		header_up -X-Forwarded-*
+		header_up -X-Real-IP
+		transport http {
+			dial_timeout 3s
+			response_header_timeout 15s
+		}
+	}
+}

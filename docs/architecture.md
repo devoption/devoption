@@ -56,6 +56,8 @@ Use focused references for details rather than loading every subsystem:
 1. The [CLI](../crates/devoption-cli/src/main.rs) selects an explicit command and
    configuration. `serve` starts the [HTTP service](../crates/devoption-server/src/server.rs),
    which validates configured owner/catalog storage before binding to loopback.
+   Optional public-origin mode requires an existing owner and an explicit local TLS
+   proxy; see [public installation](public-linux-install.md) for the boundary.
    CLI owner setup is separate; serving does not enroll an owner.
 2. The server applies Host checks, configured-page session checks and mutation
    Origin/CSRF checks. It invokes domain operations and supplies results to

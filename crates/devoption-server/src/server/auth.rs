@@ -28,7 +28,11 @@ struct AuthState {
 }
 
 // The startup caller mounts these only after finding a valid existing owner.
-pub(super) fn routes(auth: OwnerAuthService, port: u16, session: SharedSession) -> Router {
+pub(super) fn routes(
+    auth: OwnerAuthService,
+    origin: impl Into<super::RequestOrigin>,
+    session: SharedSession,
+) -> Router {
     let app = Router::new()
         .route("/auth/session", post(recover_session))
         .route("/auth/challenge", post(challenge))
@@ -40,7 +44,7 @@ pub(super) fn routes(auth: OwnerAuthService, port: u16, session: SharedSession) 
             session,
         });
     // Include Host/Origin and method rejections in the non-cacheable boundary.
-    protect_origin(app, port).layer(middleware::map_response(
+    protect_origin(app, origin).layer(middleware::map_response(
         |mut response: Response| async move {
             response
                 .headers_mut()

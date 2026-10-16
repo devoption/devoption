@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add explicit HTTPS public-origin serving behind a local proxy, requiring an
+  existing owner and strict Host/Origin checks while retaining loopback binding,
+  Secure host-only cookies and CSRF protection. Add dedicated systemd/Caddy
+  installation examples and disposable TLS/login/project/restart checks; actual
+  cloud DNS, ACME and reboot validation remain pending
+  ([#230](https://github.com/devoption/devoption/issues/230)).
+
 - Select the first Wasm web-app implementation contract: WASIp2 HTTP components,
   a supervised Wasmtime worker, explicit limits and a bounded fixture validation
   plan; map native build assumptions to required integration work without adding

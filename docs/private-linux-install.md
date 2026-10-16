@@ -1,5 +1,9 @@
 # Private Ubuntu source installation
 
+For explicit public HTTPS access, use the separate
+[public-origin installation guide](public-linux-install.md) and its validation limits.
+This private guide keeps the default loopback-origin mode.
+
 This guide covers the current runtime: CLI owner setup, browser sign-in, page
 access, project creation, optional trusted-root repository attachment, and browser-local appearance settings.
 Builds, artifacts and deployments remain unimplemented. It is one step under
