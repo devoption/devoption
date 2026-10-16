@@ -69,5 +69,6 @@ cover exact execution/grace boundaries, delayed first polls, repeated observatio
 sticky cancellation/output reasons, timeout precedence, late bounded output, empty
 chunks and policy-limit rejection. These synthetic-time tests do not sleep, launch
 workloads or signal processes. Separate [real leaf-process tests](process-supervision-fixtures.md) now exercise
-TERM/KILL and direct-child reaping. Descendant cleanup and production isolation
-still require integration tests.
+TERM/KILL and direct-child reaping. A separate
+[Linux orphan fixture](descendant-supervision-fixture.md) exercises one adopted
+descendant; general descendant containment and production isolation remain unverified.

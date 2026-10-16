@@ -55,7 +55,9 @@ emergency alarm exit from being mistaken for successful TERM/KILL supervision.
 
 ## What this does not prove
 
-These fixtures have no descendants. Process groups are not cgroups or a sandbox:
+These leaf fixtures have no descendants. The separate
+[Linux subreaper fixture](descendant-supervision-fixture.md) tests one orphan
+that remains in its original group. Process groups are not cgroups or a sandbox:
 children can leave a group, and reaping the leader does not prove all writers are
 gone. Production must implement independently tested descendant containment,
 termination and cleanup before artifact acceptance or another admission.

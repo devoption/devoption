@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Test Linux orphan-descendant cleanup through an isolated subreaper, retaining
+  the exited leader identity until signaling ends and verifying both child waits
+  and pipe closure; no production runner
+  ([#213](https://github.com/devoption/devoption/issues/213)).
+
 - Exercise build supervision against real trusted leaf subprocesses, including
   nonblocking output, timeout/cancellation, cap-triggered termination and TERM-to-KILL
   escalation; keep production execution disabled

@@ -117,3 +117,6 @@ mod tests;
 
 #[cfg(test)]
 mod process_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+mod descendant_tests;
