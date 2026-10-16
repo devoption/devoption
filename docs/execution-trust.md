@@ -84,8 +84,9 @@ Cancellation must stop the complete process group/cgroup and confirm child clean
 
 Dependency acquisition is a separate reviewed operation through the registry/proxy.
 No implicit public fetch, toolchain installation or fallback is allowed during a
-build. The target/runtime choice remains subject to the [architecture decision](decisions/0001-platform-boundaries.md);
-the existing native fixture command does not settle the Wasm ABI or compiler flags.
+build. The selected first target/runtime contract is recorded in
+[decision 0004](decisions/0004-first-wasm-web-app.md), subject to its review status;
+the existing native fixture command does not implement its Wasm ABI or compiler flags.
 Changing target or arguments requires review and a new approval.
 
 ## Owned filesystem policy for dependent implementation

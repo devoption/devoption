@@ -12,7 +12,9 @@ authentication and storage still owned by the server crate.
 
 WebAssembly-first application hosting is the selected direction. Existing native
 Rust fixture/build contracts are groundwork, not an implemented Wasm service or
-a settled runtime/ABI choice. Start with an opinionated single server; expand to
+a deployed runtime. [Decision 0004](0004-first-wasm-web-app.md) selects the first
+runtime/ABI contract, subject to its review status and validation plan.
+Start with an opinionated single server; expand to
 multiple servers after that path is usable.
 
 Registry direction includes hosted private/public packages and controlled proxy
