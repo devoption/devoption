@@ -65,6 +65,46 @@ impl Projects {
         })
     }
 
+    /// Startup-only: no HTTP requests run yet. Hold the cooperating catalog
+    /// writer lock until history recovery completes; history is already locked.
+    pub(super) fn recover_build_history(
+        &self,
+        history: &mut devoption_builds::history::History,
+    ) -> io::Result<()> {
+        let catalog_writer = self
+            .directory
+            .writer()
+            .map_err(|_| io::Error::other("build history catalog unavailable"))?;
+        let catalog = catalog_writer
+            .load()
+            .map_err(|_| io::Error::other("build history catalog unavailable"))?
+            .unwrap_or_default();
+        let records = history
+            .load()
+            .map_err(|error| io::Error::other(format!("build history unavailable: {error}")))?;
+        for record in records {
+            let project = catalog
+                .projects()
+                .iter()
+                .find(|project| project.id().to_bytes() == record.project());
+            let repository = devoption_projects::RepositoryId::from_bytes(record.repository());
+            if !catalog
+                .repositories()
+                .iter()
+                .any(|entry| entry.id() == repository)
+                || !project.is_some_and(|entry| entry.repositories().contains(&repository))
+            {
+                return Err(io::Error::other(
+                    "build history does not match the configured project catalog",
+                ));
+            }
+        }
+        history.recover_interrupted().map_err(|error| {
+            io::Error::other(format!("build history recovery unavailable: {error}"))
+        })?;
+        Ok(())
+    }
+
     async fn access<T: Send + 'static>(
         self,
         operation: impl FnOnce(&CatalogDirectory) -> Result<T, Error> + Send + 'static,
