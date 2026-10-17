@@ -417,3 +417,38 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 #app-deployment label { display: block; max-width: 32rem; margin: .75rem 0 1rem; }
 #app-deployment label input { display: block; margin-top: .5rem; }
 #app-deployment summary, #app-deployment p { overflow-wrap: anywhere; }
+
+/* Project overview: repository-first reading order with secondary guidance. */
+.project-overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 3rem; align-items: start; }
+.overview-repositories .section-heading { align-items: start; gap: 1rem; }
+.overview-repositories .section-heading p { margin-top: .5rem; font-size: var(--text-small); }
+.overview-repositories .action-button { font-size: var(--text-small); }
+.overview-list-heading { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; background: var(--color-surface); font-size: var(--text-small); }
+.overview-list-heading span { color: var(--color-muted); }
+.overview-repository-list { list-style: none; padding: 0; margin: 0; }
+.overview-repository-list li { display: flex; gap: 1rem; padding: 1.5rem 1rem; border-bottom: 1px solid var(--color-border); }
+.overview-repository-copy { min-width: 0; overflow-wrap: anywhere; }
+.overview-repository-copy h3 { font-size: 1.125rem; }
+.overview-repository-copy h3 a { color: var(--color-primary); }
+.overview-repository-copy p { margin-top: .25rem; font-size: var(--text-small); }
+.overview-repository-copy details { margin-top: .75rem; font-size: var(--text-small); color: var(--color-muted); }
+.overview-repository-copy summary { cursor: pointer; width: fit-content; }
+.overview-repository-copy code { display: block; margin-top: .5rem; overflow-wrap: anywhere; }
+.overview-guide { padding-top: .25rem; }
+.overview-guide h2 { font-size: 1rem; }
+.overview-guide p { margin-top: .5rem; font-size: var(--text-small); }
+.overview-guide ol { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; gap: 1.5rem; }
+.overview-guide li a { font-weight: 600; font-size: var(--text-small); }
+.overview-settings-link { font-size: var(--text-small); color: var(--color-muted); }
+.project-overview-layout a:hover { text-decoration: underline; text-underline-offset: .2em; }
+.overview-empty { padding: 2.5rem 1.5rem; background: var(--color-surface); text-align: center; }
+.overview-empty .repository-icon { display: inline-flex; margin-bottom: 1rem; }
+.overview-empty p { max-width: 28rem; margin: .75rem auto 1.5rem; }
+@media (max-width: 70rem) {
+  .project-overview-layout { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+  .overview-guide ol { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+}
+@media (max-width: 38rem) {
+  .overview-guide ol { grid-template-columns: minmax(0, 1fr); }
+  .overview-repositories .section-heading { flex-direction: column; }
+}
