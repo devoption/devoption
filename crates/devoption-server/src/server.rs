@@ -53,7 +53,7 @@ pub fn run_with_repository_root(
         false,
         None,
         None,
-        false,
+        ExecutionMode::Disabled,
     )
 }
 
@@ -71,7 +71,7 @@ pub fn run_with_managed_repository_root(
         true,
         None,
         None,
-        false,
+        ExecutionMode::Disabled,
     )
 }
 
@@ -94,7 +94,7 @@ pub fn run_with_build_history(
         managed,
         Some(history_directory),
         None,
-        false,
+        ExecutionMode::Disabled,
     )
 }
 
@@ -118,7 +118,7 @@ pub fn run_with_public_origin(
         managed,
         history_directory,
         Some(origin),
-        false,
+        ExecutionMode::Disabled,
     )
 }
 
@@ -137,7 +137,33 @@ pub fn run_with_execution(
         managed,
         Some(history_directory),
         public_origin,
-        true,
+        ExecutionMode::Builds,
+    )
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExecutionMode {
+    Disabled,
+    Builds,
+    Deployments,
+}
+
+pub fn run_with_deployments(
+    port: u16,
+    data_directory: &Path,
+    repository_root: &Path,
+    managed: bool,
+    history_directory: &Path,
+    public_origin: Option<PublicOrigin>,
+) -> io::Result<()> {
+    run_with_roots(
+        port,
+        Some(data_directory),
+        Some(repository_root),
+        managed,
+        Some(history_directory),
+        public_origin,
+        ExecutionMode::Deployments,
     )
 }
 
@@ -148,7 +174,7 @@ fn run_with_roots(
     managed: bool,
     history_directory: Option<&Path>,
     public_origin: Option<PublicOrigin>,
-    execution_enabled: bool,
+    execution: ExecutionMode,
 ) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
@@ -242,7 +268,7 @@ fn run_with_roots(
         None => None,
     };
     #[cfg(unix)]
-    if execution_enabled {
+    if execution != ExecutionMode::Disabled {
         let config = devoption_builds::execution::Configuration::open()?;
         config.check_storage(
             data_directory.ok_or_else(|| io::Error::other("builds require owner storage"))?,
@@ -260,7 +286,7 @@ fn run_with_roots(
         );
     }
     #[cfg(not(unix))]
-    if execution_enabled {
+    if execution != ExecutionMode::Disabled {
         return Err(io::Error::other("build execution requires Linux"));
     }
     #[cfg(unix)]
@@ -282,6 +308,17 @@ fn run_with_roots(
                     .expect("history requires configured projects");
                 configured_projects.recover_build_history(&mut history)?;
                 projects = Some(configured_projects.with_history(history));
+            }
+            #[cfg(unix)]
+            if execution == ExecutionMode::Deployments {
+                projects
+                    .as_mut()
+                    .expect("configured projects")
+                    .enable_deployment(
+                        data_directory.expect("checked owner"),
+                        repository_root.expect("checked root"),
+                        history_directory.expect("checked history"),
+                    )?;
             }
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await?;
             let address = listener.local_addr()?;

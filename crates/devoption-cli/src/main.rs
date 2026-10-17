@@ -10,7 +10,7 @@ mod source_check;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--app-deployment enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
        devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
@@ -24,6 +24,7 @@ Usage: devoption [--help | --version]
   --port PORT   Override the port (0 chooses a free port)
   --public-origin  Serve one canonical https://DNS_NAME through a local TLS proxy; requires an existing owner
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
+  --app-deployment     Explicitly enable installed Linux app runtime (value: enabled)
   --build-execution    Explicitly enable installed Linux build runner (value: enabled)
   --build-history-dir  Recover selected private history before serving
   --repository-root  Explicit trusted checkout root for inspection/attachment
@@ -31,7 +32,7 @@ Usage: devoption [--help | --version]
 
 The data path must be absolute, private, and owned by this OS user, with no symlinks or parent traversal. Startup creates no directories or permissions. Managed mode permits authenticated creation of new repository directories only. Serve creates no accounts; setup never replaces an owner.
 After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH with the same directory, then sign in at /sign-in. Browser owner setup is not available.
-The local server shows Overview, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Releases and Infrastructure show unavailable states. Factory and runtime services are not implemented.
+The local server shows Overview, saved projects and empty-project creation for configured owners, and browser-local Appearance settings. Global Releases and Infrastructure show unavailable states. Installed Linux app deployment is opt-in through project Releases; see docs/web-app-deployments.md. Full factory automation is not implemented.
 Source checks require all four options and saved 32-character hexadecimal IDs from the project and repository URLs. They use this OS user's filesystem access without reading owner credentials or starting HTTP. Exit status: 0 checks passed, 1 changes needed or unavailable, 2 invalid arguments. Passing checks do not approve execution. See docs/build-preparation.md.";
 
 fn main() -> ExitCode {
@@ -119,9 +120,24 @@ fn main() -> ExitCode {
         build_history_directory,
         public_origin,
         execution_enabled,
+        deployment_enabled,
     }) = options
     {
-        let result = if execution_enabled {
+        let result = if deployment_enabled {
+            devoption_server::run_with_deployments(
+                port,
+                data_directory.as_deref().expect("validated owner"),
+                managed_repository_root
+                    .as_deref()
+                    .or(repository_root.as_deref())
+                    .expect("validated root"),
+                managed_repository_root.is_some(),
+                build_history_directory
+                    .as_deref()
+                    .expect("validated history"),
+                public_origin,
+            )
+        } else if execution_enabled {
             devoption_server::run_with_execution(
                 port,
                 data_directory.as_deref().expect("validated owner"),
@@ -191,11 +207,13 @@ struct ServeOptions {
     build_history_directory: Option<PathBuf>,
     public_origin: Option<devoption_server::PublicOrigin>,
     execution_enabled: bool,
+    deployment_enabled: bool,
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     let mut public_origin = None;
     let mut execution_enabled = false;
+    let mut deployment_enabled = false;
     let mut port = None;
     let mut data_directory = None;
     let mut repository_root = None;
@@ -207,6 +225,8 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
         };
         if flag == "--build-execution" && value == "enabled" && !execution_enabled {
             execution_enabled = true;
+        } else if flag == "--app-deployment" && value == "enabled" && !deployment_enabled {
+            deployment_enabled = true;
         } else if flag == "--port" && port.is_none() {
             port = Some(
                 value
@@ -258,6 +278,9 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     if public_origin.is_some() && data_directory.is_none() {
         return Err("public origin requires --data-dir with an existing configured owner");
     }
+    if deployment_enabled && !execution_enabled {
+        return Err("app deployment requires --build-execution enabled");
+    }
     if execution_enabled
         && (data_directory.is_none()
             || build_history_directory.is_none()
@@ -266,6 +289,7 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
         return Err("build execution requires owner, repository and history directories");
     }
     Ok(ServeOptions {
+        deployment_enabled,
         execution_enabled,
         public_origin,
         port: port.unwrap_or(3000),
@@ -274,4 +298,41 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
         managed_repository_root,
         build_history_directory,
     })
+}
+
+#[cfg(test)]
+mod deployment_options_tests {
+    use super::*;
+    #[test]
+    fn deployment_is_explicit_and_requires_the_existing_build_storage_contract() {
+        assert!(!serve_options(&[]).unwrap().deployment_enabled);
+        let parse =
+            |args: &[&str]| serve_options(&args.iter().map(OsString::from).collect::<Vec<_>>());
+        assert!(parse(&["--app-deployment", "enabled"]).is_err());
+        assert!(
+            parse(&[
+                "--app-deployment",
+                "enabled",
+                "--build-execution",
+                "enabled"
+            ])
+            .is_err()
+        );
+        let selected = [
+            "--app-deployment",
+            "enabled",
+            "--build-execution",
+            "enabled",
+            "--data-dir",
+            "/owner",
+            "--repository-root",
+            "/repositories",
+            "--build-history-dir",
+            "/history",
+        ];
+        assert!(parse(&selected).unwrap().deployment_enabled);
+        let mut duplicate = selected.to_vec();
+        duplicate.extend(["--app-deployment", "enabled"]);
+        assert!(parse(&duplicate).is_err());
+    }
 }

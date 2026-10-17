@@ -1,0 +1,24 @@
+[package]
+name = "devoption-runtime"
+description = "Bounded private WASI HTTP application worker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+wasmtime = { version = "=49.0.3", default-features = false, features = ["std", "runtime", "cranelift", "component-model", "async"] }
+wasmtime-wasi = { version = "=49.0.3", default-features = false, features = ["p2"] }
+wasmtime-wasi-http = { version = "=49.0.3", default-features = false, features = ["p2"] }
+tokio = { version = "=1.53.2", features = ["net", "rt", "sync", "time", "macros", "io-util"] }
+hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }
+httparse = "=1.10.1"
+http-body-util = "=0.1.5"
+
+[dev-dependencies]
+wasm-encoder = "=0.258.3"
+
+[lints]
+workspace = true

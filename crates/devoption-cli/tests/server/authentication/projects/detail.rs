@@ -178,3 +178,37 @@ fn project_sections_are_deep_linkable_authenticated_and_read_only() {
         assert!(!response.contains(ESCAPED));
     }
 }
+
+#[test]
+fn deployment_mutations_stay_behind_session_origin_csrf_and_explicit_enablement() {
+    let (_temporary, data) = configured();
+    let catalog = seed(&data);
+    let id: String = catalog.projects()[0]
+        .id()
+        .to_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let original = fs::read(data.join("projects.bin")).unwrap();
+    let (_server, address) = start_with(&data);
+    let issued = sign_in(address);
+    for action in ["promote", "prepare", "approve", "stop"] {
+        let path = format!("/projects/{id}/releases/{action}");
+        let raw = super::create::create_request(address, &issued, "")
+            .replace("POST /projects HTTP", &format!("POST {path} HTTP"));
+        assert!(request(address, &raw).starts_with("HTTP/1.1 409"));
+        let no_csrf = raw
+            .lines()
+            .filter(|line| !line.starts_with("X-CSRF-Token:"))
+            .collect::<Vec<_>>()
+            .join("\r\n")
+            + "\r\n\r\n";
+        assert!(request(address, &no_csrf).starts_with("HTTP/1.1 401"));
+        let foreign = raw.replace(
+            &format!("Origin: http://{address}"),
+            "Origin: https://other.example",
+        );
+        assert!(request(address, &foreign).starts_with("HTTP/1.1 403"));
+    }
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), original);
+}

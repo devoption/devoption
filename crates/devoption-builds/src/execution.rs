@@ -644,7 +644,7 @@ pub fn execute(
         file.write_all(&artifact)?;
         file.sync_all()?;
         let receipt = format!(
-            "version = 1\njob = \"{}\"\nproject = \"{}\"\nrepository = \"{}\"\ncommit = \"{}\"\nsource_sha256 = \"{}\"\nreview_sha256 = \"{}\"\nartifact_sha256 = \"{}\"\nartifact_bytes = {}\nartifact = \"component.wasm\"\n",
+            "version = 2\njob = \"{}\"\nproject = \"{}\"\nrepository = \"{}\"\ncommit = \"{}\"\nsource_sha256 = \"{}\"\nreview_sha256 = \"{}\"\nartifact_sha256 = \"{}\"\nartifact_bytes = {}\nartifact = \"component.wasm\"\n",
             hex(&review.job.id().to_bytes()),
             hex(&review.job.plan().details().project.to_bytes()),
             hex(&review.job.plan().details().repository.to_bytes()),
@@ -653,6 +653,13 @@ pub fn execute(
             hex(review.context.sha256().bytes()),
             hex(digest.bytes()),
             artifact.len()
+        );
+        let context = review.context.details();
+        let receipt = format!(
+            "{receipt}toolchain_sha256 = \"{}\"\ndependency_sha256 = \"{}\"\nconfiguration_sha256 = \"{}\"\nbuild_policy = \"WasmBuildV1\"\ntarget = \"wasm32-wasip2\"\nabi = \"wasi:http/proxy@0.2.4\"\n",
+            hex(context.toolchain_manifest.bytes()),
+            hex(context.dependency_bundle.bytes()),
+            hex(context.configuration.bytes())
         );
         let mut receipt_file = fs::OpenOptions::new()
             .write(true)

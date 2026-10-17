@@ -7,7 +7,7 @@ Verify current code when starting work; planned capabilities are not runtime beh
 
 ## Implemented structure
 
-The Rust workspace has six crates. The running service uses
+The Rust workspace has seven crates. The running service uses
 `devoption-cli` → `devoption-server`, which composes `devoption-projects`,
 `devoption-builds` and `devoption-ui`. The project domain core is independent of those delivery layers:
 
@@ -17,6 +17,7 @@ The Rust workspace has six crates. The running service uses
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
+| `devoption-runtime` | Separate Wasmtime WASIp2 HTTP worker; private listener, fresh bounded Store per request, denied filesystem/environment/network grants |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
 | `devoption-ui` | HTML rendering and browser assets |
 
@@ -83,12 +84,13 @@ implemented runner guarantees.
 The [roadmap](../ROADMAP.md) owns the intended
 reviewed-source → approved build → verified artifact → approved deployment →
 observable application sequence. Connecting those stages requires explicit
-identity, approval, persistence and execution boundaries; today's observation
-and contract code does not implement them.
+identity, approval, persistence and execution boundaries. The opt-in trusted
+[build](web-app-builds.md) and [private deployment](web-app-deployments.md) adapters
+connect those stages for the selected single-node fixture; public app ingress remains separate.
 
 [Product goals](product.md) define optional MCP parity with human operations.
 MCP has no implemented transport here and must not become a permission bypass.
 The first Wasm runtime/ABI and app subset are selected in
-[decision 0004](decisions/0004-first-wasm-web-app.md), subject to its review status;
-its integration map and fixture plan do not imply implemented hosting. Broader
+[decision 0004](decisions/0004-first-wasm-web-app.md). The deployment guide
+describes the implemented private worker and its limits. Broader
 capabilities remain [open questions](decisions/README.md#open-questions).

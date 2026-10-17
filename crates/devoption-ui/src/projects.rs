@@ -1,3 +1,6 @@
+mod deployment;
+pub(super) use deployment::content as deployment_content;
+pub use deployment::{DeploymentView, ReleaseView};
 mod execution;
 pub use execution::BuildExecutionView;
 pub(super) use execution::content as execution_content;

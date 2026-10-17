@@ -2,7 +2,7 @@
 
 Status: Selected implementation contract for review under
 [#229](https://github.com/devoption/devoption/issues/229); accepted when this record
-is merged. Not implemented or runtime-validated.
+is merged. The build and private runtime integrations are documented below.
 
 ## Decision
 
@@ -175,6 +175,17 @@ artifact and logs. This changes no runtime capability grant. Component header,
 size and digest handoff checks precede the still-required #232 HTTP world/import
 and runtime compatibility validation. Cloud validation is deferred until the local
 build/run/deploy path works.
+
+## Private deployment integration (#232)
+
+[Same-node deployment](../web-app-deployments.md) implements the embedded worker,
+immutable local releases, review controls and desired-state recovery. Rust std
+imports standard WASI interfaces beyond the HTTP proxy world; those interfaces
+are supplied with no preopens, inherited arguments/environment or socket grants.
+Guest stdout/stderr are each capped at 32 KiB; exhausting either fails the request
+with an explicit output-limit marker. This is stricter than silently truncating
+and continuing the guest. HTTP/1 connections close after one request; chunked
+uploads and streaming responses are outside this initial adapter.
 
 ## Bounded fixture validation plan
 

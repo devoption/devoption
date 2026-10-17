@@ -59,7 +59,9 @@ fn help_explains_the_actual_scope() {
         assert!(text.contains("After CLI setup, run devoption serve --data-dir ABSOLUTE_PATH"));
         assert!(text.contains("with the same directory, then sign in at /sign-in"));
         assert!(text.contains("Browser owner setup is not available"));
-        assert!(text.contains("services are not implemented"));
+        assert!(text.contains("Full factory automation is not implemented"));
+        assert!(text.contains("--app-deployment enabled"));
+        assert!(text.contains("Installed Linux app deployment is opt-in"));
         assert!(text.contains("devoption check-source --data-dir"));
         assert!(text.contains("--project 32HEX --repository 32HEX"));
         assert!(

@@ -15,6 +15,7 @@ use devoption_projects::{
 use tokio::sync::Mutex;
 
 mod builds;
+pub(super) mod deployment;
 mod execution;
 mod files;
 mod history;
@@ -27,6 +28,7 @@ mod startup_tests;
 #[derive(Clone)]
 pub(super) struct Projects {
     directory: Arc<CatalogDirectory>,
+    pub(super) deployment: Option<Arc<Mutex<deployment::Engine>>>,
     execution: Option<Arc<Mutex<execution::Engine>>>,
     history: Option<Arc<Mutex<devoption_builds::history::History>>>,
     gate: Arc<Mutex<()>>,
@@ -35,6 +37,22 @@ pub(super) struct Projects {
 }
 
 impl Projects {
+    pub(super) fn enable_deployment(
+        &mut self,
+        owner: &Path,
+        repositories: &Path,
+        history: &Path,
+    ) -> io::Result<()> {
+        let catalog = self
+            .directory
+            .load()
+            .map_err(io::Error::other)?
+            .unwrap_or_default();
+        let engine = deployment::Engine::open(owner, repositories, history, &catalog)?;
+        self.deployment = Some(Arc::new(Mutex::new(engine)));
+        Ok(())
+    }
+
     pub(super) fn with_execution(
         mut self,
         config: devoption_builds::execution::Configuration,
@@ -74,6 +92,7 @@ impl Projects {
             directory: Arc::new(directory),
             history: None,
             execution: None,
+            deployment: None,
             gate: Arc::new(Mutex::new(())),
             root: root.map(Arc::new),
             managed: None,
@@ -152,6 +171,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         .merge(files::routes(projects.clone()))
         .merge(builds::routes(projects.clone()))
         .merge(execution::routes(projects.clone()))
+        .merge(deployment::routes(projects.clone()))
         .merge(history::routes(projects.clone()))
         .merge(creation)
         .route(

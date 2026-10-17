@@ -23,7 +23,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
 | Source checks | `/projects/{id}/builds/{repository}` | backend, clean committed fixture; 1280 × 1400 | `build-source-checks.jpg` |
 | Source changes | `/projects/{id}/builds/{repository}` | backend, one modified source file; 1280 × 1400 | `build-source-changes.jpg` |
-| Project releases | `/projects/{id}/releases` | Unavailable state | `project-releases.jpg` |
+| Deployment review | `/projects/{id}/releases` | Exact saved release, health and runtime policy before approval; 1280 × 1200 | `deployment-review.jpg` |
+| Project releases | `/projects/{id}/releases` | Real saved Wasm releases and healthy private deployment; 1280 × 1200 | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit | `project-settings.jpg` |
 | Create repository | `/projects/{id}/code` | New repository dialog; sample-service entered, not submitted | `repository-create.jpg` |
@@ -141,3 +142,8 @@ in a disposable local Ubuntu VM. Use the public fixture and a disposable owner.
 Capture the prepared review before approval, then a real successful attempt with
 saved compiler output. Existing interrupted/truncated screenshots remain synthetic
 display tests. Never substitute seeded success for real build evidence.
+
+For deployment captures, follow [private app deployment](../web-app-deployments.md)
+in the same disposable Ubuntu VM. Save real successful builds, capture the exact
+review before approval, then capture the healthy release with saved app logs.
+These screenshots show the private runtime; public app ingress is not configured.

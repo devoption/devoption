@@ -1,7 +1,7 @@
 # Screenshot gallery
 
 These captures show the current application with disposable fixture data. Build
-execution, releases and deployments remain unavailable. See the [capture guide](README.md)
+execution and private app deployment are opt-in Linux capabilities. See the [capture guide](README.md)
 for dimensions, states and refresh instructions.
 
 **Overview**
@@ -30,7 +30,9 @@ for dimensions, states and refresh instructions.
 
 ![Source changes requiring attention](build-source-changes.jpg)
 
-![Project Releases, unavailable](project-releases.jpg)
+![Project Releases with a healthy private app](project-releases.jpg)
+
+![Deployment review before approval](deployment-review.jpg)
 
 ![Project Packages, unavailable](project-packages.jpg)
 

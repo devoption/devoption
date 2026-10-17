@@ -42,6 +42,9 @@ async fn show(
     let (Some(id), Some(section)) = (project, section) else {
         return missing();
     };
+    if section == ProjectSection::Releases {
+        return super::deployment::show(projects, id).await;
+    }
     if section == ProjectSection::Code {
         return super::files::code(projects, id).await;
     }
