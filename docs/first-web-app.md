@@ -116,15 +116,11 @@ app** and confirm it remains stopped after reboot. No new build should start.
 
 ## Recovery boundary and acceptance record
 
-The [existing offline backup/restore procedure](private-linux-install.md#restart-backup-and-restore)
-covers owner/catalog/profile records. It is **not a complete build/deployment
-backup**. Before declaring this path accepted, rehearse a consistent stopped-node
-snapshot including repositories, build history/jobs/receipts, root release store
-and intent, compatible binaries/helpers/configuration, prepared inputs and Caddy
-state. Retain original UID/GID, paths, ownership and private modes. Repository
-identity checks also bind filesystem identity; copying to a new filesystem is not
-a proven portable restore. Never overwrite the only working installation or assume
-that copying owner data restores an app. Full combined restore remains unperformed.
+Use the [bounded same-node snapshot and staged restore](same-node-recovery.md)
+for owner/catalog/profile records, build history/jobs and saved releases together.
+It preserves the working installation and requires the original repository and
+prepared-input roots, binaries/configuration and Caddy state to remain available.
+It is not a portable machine backup. Combined removal remains unperformed; never assume an owner-record copy restores an app.
 
 For a data-preserving removal, first cancel any build and wait for its terminal
 state, then **Stop app** and confirm it stopped. Disable/stop this installation's
@@ -143,7 +139,7 @@ Record each row as passed, failed or unperformed with exact revision and evidenc
 | Save/deploy, failed candidate, return to A | [Local Wasmtime/systemd rehearsal](web-app-deployments.md#disposable-local-evidence) |
 | Two hostnames, A → B → A, reboot and stopped intent | [Local HTTPS rehearsal](app-hostnames.md#observed-ubuntu-rehearsal) |
 | Public DNS, ACME issuance/renewal, external access | Unperformed; requires separately supplied host/DNS authority |
-| Combined backup/restore and data-preserving removal | Unperformed; required before #234 closes |
+| Bounded same-node record snapshot and restore | [Workflow and validation scope](same-node-recovery.md); same-node recovery passed; combined removal unperformed |
 
 The linked rehearsals were separate passes on an existing disposable VM, not one
 fresh-machine acceptance run. Keep that distinction in the final evidence. Product

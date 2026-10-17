@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add bounded offline snapshots and verified, non-overwriting restore staging for
+  owner records, build history/artifacts and saved app releases on the same
+  installation; require stopped workers/intent and retain explicit external-input
+  and disaster-recovery limits
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
 - Run Rust lint, tests, release installation checks, and script checks in parallel;
   avoid rerunning code checks when a draft PR becomes ready for review or its
   description is edited, while retaining separate contribution validation
