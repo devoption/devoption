@@ -16,7 +16,8 @@ platform.example.com {
 		header_up -X-Real-IP
 		transport http {
 			dial_timeout 3s
-			response_header_timeout 15s
+			# Allow the bounded build/deployment approval to finish.
+			response_header_timeout 95s
 		}
 	}
 }

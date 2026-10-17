@@ -162,3 +162,8 @@ or simulate disk loss. Existing app-serving/reboot evidence remains in the
 [deployment guide](web-app-deployments.md#disposable-local-evidence). Automated
 snapshot tests also cover corruption, missing/extra files, links, busy locks,
 running intent, size bounds, changed references and source changes during copy.
+
+The later [clean local rehearsal](clean-local-rehearsal.md) repeated snapshot
+adoption through the HTTPS browser interface, served saved A at the app hostname,
+and verified combined data-preserving removal/reinstallation. Its prepared-binary
+and public DNS/ACME limitations remain explicit.
