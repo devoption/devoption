@@ -9,7 +9,8 @@ and Git status inspection,
 [source preparation checks](docs/build-preparation.md) in Builds or the CLI,
 owner sign-in, and appearance preferences. An opt-in [Linux build runner](docs/web-app-builds.md)
 can build the selected trusted Wasm web app through review and approval in the interface.
-**App runtime and deployment are not available yet.** Authentication
+The opt-in [private app runtime](docs/web-app-deployments.md) adds saved releases,
+reviewed deployment, health/log/stop controls and restart recovery on the same node. Authentication
 currently supports one owner; team accounts are planned, not implemented.
 There is no published release. An explicit [HTTPS proxy setup](docs/public-linux-install.md)
 is available for validation; cloud DNS/ACME and reboot evidence remain pending.

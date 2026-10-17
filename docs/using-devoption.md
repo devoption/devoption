@@ -104,8 +104,9 @@ Development checks create owners only in [temporary fixture stores](browser-sess
 Create repositories through **New repository** on a project's Code page after an
 administrator selects [managed storage](managed-repositories.md). DevOption creates
 and registers each empty Git checkout on the server. Existing-checkout attachment
-is an optional inspection/import path. Source editing, initial commits, Git hosting,
-deployment remains unavailable; the selected web app has an opt-in [Linux build workflow](web-app-builds.md).
+is an optional inspection/import path. Source editing, initial commits and Git hosting remain unavailable. The selected
+web app has an opt-in [Linux build workflow](web-app-builds.md) and
+[private same-node deployment](web-app-deployments.md).
 
 Projects displays saved names, repository names and counts from the
 [catalog](project-catalog.md). Open a project name to see its repositories,
@@ -119,7 +120,9 @@ own workspace at `/projects/{id}`. **Overview** summarizes its repositories;
 name. **Builds** offers [source preparation checks](build-preparation.md) for an
 attached repository: observed commit, Git changes, tracked Cargo inputs and binary
 source. **Check again** reads current state; no build is run or approved. **Releases**
-and **Packages** retain unavailable states.
+saves successful builds and reviews deployment when the Linux app runtime is explicitly
+enabled; see [deployment setup and recovery](web-app-deployments.md). **Packages**
+retains its unavailable state.
 The same read-only checks are available locally or over SSH through
 [`devoption check-source`](build-preparation.md#check-from-a-local-terminal-or-ssh),
 with explicit catalog/root paths, saved IDs and documented exit statuses.

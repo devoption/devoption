@@ -7,10 +7,15 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Save verified Wasm builds as immutable local releases and deploy, inspect,
+  stop, update and recover the selected app through the project interface using
+  an opt-in bounded private Wasmtime worker
+  ([#232](https://github.com/devoption/devoption/issues/232)).
+
 - Build the selected trusted Wasm web app through project review and explicit
   approval using an opt-in Linux systemd worker, prepared offline inputs, bounded
   logs, cancellation and durable artifact provenance. Add the real fixture and
-  installation guide; app runtime/deployment remain pending
+  installation guide
   ([#231](https://github.com/devoption/devoption/issues/231)).
 
 - Admit the selected web-app's narrow `cdylib` manifest and complete library source

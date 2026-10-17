@@ -14,16 +14,20 @@ mod auth;
 mod profile;
 mod projects;
 pub use projects::{
-    BuildAttemptView, BuildExecutionView, BuildHistoryView, BuildLogView, FileEntry, FilePreview,
-    HistoryAvailability, PreparationCheck, PreparationView, ProjectSection, ProjectSummary,
-    RepositoryFilesView, RepositorySummary,
+    BuildAttemptView, BuildExecutionView, BuildHistoryView, BuildLogView, DeploymentView,
+    FileEntry, FilePreview, HistoryAvailability, PreparationCheck, PreparationView, ProjectSection,
+    ProjectSummary, ReleaseView, RepositoryFilesView, RepositorySummary,
 };
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const REPOSITORY_CREATE: &str = include_str!("../assets/repository-create.js");
 const PROFILE: &str = include_str!("../assets/profile.js");
-const BUILD_EXECUTION: &str = include_str!("../assets/build-execution.js");
+const BUILD_EXECUTION: &str = concat!(
+    include_str!("../assets/build-execution.js"),
+    "\n",
+    include_str!("../assets/deployment.js")
+);
 const AUTH: &str = include_str!("../assets/auth.js");
 const REPOSITORY_STATUS: &str = include_str!("../assets/repository-status.js");
 const PROJECT_FILTER: &str = include_str!("../assets/project-filter.js");
@@ -160,6 +164,14 @@ pub fn render_build_preparation(
     )
 }
 
+pub fn render_deployment(project: &ProjectSummary<'_>, view: &DeploymentView) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Deployment(project, view)),
+    )
+}
+
 pub fn render_build_execution(project: &ProjectSummary<'_>, view: &BuildExecutionView) -> String {
     render_page(
         Page::Projects,
@@ -177,6 +189,7 @@ pub fn render_build_history(project: &ProjectSummary<'_>, view: &BuildHistoryVie
 }
 
 enum ProjectView<'a> {
+    Deployment(&'a ProjectSummary<'a>, &'a DeploymentView),
     Execution(&'a ProjectSummary<'a>, &'a BuildExecutionView),
     History(&'a ProjectSummary<'a>, &'a BuildHistoryView),
     List(&'a [ProjectSummary<'a>], bool),
@@ -203,6 +216,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
                     | ProjectView::Files(..)
                     | ProjectView::Preparation(..)
                     | ProjectView::History(..)
+                    | ProjectView::Deployment(..)
                     | ProjectView::Execution(..),
                 ) => "",
                 None => "Project management is not available yet.",
@@ -235,6 +249,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         | ProjectView::Files(project, _)
         | ProjectView::Preparation(project, _)
         | ProjectView::History(project, _)
+        | ProjectView::Deployment(project, _)
         | ProjectView::Execution(project, _),
     ) = &projects
     {
@@ -253,6 +268,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             | ProjectView::Files(..)
             | ProjectView::Preparation(..)
             | ProjectView::History(..)
+            | ProjectView::Deployment(..)
             | ProjectView::Execution(..),
         ) => "",
         None => "",
@@ -264,6 +280,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
                 | ProjectView::Files(..)
                 | ProjectView::Preparation(..)
                 | ProjectView::History(..)
+                | ProjectView::Deployment(..)
                 | ProjectView::Execution(..)
         )
     ) {
@@ -276,6 +293,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
     let document_title = match &projects {
+        Some(ProjectView::Deployment(..)) => format!("{title} · Releases"),
         Some(ProjectView::Files(..)) => format!("{title} · Files"),
         Some(
             ProjectView::Preparation(..) | ProjectView::History(..) | ProjectView::Execution(..),
@@ -290,6 +308,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
     let project_content = projects.map(|view| match view {
         ProjectView::Files(project, files) => projects::files_content(project, files),
         ProjectView::History(project, view) => projects::history_content(project, view),
+        ProjectView::Deployment(project, view) => projects::deployment_content(project, view),
         ProjectView::Execution(project, view) => projects::execution_content(project, view),
         ProjectView::Preparation(project, view) => projects::preparation_content(project, view),
         ProjectView::List(projects, available) => projects::content(projects, available),

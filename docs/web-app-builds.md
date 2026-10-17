@@ -185,3 +185,5 @@ The node's existing baseline owner/service was kept separate from the temporary
 build installation. The PR records final checks and cleanup.
 The supported target is intentionally narrow. Runtime requests, deployment,
 public app DNS/HTTPS and fresh cloud installation are not yet verified here.
+
+Successful builds can next be [saved and deployed through Releases](web-app-deployments.md) when the Linux app runtime is explicitly installed and enabled. New receipts retain explicit compiler, dependency and configuration digests for immutable release provenance.

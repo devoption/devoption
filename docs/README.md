@@ -50,3 +50,5 @@ These guides describe bounded fixture checks, not production execution support.
 - [Offline Cargo fixture build](offline-fixture-build.md)
 - [Linux installation rehearsal](linux-rehearsal.md) and [unattended rehearsal](linux-unattended-rehearsal.md)
 - [Disposable runner proposal](disposable-runner-proposal.md), [initial build](disposable-build-rehearsal.md) and [diagnostic repeat](disposable-build-repeat.md)
+
+- [Deploy a web app on the same node](web-app-deployments.md): private Wasm releases, runtime setup, review, health, stop and recovery.
