@@ -73,27 +73,44 @@ pub(crate) fn content_with_creation(
     let mut html = navigation(project, section);
     match section {
         ProjectSection::Overview => {
-            html.push_str(r#"<section aria-labelledby="project-overview-title"><div class="section-heading"><h2 id="project-overview-title">Repositories</h2>"#);
-            html.push_str(&format!(r#"<a class="text-button" href="/projects/{id}/code">Open Code <span aria-hidden="true">→</span></a></div>"#));
+            html.push_str(r#"<div class="project-overview-layout"><section class="overview-repositories" aria-labelledby="project-overview-title"><div class="section-heading"><div><h2 id="project-overview-title">Repositories</h2><p>Browse the code that makes up this project.</p></div>"#);
+            html.push_str(&format!(r#"<a class="action-button" href="/projects/{id}/code">Manage repositories</a></div>"#));
             if project.repositories.is_empty() {
-                html.push_str(r#"<div class="empty-state"><h3>No repositories yet.</h3><p>This project is ready for its source code.</p></div>"#);
+                html.push_str(r#"<div class="overview-empty"><span class="repository-icon" aria-hidden="true">"#);
+                html.push_str(&crate::icon("M3 7V4h6l3 3h9v13H3Z"));
+                html.push_str(r#"</span><h3>Start with your code</h3><p>No repositories yet. Add one to bring your project’s files, builds, and releases together.</p>"#);
+                html.push_str(&format!(r#"<a class="action-button primary" href="/projects/{id}/code">Set up a repository</a></div>"#));
             } else {
-                html.push_str(r#"<p class="project-summary-count">"#);
+                html.push_str(r#"<div class="overview-list-heading">"#);
                 repository_count(&mut html, project);
-                html.push_str(r#"</p><div class="project-table-wrap"><table class="project-table"><caption class="visually-hidden">Repositories for "#);
-                escape_into(&mut html, project.name);
-                html.push_str("</caption><thead><tr><th scope=\"col\">Repository</th><th scope=\"col\">Default checkout</th></tr></thead><tbody>");
+                html.push_str(r#"<span>Source code</span></div><ul class="overview-repository-list" aria-label="Project repositories">"#);
                 for repository in &project.repositories {
                     let repository_id = identifier(&repository.id);
-                    html.push_str(&format!(r#"<tr><th scope="row"><a href="/projects/{id}/repositories/{repository_id}/files">"#));
+                    html.push_str(r#"<li><span class="repository-icon" aria-hidden="true">"#);
+                    html.push_str(&crate::icon("M4 3h14v18H4V3Zm0 14h14M8 7h6"));
+                    html.push_str(&format!(r#"</span><div class="overview-repository-copy"><h3><a href="/projects/{id}/repositories/{repository_id}/files">"#));
                     escape_into(&mut html, repository.name);
-                    html.push_str("</a></th><td>");
-                    if let Some(path) = repository.default_checkout { escape_into(&mut html, path); } else { html.push_str("Not attached"); }
-                    html.push_str("</td></tr>");
+                    html.push_str("</a></h3>");
+                    if let Some(path) = repository.default_checkout {
+                        html.push_str(r#"<p>Browse files and source code</p><details><summary>Checkout location</summary><code>"#);
+                        escape_into(&mut html, path);
+                        html.push_str("</code></details>");
+                    } else {
+                        html.push_str("<p>No checkout attached</p>");
+                    }
+                    html.push_str("</div></li>");
                 }
-                html.push_str("</tbody></table></div>");
+                html.push_str("</ul>");
             }
-            html.push_str("</section>");
+            html.push_str(r#"</section><aside class="overview-guide" aria-labelledby="overview-guide-title"><h2 id="overview-guide-title">Work on this project</h2><p>From source code to a running application.</p><ol>"#);
+            for (segment, label, description) in [
+                ("code", "Explore code", "Browse files and manage repositories."),
+                ("builds", "Build your app", "Check source and review build results."),
+                ("releases", "Manage releases", "Review saved releases and deployment options."),
+            ] {
+                html.push_str(&format!(r#"<li><a href="/projects/{id}/{segment}">{label}<span aria-hidden="true"> →</span></a><p>{description}</p></li>"#));
+            }
+            html.push_str(&format!(r#"</ol><a class="overview-settings-link" href="/projects/{id}/settings">Project settings <span aria-hidden="true">→</span></a></aside></div>"#));
         }
         ProjectSection::Code => html.push_str(&repositories(project, attachment_available, creation_available)),
         ProjectSection::Settings => {

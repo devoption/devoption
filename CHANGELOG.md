@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Make project overviews easier to scan with repository rows, expandable checkout
+  locations, a guided empty state, and links to code, builds and releases
+  ([#248](https://github.com/devoption/devoption/issues/248)).
+
 - Allow bounded deployment approvals to finish through the initial platform proxy,
   correct the Overview capability description, and record a clean local VM
   rehearsal of browser builds/deployments, two hostnames, updates, reboot,

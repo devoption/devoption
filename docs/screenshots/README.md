@@ -12,7 +12,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Overview | `/` | Signed in | `home.jpg` |
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
-| Project overview | `/projects/{id}` | Example application; repository summary; 1280 × 900 | `project-details.jpg` |
+| Project overview | `/projects/{id}` | Example application; repository list, checkout locations collapsed; 1280 × 900 | `project-details.jpg` |
 | Project code | `/projects/{id}/code` | Immediate frontend file list; managed creation enabled; status read below files; 1280 × 900 | `project-code.jpg` |
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |

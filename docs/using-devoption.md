@@ -114,7 +114,9 @@ or use **Filter projects by name** to find a case-insensitive name fragment in t
 current list. **Clear filter** restores all rows and focuses the search field.
 Filtering stays in the page; it sends no request and saves no browser preference.
 Without JavaScript, the full list remains visible. Opening a project enters its
-own workspace at `/projects/{id}`. **Overview** summarizes its repositories;
+own workspace at `/projects/{id}`. **Overview** lists its repositories with links
+to their files and guidance for code, builds and releases. Expand **Checkout location** on a repository to see its saved
+path, or use **Manage repositories** to open Code.
 **Code** opens tracked files, with repository details and inspection below;
 **Settings** edits the project
 name. **Builds** offers [source preparation checks](build-preparation.md) for an
