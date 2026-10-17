@@ -114,6 +114,63 @@ project, build and release records, both HTTPS URLs and the approved app's healt
 Wait for actual responses: systemd “active” is not readiness. Repeat after **Stop
 app** and confirm it remains stopped after reboot. No new build should start.
 
+## External HTTPS verification
+
+After the operator has configured real DNS and publicly trusted certificates, run
+this from an **external client**, not the VM or a client with rehearsal DNS/trust
+settings. Python 3.11+ and its normal system trust store are required; no packages,
+account password, session or platform configuration files are needed.
+
+```sh
+python3 scripts/check_public_app.py \
+  --platform-hostname platform.example.com \
+  --app-hostname app.example.com \
+  --expected-address YOUR_PUBLIC_VM_IPV4 \
+  --expected-health 'ok A' > public-check-A.json
+```
+
+Replace the names and address with the actual installation. Repeat
+`--expected-address` for every configured public IPv4/IPv6 address. Both names must
+resolve to exactly that set; unexpected, stale or missing addresses fail that
+hostname's DNS check and skip its requests. The checker uses this client's system
+resolver, pins connections to the checked addresses, and tests **every** address.
+It cannot distinguish public DNS from a local hosts-file or split-DNS override.
+A client without working IPv6 will fail an advertised IPv6 route; do not hide that
+failure by omitting the address.
+
+The command sends credential-free GET requests on port 443 only, follows no
+redirects and does not use HTTP proxy environment settings. It validates TLS using
+the configured hostname and Python's default trust store, then checks:
+
+- Platform sign-in returns 200 and unauthenticated `/projects` redirects exactly
+  to `/sign-in` with 303.
+- App `/healthz` returns 200 with the exact supplied UTF-8 body.
+- Reserved app authentication/setup paths return 404.
+- An unknown HTTP Host on the platform TLS connection and a platform Host on the
+  app TLS connection return 421, as required by the generated Caddy configuration.
+
+Output is timestamped JSON with per-check results and the expected health body
+SHA-256, without response bodies, cookies or certificate contents. Exit 0 means these checks passed, 1 means at least one
+failed, and 2 means invalid command arguments. Review the hostname/address metadata
+before sharing the report publicly. Socket operations time out after five seconds
+and response bodies are limited to 64 KiB; system DNS resolution and slow streams
+are not subject to a whole-command deadline. Run one check at a time and interrupt
+it if necessary. Failed certificates, routing, redirects or health never count as
+a successful route, and the command does not retry or repair the installation.
+
+Save separate reports after A, after B with `--expected-health 'ok B'`, after
+returning to A and after reboot. The hostname/address inputs must stay unchanged.
+For stopped-intent checks, the running-health command should fail; separately
+verify the app unit remains inactive and platform login works.
+
+These reports are routing snapshots, not complete #234 acceptance. Normal system
+trust can include locally installed roots; the operator must confirm this client
+has no rehearsal trust/overrides. This command does not test unknown **TLS SNI**
+rejection, cookie stripping inside the app, authenticated login/build/deployment,
+ACME issuance/renewal, or backup/recovery. Keep the browser, certificate lifecycle
+and service-state evidence required by the linked runbooks. Unit tests use mocked
+DNS/HTTPS responses and do not establish public reachability.
+
 ## Recovery boundary and acceptance record
 
 Use the [bounded same-node snapshot and staged restore](same-node-recovery.md)

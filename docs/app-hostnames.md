@@ -111,6 +111,11 @@ host strips control credentials again. `/auth`, `/auth/*`, `/sign-in`, `/setup` 
 `/setup/*` are reserved and return 404 at the app proxy. Other app paths never route
 to the platform. This first stateless app profile does not support app authentication.
 
+Use the [external HTTPS verification command](first-web-app.md#external-https-verification)
+from an external client to save repeatable per-address routing checks after
+installation, updates and reboot. Its results supplement the browser and
+certificate-lifecycle evidence; they do not replace full public acceptance.
+
 ## Local validation
 
 The existing ignored `public_https_proxy` integration test now uses the generated
