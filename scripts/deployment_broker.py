@@ -13,6 +13,9 @@ import os
 from pathlib import Path
 import re
 import stat
+import socket
+import ssl
+import ipaddress
 import subprocess
 import sys
 import time
@@ -61,12 +64,67 @@ def protected(path, uid=0):
             raise ValueError('unprotected path')
 
 
+def hostname(value):
+    if not isinstance(value, str) or len(value) > 253 or '.' not in value:
+        raise ValueError('use a lowercase ASCII DNS hostname')
+    if not re.search(r'[a-z]', value.rsplit('.', 1)[-1]) or not all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label) for label in value.split('.')):
+        raise ValueError('invalid DNS hostname')
+    try: ipaddress.ip_address(value)
+    except ValueError: return value
+    raise ValueError('IP addresses are not hostnames')
+
+
+def validate_ingress(binding, app_port):
+    required = {'platform_hostname', 'app_hostname', 'project', 'platform_port'}
+    if not isinstance(binding, dict) or set(binding) - {'ca_file'} != required:
+        raise ValueError('unexpected hostname binding fields')
+    platform = hostname(binding['platform_hostname'])
+    app = hostname(binding['app_hostname'])
+    if platform == app:
+        raise ValueError('platform and app hostnames must differ')
+    if not isinstance(binding['project'], str) or not ID.fullmatch(binding['project']):
+        raise ValueError('hostname requires one exact project identity')
+    port = binding['platform_port']
+    if type(port) is not int or not 1024 <= port <= 65535 or port == app_port:
+        raise ValueError('platform and app require distinct private ports')
+    if 'ca_file' in binding and (not isinstance(binding['ca_file'], str) or not re.fullmatch(r'/[A-Za-z0-9_./-]+', binding['ca_file'])):
+        raise ValueError('invalid explicit rehearsal CA path')
+
+
+def ingress_status(config, record):
+    binding = config.get('ingress')
+    if not binding: return None
+    result = {'project': binding['project'], 'url': 'https://' + binding['app_hostname']}
+    def report(message):
+        return {**result, 'status': message}
+    if not record or record['project'] != binding['project'] or record['intent'] != 'running':
+        return report('App stopped or not deployed. Review and deploy a saved release before checking HTTPS.')
+    try:
+        context = ssl.create_default_context(cafile=binding.get('ca_file'))
+        # Probe only the local ingress. DNS never chooses a destination for this privileged process.
+        with socket.create_connection(('127.0.0.1', 443), timeout=2) as raw:
+            with context.wrap_socket(raw, server_hostname=binding['app_hostname']) as stream:
+                stream.sendall(('GET /healthz HTTP/1.1\r\nHost: ' + binding['app_hostname'] + '\r\nConnection: close\r\n\r\n').encode())
+                response = http.client.HTTPResponse(stream); response.begin()
+                body = response.read(257)
+                if response.status == 502 or response.status == 503:
+                    return report('HTTPS proxy cannot reach the app. Check its private upstream port and worker status.')
+                if response.status != 200 or body != record['health'].encode() or response.getheader('X-DevOption-Invocation') != record.get('invocation'):
+                    return report('HTTPS route does not match the selected app. Check the exact hostname, upstream and release health.')
+        label = 'Local HTTPS route verified with the explicit rehearsal CA.' if binding.get('ca_file') else 'Local HTTPS route and certificate verified.'
+        return report(label + ' Public DNS and reachability are not checked here.')
+    except ssl.SSLCertVerificationError:
+        return report('Certificate verification failed. Check certificate hostname, expiry, Caddy issuance/renewal logs and trust chain; do not bypass TLS verification.')
+    except (OSError, ssl.SSLError, http.client.HTTPException):
+        return report('Local HTTPS ingress unavailable. Check Caddy on port 443, its TLS configuration and service logs.')
+
+
 def configuration():
     protected(CONFIG)
     protected(BROKER)
     raw = read_regular(CONFIG, 16384, 0)
     config = tomllib.loads(raw.decode())
-    if set(config) != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
+    if set(config) - {'ingress'} != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
         raise ValueError('unexpected configuration')
     if type(config['uid']) is not int or config['uid'] <= 0 or int(os.environ.get('SUDO_UID', '-1')) != config['uid']:
         raise ValueError('caller not configured owner')
@@ -86,7 +144,13 @@ def configuration():
         raise ValueError('deployment and platform storage must be disjoint')
     if config['state'] in config['worker'].parents:
         raise ValueError('worker must be outside release storage')
-    config['fingerprint'] = digest(raw + read_regular(BROKER, 65536, 0) + read_regular(config['worker'], 256*1024*1024, 0))
+    trust = b''
+    if 'ingress' in config:
+        validate_ingress(config['ingress'], config['port'])
+        if 'ca_file' in config['ingress']:
+            protected(Path(config['ingress']['ca_file']))
+            trust = read_regular(Path(config['ingress']['ca_file']), 65536, 0)
+    config['fingerprint'] = digest(raw + trust + read_regular(BROKER, 65536, 0) + read_regular(config['worker'], 256*1024*1024, 0))
     return config
 
 
@@ -283,6 +347,8 @@ def start(config, release, expected, fingerprint, generation=None):
     if generation is not None and generation != digest(canonical(desired(config))):
         raise ValueError('deployment changed; review again')
     manifest = load_release(config, release)
+    if config.get('ingress') and manifest['project'] != config['ingress']['project']:
+        raise ValueError('hostname is bound to another project; operator reconfiguration required')
     # Validate candidate before disturbing a running release. Compilation is bounded
     # by the validation unit, but never instantiates application code here.
     try:
@@ -340,7 +406,7 @@ def status(config):
         except (ValueError, OSError): log = '[Log changed during inspection; refresh to read again.]'
     last_path = config['state'] / 'last-action.json'
     last = json.loads(read_regular(last_path, 16384, 0)) if last_path.exists() else None
-    return {'last_action': last, 'generation': digest(canonical(desired(config))), 'fingerprint': config['fingerprint'], 'port': config['port'], 'deployment': record, 'releases': releases, 'log': log}
+    return {'ingress': ingress_status(config, record), 'last_action': last, 'generation': digest(canonical(desired(config))), 'fingerprint': config['fingerprint'], 'port': config['port'], 'deployment': record, 'releases': releases, 'log': log}
 
 
 def dispatch(config, args):

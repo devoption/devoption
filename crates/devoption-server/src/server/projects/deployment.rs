@@ -30,6 +30,8 @@ impl Engine {
         repositories: &Path,
         history: &Path,
         catalog: &Catalog,
+        public_origin: Option<&str>,
+        port: u16,
     ) -> io::Result<Self> {
         for name in [CONFIG, BROKER] {
             for path in Path::new(name).ancestors() {
@@ -52,6 +54,28 @@ impl Engine {
             {
                 return Err(io::Error::other(
                     "runtime storage does not match selected platform storage",
+                ));
+            }
+        }
+        if let Some(binding) = config.get("ingress") {
+            let expected = binding
+                .get("platform_hostname")
+                .and_then(toml::Value::as_str)
+                .map(|host| format!("https://{host}"));
+            let project = binding.get("project").and_then(toml::Value::as_str);
+            if expected.as_deref() != public_origin
+                || public_origin.is_none()
+                || binding
+                    .get("platform_port")
+                    .and_then(toml::Value::as_integer)
+                    != Some(i64::from(port))
+                || !catalog
+                    .projects()
+                    .iter()
+                    .any(|p| Some(hex(&p.id().to_bytes())).as_deref() == project)
+            {
+                return Err(io::Error::other(
+                    "hostname binding must match the selected public origin, port and saved project",
                 ));
             }
         }
@@ -219,6 +243,11 @@ async fn mutate(
                     return Err(io::Error::other("invalid review"));
                 }
                 let state = broker(&["status"])?;
+                if !state["ingress"].is_null()
+                    && state["ingress"]["project"] != hex(&project.to_bytes())
+                {
+                    return Err(io::Error::other("hostname belongs to another project"));
+                }
                 let manifest = state["releases"]
                     .as_array()
                     .and_then(|r| {
@@ -325,6 +354,14 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
         if let Some(engine) = engine {
             view.enabled = true;
             let state = broker(&["status"])?;
+            view.bound_elsewhere = !state["ingress"].is_null()
+                && state["ingress"]["project"] != hex(&project.to_bytes());
+            if state["ingress"]["project"] == hex(&project.to_bytes()) {
+                view.ingress = Some((
+                    field(&state["ingress"], "url")?.into(),
+                    field(&state["ingress"], "status")?.into(),
+                ));
+            }
             view.port = state["port"].as_u64().unwrap_or(0) as u16;
             let deployment = &state["deployment"];
             if deployment["project"] == hex(&project.to_bytes()) {
@@ -337,8 +374,12 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
                 view.can_stop = true;
                 view.log = field(&state, "log")?.into();
             } else if !deployment.is_null() {
-                view.status =
-                    "Another project occupies this node. Deployment will replace it.".into();
+                view.status = if view.bound_elsewhere {
+                    "Another project owns this node’s app hostname."
+                } else {
+                    "Another project occupies this node. Deployment will replace it."
+                }
+                .into();
             } else {
                 view.status = "No app deployed yet.".into();
             }

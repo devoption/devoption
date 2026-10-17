@@ -42,13 +42,16 @@ impl Projects {
         owner: &Path,
         repositories: &Path,
         history: &Path,
+        public_origin: Option<&str>,
+        port: u16,
     ) -> io::Result<()> {
         let catalog = self
             .directory
             .load()
             .map_err(io::Error::other)?
             .unwrap_or_default();
-        let engine = deployment::Engine::open(owner, repositories, history, &catalog)?;
+        let engine =
+            deployment::Engine::open(owner, repositories, history, &catalog, public_origin, port)?;
         self.deployment = Some(Arc::new(Mutex::new(engine)));
         Ok(())
     }

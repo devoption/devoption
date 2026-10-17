@@ -2,6 +2,8 @@ use super::{ProjectSection, ProjectSummary, escape_into, identifier};
 #[derive(Default)]
 pub struct DeploymentView {
     pub enabled: bool,
+    pub ingress: Option<(String, String)>,
+    pub bound_elsewhere: bool,
     pub status: String,
     pub port: u16,
     pub current: Option<String>,
@@ -28,10 +30,16 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
     let mut html = super::workspace::navigation(project, ProjectSection::Releases);
     html.push_str(&format!(r#"<section class="build-preparation" id="app-deployment" data-base="{base}"><h2>Run your web app</h2><p id="deployment-action-status" role="status">{}</p>"#, escaped(&view.status)));
     if view.enabled {
+        if view.bound_elsewhere {
+            html.push_str("<p>This node's app hostname belongs to another project. An operator must reconfigure the binding before deploying this project.</p>");
+        }
+        if let Some((url, status)) = &view.ingress {
+            html.push_str(&format!(r#"<h3>App hostname</h3><p><a href="{}" target="_blank" rel="noopener noreferrer">Open app: {}</a></p><p>{}</p><p>Hostname changes are operator-managed. <a href="https://github.com/devoption/devoption/blob/main/docs/app-hostnames.md" target="_blank" rel="noopener noreferrer">App hostname setup</a>.</p>"#,escaped(url),escaped(url),escaped(status)));
+        }
         if let Some(current) = &view.current {
             html.push_str(&format!("<dl class=\"build-identities\"><div><dt>Selected release</dt><dd><code>{}</code></dd></div><div><dt>Private app endpoint on this node</dt><dd><code>http://127.0.0.1:{}</code></dd></div></dl>",escaped(current),view.port));
         }
-        html.push_str(r#"<p>One app runs on this node. Updates can have downtime. Public hostname routing is not configured here.</p><a class="text-button" href="">Refresh health and logs</a> "#);
+        html.push_str(r#"<p>One app runs on this node. Updates can have downtime.</p><a class="text-button" href="">Refresh health and logs</a> "#);
         if view.can_stop {
             html.push_str(
                 r#"<button class="text-button" data-deploy-action="stop">Stop app</button>"#,
@@ -46,7 +54,10 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
         }
         for release in &view.releases {
             let id = escaped(&release.id);
-            html.push_str(&format!(r#"<details class="build-source-details"><summary>Commit {}</summary><dl class="build-identities"><div><dt>Release</dt><dd><code>{id}</code></dd></div><div><dt>Artifact SHA-256</dt><dd><code>{}</code></dd></div><div><dt>Build</dt><dd><a href="/projects/{}/builds/attempts/{}">Open build and logs</a></dd></div></dl><label>Expected health response <input data-health="{id}" type="text" maxlength="128" placeholder="ok A" autocomplete="off"></label> <button class="action-button" data-deploy-action="prepare" data-value="{id}">Review deployment</button>"#,escaped(&release.commit),escaped(&release.checksum),identifier(&project.id),escaped(&release.job)));
+            html.push_str(&format!(r#"<details class="build-source-details"><summary>Commit {}</summary><dl class="build-identities"><div><dt>Release</dt><dd><code>{id}</code></dd></div><div><dt>Artifact SHA-256</dt><dd><code>{}</code></dd></div><div><dt>Build</dt><dd><a href="/projects/{}/builds/attempts/{}">Open build and logs</a></dd></div></dl>"#,escaped(&release.commit),escaped(&release.checksum),identifier(&project.id),escaped(&release.job)));
+            if !view.bound_elsewhere {
+                html.push_str(&format!(r#"<label>Expected health response <input data-health="{id}" type="text" maxlength="128" placeholder="ok A" autocomplete="off"></label> <button class="action-button" data-deploy-action="prepare" data-value="{id}">Review deployment</button>"#));
+            }
             html.push_str(
                 "<details class=\"build-source-details\"><summary>Build provenance</summary><pre>",
             );
@@ -100,6 +111,14 @@ mod tests {
         assert!(page.contains("&lt;script&gt;private&lt;/script&gt;"));
         assert!(page.contains("&lt;manifest&gt;"));
         assert!(!page.contains("Approve and deploy"));
+        view.bound_elsewhere = true;
+        assert!(!content(&project, &view).contains("data-deploy-action=\"prepare\""));
+        view.bound_elsewhere = false;
+        view.ingress = Some((
+            "https://app.example.test".into(),
+            "<certificate failed>".into(),
+        ));
+        assert!(content(&project, &view).contains("&lt;certificate failed&gt;"));
         view.review = Some((
             "ab".repeat(16),
             "cd".repeat(32),

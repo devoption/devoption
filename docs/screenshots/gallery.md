@@ -34,6 +34,10 @@ for dimensions, states and refresh instructions.
 
 ![Deployment review before approval](deployment-review.jpg)
 
+![App hostname certificate failure with recovery guidance](app-hostname-error.jpg)
+
+![Revision A served at the separate app HTTPS hostname](deployed-app.jpg)
+
 ![Project Packages, unavailable](project-packages.jpg)
 
 ![Project Settings](project-settings.jpg)

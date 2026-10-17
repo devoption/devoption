@@ -2,8 +2,8 @@
 
 This opt-in Linux workflow follows [building through the interface](web-app-builds.md).
 It promotes successful Wasm builds into local releases and runs one approved app
-behind a private loopback HTTP listener. It does not configure public ingress,
-DNS, certificates, a registry, or a DevOption product release.
+behind a private loopback HTTP listener. Use the separate [app hostname flow](app-hostnames.md) to configure HTTPS ingress.
+Deployment does not itself change DNS, certificates, a registry or a DevOption product release.
 
 ## Operator installation
 

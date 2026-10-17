@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Bind a second HTTPS hostname to one project, generate reviewed Caddy and runtime
+  configuration, and show verified local routing/certificate status in Releases
+  ([#233](https://github.com/devoption/devoption/issues/233)).
+
 - Save verified Wasm builds as immutable local releases and deploy, inspect,
   stop, update and recover the selected app through the project interface using
   an opt-in bounded private Wasmtime worker
