@@ -120,30 +120,36 @@ Use the [bounded same-node snapshot and staged restore](same-node-recovery.md)
 for owner/catalog/profile records, build history/jobs and saved releases together.
 It preserves the working installation and requires the original repository and
 prepared-input roots, binaries/configuration and Caddy state to remain available.
-It is not a portable machine backup. Combined removal remains unperformed; never assume an owner-record copy restores an app.
+It is not a portable machine backup. The [clean local rehearsal](clean-local-rehearsal.md)
+verified snapshot adoption and combined removal/reinstallation; an owner-record
+copy alone cannot restore an app.
 
 For a data-preserving removal, first cancel any build and wait for its terminal
 state, then **Stop app** and confirm it stopped. Disable/stop this installation's
 platform and Caddy units. Have the administrator verify the fixed build/app units
 are inactive before removing only inspected installed units, helper/binary files
 and their dedicated sudo entries. Preserve all state, repositories, certificates,
-inputs and backups; do not delete accounts automatically. This combined removal
-still needs rehearsal; the platform-only uninstall evidence is narrower.
+inputs and backups; do not delete accounts automatically. Retain private copies
+of the reviewed installed files and their modes before removal. Verify listeners
+are closed and retained state is unchanged. Reinstallation must restore the same
+files, paths and account IDs, then verify login, records and stopped intent before
+a fresh deployment review. Do not rerun fresh-owner setup on retained data. See
+the [tested removal inventory](clean-local-rehearsal.md#data-preserving-removal-and-reinstallation).
 
 Record each row as passed, failed or unperformed with exact revision and evidence:
 
 | Acceptance step | Existing evidence / remaining work |
 | --- | --- |
-| Install and HTTPS login | [Local Ubuntu service/reboot rehearsal](public-linux-rehearsal.md); clean cloud install pending |
+| Install and HTTPS login | [Fresh local OS/state installation](clean-local-rehearsal.md); prepared binaries reused; clean cloud install pending |
 | Create project and build A | [Real local interface builds](web-app-builds.md#local-evidence-and-remaining-limits) |
 | Save/deploy, failed candidate, return to A | [Local Wasmtime/systemd rehearsal](web-app-deployments.md#disposable-local-evidence) |
 | Two hostnames, A → B → A, reboot and stopped intent | [Local HTTPS rehearsal](app-hostnames.md#observed-ubuntu-rehearsal) |
 | Public DNS, ACME issuance/renewal, external access | Unperformed; requires separately supplied host/DNS authority |
-| Bounded same-node record snapshot and restore | [Workflow and validation scope](same-node-recovery.md); same-node recovery passed; combined removal unperformed |
+| Bounded same-node record snapshot and restore | [Workflow and validation scope](same-node-recovery.md); same-node recovery and combined removal/reinstallation passed locally |
 
-The linked rehearsals were separate passes on an existing disposable VM, not one
-fresh-machine acceptance run. Keep that distinction in the final evidence. Product
-release approval remains separate under #21.
+The [clean local run](clean-local-rehearsal.md) now connects these capabilities on
+one fresh OS/state installation. It reuses prepared Linux binaries/inputs and
+is not public cloud acceptance. Product release approval remains separate under #21.
 
 ## Service generator validation
 

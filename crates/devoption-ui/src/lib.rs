@@ -326,7 +326,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             match page {
                 Page::Profile => profile::CONTENT,
                 Page::Home => {
-                    r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your software. Builds and deployments are not available yet.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
+                    r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your source code, builds and app releases.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
                 }
                 Page::Releases => {
                     r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and publishing are not implemented. Your saved projects and repositories are available in Projects.</p><a class="action-button" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#

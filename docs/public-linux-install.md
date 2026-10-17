@@ -3,8 +3,9 @@
 This is the first public-platform slice of
 [#230](https://github.com/devoption/devoption/issues/230). The server now supports
 one configured HTTPS origin behind a local proxy. Projects, login and restart are
-covered by disposable integration tests; a real cloud VM, public DNS, ACME renewal
-and reboot have **not yet been rehearsed**. [App builds](web-app-builds.md), [deployment](web-app-deployments.md) and
+covered by disposable integration tests and a [clean local VM rehearsal](clean-local-rehearsal.md),
+including reboot. A real cloud VM, public DNS and ACME issuance/renewal remain
+unperformed. [App builds](web-app-builds.md), [deployment](web-app-deployments.md) and
 a [second app hostname](app-hostnames.md) are available as separate opt-in steps.
 The [private installation](private-linux-install.md) remains available unchanged.
 
@@ -30,6 +31,10 @@ Add AAAA only if IPv6 reaches this same server and its firewall permits HTTPS/HT
 Remove stale AAAA records. Check DNS from outside the VM before starting Caddy.
 Caddy needs outbound DNS and HTTPS for certificate issuance/renewal. No DNS-provider
 API credentials are required by this HTTP/TLS challenge setup.
+
+The proxy allows 95 seconds for response headers so bounded build/deployment
+approvals can finish, including failed health checks before an app hostname is
+configured. Keep this allowance when adapting the example.
 
 The proxy preserves Host and Origin and strips all forwarding metadata. DevOption
 never uses `Forwarded`, `X-Forwarded-*` or `X-Real-IP` to infer scheme, host or client

@@ -12,6 +12,7 @@ accounts and production hosting acceptance remain planned.
   [architecture](architecture.md), [decisions](decisions/README.md) and
   [task/handoff template](task-template.md); [priorities](../ROADMAP.md)
 - [First web app: install, build, deploy and maintain](first-web-app.md)
+- [Clean local installation, app lifecycle and recovery evidence](clean-local-rehearsal.md)
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)
 - [Same-node snapshot and staged recovery](same-node-recovery.md)

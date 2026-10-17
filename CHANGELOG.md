@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Allow bounded deployment approvals to finish through the initial platform proxy,
+  correct the Overview capability description, and record a clean local VM
+  rehearsal of browser builds/deployments, two hostnames, updates, reboot,
+  snapshot recovery and data-preserving removal/reinstallation; public DNS/ACME
+  acceptance remains pending
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
 - Add bounded offline snapshots and verified, non-overwriting restore staging for
   owner records, build history/artifacts and saved app releases on the same
   installation; require stopped workers/intent and retain explicit external-input
