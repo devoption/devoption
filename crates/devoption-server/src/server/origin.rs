@@ -8,6 +8,10 @@ use axum::http::header::{HOST, ORIGIN};
 pub struct PublicOrigin(String);
 
 impl PublicOrigin {
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+
     pub fn parse(value: &str) -> Result<Self, &'static str> {
         let host = value
             .strip_prefix("https://")

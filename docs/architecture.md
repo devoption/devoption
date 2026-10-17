@@ -86,7 +86,10 @@ reviewed-source → approved build → verified artifact → approved deployment
 observable application sequence. Connecting those stages requires explicit
 identity, approval, persistence and execution boundaries. The opt-in trusted
 [build](web-app-builds.md) and [private deployment](web-app-deployments.md) adapters
-connect those stages for the selected single-node fixture; public app ingress remains separate.
+connect those stages for the selected single-node fixture. [App hostname configuration](app-hostnames.md)
+binds one project to a second explicit Caddy HTTPS site on the same IP. The control
+service verifies its canonical origin, while the broker binds deployment to that
+project and checks local TLS/health without resolving arbitrary network destinations.
 
 [Product goals](product.md) define optional MCP parity with human operations.
 MCP has no implemented transport here and must not become a permission bypass.

@@ -4,7 +4,8 @@ This is the first public-platform slice of
 [#230](https://github.com/devoption/devoption/issues/230). The server now supports
 one configured HTTPS origin behind a local proxy. Projects, login and restart are
 covered by disposable integration tests; a real cloud VM, public DNS, ACME renewal
-and reboot have **not yet been rehearsed**. App building/deployment remains pending.
+and reboot have **not yet been rehearsed**. [App builds](web-app-builds.md), [deployment](web-app-deployments.md) and
+a [second app hostname](app-hostnames.md) are available as separate opt-in steps.
 The [private installation](private-linux-install.md) remains available unchanged.
 
 ## Supported shape and prerequisites

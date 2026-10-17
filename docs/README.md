@@ -52,3 +52,5 @@ These guides describe bounded fixture checks, not production execution support.
 - [Disposable runner proposal](disposable-runner-proposal.md), [initial build](disposable-build-rehearsal.md) and [diagnostic repeat](disposable-build-repeat.md)
 
 - [Deploy a web app on the same node](web-app-deployments.md): private Wasm releases, runtime setup, review, health, stop and recovery.
+
+- [App hostnames](app-hostnames.md): generate the two-host Caddy configuration and inspect local HTTPS routing/certificate status.

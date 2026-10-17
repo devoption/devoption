@@ -247,3 +247,7 @@ and project data. The existing shared sign-in rate limits are unchanged.
 Follow the [public installation guide](public-linux-install.md) for the dedicated
 service account, exact proxy example, checks and unverified cloud-hosting limits.
 Omitting `--public-origin` preserves the existing private Host/Origin policy.
+
+For a separate app URL on the same server, follow [app hostnames](app-hostnames.md).
+The project Releases page shows the configured URL and local TLS/routing status;
+public DNS and external reachability still need operator verification.

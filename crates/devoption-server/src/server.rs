@@ -318,6 +318,8 @@ fn run_with_roots(
                         data_directory.expect("checked owner"),
                         repository_root.expect("checked root"),
                         history_directory.expect("checked history"),
+                        public_origin.as_ref().map(PublicOrigin::as_str),
+                        port,
                     )?;
             }
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await?;
