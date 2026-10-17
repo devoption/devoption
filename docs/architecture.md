@@ -39,7 +39,7 @@ Use focused references for details rather than loading every subsystem:
   saved attempts and bounded checkpoints through fresh catalog scoping checks.
   [Supervision decisions](build-supervision.md) track stop reasons and grace
   without delivering signals or asserting cleanup.
-  [Complete snapshots](source-snapshots.md) retain verified source bytes; the registered collector has no HTTP/CLI integration.
+  [Complete snapshots](source-snapshots.md) retain verified source bytes; the Linux build adapter uses them for the selected trusted app.
 - [Registry contracts](registry-contract.md), [Cargo inputs](cargo-inputs.md) and
   [source proofs](cargo-source-proof.md) validate supplied data; they do not provide
   acquisition, registry hosting or build permission.
@@ -71,25 +71,34 @@ Use focused references for details rather than loading every subsystem:
    turn source inspection into execution. Storage rules belong in the
    [catalog](project-catalog.md) and [managed repository](managed-repositories.md) guides.
 4. Source preparation through HTTP or CLI produces read-only observations.
-   Snapshot, plan, job, registry and artifact contracts have separate fixture
-   evidence; they are not a connected application build/deploy service. See the
-   focused references above for each boundary.
+   With [Linux builds](web-app-builds.md) explicitly enabled, the server captures
+   committed source, prepares an immutable review, consumes owner approval and
+   invokes the fixed broker. Its unprivileged systemd worker compiles with verified
+   offline inputs; the adapter checkpoints bounded logs, outcomes and provenance.
+   Startup reconciles the owned build unit before recovering unfinished history.
+5. With [deployment](web-app-deployments.md) explicitly enabled, the owner promotes
+   a successful build into an immutable saved release, then separately reviews
+   and approves deployment. The broker verifies provenance/artifact bytes and
+   starts the bounded Wasmtime worker under a separate dynamic identity. The
+   interface supplies health/log/stop controls and explicit saved-release recovery.
+   Previously approved healthy running intent can recover after restart; stopped
+   intent remains stopped.
+6. [App hostname configuration](app-hostnames.md) binds one project to a second
+   explicit Caddy HTTPS site on the same IP. The control service verifies its
+   canonical origin; the broker checks local TLS/health for that binding.
+   [Same-node recovery](same-node-recovery.md) snapshots records/artifacts offline
+   and stages verified copies without overwriting the installation.
+
+The [execution trust contract](execution-trust.md) owns the policy; the build and
+runtime guides specify enforced limits and remaining trust assumptions. The
+[first-app runbook](first-web-app.md) links setup and validation evidence. Local
+fixture/rehearsal results do not establish public DNS/ACME acceptance or general
+production readiness.
 
 ## Planned flow and unresolved boundaries
 
-The [execution trust contract](execution-trust.md) owns the required approval,
-environment, storage, resource and output policy. Its future requirements are not
-implemented runner guarantees.
-
-The [roadmap](../ROADMAP.md) owns the intended
-reviewed-source → approved build → verified artifact → approved deployment →
-observable application sequence. Connecting those stages requires explicit
-identity, approval, persistence and execution boundaries. The opt-in trusted
-[build](web-app-builds.md) and [private deployment](web-app-deployments.md) adapters
-connect those stages for the selected single-node fixture. [App hostname configuration](app-hostnames.md)
-binds one project to a second explicit Caddy HTTPS site on the same IP. The control
-service verifies its canonical origin, while the broker binds deployment to that
-project and checks local TLS/health without resolving arbitrary network destinations.
+The [roadmap](../ROADMAP.md) owns remaining public-host acceptance and broader
+platform expansion beyond the selected trusted single-node app profile.
 
 [Product goals](product.md) define optional MCP parity with human operations.
 MCP has no implemented transport here and must not become a permission bypass.

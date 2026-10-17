@@ -1,8 +1,9 @@
 # 0004: First single-node Wasm web app
 
-Status: Selected implementation contract for review under
-[#229](https://github.com/devoption/devoption/issues/229); accepted when this record
-is merged. The build and private runtime integrations are documented below.
+Status: Accepted in [PR #236](https://github.com/devoption/devoption/pull/236)
+under [#229](https://github.com/devoption/devoption/issues/229). The opt-in
+[build](../web-app-builds.md) and [private runtime](../web-app-deployments.md)
+integrations implement the selected profile; public-host acceptance remains open.
 
 ## Decision
 

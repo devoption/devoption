@@ -26,21 +26,30 @@ The development preview supports:
   projects can each have a repository with the same name.
 - Read-only source preparation checks in Builds and the CLI, plus documented
   private Ubuntu source installation, backup and recovery procedures.
-- Authenticated project build-history and log views, with selected history recovery
-  at server startup; these views do not run builds.
+- Opt-in [reviewed Linux Wasm builds](docs/web-app-builds.md) of the selected
+  trusted app, with immutable source, prepared offline inputs, cancellation,
+  bounded saved output and restart interruption handling.
+- [Immutable saved releases and same-node deployment](docs/web-app-deployments.md)
+  through the interface, with a private Wasmtime worker, health/log/stop controls,
+  updates, explicit return to a saved release and approved restart recovery.
+- [Two-host HTTPS configuration](docs/app-hostnames.md), local routing/certificate
+  status, and [bounded same-node snapshots and staged restore](docs/same-node-recovery.md).
 
-The preview binds to loopback and has an explicit HTTPS proxy mode with a
-[public installation guide](docs/public-linux-install.md).
-[Local Ubuntu HTTPS and reboot checks](docs/public-linux-rehearsal.md) passed;
-real cloud DNS/ACME and fresh-host validation remain pending. There is no published
-release, application
-build/deployment service, Wasm runtime, MCP interface or team access yet. See the [current user guide](docs/using-devoption.md)
-for supported operations.
+The preview binds its backend to loopback and offers an explicit HTTPS proxy mode
+for server deployment. The [first-app runbook](docs/first-web-app.md) connects
+installation, source setup, build, release, deployment and maintenance. A
+[clean local Ubuntu rehearsal](docs/clean-local-rehearsal.md) passed with fresh
+OS/state and prepared Linux binaries: real builds, two test-CA HTTPS hostnames,
+A → B → saved A, failed health, running/stopped reboots, staged recovery and
+data-preserving removal/reinstallation. It does not prove fresh platform
+compilation, public cloud DNS, ACME issuance/renewal or external reachability.
 
-Existing [build contracts](docs/build-plans.md), immutable source verification and
-fixture checks are groundwork for native Rust binaries. They do not provide a
-usable application build service or implemented Rust-to-Wasm builds. Those
-contracts must evolve to describe Wasm targets, artifacts and runtime requirements.
+The supported app is one trusted stateless Rust/WASIp2 fixture on Ubuntu 24.04
+x86_64, with explicit operator-installed build and deployment support. General
+application targets, hostile multi-tenant hosting, MCP and team accounts remain
+unimplemented. There is no published product release. The older native
+[build contracts](docs/build-plans.md) remain separate from this selected
+[Wasm implementation contract](docs/decisions/0004-first-wasm-web-app.md).
 
 ## Immediate priority: one VM, platform DNS, deployed web-app DNS
 
@@ -62,14 +71,14 @@ user-visible capability before moving to optional improvements.
 
 ### Delivery sequence
 
-| Task | Observable completion | Dependencies |
+| Task | Current status and remaining acceptance | Dependencies |
 | --- | --- | --- |
-| [#229: Minimum web-app contract](https://github.com/devoption/devoption/issues/229) | Select one Wasm runtime, target/ABI and HTTP interface, plus a tiny Rust web app and exact source/dependency preparation path. Reconcile existing native build assumptions. | First implementation-enabling decision |
-| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Fresh Ubuntu VM, persistent platform service, configured public origin, HTTPS ingress, owner setup and working authenticated project creation. | Can proceed independently of the runtime choice |
-| [#231: Build from the project interface](https://github.com/devoption/devoption/issues/231) | Review and approve a real build of the selected app; see durable outcomes/logs and obtain the verified Wasm output. | #229; #230 for public UI validation |
-| [#232: Release and deploy on the node](https://github.com/devoption/devoption/issues/232) | Promote a verified artifact, deploy it, inspect health/logs, stop it, update it and recover the prior version; reconcile after restart. | #229 and #231 |
-| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | A second hostname reaches the app on the same VM, stays stable through updates/restart, and remains separate from platform control. | #230 and #232 |
-| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | One repeatable runbook and real evidence for all six steps, a second revision, failure recovery, reboot and backup/restore. | #230–#233 |
+| [#229: Minimum web-app contract](https://github.com/devoption/devoption/issues/229) | Complete: selected WASIp2/Wasmtime contract, public app fixture and pinned source/dependency preparation. | First implementation-enabling decision |
+| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Implemented and locally rehearsed: persistent service, canonical HTTPS origin, owner login/project creation and reboot. Fresh cloud/source installation and public DNS/ACME evidence remain open. | Can proceed independently of the runtime choice |
+| [#231: Build from the project interface](https://github.com/devoption/devoption/issues/231) | Complete for the selected trusted app: real reviewed interface builds, durable outcomes/logs, verified component output and failure/cancel/restart evidence. | #229; #230 for public UI validation |
+| [#232: Release and deploy on the node](https://github.com/devoption/devoption/issues/232) | Complete for the selected Wasm profile: immutable releases, private deployment, health/log/stop, A → B → saved A, running/stopped reboot evidence. | #229 and #231 |
+| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | Implemented and locally rehearsed through two test-CA hostnames, including updates/reboot and control separation. Public DNS and ACME issuance/renewal remain open. | #230 and #232 |
+| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | Runbook and combined fresh-OS/state local rehearsal exist. Fresh platform compilation and public cloud/DNS/ACME/external acceptance remain open; the external HTTPS checker alone does not satisfy them. | #230–#233 |
 
 The series integrates the existing build [#17](https://github.com/devoption/devoption/issues/17),
 artifact [#18](https://github.com/devoption/devoption/issues/18), deployment
@@ -83,8 +92,8 @@ Unaffected integrity, authorization and recovery criteria remain applicable.
 ### Keep the first path small
 
 Start with one owner, one Ubuntu 24.04 x86_64 VM and one trusted Rust HTTP web app.
-The first task selects the [Wasm contract](docs/decisions/0004-first-wasm-web-app.md);
-see its review status. It is not an already supported runtime.
+The selected [Wasm contract](docs/decisions/0004-first-wasm-web-app.md) now has
+opt-in build and private runtime implementations; broader app profiles remain deferred.
 A minimal app serving HTML and a health endpoint is enough to establish the path;
 arbitrary web frameworks, databases and untrusted workloads are not prerequisites.
 The owner may create the VM and DNS records manually and stage the source checkout
