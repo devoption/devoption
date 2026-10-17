@@ -94,7 +94,29 @@ async fn show_selected(
                 .as_ref()
                 .ok_or(Error::CheckoutRequired)
                 .and_then(|root| {
-                    catalog.repository_files(project, repository, root, path.as_deref())
+                    let files =
+                        catalog.repository_files(project, repository, root, path.as_deref())?;
+                    // Prefer a tracked root README, using the same bounded,
+                    // anchored read path as an explicit file selection.
+                    if path.is_none() {
+                        let readme = ["readme.md", "readme.markdown", "readme.txt", "readme"]
+                            .iter()
+                            .find_map(|name| {
+                                files
+                                    .entries
+                                    .iter()
+                                    .find(|entry| entry.path.eq_ignore_ascii_case(name))
+                            });
+                        if let Some(readme) = readme {
+                            return catalog.repository_files(
+                                project,
+                                repository,
+                                root,
+                                Some(&readme.path),
+                            );
+                        }
+                    }
+                    Ok(files)
                 });
             Ok((catalog, Some((repository, files))))
         })

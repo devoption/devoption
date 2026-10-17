@@ -220,7 +220,7 @@ fn manual_cookie_browser_fixture() {
     }
     std::fs::write(
         root.join("frontend/README.md"),
-        "# Disposable browser fixture\n",
+        "# Example application\n\nA small Rust application for exploring DevOption’s code browser.\n\n## Getting started\n\n- Browse [the application source](src/main.rs).\n- Review the package settings in `Cargo.toml`.\n\n```rust\nfn main() {\n    println!(\"Hello from your project.\");\n}\n```\n\n## About this repository\n\nThis is a **disposable browser fixture**. It contains no production data.\n",
     )
     .unwrap();
     if std::env::var_os("DEVOPTION_BROWSER_FILES").is_some() {

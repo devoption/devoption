@@ -1,13 +1,33 @@
 # Browse repository files
 
-Open a project's **Code** page to see tracked files immediately. It selects the
-first attached repository in saved order; when there are several, choose another
-repository above the file list. Explicit repository links retain that selection.
-Select a tracked path to read its current working-tree text. **All tracked files**
-returns to its list. Status and attachment/creation controls remain under
-**Repository details** below the files. Ordinary links support
-bookmarks, refresh, browser history and keyboard navigation. Browsing itself needs
-no JavaScript; signing in still does.
+Open a project's **Code** page to browse its files in an expandable folder tree.
+It selects the first attached repository in saved order; when there are several,
+choose another repository above the tree. Explicit repository links retain that
+selection. The tree stays beside the selected file and opens its parent folders;
+on narrow screens it stacks above the viewer and can be collapsed with **Files**.
+Folder disclosures and file links support keyboard access.
+
+A tracked root README opens automatically, preferring `README.md`,
+`README.markdown`, `README.txt`, then `README` (case-insensitive, with lexical
+ordering for ties). Nested and untracked READMEs are not selected automatically.
+Markdown files open in **Preview**; select **Source** for their literal text.
+Plain-text READMEs use the source viewer. If the chosen README is unavailable,
+binary or oversized, its normal explanation is shown; other files remain browsable.
+
+Source files show line numbers and syntax highlighting for common languages,
+including Rust, JavaScript/TypeScript, Python, HTML/CSS, JSON, TOML and YAML.
+Unknown extensions remain plain text. Highlighting uses a bundled library and
+makes no CDN requests. File navigation, Markdown rendering and the Preview/Source
+switch work without JavaScript; syntax colors and signing in require JavaScript.
+
+Markdown supports headings, lists, tables, links and fenced code. Raw HTML is
+shown as text. Images become text labels without fetching media. HTTP(S) links
+are allowed; relative file links resolve only to tracked paths within this
+repository. Unsupported links, including fragment-only links, remain text.
+Markdown headings do not currently have linkable anchors.
+
+Status and attachment/creation controls remain under **Repository details** below
+the viewer. Ordinary links support bookmarks, refresh and browser history.
 
 This is a read-only preview of files currently recorded in the Git index. It may
 show uncommitted changes and is **not a pinned commit, source proof or build
@@ -61,4 +81,5 @@ for browser checks, including keyboard links, mobile widths, 200% text resizing,
 deep-link reloads and browsing without JavaScript.
 
 Implemented under [#169](https://github.com/devoption/devoption/issues/169), with
-direct Code browsing under [#179](https://github.com/devoption/devoption/issues/179).
+direct Code browsing under [#179](https://github.com/devoption/devoption/issues/179)
+and the tree/README/source viewer under [#250](https://github.com/devoption/devoption/issues/250).

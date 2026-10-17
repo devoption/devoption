@@ -205,3 +205,42 @@ fn empty_indexes_and_missing_root_have_honest_authenticated_states() {
     assert!(body.contains("Repository inspection is not configured"));
     assert!(!body.contains("No tracked files"));
 }
+
+#[test]
+fn root_readme_preview_is_tracked_bounded_and_does_not_override_explicit_files() {
+    let (_data, data) = configured();
+    let (_root, root) = repositories::root_fixture();
+    fs::create_dir(root.join("main/docs")).unwrap();
+    fs::write(root.join("main/docs/README.md"), "# Nested only").unwrap();
+    fs::write(root.join("main/README.txt"), "Plain readme").unwrap();
+    stage(&root);
+    fs::write(root.join("main/README.md"), "# UNTRACKED SECRET").unwrap();
+    let (url, _) = seed(&data, &root);
+    let (_server, address) = start(&data, &root);
+    let issued = sign_in(address);
+    let response = read(address, "GET", &url, Some(&issued));
+    let body = check(&response, 200);
+    assert!(body.contains("Plain readme"));
+    assert!(!body.contains("UNTRACKED SECRET") && !body.contains("<h1>Nested only</h1>"));
+    fs::write(root.join("main/README.md"), "# Project guide\n\n**Welcome**\n\n<script>attack()</script>\n\n![remote](https://example.com/tracker)\n").unwrap();
+    stage(&root);
+    let response = read(address, "GET", &url, Some(&issued));
+    let body = check(&response, 200);
+    assert!(body.contains("<h1>Project guide</h1>") && body.contains("<strong>Welcome</strong>"));
+    assert!(
+        !body.contains("<script>attack()") && !body.contains("src=\"https://example.com/tracker")
+    );
+    assert!(body.contains("id=\"file-preview-mode\" checked"));
+    assert!(body.contains("README.txt") && body.contains("aria-label=\"Repository files\""));
+    let response = read(address, "GET", &format!("{url}/README.txt"), Some(&issued));
+    assert!(check(&response, 200).contains("Plain readme"));
+    assert!(!check(&response, 200).contains("<h1>Project guide</h1>"));
+    for (contents, expected) in [
+        (vec![0], "Binary files"),
+        (vec![b'x'; 65537], "too large to display"),
+    ] {
+        fs::write(root.join("main/README.md"), contents).unwrap();
+        let response = read(address, "GET", &url, Some(&issued));
+        assert!(check(&response, 200).contains(expected));
+    }
+}
