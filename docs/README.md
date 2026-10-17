@@ -45,15 +45,15 @@ accounts and production hosting acceptance remain planned.
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)
+- [Build the selected Wasm web app](web-app-builds.md)
+- [Deploy a web app on the same node](web-app-deployments.md)
+- [App hostnames and local HTTPS status](app-hostnames.md)
 
 ## Validation evidence
 
-These guides describe bounded fixture checks, not production execution support.
+These guides record bounded fixture checks and their limits; connected app lifecycle
+evidence is linked under [Use and contribute](#use-and-contribute).
 
 - [Offline Cargo fixture build](offline-fixture-build.md)
 - [Linux installation rehearsal](linux-rehearsal.md) and [unattended rehearsal](linux-unattended-rehearsal.md)
 - [Disposable runner proposal](disposable-runner-proposal.md), [initial build](disposable-build-rehearsal.md) and [diagnostic repeat](disposable-build-repeat.md)
-
-- [Deploy a web app on the same node](web-app-deployments.md): private Wasm releases, runtime setup, review, health, stop and recovery.
-
-- [App hostnames](app-hostnames.md): generate the two-host Caddy configuration and inspect local HTTPS routing/certificate status.
