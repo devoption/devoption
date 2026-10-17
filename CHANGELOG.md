@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Run Rust lint, tests, release installation checks, and script checks in parallel;
+  avoid rerunning code checks when a draft PR becomes ready for review or its
+  description is edited, while retaining separate contribution validation
+  ([#244](https://github.com/devoption/devoption/issues/244)).
+
 - Bind a second HTTPS hostname to one project, generate reviewed Caddy and runtime
   configuration, and show verified local routing/certificate status in Releases
   ([#233](https://github.com/devoption/devoption/issues/233)).

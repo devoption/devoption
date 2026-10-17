@@ -34,3 +34,23 @@ installed Rust toolchain/linker are required):
 cargo test -p devoption-registry --test offline_build --locked --offline -- --ignored --nocapture
 ```
 
+## Continuous integration
+
+Code validation runs when a PR is opened, reopened, or receives new commits, on
+pushes to `main`, and through the reusable release check. Marking a draft PR ready
+for review does not restart CI. PR title/body edits run only the separate
+contribution workflow, which validates issue references and change documentation.
+
+CI runs four independent jobs in parallel: Rust formatting/Clippy, workspace tests
+and the debug build (including the explicit trusted offline fixture), the release
+build and installation fixtures, and Python/Node checks. Each of these jobs checks for
+tracked-file changes. The required `Rust and repository checks` status succeeds
+only when all four jobs succeed; failure, cancellation, or skipping cannot pass
+that gate. `Issue and change documentation` remains a separate required status.
+This preserves branch protection without changing repository settings.
+
+Each job uses a fresh GitHub-hosted Ubuntu runner. Rust jobs fetch locked inputs
+before checking offline; no build cache or shared compiled artifacts are used.
+Parallel jobs reduce elapsed time but can use more total runner time because
+compilation/setup is repeated. The complete workspace test suite remains together
+so Cargo continues to discover new crates and tests automatically.

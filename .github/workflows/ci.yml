@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    types: [opened, synchronize, reopened, edited, ready_for_review]
+    types: [opened, synchronize, reopened]
   workflow_call:
 
 permissions:
@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Rust and repository checks
+  lint:
+    name: Rust formatting and Clippy
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -25,18 +25,54 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust components
         run: rustup show active-toolchain
-      - run: cargo fmt --all -- --check
       - run: cargo fetch --locked
+      - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+      - run: git diff --exit-code
+
+  tests:
+    name: Rust tests and debug build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust components
+        run: rustup show active-toolchain
+      - run: cargo fetch --locked
       - run: cargo test --workspace --locked --offline
       - name: Build trusted fixture from verified local registry seed
         run: cargo test -p devoption-registry --test offline_build --locked --offline -- --ignored --nocapture
       - run: cargo build --workspace --locked --offline
+      - run: git diff --exit-code
+
+  installation:
+    name: Release build and installation checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust components
+        run: rustup show active-toolchain
+      - run: cargo fetch --locked
       - name: Check private source-install fixtures
         run: |
           cargo build --release --locked --offline
           cargo test -p devoption-cli --test server --release --locked --offline installation
           python3 scripts/check_systemd_unit.py target/release/devoption
+      - run: git diff --exit-code
+
+  scripts:
+    name: Python and Node checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: python3 -m unittest discover -s scripts -p 'test_*.py'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -45,19 +81,22 @@ jobs:
       - run: node --test scripts/test_*.cjs
       - run: git diff --exit-code
 
-  contribution:
-    name: Issue and change documentation
-    if: github.event_name == 'pull_request'
+  checks:
+    # Preserve the required status; skipped or failed dependencies must fail it.
+    name: Rust and repository checks
+    needs: [lint, tests, installation, scripts]
+    if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    permissions:
-      contents: read
-      issues: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - run: python3 scripts/check_pr.py
+      - name: Require every validation job to pass
         env:
-          GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          import os
+          results = json.loads(os.environ["RESULTS"])
+          if len(results) != 4 or any(result != "success" for result in results):
+              raise SystemExit(f"Validation jobs did not all pass: {results}")
+          PYTHON
