@@ -46,6 +46,7 @@ Run `cargo run --locked --offline -- --help` for command options.
 
 ## Documentation
 
+- [Your first web app](docs/first-web-app.md) — install, build, deploy and maintain
 - [Platform roadmap](ROADMAP.md) — current capabilities and planned direction
 - [User guide](docs/using-devoption.md) — setup, sign-in, projects and repositories
 - [Install, back up and restore](docs/private-linux-install.md) — private Ubuntu preview

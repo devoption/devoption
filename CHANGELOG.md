@@ -12,6 +12,11 @@ Entries describe implemented changes, not the roadmap.
   description is edited, while retaining separate contribution validation
   ([#244](https://github.com/devoption/devoption/issues/244)).
 
+- Add a staged platform service generator that aligns installed build/deployment
+  storage and opt-ins, plus one operator path from installation to app updates,
+  with explicit outstanding recovery and cloud acceptance checks
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
 - Bind a second HTTPS hostname to one project, generate reviewed Caddy and runtime
   configuration, and show verified local routing/certificate status in Releases
   ([#233](https://github.com/devoption/devoption/issues/233)).
