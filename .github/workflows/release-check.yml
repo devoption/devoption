@@ -13,10 +13,8 @@ permissions:
 
 jobs:
   checks:
-    # The reused CI also declares an issue-reading PR job (skipped for releases).
     permissions:
       contents: read
-      issues: read
     uses: ./.github/workflows/ci.yml
 
   notes:

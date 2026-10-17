@@ -1,0 +1,29 @@
+name: Contribution checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contribution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contribution:
+    name: Issue and change documentation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - run: python3 scripts/check_pr.py
+        env:
+          GH_TOKEN: ${{ github.token }}
