@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Reconcile the roadmap, architecture and accepted-decision index with implemented
+  trusted Wasm builds, immutable releases, same-node deployment and local lifecycle
+  evidence; preserve outstanding fresh-host/public DNS/ACME acceptance and broader
+  platform limits, and make the operational guides easier to find
+  ([#253](https://github.com/devoption/devoption/issues/253)).
+
 - Add a credential-free external HTTPS verification command and acceptance-report
   instructions for both single-node hostnames, with exact DNS/address checks,
   trusted TLS, app health and control-route separation checks; public-host
