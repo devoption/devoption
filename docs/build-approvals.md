@@ -3,8 +3,8 @@
 [#192](https://github.com/devoption/devoption/issues/192) implements
 `devoption_builds::approvals`, a bounded bookkeeping prerequisite of
 [#17](https://github.com/devoption/devoption/issues/17). It records an owner action,
-expires it after five minutes, and consumes or revokes it once. No production
-caller, HTTP route, UI, persisted approval, executor or runner-event issuer exists.
+expires it after five minutes, and consumes or revokes it once. The [Linux web-app integration](web-app-builds.md) now supplies the owner-facing
+review/approval adapter. Approvals are never persisted or restored.
 No real workload is approved by these APIs or their temporary-fixture tests.
 
 The [execution trust contract](execution-trust.md) remains authoritative for the
@@ -92,6 +92,5 @@ plans reuse existing disposable metadata fixtures; no build or child is launched
 Run `cargo test -p devoption-builds --locked --offline`, then the
 [workspace checks](development.md#checks). These tests do not establish live HTTP
 approval, filesystem freshness, dependency verification, durable atomic admission,
-OS isolation, process cleanup or restart recovery. Those remain #17 integration
-work under the trust contract. [Job lifecycle records](build-jobs.md) still have
-no production runner-event issuer; consuming an approval does not bypass that seal.
+OS isolation, process cleanup or restart recovery. Those require the separate Linux integration and its validation; consuming an
+approval alone does not bypass the job event seal.

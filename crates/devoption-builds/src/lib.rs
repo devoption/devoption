@@ -9,6 +9,7 @@
 
 pub mod approvals;
 pub mod cargo_source;
+pub mod execution;
 pub mod history;
 pub mod jobs;
 pub mod output;
@@ -128,9 +129,18 @@ impl BuildPlan {
         if !target_name(&input.package) || !target_name(&input.binary) {
             return Err(Error::InvalidTarget);
         }
-        if input.package != input.source.package()
-            || Some(input.binary.as_str()) != input.source.binary()
-        {
+        let target_matches = match input.source.target() {
+            devoption_registry::cargo_inputs::SourceTarget::Binary => {
+                Some(input.binary.as_str()) == input.source.binary()
+            }
+            devoption_registry::cargo_inputs::SourceTarget::Cdylib { name } => {
+                input.package == "devoption-web-fixture"
+                    && name == "devoption_web_fixture"
+                    && input.binary == *name
+                    && input.rust_version == "1.99.0"
+            }
+        };
+        if input.package != input.source.package() || !target_matches {
             return Err(Error::TargetMismatch);
         }
         if input.environment.len() > MAX_ENVIRONMENT_ENTRIES {
@@ -156,6 +166,21 @@ impl BuildPlan {
         Ok(Self(input))
     }
 
+    pub fn is_wasm(&self) -> bool {
+        matches!(
+            self.0.source.target(),
+            devoption_registry::cargo_inputs::SourceTarget::Cdylib { .. }
+        )
+    }
+
+    pub fn artifact_path(&self) -> String {
+        if self.is_wasm() {
+            "wasm32-wasip2/release/devoption_web_fixture.wasm".into()
+        } else {
+            format!("release/{}", self.0.binary)
+        }
+    }
+
     /// Read-only review metadata, without HTML/shell encoding or secret redaction.
     pub fn details(&self) -> &PlanInput {
         &self.0
@@ -163,8 +188,21 @@ impl BuildPlan {
 
     /// Fixed argument vector for review. These flags constrain Cargo dependency
     /// resolution; they do not sandbox build scripts or prevent network access.
-    pub fn cargo_arguments(&self) -> [&str; 8] {
-        [
+    pub fn cargo_arguments(&self) -> Vec<&str> {
+        if self.is_wasm() {
+            return vec![
+                "build",
+                "--release",
+                "--locked",
+                "--offline",
+                "--target",
+                "wasm32-wasip2",
+                "--package",
+                &self.0.package,
+                "--lib",
+            ];
+        }
+        vec![
             "build",
             "--release",
             "--locked",

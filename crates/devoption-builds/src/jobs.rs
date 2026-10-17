@@ -1,5 +1,5 @@
 //! In-memory lifecycle records, with no runner, persistence or execution authority.
-//! Runner-driven transitions require an opaque event with no production issuer yet.
+//! Runner-driven transitions require an opaque event issued by the Linux adapter.
 
 use crate::BuildPlan;
 use devoption_registry::Sha256;
@@ -77,8 +77,8 @@ pub enum State {
     Interrupted,
 }
 
-/// Sealed handoff from a future trusted runner. There is deliberately no public
-/// constructor, deserializer or production issuer. Only module-local tests issue
+/// Sealed handoff from the trusted Linux adapter. There is deliberately no public
+/// constructor or deserializer. Module-local tests also issue
 /// synthetic events. Before adding an issuer, it must establish approval, the
 /// exact attempt/plan, actual process state and cleanup; success additionally needs
 /// a successful exit and verification of the actual plan-selected artifact bytes.
@@ -111,6 +111,16 @@ pub struct BuildJob {
     id: JobId,
     plan: BuildPlan,
     state: State,
+}
+
+impl RunnerEvent {
+    pub(super) fn observed(job: &BuildJob, state: State) -> Self {
+        Self {
+            job: job.id(),
+            plan: job.plan().clone(),
+            state,
+        }
+    }
 }
 
 impl BuildJob {

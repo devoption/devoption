@@ -10,6 +10,14 @@ fn filename(id: JobId) -> String {
     format!("build-output-{hex}.bin")
 }
 impl History {
+    /// Persist the last output before a terminal summary makes further output
+    /// immutable. If summary publication fails, recovery retains an unfinished
+    /// attempt with its last durable log; this is not a multi-file transaction.
+    pub fn checkpoint(&mut self, job: &BuildJob, output: &BuildOutput) -> Result<(), Error> {
+        self.save_output(job, output)?;
+        self.record(job)
+    }
+
     /// Save an append-only snapshot for a known unfinished attempt. Caller-supplied
     /// output does not prove execution. Checkpoint before persisting terminal state.
     pub fn save_output(&mut self, job: &BuildJob, output: &BuildOutput) -> Result<(), Error> {

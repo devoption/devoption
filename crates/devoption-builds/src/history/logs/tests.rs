@@ -222,3 +222,34 @@ fn maximum_exact_fill_roundtrips_without_inventing_truncation() {
         output.escaped_text(Stream::Stderr)
     );
 }
+
+#[test]
+fn runner_checkpoint_saves_final_output_before_sealing_each_terminal_result() {
+    use crate::jobs::{ArtifactMetadata, Failure, RunnerEvent};
+    let digest = devoption_registry::Sha256::digest(b"synthetic artifact");
+    for terminal in [
+        State::Succeeded(ArtifactMetadata::new(digest, 18).unwrap()),
+        State::Failed(Failure::ExitFailure),
+        State::Cancelled,
+    ] {
+        let (_temp, _path, mut store, mut job, mut output) = fixture();
+        job.apply(RunnerEvent::observed(&job, State::Running))
+            .unwrap();
+        store.checkpoint(&job, &output).unwrap();
+        output.append(Stream::Stderr, b"final compiler diagnostic");
+        job.apply(RunnerEvent::observed(&job, terminal.clone()))
+            .unwrap();
+        store.checkpoint(&job, &output).unwrap();
+        assert_eq!(store.load().unwrap()[0].state(), &terminal);
+        assert_eq!(
+            store
+                .load_output(job.id())
+                .unwrap()
+                .unwrap()
+                .retained_bytes(),
+            output.retained_bytes()
+        );
+        // Sealing remains enforced; a completed attempt cannot append more logs.
+        assert_eq!(store.save_output(&job, &output), Err(Error::Transition));
+    }
+}

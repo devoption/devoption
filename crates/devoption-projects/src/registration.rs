@@ -56,6 +56,50 @@ impl DefaultCheckout {
 }
 
 impl Catalog {
+    /// Canonical selected binding metadata for a build review. This does not
+    /// revalidate the filesystem; use the registered source reader first.
+    pub fn selected_binding_bytes(
+        &self,
+        project: ProjectId,
+        repository: RepositoryId,
+    ) -> Result<Vec<u8>, Error> {
+        if !self
+            .projects
+            .iter()
+            .any(|p| p.id == project && p.repositories.contains(&repository))
+        {
+            return Err(Error::UnknownRepository);
+        }
+        let root = self.root.as_ref().ok_or(Error::RootMismatch)?;
+        let binding = self
+            .bindings
+            .iter()
+            .find(|b| b.repository == repository)
+            .ok_or(Error::UnknownRepository)?;
+        let checkout = self
+            .checkouts
+            .iter()
+            .find(|c| c.project == project && c.repository == repository)
+            .ok_or(Error::CheckoutRequired)?;
+        let mut bytes = b"devoption.selected-binding\0\x01".to_vec();
+        bytes.extend_from_slice(&project.to_bytes());
+        bytes.extend_from_slice(&repository.to_bytes());
+        for path in [&root.path, &checkout.path] {
+            bytes.extend_from_slice(&(path.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(path.as_bytes());
+        }
+        for identity in [
+            root.identity,
+            binding.common_directory,
+            checkout.worktree,
+            checkout.git_directory,
+        ] {
+            bytes.extend_from_slice(&identity.device.to_be_bytes());
+            bytes.extend_from_slice(&identity.inode.to_be_bytes());
+        }
+        Ok(bytes)
+    }
+
     pub fn repository_root(&self) -> Option<&RootBinding> {
         self.root.as_ref()
     }

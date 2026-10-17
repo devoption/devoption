@@ -37,7 +37,7 @@ impl ProofFixture {
             ("src/main.rs", MAIN),
         ])
     }
-    fn with_files(files: &[(&str, &[u8])]) -> Self {
+    pub(crate) fn with_files(files: &[(&str, &[u8])]) -> Self {
         let mut objects = Vec::new();
         let tree = make_tree(files, &mut objects);
         Self {

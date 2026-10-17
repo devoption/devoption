@@ -477,3 +477,51 @@ fn cdylib_snapshot_cannot_enter_the_native_plan_or_approval_path() {
     input.binary = input.source.package().into();
     rejected(&catalog, input, Error::TargetMismatch);
 }
+
+#[test]
+fn selected_web_app_plan_uses_only_the_pinned_wasip2_target() {
+    let (catalog, mut input) = fixture();
+    input.source = source_snapshot::tests::ProofFixture::with_files(&[
+        (
+            "Cargo.toml",
+            include_bytes!("../../../examples/web-app/Cargo.toml"),
+        ),
+        (
+            "Cargo.lock",
+            include_bytes!("../../../examples/web-app/Cargo.lock"),
+        ),
+        (
+            "src/lib.rs",
+            include_bytes!("../../../examples/web-app/src/lib.rs"),
+        ),
+    ])
+    .verify()
+    .unwrap();
+    input.commit = input.source.commit().into();
+    input.dependencies = dependencies(&input.source);
+    input.package = "devoption-web-fixture".into();
+    input.binary = "devoption_web_fixture".into();
+    input.rust_version = "1.99.0".into();
+    let plan = BuildPlan::validate(input.clone(), &catalog).unwrap();
+    assert!(plan.is_wasm());
+    assert_eq!(
+        plan.artifact_path(),
+        "wasm32-wasip2/release/devoption_web_fixture.wasm"
+    );
+    assert_eq!(
+        plan.cargo_arguments(),
+        [
+            "build",
+            "--release",
+            "--locked",
+            "--offline",
+            "--target",
+            "wasm32-wasip2",
+            "--package",
+            "devoption-web-fixture",
+            "--lib"
+        ]
+    );
+    input.rust_version = "1.98.0".into();
+    assert!(BuildPlan::validate(input, &catalog).is_err());
+}

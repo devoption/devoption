@@ -2,10 +2,11 @@
 
 Review gate: policy tracked under [#15](https://github.com/devoption/devoption/issues/15).
 Merging this contract accepts requirements for dependent work; it does not enable
-execution or authorize a workload. The HTTP controls below exist today. Production job
-approval, work/artifact storage and resource enforcement do not. A separate
-[in-memory approval lifecycle](build-approvals.md) models single-use review records
-without an authenticated production adapter or execution capability.
+execution or authorize a workload. The HTTP controls below exist today. The opt-in [Linux web-app build integration](web-app-builds.md) now connects
+owner approval, private staging, bounded compilation and saved artifacts for the
+selected trusted target. The [approval lifecycle](build-approvals.md) remains an
+in-memory model; its metadata alone cannot grant execution. Runtime/deployment
+remain separate work.
 
 ## Trust and authority
 
@@ -52,6 +53,11 @@ Password forms currently have a 4096-byte limit and five-second read deadline.
 Other mutation bodies use bounded parsers with a five-second deadline and explicit
 route-specific byte limits. Retain these controls; future endpoints must specify
 and test limits before mounting. No unbounded JSON/form/log ingestion is allowed.
+
+The implemented `WasmBuildV1` mapping, including split executable target scratch,
+read-only host staging, reserved storage and recovery, is specified in the
+[build workflow](web-app-builds.md#enforced-policy-and-recovery). The native
+`InitialBuildV1` proposal below remains a contract, not a native runner.
 
 ## Required review and approval contract
 

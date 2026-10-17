@@ -10,7 +10,7 @@ mod source_check;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
        devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
@@ -24,7 +24,8 @@ Usage: devoption [--help | --version]
   --port PORT   Override the port (0 chooses a free port)
   --public-origin  Serve one canonical https://DNS_NAME through a local TLS proxy; requires an existing owner
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
-  --build-history-dir  Recover selected private history before serving; builds remain unavailable
+  --build-execution    Explicitly enable installed Linux build runner (value: enabled)
+  --build-history-dir  Recover selected private history before serving
   --repository-root  Explicit trusted checkout root for inspection/attachment
   --managed-repository-root  Explicit private root allowing creation of new repositories
 
@@ -35,6 +36,21 @@ Source checks require all four options and saved 32-character hexadecimal IDs fr
 
 fn main() -> ExitCode {
     let args: Vec<_> = env::args_os().skip(1).collect();
+    #[cfg(unix)]
+    if let [command, path] = args.as_slice()
+        && command == "build-input-digest"
+    {
+        return match devoption_builds::execution::input_digest(&PathBuf::from(path)) {
+            Ok(digest) => {
+                println!("{digest}");
+                ExitCode::SUCCESS
+            }
+            Err(_) => {
+                eprintln!("error: prepared input digest unavailable");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let options = match args.as_slice() {
         [command, options @ ..] if command == "recover-repositories" => {
             #[cfg(unix)]
@@ -102,9 +118,24 @@ fn main() -> ExitCode {
         managed_repository_root,
         build_history_directory,
         public_origin,
+        execution_enabled,
     }) = options
     {
-        let result = if let Some(origin) = public_origin {
+        let result = if execution_enabled {
+            devoption_server::run_with_execution(
+                port,
+                data_directory.as_deref().expect("validated owner"),
+                managed_repository_root
+                    .as_deref()
+                    .or(repository_root.as_deref())
+                    .expect("validated repository root"),
+                managed_repository_root.is_some(),
+                build_history_directory
+                    .as_deref()
+                    .expect("validated history"),
+                public_origin,
+            )
+        } else if let Some(origin) = public_origin {
             devoption_server::run_with_public_origin(
                 port,
                 data_directory
@@ -159,10 +190,12 @@ struct ServeOptions {
     managed_repository_root: Option<PathBuf>,
     build_history_directory: Option<PathBuf>,
     public_origin: Option<devoption_server::PublicOrigin>,
+    execution_enabled: bool,
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     let mut public_origin = None;
+    let mut execution_enabled = false;
     let mut port = None;
     let mut data_directory = None;
     let mut repository_root = None;
@@ -172,7 +205,9 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
         let [flag, value, rest @ ..] = args else {
             return Err("serve options require a value");
         };
-        if flag == "--port" && port.is_none() {
+        if flag == "--build-execution" && value == "enabled" && !execution_enabled {
+            execution_enabled = true;
+        } else if flag == "--port" && port.is_none() {
             port = Some(
                 value
                     .to_str()
@@ -223,7 +258,15 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     if public_origin.is_some() && data_directory.is_none() {
         return Err("public origin requires --data-dir with an existing configured owner");
     }
+    if execution_enabled
+        && (data_directory.is_none()
+            || build_history_directory.is_none()
+            || (repository_root.is_none() && managed_repository_root.is_none()))
+    {
+        return Err("build execution requires owner, repository and history directories");
+    }
     Ok(ServeOptions {
+        execution_enabled,
         public_origin,
         port: port.unwrap_or(3000),
         data_directory,

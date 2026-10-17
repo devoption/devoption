@@ -397,3 +397,40 @@ fn changes_after_successful_inspection_are_stale_even_when_reinspection_fails() 
         );
     }
 }
+
+#[test]
+fn selected_build_binding_tracks_filesystem_identity_without_unrelated_catalog_edits() {
+    let f = Fixture::new();
+    let mut store = CatalogStore::open_absolute(&f.data).unwrap();
+    let repository = store
+        .attach_repository(f.first, &f.root(), Path::new("main"))
+        .unwrap();
+    let original = store.load().unwrap().unwrap();
+    let selected = original
+        .selected_binding_bytes(f.first, repository)
+        .unwrap();
+    assert!(
+        original
+            .selected_binding_bytes(f.second, repository)
+            .is_err()
+    );
+    let mut edited = original.clone();
+    edited.create_project("Unrelated new project").unwrap();
+    assert_eq!(
+        edited.selected_binding_bytes(f.first, repository).unwrap(),
+        selected
+    );
+    for field in 0..4 {
+        let mut changed = original.clone();
+        match field {
+            0 => changed.root.as_mut().unwrap().identity.inode += 1,
+            1 => changed.bindings[0].common_directory.inode += 1,
+            2 => changed.checkouts[0].worktree.inode += 1,
+            _ => changed.checkouts[0].git_directory.inode += 1,
+        }
+        assert_ne!(
+            changed.selected_binding_bytes(f.first, repository).unwrap(),
+            selected
+        );
+    }
+}

@@ -15,6 +15,7 @@ use devoption_projects::{
 use tokio::sync::Mutex;
 
 mod builds;
+mod execution;
 mod files;
 mod history;
 mod managed;
@@ -26,6 +27,7 @@ mod startup_tests;
 #[derive(Clone)]
 pub(super) struct Projects {
     directory: Arc<CatalogDirectory>,
+    execution: Option<Arc<Mutex<execution::Engine>>>,
     history: Option<Arc<Mutex<devoption_builds::history::History>>>,
     gate: Arc<Mutex<()>>,
     root: Option<Arc<PermittedRoot>>,
@@ -33,6 +35,15 @@ pub(super) struct Projects {
 }
 
 impl Projects {
+    pub(super) fn with_execution(
+        mut self,
+        config: devoption_builds::execution::Configuration,
+        owner: IdentityId,
+    ) -> Self {
+        self.execution = Some(Arc::new(Mutex::new(execution::Engine::new(config, owner))));
+        self
+    }
+
     pub(super) fn open_with_managed_root(
         owner: &crate::owner_store::OwnerStore,
         root: &Path,
@@ -62,6 +73,7 @@ impl Projects {
         Ok(Self {
             directory: Arc::new(directory),
             history: None,
+            execution: None,
             gate: Arc::new(Mutex::new(())),
             root: root.map(Arc::new),
             managed: None,
@@ -139,6 +151,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         .merge(pages::routes(projects.clone()))
         .merge(files::routes(projects.clone()))
         .merge(builds::routes(projects.clone()))
+        .merge(execution::routes(projects.clone()))
         .merge(history::routes(projects.clone()))
         .merge(creation)
         .route(

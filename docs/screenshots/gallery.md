@@ -24,7 +24,7 @@ for dimensions, states and refresh instructions.
 
 ![Current source text](repository-file.jpg)
 
-![Project Builds source preparation](project-builds.jpg)
+![Project Builds with the build action and real local attempt history](project-builds.jpg)
 
 ![Passed initial source checks, without execution](build-source-checks.jpg)
 
@@ -117,3 +117,12 @@ for dimensions, states and refresh instructions.
 ![Interrupted attempt and last saved stdout/stderr](build-attempt.jpg)
 
 ![Truncated output with inert script and control characters](build-output-truncated.jpg)
+
+## Reviewed web-app builds
+
+These captures use the opt-in Linux runner in a disposable local Ubuntu VM.
+The component is compiled, not deployed or serving HTTP.
+
+![Exact build review before single-use approval](build-review.jpg)
+
+![Successful local compile and saved diagnostics](build-succeeded.jpg)

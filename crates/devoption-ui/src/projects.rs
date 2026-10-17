@@ -1,3 +1,6 @@
+mod execution;
+pub use execution::BuildExecutionView;
+pub(super) use execution::content as execution_content;
 mod history;
 pub(super) use history::content as history_content;
 pub use history::{BuildAttemptView, BuildHistoryView, BuildLogView, HistoryAvailability};
