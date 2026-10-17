@@ -14,6 +14,7 @@ accounts and production hosting acceptance remain planned.
 - [First web app: install, build, deploy and maintain](first-web-app.md)
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)
+- [Same-node snapshot and staged recovery](same-node-recovery.md)
 - [Private Ubuntu installation, backup and recovery](private-linux-install.md)
 - [Public-origin HTTPS installation and validation limits](public-linux-install.md)
 - [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)
