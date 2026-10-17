@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a credential-free external HTTPS verification command and acceptance-report
+  instructions for both single-node hostnames, with exact DNS/address checks,
+  trusted TLS, app health and control-route separation checks; public-host
+  acceptance remains pending
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
 - Add a persistent folder tree, line-numbered syntax highlighting, and default
   tracked root README previews with a Preview/Source switch. Markdown renders
   without active repository HTML or remote images, under existing read bounds
