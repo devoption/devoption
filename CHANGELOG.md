@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Build the selected trusted Wasm web app through project review and explicit
+  approval using an opt-in Linux systemd worker, prepared offline inputs, bounded
+  logs, cancellation and durable artifact provenance. Add the real fixture and
+  installation guide; app runtime/deployment remain pending
+  ([#231](https://github.com/devoption/devoption/issues/231)).
+
 - Admit the selected web-app's narrow `cdylib` manifest and complete library source
   snapshot, with Cargo-compatible exact dependency matching that retains full
   locked version/checksum identity. Reject mixed targets and keep library snapshots

@@ -46,7 +46,15 @@ pub fn run_with_repository_root(
     data_directory: Option<&Path>,
     repository_root: Option<&Path>,
 ) -> io::Result<()> {
-    run_with_roots(port, data_directory, repository_root, false, None, None)
+    run_with_roots(
+        port,
+        data_directory,
+        repository_root,
+        false,
+        None,
+        None,
+        false,
+    )
 }
 
 /// Explicit creation capability in a selected private repository root. Existing
@@ -63,6 +71,7 @@ pub fn run_with_managed_repository_root(
         true,
         None,
         None,
+        false,
     )
 }
 
@@ -85,6 +94,7 @@ pub fn run_with_build_history(
         managed,
         Some(history_directory),
         None,
+        false,
     )
 }
 
@@ -108,6 +118,26 @@ pub fn run_with_public_origin(
         managed,
         history_directory,
         Some(origin),
+        false,
+    )
+}
+
+pub fn run_with_execution(
+    port: u16,
+    data_directory: &Path,
+    repository_root: &Path,
+    managed: bool,
+    history_directory: &Path,
+    public_origin: Option<PublicOrigin>,
+) -> io::Result<()> {
+    run_with_roots(
+        port,
+        Some(data_directory),
+        Some(repository_root),
+        managed,
+        Some(history_directory),
+        public_origin,
+        true,
     )
 }
 
@@ -118,6 +148,7 @@ fn run_with_roots(
     managed: bool,
     history_directory: Option<&Path>,
     public_origin: Option<PublicOrigin>,
+    execution_enabled: bool,
 ) -> io::Result<()> {
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
@@ -210,6 +241,28 @@ fn run_with_roots(
         }
         None => None,
     };
+    #[cfg(unix)]
+    if execution_enabled {
+        let config = devoption_builds::execution::Configuration::open()?;
+        config.check_storage(
+            data_directory.ok_or_else(|| io::Error::other("builds require owner storage"))?,
+            repository_root.ok_or_else(|| io::Error::other("builds require repository storage"))?,
+            history_directory.ok_or_else(|| io::Error::other("builds require history storage"))?,
+        )?;
+        config.stop_previous()?;
+        let identity =
+            owner_identity.ok_or_else(|| io::Error::other("builds require an existing owner"))?;
+        projects = Some(
+            projects
+                .take()
+                .ok_or_else(|| io::Error::other("builds require repository storage"))?
+                .with_execution(config, identity),
+        );
+    }
+    #[cfg(not(unix))]
+    if execution_enabled {
+        return Err(io::Error::other("build execution requires Linux"));
+    }
     #[cfg(unix)]
     let owner_auth = owner_store.map(|store| {
         (

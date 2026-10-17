@@ -152,6 +152,7 @@ dependencies = [
  "sha1collisiondetection",
  "sha2",
  "tempfile",
+ "toml",
 ]
 
 [[package]]

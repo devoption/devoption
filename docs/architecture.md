@@ -13,7 +13,7 @@ The Rust workspace has six crates. The running service uses
 
 | Crate | Responsibility |
 | --- | --- |
-| `devoption-builds` | Source preparation observations, immutable Unix build plans, in-memory approval/job lifecycle records and bounded Cargo source membership proofs; no production approval adapter or execution |
+| `devoption-builds` | Source preparation observations, immutable Unix build plans, in-memory approval/job lifecycle records and bounded Cargo source membership proofs; opt-in reviewed Linux Wasm build execution (see [build workflow](web-app-builds.md)) |
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |

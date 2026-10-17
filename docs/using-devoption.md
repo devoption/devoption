@@ -105,7 +105,7 @@ Create repositories through **New repository** on a project's Code page after an
 administrator selects [managed storage](managed-repositories.md). DevOption creates
 and registers each empty Git checkout on the server. Existing-checkout attachment
 is an optional inspection/import path. Source editing, initial commits, Git hosting,
-builds and deployment remain unavailable.
+deployment remains unavailable; the selected web app has an opt-in [Linux build workflow](web-app-builds.md).
 
 Projects displays saved names, repository names and counts from the
 [catalog](project-catalog.md). Open a project name to see its repositories,
@@ -218,8 +218,9 @@ stdout/stderr checkpoint. **Source and attempt details** expands exact identitie
 These are saved records, not live process status. Interrupted attempts will not
 resume. Logs show retained bytes and truncation separately; missing checkpoints
 and failed reads have distinct messages. No artifact download is offered.
-The server still cannot start or approve a build. Source checks remain available
-below the history list. See the [history contract](build-history.md#authenticated-project-history)
+With the [Linux build runner](web-app-builds.md) explicitly enabled, this page also
+opens preparation, review, approval and cancellation for the selected trusted web
+app. Otherwise source checks remain available below the history list. See the [history contract](build-history.md#authenticated-project-history)
 for authentication, bounds and remaining integration work.
 
 

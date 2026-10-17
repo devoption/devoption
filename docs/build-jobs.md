@@ -2,11 +2,10 @@
 
 [#127](https://github.com/devoption/devoption/issues/127) adds the pure Unix
 `devoption_builds::jobs` domain. It uses the existing immutable
-[`BuildPlan`](build-plans.md) without duplicating its fields. There is no process
-launch, runtime caller, route, UI, storage or production event issuer.
-The separate [approval lifecycle](build-approvals.md) records single-use in-memory
-review actions; it is not integrated with job admission or runner transitions.
-No job records are created in the real instance. Application builds remain unavailable.
+[`BuildPlan`](build-plans.md) without duplicating its fields. This module itself performs no process launch or storage. The separate
+[Linux web-app integration](web-app-builds.md) connects owner approval and
+real runner events to these records and the history store. The event constructor
+is crate-private; callers cannot manufacture runner evidence.
 
 ## Identity and records
 

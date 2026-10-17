@@ -1,5 +1,14 @@
 # Typed build review context
 
+`WasmBuildV1` is the additional implemented policy for the [Linux web-app
+integration](web-app-builds.md). It pins the selected WASIp2 command and all twelve
+virtual worker environment values, uses policy tag 2, and binds host staging
+observations plus installed helper/configuration hashes. `InitialBuildV1` remains
+native-only. The seven directory records describe host staging identities;
+`/source`, `/toolchain`, `/vendor` and `/job` are the worker's fixed mount mapping.
+The pure context validator performs no OS enforcement.
+
+
 [#194](https://github.com/devoption/devoption/issues/194) replaces the arbitrary
 external digest accepted by [approval records](build-approvals.md) with immutable
 `devoption_builds::review_context::ReviewContext` metadata. This is a non-executing

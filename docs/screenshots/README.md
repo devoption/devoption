@@ -16,7 +16,9 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Project code | `/projects/{id}/code` | Immediate frontend file list; managed creation enabled; status read below files; 1280 × 900 | `project-code.jpg` |
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |
-| Project builds | `/projects/{id}/builds` | Synthetic saved attempts and source-check choices; 1280 × 1200 | `project-builds.jpg` |
+| Project builds | `/projects/{id}/builds` | Real local Wasm fixture attempts and enabled build action; 1280 × 1200 | `project-builds.jpg` |
+| Build review | `/projects/{id}/builds/{repository}/run` | Real prepared fixture, input identities collapsed; 1280 × 1200 | `build-review.jpg` |
+| Successful build | `/projects/{id}/builds/attempts/{id}` | Real local Wasm compile with saved diagnostics; 1280 × 1200 | `build-succeeded.jpg` |
 | Build attempt | `/projects/{id}/builds/attempts/{id}` | Interrupted synthetic record, saved streams, source details collapsed; 1280 × 1200 | `build-attempt.jpg` |
 | Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
 | Source checks | `/projects/{id}/builds/{repository}` | backend, clean committed fixture; 1280 × 1400 | `build-source-checks.jpg` |
@@ -133,3 +135,9 @@ and open Failed for `build-output-truncated.jpg`. Keep source details collapsed
 in the captures, but verify expansion and exact identifiers separately. Confirm
 truncated script/control/bidi text remains inert and no horizontal overflow at
 320, 375, 768, 800 and 1280 pixels. Source checks retain their existing captures.
+
+For the real runner captures, follow [web-app build setup](../web-app-builds.md)
+in a disposable local Ubuntu VM. Use the public fixture and a disposable owner.
+Capture the prepared review before approval, then a real successful attempt with
+saved compiler output. Existing interrupted/truncated screenshots remain synthetic
+display tests. Never substitute seeded success for real build evidence.

@@ -165,6 +165,17 @@ still apply. The private upstream port is a host-worker setting, not a guest `PO
 environment variable. Public ingress remains #230/#233. Nothing here implements
 these tasks or changes the existing private preview's behavior.
 
+## Build integration update (#231)
+
+The [Linux build workflow](../web-app-builds.md) implements the selected compiler
+path. The locked dependency needs executable target scratch for its build script:
+`WasmBuildV1` therefore splits bounded scratch into a noexec job filesystem and
+an executable target filesystem, reserving the remaining job budget for staging,
+artifact and logs. This changes no runtime capability grant. Component header,
+size and digest handoff checks precede the still-required #232 HTTP world/import
+and runtime compatibility validation. Cloud validation is deferred until the local
+build/run/deploy path works.
+
 ## Bounded fixture validation plan
 
 No guest compilation or execution was performed for this decision. Under #231/#232,

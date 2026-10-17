@@ -124,7 +124,8 @@ managed log data is bounded to approximately 10 MiB plus one pending snapshot;
 unrelated entries or same-account modifications are outside that bound.
 
 Raw stored logs can contain secrets or private paths. Private filesystem modes
-are not redaction or secure deletion. There is no runner reader, automatic checkpoint schedule or retention expiry yet.
+are not redaction or secure deletion. The opt-in Linux integration checkpoints bounded output during a build;
+there is no retention expiry yet.
 
 ## Explicit restart recovery
 
@@ -173,12 +174,11 @@ detail-page reads use `load_output` checks. Existing pending files are preserved
 and block any needed recovery write. A bind failure after recovery can leave the
 interrupted summaries saved; recovery is intentionally not rolled back.
 
-Opening/recovery does not restore approvals, inspect/kill surviving processes,
-delete job directories or release a runner slot. **Builds remain unavailable.** Before adding execution
-admission, leftover reconciliation and fresh approval checks must be implemented.
-An Interrupted label only records lost supervisor continuity. With no current
-runner or approval registry instantiated by the server, there is no restored
-execution authority on this path.
+History-only opening/recovery does not restore approvals, inspect/kill surviving
+processes or delete job directories. With [Linux execution](web-app-builds.md)
+explicitly enabled, the server separately stops and verifies the fixed build unit
+before history recovery. Restart never resumes a queued/running attempt or
+restores approval. An Interrupted label remains a record of lost continuity.
 
 ## Authenticated project history
 

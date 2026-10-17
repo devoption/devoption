@@ -63,6 +63,7 @@ pub(super) async fn show(
             selected: attempt.map(JobId::to_bytes),
             log: BuildLogView::Missing,
             source_available: projects.root.is_some(),
+            execution_available: projects.execution.is_some(),
         };
         let mut status = StatusCode::OK;
         if let Some(history) = history {
@@ -87,6 +88,18 @@ pub(super) async fn show(
                             .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
                         let (state, explanation) = state(record.state());
                         view.attempts.push(BuildAttemptView {
+                            artifact: match record.state() {
+                                State::Succeeded(metadata) => Some((
+                                    metadata
+                                        .sha256()
+                                        .bytes()
+                                        .iter()
+                                        .map(|b| format!("{b:02x}"))
+                                        .collect(),
+                                    metadata.bytes(),
+                                )),
+                                _ => None,
+                            },
                             id: record.id().to_bytes(),
                             repository: repository.name().to_owned(),
                             commit: record.commit().to_owned(),

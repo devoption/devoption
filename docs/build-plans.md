@@ -3,11 +3,11 @@
 `devoption-builds` implements a pure Unix Rust build-plan model under
 [#116](https://github.com/devoption/devoption/issues/116), an initial domain slice
 of [#15](https://github.com/devoption/devoption/issues/15) and
-[#17](https://github.com/devoption/devoption/issues/17). The plan model has no runtime caller,
-persistence, production approval issuer or executor. The separate
+[#17](https://github.com/devoption/devoption/issues/17). The plan model itself performs no I/O. The separate
+[Linux web-app integration](web-app-builds.md) now consumes plans for real builds. The separate
 [approval lifecycle](build-approvals.md) binds a supplied review action to the exact
 plan and typed external [review context](review-context.md); it neither verifies
-external state nor executes. Build execution remains unavailable.
+external state nor executes. Native execution remains unavailable.
 The crate also provides a separate [source preparation flow](build-preparation.md)
 used by project Builds; those current working-tree observations neither construct
 a BuildPlan nor grant approval.
@@ -37,8 +37,7 @@ The [offline fixture proof](offline-fixture-build.md) separately compiles truste
 test code from a checksum-verified seed. It does not consume a `BuildPlan` or
 implement production approval, isolation or job lifecycle.
 The separate [job lifecycle model](build-jobs.md) now defines in-memory records and
-transition rules using exact plan equality. It has no production runner-event
-issuer, persistence or runtime integration.
+transition rules using exact plan equality. Its event seal now admits the Linux integration; the model alone does not run processes.
 
 `BuildPlan::validate` consumes owned `PlanInput` values and reads a supplied
 in-memory catalog snapshot. It requires existing, associated project/repository
@@ -82,7 +81,10 @@ approval, freshness check or durable plan identifier.
   with a letter or underscore and then permit letters, digits, `_` and `-`.
   Both must match the verified package's conventional binary at `src/main.rs`.
   Additional automatic/explicit targets are rejected by the source snapshot.
-  Arbitrary Cargo flags and target kinds are unsupported.
+  The additional selected Wasm target is the fixed `devoption-web-fixture`
+  package / `devoption_web_fixture` cdylib, Rust 1.99.0 and `wasm32-wasip2`;
+  its fixed command ends in `--target wasm32-wasip2 --package devoption-web-fixture --lib`.
+  Arbitrary Cargo flags and other target kinds are unsupported.
 - Up to 32 explicit environment entries: unique, case-sensitive POSIX-style
   names of 1–64 ASCII bytes and values of at most 1024 UTF-8 bytes without control
   characters. Empty values and an empty list are allowed. No variables are
@@ -93,9 +95,9 @@ approval, freshness check or durable plan identifier.
   values, not enforced limits or an approved resource budget. Structural bounds
   do not define production execution policy.
 
-## Before execution can exist
+## Requirements for execution integration
 
-The future approval/execution layer must authenticate repository/revision selection
+An approval/execution layer must authenticate repository/revision selection
 and a fresh catalog binding, obtain a complete source snapshot and verify the actual
 registry bundle, and create a clean owned work directory without modifying
 the user's checkout, verify toolchain/executable identity, and define an explicit
@@ -113,5 +115,5 @@ require a separate isolation design.
 The [execution trust contract](execution-trust.md) defines the review and approval
 lifecycle, environment allowlist, owned directory policy, resource caps and output
 rules required of dependent implementation. These are policy requirements; this
-pure model does not enforce them or select production paths. Provider transport,
-runner enforcement and approval integration remain unimplemented.
+pure model does not enforce them or select production paths. The selected Wasm adapter implements its own verified-input and OS boundary;
+general registry transport and native execution remain unimplemented.

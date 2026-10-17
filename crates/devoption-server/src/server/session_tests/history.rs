@@ -312,3 +312,70 @@ fn history_detail_rejects_unsafe_host_and_mutation_methods() {
             );
         });
 }
+
+#[test]
+fn build_actions_require_session_csrf_and_explicit_runner_without_mutating_history() {
+    fn action_status(app: &Router, request: Request) -> StatusCode {
+        Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async { app.clone().oneshot(request).await.unwrap().status() })
+    }
+
+    let f = fixture(true);
+    let saved = fs::read(f.history.join("build-history.bin")).unwrap();
+    let repository: String = f.unassociated.iter().map(|b| format!("{b:02x}")).collect();
+    let base = format!("/projects/{}/builds/{repository}", f.project);
+    assert_eq!(
+        read(&f, &format!("{base}/run"), false).0,
+        StatusCode::SEE_OTHER
+    );
+    assert_eq!(
+        read(&f, &format!("{base}/run"), true).0,
+        StatusCode::NOT_FOUND
+    );
+    for action in ["prepare", "approve", "cancel"] {
+        for authenticated in [false, true] {
+            let body = if action == "approve" {
+                "ab".repeat(16)
+            } else {
+                String::new()
+            };
+            let mut request = Request::builder()
+                .method(Method::POST)
+                .uri(format!("{base}/{action}"))
+                .header(HOST, "127.0.0.1:3000")
+                .header(ORIGIN, "http://127.0.0.1:3000")
+                .header("content-type", "text/plain;charset=UTF-8")
+                .body(Body::from(body))
+                .unwrap();
+            if authenticated {
+                authorize(&mut request, &FIXTURE, &CSRF);
+            }
+            let status = action_status(&f.app, request);
+            assert_eq!(
+                status,
+                if authenticated {
+                    StatusCode::SERVICE_UNAVAILABLE
+                } else {
+                    StatusCode::UNAUTHORIZED
+                }
+            );
+        }
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri(format!("{base}/{action}"))
+            .header(HOST, "127.0.0.1:3000")
+            .header(ORIGIN, "http://127.0.0.1:3000")
+            .header("content-type", "text/plain;charset=UTF-8")
+            .body(Body::from("x".repeat(33)))
+            .unwrap();
+        authorize(&mut request, &FIXTURE, &CSRF);
+        assert!(action_status(&f.app, request).is_client_error());
+    }
+    assert_eq!(
+        fs::read(f.history.join("build-history.bin")).unwrap(),
+        saved
+    );
+}

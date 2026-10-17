@@ -6,6 +6,7 @@ pub struct BuildAttemptView {
     pub commit: String,
     pub source: String,
     pub state: &'static str,
+    pub artifact: Option<(String, u64)>,
     pub explanation: &'static str,
 }
 pub enum HistoryAvailability {
@@ -30,10 +31,24 @@ pub struct BuildHistoryView {
     pub selected: Option<[u8; 16]>,
     pub log: BuildLogView,
     pub source_available: bool,
+    pub execution_available: bool,
 }
 pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> String {
     let mut html = super::workspace::navigation(project, ProjectSection::Builds);
     let base = format!("/projects/{}/builds", identifier(&project.id));
+    if view.selected.is_none() && view.execution_available {
+        html.push_str("<section class=\"build-preparation\"><h2>Build web app</h2><p>Prepare, review and build the committed app. Only one build runs at a time.</p><ul>");
+        for repository in &project.repositories {
+            html.push_str(&format!(
+                "<li><a class=\"text-button\" href=\"{}/{}/run\">",
+                base,
+                identifier(&repository.id)
+            ));
+            escape_into(&mut html, repository.name);
+            html.push_str(" · Build app</a></li>");
+        }
+        html.push_str("</ul></section>");
+    }
     html.push_str("<section class=\"build-history\" aria-labelledby=\"history-title\">");
     if let Some(id) = view.selected {
         html.push_str(&format!(
@@ -58,6 +73,13 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> 
                 html.push_str("</dt><dd><code>");
                 escape_into(&mut html, &value);
                 html.push_str("</code></dd></div>");
+            }
+            if let Some((digest, bytes)) = &attempt.artifact {
+                html.push_str("<div><dt>Recorded component SHA-256</dt><dd><code>");
+                escape_into(&mut html, digest);
+                html.push_str(&format!(
+                    "</code></dd></div><div><dt>Component size</dt><dd>{bytes} bytes</dd></div>"
+                ));
             }
             html.push_str("</dl></details><h3>Saved output</h3><p class=\"preparation-note\">This is the last saved checkpoint, not a live stream. Output alone does not prove completion. No artifact download is available.</p>");
             match &view.log {
@@ -140,7 +162,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> 
         }
     }
     html.push_str("</section>");
-    if view.selected.is_none() {
+    if view.selected.is_none() && !view.execution_available {
         html.push_str(&super::builds::list(project, view.source_available));
     }
     html
@@ -162,6 +184,7 @@ mod tests {
             selected: None,
             log: BuildLogView::Missing,
             source_available: false,
+            execution_available: false,
         };
         assert!(content(&project, &view).contains("No saved build attempts"));
         view.availability = HistoryAvailability::Unconfigured;
@@ -170,6 +193,7 @@ mod tests {
         assert!(content(&project, &view).contains("could not be loaded"));
         view.availability = HistoryAvailability::Available;
         view.attempts.push(BuildAttemptView {
+            artifact: None,
             id: [2; 16],
             repository: "<repo>".into(),
             commit: "<commit>".into(),
