@@ -151,8 +151,8 @@ and explicit return to the previous release are supported, not automatic rollbac
 
 | Current implementation | Required change in the delivery series |
 | --- | --- |
-| `devoption-registry/src/cargo_inputs.rs` accepts only package/dependencies; exact package identity handling | #231: admit the narrow cdylib manifest; compare Cargo version requirements separately from full locked identities while preserving exact source/checksum checks and materialize the complete dependency bundle |
-| `devoption-builds/src/source_snapshot.rs` requires `src/main.rs` and rejects `src/lib.rs` | #231: verify the selected sole library source/target; retain complete-tree and fresh checkout checks |
+| `devoption-registry/src/cargo_inputs.rs` admits the narrow cdylib manifest and separates exact requirements from full locked identities | #231: materialize the complete verified dependency bundle; parsing does not prove archive availability or resolution |
+| `devoption-builds/src/source_snapshot.rs` verifies the sole conventional binary or cdylib source, including complete-tree and fresh checkout checks | #231: connect library snapshots to Wasm plans; the native planner currently rejects them |
 | `devoption-builds/src/lib.rs` plans `--bin` without a target triple | #231: version the plan/review identity for target, library kind, ABI, artifact path and complete toolchain inputs; invalidate old approvals |
 | Snapshot, review, approval, history, bounded output and supervision helpers | #231: connect real materialization, OS-enforced runner, admission, events, cleanup and automatic log checkpoints to the UI |
 | Python artifact handoff is a separate rehearsal helper | #231/#232: implement production collection with the existing no-follow, independent-copy, stopped-writer, size/hash rules; no executable permission requirement for Wasm |

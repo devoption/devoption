@@ -126,7 +126,12 @@ fn retains_all_owned_bytes_and_exact_conventional_target() {
             source.binary(),
             source.target_path()
         ),
-        ("ExampleService", "0.1.0", "ExampleService", "src/main.rs")
+        (
+            "ExampleService",
+            "0.1.0",
+            Some("ExampleService"),
+            "src/main.rs"
+        )
     );
     assert!(source.files().windows(2).all(|f| f[0].path() < f[1].path()));
     for file in source.files() {
@@ -528,4 +533,90 @@ fn actual_git_commit_supplies_complete_owned_snapshot_without_checkout_writes() 
     assert!(snapshot() == source);
     drop(temp);
     assert!(snapshot() == source);
+}
+
+impl ProofFixture {
+    pub(crate) fn cdylib() -> Self {
+        let manifest = [
+            MANIFEST,
+            b"\n[lib]\nname = 'ExampleService'\ncrate-type = ['cdylib']\n",
+        ]
+        .concat();
+        Self::with_files(&[
+            ("Cargo.toml", &manifest),
+            ("Cargo.lock", LOCK),
+            ("src/lib.rs", MAIN),
+        ])
+    }
+}
+
+#[test]
+fn cdylib_source_is_owned_without_native_binary_authority() {
+    let snapshot = ProofFixture::cdylib().verify().unwrap();
+    assert_eq!(snapshot.binary(), None);
+    assert_eq!(snapshot.target_path(), "src/lib.rs");
+    assert_eq!(
+        snapshot.target(),
+        &cargo_inputs::SourceTarget::Cdylib {
+            name: "ExampleService".into()
+        }
+    );
+    assert!(snapshot.sha256() != ProofFixture::new().verify().unwrap().sha256());
+    let manifest = [
+        MANIFEST,
+        b"\n[lib]\nname = 'ExampleService'\ncrate-type = ['cdylib']\n",
+    ]
+    .concat();
+    for source in [b"".as_slice(), b" \n", b"\xff"] {
+        assert_eq!(
+            ProofFixture::with_files(&[
+                ("Cargo.toml", &manifest),
+                ("Cargo.lock", LOCK),
+                ("src/lib.rs", source)
+            ])
+            .verify()
+            .err(),
+            Some(Error::UnsupportedTarget)
+        );
+    }
+    for extra in [
+        "src/main.rs",
+        "src/MAIN.RS",
+        "src/bin/extra.rs",
+        "build.rs",
+        "examples/app.rs",
+        ".cargo/config.toml",
+    ] {
+        assert!(
+            ProofFixture::with_files(&[
+                ("Cargo.toml", &manifest),
+                ("Cargo.lock", LOCK),
+                ("src/lib.rs", MAIN),
+                (extra, b"extra")
+            ])
+            .verify()
+            .is_err()
+        );
+    }
+    assert_eq!(
+        ProofFixture::with_files(&[
+            ("Cargo.toml", &manifest),
+            ("Cargo.lock", LOCK),
+            ("src/main.rs", MAIN)
+        ])
+        .verify()
+        .err(),
+        Some(Error::UnsupportedTarget)
+    );
+    assert_eq!(
+        ProofFixture::with_files(&[
+            ("Cargo.toml", MANIFEST),
+            ("Cargo.lock", LOCK),
+            ("src/main.rs", MAIN),
+            ("src/lib.rs", MAIN)
+        ])
+        .verify()
+        .err(),
+        Some(Error::UnsupportedTarget)
+    );
 }

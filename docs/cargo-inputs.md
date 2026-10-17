@@ -7,7 +7,7 @@ expected SHA-256 values for both inputs. It has no filesystem, Git, Cargo,
 process, environment or network access. The additional `inspect` entry point
 shares the same parsing, hash computation, bounds and graph checks without an
 expected-hash claim or registry selection. It returns package name/version, input
-hashes and dependency count to the [source preparation flow](build-preparation.md).
+hashes, source-target shape and dependency count to the [source preparation flow](build-preparation.md).
 `validate` retains its expected-hash check and explicit registry identity; neither
 entry point proves source provenance or archive availability.
 
@@ -20,15 +20,25 @@ iterative. These are input-validation bounds, not execution/resource permissions
 
 ## Deliberately supported subset
 
-- One standalone package. The manifest permits only `[package]` and an optional
-  `[dependencies]` table. Package keys are exactly `name`, `version`, `edition`
+- One standalone package. The manifest permits `[package]`, optional `[dependencies]`, and the narrow
+  `[lib]` form below. Package keys are exactly `name`, `version`, `edition`
   and `build`; all are required. Edition is `2021` or `2024`, and `build = false`
   disables automatic root build-script discovery. Package names and versions use
   the [registry contract's bounds](registry-contract.md#source-identity-and-bounds).
+- An optional `[lib]` must contain exactly `name` and `crate-type = ["cdylib"]`.
+  Its name must equal the package name with hyphens replaced by underscores and
+  use ASCII Rust identifier syntax. Its conventional source is `src/lib.rs`;
+  without `[lib]`, the source shape remains the default binary at `src/main.rs`.
+  This admits the [selected web-app manifest](decisions/0004-first-wasm-web-app.md)
+  under [#231](https://github.com/devoption/devoption/issues/231), but does not
+  prove a Wasm target, HTTP ABI, source presence or a successful compilation.
 - Direct dependencies are string-valued exact pins, such as `http = "=1.2.3"`.
-  The version spelling must exactly match the corresponding lock entry, including
-  any prerelease/build metadata. This is stricter than Cargo's general SemVer
-  requirement matching; no requirements are resolved here.
+  Core and prerelease spelling must match the corresponding locked version.
+  Build metadata after `+` is ignored only for requirement matching, following
+  [Cargo's version metadata rules](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#version-metadata).
+  Thus `wasip2 = "=1.0.1"` matches locked `1.0.1+wasi-0.2.4`. The complete locked
+  version and archive checksum remain in the request identity; changing metadata
+  still changes that identity. Ranges and floating requirements remain unsupported.
 - A version-4 lockfile with only `version` and `[[package]]` at the top level.
   Package entries permit only `name`, `version`, `source`, `checksum` and
   `dependencies`. Exactly one entry has no source: it must match the manifest's
@@ -47,7 +57,7 @@ iterative. These are input-validation bounds, not execution/resource permissions
 Everything outside that subset is rejected rather than ignored: workspaces and
 workspace inheritance, path/Git/private registry dependencies, dependency tables,
 renames, optional dependencies, features, target conditions, dev/build dependencies,
-patches/replacements, profiles, explicit targets, other manifest metadata/keys,
+patches/replacements, profiles, other explicit targets, other manifest metadata/keys,
 source-qualified lock references and other lockfile versions. Even benign metadata
 such as a package description is currently outside this narrow adapter. It cannot
 consume DevOption's own workspace manifest.

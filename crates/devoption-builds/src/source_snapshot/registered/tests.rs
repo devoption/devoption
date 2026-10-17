@@ -141,7 +141,7 @@ fn reads_exact_committed_binary_and_nested_bytes_without_modifying_storage() {
     assert_eq!(before, state());
     assert!(!f.app().join("target").exists());
     assert_eq!(snapshot.commit(), f.selected);
-    assert_eq!(snapshot.binary(), "fixture-app");
+    assert_eq!(snapshot.binary(), Some("fixture-app"));
     assert_eq!(snapshot.files().len(), 5);
     for file in snapshot.files() {
         assert_eq!(file.bytes(), fs::read(f.app().join(file.path())).unwrap());
@@ -397,4 +397,37 @@ fn final_comparison_rechecks_revision_files_and_binding_after_collection() {
         f.capture().err().unwrap(),
         InspectionError::SelectedCommitMismatch,
     );
+}
+
+#[test]
+fn registered_cdylib_capture_retains_fresh_checkout_checks() {
+    let mut f = Fixture::new();
+    fs::rename(f.app().join("src/main.rs"), f.app().join("src/lib.rs")).unwrap();
+    fs::write(
+        f.app().join("Cargo.toml"),
+        format!("{MANIFEST}\n[lib]\nname = 'fixture_app'\ncrate-type = ['cdylib']\n"),
+    )
+    .unwrap();
+    f.commit();
+    let snapshot = f.capture().unwrap();
+    assert_eq!(snapshot.target_path(), "src/lib.rs");
+    assert_eq!(snapshot.binary(), None);
+    assert_eq!(
+        snapshot.target(),
+        &devoption_registry::cargo_inputs::SourceTarget::Cdylib {
+            name: "fixture_app".into()
+        }
+    );
+    let original = fs::read(f.app().join("src/lib.rs")).unwrap();
+    assert_eq!(
+        snapshot
+            .files()
+            .iter()
+            .find(|file| file.path() == "src/lib.rs")
+            .unwrap()
+            .bytes(),
+        original
+    );
+    fs::write(f.app().join("src/lib.rs"), "changed source\n").unwrap();
+    assert!(f.capture().is_err());
 }

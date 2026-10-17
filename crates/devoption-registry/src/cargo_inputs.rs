@@ -21,6 +21,22 @@ pub struct InputHashes {
     pub lockfile: Sha256,
 }
 
+/// Supported source shape, not a target triple, ABI proof or execution grant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SourceTarget {
+    Binary,
+    Cdylib { name: String },
+}
+
+impl SourceTarget {
+    pub fn path(&self) -> &'static str {
+        match self {
+            Self::Binary => "src/main.rs",
+            Self::Cdylib { .. } => "src/lib.rs",
+        }
+    }
+}
+
 /// Internally consistent supplied inputs, without a provider or source proof.
 /// No Debug implementation prints package metadata implicitly.
 pub struct InspectedInputs {
@@ -28,9 +44,13 @@ pub struct InspectedInputs {
     version: String,
     hashes: InputHashes,
     packages: Vec<LockedPackage>,
+    target: SourceTarget,
 }
 
 impl InspectedInputs {
+    pub fn target(&self) -> &SourceTarget {
+        &self.target
+    }
     pub fn package(&self) -> &str {
         &self.package
     }
@@ -91,7 +111,7 @@ fn inspect_expected(
         return Err(Error::HashMismatch);
     }
     let manifest = parse(manifest)?;
-    keys(&manifest, &["package", "dependencies"])?;
+    keys(&manifest, &["package", "dependencies", "lib"])?;
     let package = table(manifest.get("package"))?;
     keys(package, &["name", "version", "edition", "build"])?;
     let root_name = string(package.get("name"))?;
@@ -104,6 +124,25 @@ fn inspect_expected(
     {
         return Err(Error::Unsupported);
     }
+    let target = match manifest.get("lib") {
+        None => SourceTarget::Binary,
+        Some(value) => {
+            let library = table(Some(value))?;
+            keys(library, &["name", "crate-type"])?;
+            let name = string(library.get("name"))?;
+            let types = library.get("crate-type").and_then(Value::as_array);
+            // One conventional library name/path only; no renamed or extra targets.
+            if name != root_name.replace('-', "_")
+                || !name.bytes().enumerate().all(|(i, b)| {
+                    b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit())
+                })
+                || !matches!(types, Some(values) if values.len() == 1 && values[0].as_str() == Some("cdylib"))
+            {
+                return Err(Error::Unsupported);
+            }
+            SourceTarget::Cdylib { name: name.into() }
+        }
+    };
     let mut direct = BTreeMap::new();
     if let Some(dependencies) = manifest.get("dependencies") {
         for (name, value) in table(Some(dependencies))? {
@@ -197,7 +236,11 @@ fn inspect_expected(
     let edges = resolve_edges(&nodes)?;
     if edges[root].len() != direct.len()
         || edges[root].iter().any(|&i| {
-            direct.get(nodes[i].name.as_str()).copied() != Some(nodes[i].version.as_str())
+            direct.get(nodes[i].name.as_str()).is_none_or(|pin| {
+                // Cargo ignores build metadata in version requirements. Full locked
+                // versions and checksums remain in the dependency request identity.
+                release_version(pin) != release_version(&nodes[i].version)
+            })
         })
     {
         return Err(Error::DependencyMismatch);
@@ -208,7 +251,14 @@ fn inspect_expected(
         version: root_version.into(),
         hashes: actual,
         packages,
+        target,
     })
+}
+
+fn release_version(version: &str) -> &str {
+    version
+        .split_once('+')
+        .map_or(version, |(release, _)| release)
 }
 
 struct Node {

@@ -128,7 +128,9 @@ impl BuildPlan {
         if !target_name(&input.package) || !target_name(&input.binary) {
             return Err(Error::InvalidTarget);
         }
-        if input.package != input.source.package() || input.binary != input.source.binary() {
+        if input.package != input.source.package()
+            || Some(input.binary.as_str()) != input.source.binary()
+        {
             return Err(Error::TargetMismatch);
         }
         if input.environment.len() > MAX_ENVIRONMENT_ENTRIES {
