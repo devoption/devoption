@@ -61,7 +61,9 @@ read-only system paths, hidden home/platform storage, and its own dynamic identi
 No new login credentials are required. Installation and sudo configuration are
 operator actions, never browser actions.
 
-Add `--app-deployment enabled` to the existing `serve` command, retaining
+Use the [service generator](first-web-app.md#2-supply-the-app-and-install-builddeployment-support)
+for a system installation. For a foreground invocation, add
+`--app-deployment enabled` to the existing `serve` command, retaining
 `--build-execution enabled` and its owner/history/repository flags. Enabling it
 reconciles saved intent before the control listener is opened. It does not create
 storage directories or enroll an owner. Without it, Releases explains that the

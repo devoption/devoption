@@ -4,7 +4,7 @@ The opt-in Linux runner connects project source, immutable review, explicit owne
 approval, real offline compilation and saved results. It builds the trusted
 [`examples/web-app`](../examples/web-app/) WASIp2 fixture selected by
 [ADR 0004](decisions/0004-first-wasm-web-app.md). It does **not** run or deploy the
-component. Runtime interface/import validation and deployment belong to #232.
+component. [The deployment runtime](web-app-deployments.md) validates imports and runs saved releases.
 Cloud infrastructure is unnecessary for this step: use a disposable Ubuntu 24.04
 x86_64 VM. Public DNS/ACME and fresh cloud installation remain later acceptance.
 
@@ -101,8 +101,8 @@ opt-in (the paths must exactly match the installed configuration):
   --build-execution enabled
 ```
 
-For a service, update its ExecStart accordingly and retain writable access only
-to its selected storage. `--public-origin` remains optional and independent.
+For a service, use the [configuration-driven service generator](first-web-app.md#2-supply-the-app-and-install-builddeployment-support)
+to include the selected storage and broker privilege requirements. `--public-origin` remains optional and independent.
 Missing isolation, unsafe configuration, another runner holding the jobs lock,
 or failure to reconcile the previous fixed unit prevents startup. There is no
 fallback that runs Cargo directly on the host.
@@ -132,8 +132,8 @@ recompute the artifact SHA-256 before any downstream handoff. A receipt without
 a matching Succeeded history record is not a successful build. The UI shows the
 recorded artifact digest and size in **Source and attempt details**; it does not
 serve downloads or independently reverify saved artifacts on each page read.
-The component header is not proof of the expected HTTP world/imports; #232 must
-validate those before instantiation. Historical display fixtures remain records,
+The component header is not proof of the expected HTTP world/imports; the deployment
+runtime validates those before instantiation. Historical display fixtures remain records,
 not executable artifacts.
 
 ## Enforced policy and recovery
