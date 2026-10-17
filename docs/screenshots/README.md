@@ -13,9 +13,9 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
 | Project overview | `/projects/{id}` | Example application; repository list, checkout locations collapsed; 1280 × 900 | `project-details.jpg` |
-| Project code | `/projects/{id}/code` | Immediate frontend file list; managed creation enabled; status read below files; 1280 × 900 | `project-code.jpg` |
-| Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths; 1280 × 900 | `repository-files.jpg` |
-| Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend working-tree source; 1280 × 900 | `repository-file.jpg` |
+| Project code | `/projects/{id}/code` | Frontend tree and default README preview; managed creation enabled; status read below viewer; 1280 × 900 | `project-code.jpg` |
+| Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths and README preview; 1280 × 900 | `repository-files.jpg` |
+| Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend highlighted source with expanded src folder; 1280 × 900 | `repository-file.jpg` |
 | Project builds | `/projects/{id}/builds` | Real local Wasm fixture attempts and enabled build action; 1280 × 1200 | `project-builds.jpg` |
 | Build review | `/projects/{id}/builds/{repository}/run` | Real prepared fixture, input identities collapsed; 1280 × 1200 | `build-review.jpg` |
 | Successful build | `/projects/{id}/builds/attempts/{id}` | Real local Wasm compile with saved diagnostics; 1280 × 1200 | `build-succeeded.jpg` |
@@ -76,8 +76,8 @@ printed ephemeral origin. Do not create an owner for that capture.
 3. Capture Example application’s Overview and each project section. On Code, select the frontend's **View status**. Wait for branch
    `main`, **No commits yet**, **3 staged**, **1 untracked entry**, and **Last checked**. This time
    is when the browser received the valid response, not continuous monitoring.
-   Code already shows its three tracked paths. Choose **frontend** above the list
-   for the explicit repository URL capture, then open `src/main.rs` and capture
+   Code shows a folder tree and its README preview. Choose **frontend** above the list
+   for the explicit repository URL capture, then expand `src` and open `main.rs` and capture
    the source. Return to Code before continuing.
 4. On Projects, open **New project**, enter **Example new project** and capture
    the dialog. Submit, capture the new empty details page, then open Code and **Attach

@@ -16,13 +16,13 @@ for dimensions, states and refresh instructions.
 
 ![Project Overview](project-details.jpg)
 
-![Project Code with files shown immediately and repository details below](project-code.jpg)
+![Project Code with a folder tree and default README preview](project-code.jpg)
 
-**Tracked repository files and current working-tree text**
+**Repository tree, README preview and highlighted source**
 
-![Tracked frontend paths](repository-files.jpg)
+![Frontend tree with rendered README](repository-files.jpg)
 
-![Current source text](repository-file.jpg)
+![Highlighted source with line numbers and an expanded folder tree](repository-file.jpg)
 
 ![Project Builds with the build action and real local attempt history](project-builds.jpg)
 

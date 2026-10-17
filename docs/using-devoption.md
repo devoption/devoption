@@ -117,7 +117,9 @@ Without JavaScript, the full list remains visible. Opening a project enters its
 own workspace at `/projects/{id}`. **Overview** lists its repositories with links
 to their files and guidance for code, builds and releases. Expand **Checkout location** on a repository to see its saved
 path, or use **Manage repositories** to open Code.
-**Code** opens tracked files, with repository details and inspection below;
+**Code** opens a folder tree and previews a tracked root README when present.
+Source files include line numbers and syntax highlighting; Markdown offers
+**Preview** and **Source** views. Repository details and inspection remain below;
 **Settings** edits the project
 name. **Builds** offers [source preparation checks](build-preparation.md) for an
 attached repository: observed commit, Git changes, tracked Cargo inputs and binary

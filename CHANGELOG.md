@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a persistent folder tree, line-numbered syntax highlighting, and default
+  tracked root README previews with a Preview/Source switch. Markdown renders
+  without active repository HTML or remote images, under existing read bounds
+  ([#250](https://github.com/devoption/devoption/issues/250)).
+
 - Make project overviews easier to scan with repository rows, expandable checkout
   locations, a guided empty state, and links to code, builds and releases
   ([#248](https://github.com/devoption/devoption/issues/248)).
