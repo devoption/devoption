@@ -5,6 +5,8 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+## [0.1.0-preview.1] - 2026-10-18
+
 ### Changed
 
 - Use the checksum-pinned GNU/Linux release-plz build to avoid musl changelog
@@ -806,3 +808,19 @@ Entries describe implemented changes, not the roadmap.
   for easier reading; document the owner-authorized PR-and-CI protection now
   enabled on `main`
   ([#2](https://github.com/devoption/devoption/issues/2)).
+
+<!-- devoption-release-metadata:start -->
+### Release compatibility and support
+
+- Preview version: `0.1.0-preview.1`; supported platform: Ubuntu 24.04 amd64.
+- Installation: fresh only. Upgrades from earlier platform versions are unsupported.
+- Data compatibility: Use fresh platform state. Existing installations are not supported upgrade targets for this preview.
+- Configuration compatibility: Use the operator-managed source installation instructions in docs/public-linux-install.md; no automatic configuration conversion is provided.
+- Migration: none implemented. No platform data or configuration migration is implemented. Do not reuse existing installation state as an upgrade procedure.
+- Binary rollback: unsupported. Do not assume replacing the executable reverses data changes. The same-installation snapshot and staged restore in docs/same-node-recovery.md require the original external files and operator verification; they are not cross-version upgrade recovery.
+- Support status: development preview.
+- Warning: One owner and one trusted stateless Rust/WASIp2 app on a dedicated Ubuntu 24.04 amd64 node; arbitrary applications and hostile multi-tenant hosting are unsupported.
+- Warning: Source installation remains operator-managed. Published bundles, a verified bundle installer and supported platform upgrades are not available.
+- Warning: Preview metadata is not production-readiness evidence or permission to publish; the release approval gate under issue #21 still applies.
+- Metadata SHA-256: `d4c93fe0e7496f6085adc42cca8df62272ba5ba6743cc1fb3cc8a3e0d4aff343` (metadata identity, not artifact provenance).
+<!-- devoption-release-metadata:end -->
