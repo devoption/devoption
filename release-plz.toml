@@ -1,0 +1,47 @@
+[workspace]
+# Preparation only. Publication and tag creation require a separate reviewed change.
+git_only = true
+publish = false
+git_tag_enable = false
+git_tag_name = "v{{ version }}"
+git_release_enable = false
+release_always = false
+semver_check = false
+dependencies_update = false
+features_always_increment_minor = true
+pr_draft = true
+pr_branch_prefix = "codex/release-plz-"
+pr_name = "chore: prepare platform release{% if version %} {{ version }}{% endif %}"
+pr_body = """
+Review the generated version/changelog changes and the release evidence under #21.
+This proposal does not authorize tags, publication, or merging.
+
+Refs #260
+"""
+changelog_update = false
+release_commits = '(?m)^(feat|fix|perf)(\([^\n]+\))?!?:|^[a-z]+(\([^\n]+\))?!:|^BREAKING[ -]CHANGE:'
+
+[[package]]
+name = "devoption-cli"
+changelog_path = "CHANGELOG.md"
+changelog_update = true
+changelog_include = ["devoption-runtime", "devoption-builds", "devoption-projects", "devoption-registry", "devoption-server", "devoption-ui"]
+version_group = "platform"
+[[package]]
+name = "devoption-runtime"
+version_group = "platform"
+[[package]]
+name = "devoption-builds"
+version_group = "platform"
+[[package]]
+name = "devoption-projects"
+version_group = "platform"
+[[package]]
+name = "devoption-registry"
+version_group = "platform"
+[[package]]
+name = "devoption-server"
+version_group = "platform"
+[[package]]
+name = "devoption-ui"
+version_group = "platform"
