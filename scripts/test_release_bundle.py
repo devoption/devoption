@@ -5,13 +5,14 @@ import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path
 import tarfile
-import tomllib
 from unittest.mock import patch
 
 from check_release_bundle import check
 from release_bundle import SOURCE_FILES, assemble, binary_bytes, probe, sha256
+from release_inventory import SBOM, PROVENANCE
 from release_metadata import load_metadata, render_metadata
 from release_plan import git
 from test_release_plan import Fixture, ROOT
@@ -27,14 +28,11 @@ class BundleTests(Fixture):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes((ROOT / name).read_bytes())
-        for name in ("Cargo.toml", "Cargo.lock"):
-            path = self.root / name
-            path.write_text(path.read_text().replace("0.2.0", self.version))
-        lock = self.root / "Cargo.lock"
-        for package in tomllib.loads((ROOT / "Cargo.lock").read_text())["package"]:
-            if package["name"] in ("wasmtime", "wasmtime-wasi", "wasmtime-wasi-http"):
-                with lock.open("a") as stream:
-                    stream.write(f'\n[[package]]\nname = "{package["name"]}"\nversion = "{package["version"]}"\n')
+        path = self.root / "Cargo.toml"
+        path.write_text(path.read_text().replace("0.2.0", self.version))
+        (self.root / "Cargo.lock").write_text(re.sub(
+            r'(?m)(^name = "devoption-[^"]+"\nversion = ")[^"]+("$)',
+            lambda match: match[1] + self.version + match[2], (ROOT / "Cargo.lock").read_text()))
         metadata, digest = load_metadata(self.root, self.version)
         (self.root / "CHANGELOG.md").write_text(
             f"# Changelog\n\n## [Unreleased]\n\n## [{self.version}] - {date.today()}\n\n"
@@ -72,7 +70,7 @@ class BundleTests(Fixture):
         self.assertEqual(manifest["release_metadata"]["compatibility"]["upgrade_from"], [])
         with tarfile.open(self.output / first["archive"]) as archive:
             members = archive.getmembers()
-            self.assertEqual({m.name for m in members}, {*SOURCE_FILES, "bin/devoption", "RELEASE-NOTES.md", "manifest.json"})
+            self.assertEqual({m.name for m in members}, {*SOURCE_FILES, "bin/devoption", "RELEASE-NOTES.md", "manifest.json", SBOM})
             self.assertEqual(archive.extractfile("manifest.json").read(), (self.output / "manifest.json").read_bytes())
             for record in manifest["files"]:
                 entry = archive.getmember(record["path"])
@@ -116,6 +114,20 @@ class BundleTests(Fixture):
                 (self.output / "SHA256SUMS").write_text(f"{sha256(archive.read_bytes())}  {archive.name}\n")
                 with self.assertRaisesRegex(ValueError, expected):
                     check(self.root, self.binary, self.output)
+
+    def test_checker_rejects_unsigned_statement_and_inventory_edits(self):
+        result = self.assemble()
+        statement_path = self.output / PROVENANCE
+        statement = json.loads(statement_path.read_bytes())
+        self.assertEqual(statement["subject"][0]["digest"]["sha256"], result["sha256"])
+        self.assertEqual(statement["predicate"]["buildDefinition"]["externalParameters"]["authentication"], "unsigned")
+        statement["subject"][0]["digest"]["sha256"] = "0" * 64
+        statement_path.write_text(json.dumps(statement))
+        with self.assertRaisesRegex(ValueError, "provenance subject"):
+            check(self.root, self.binary, self.output)
+        (self.output / SBOM).write_text("{}")
+        with self.assertRaisesRegex(ValueError, "SBOM differs"):
+            check(self.root, self.binary, self.output)
 
     def test_existing_candidate_is_preserved(self):
         first = self.assemble()

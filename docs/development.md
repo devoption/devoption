@@ -51,7 +51,8 @@ This preserves branch protection without changing repository settings.
 
 The installation job also assembles a local preview bundle from the release
 executable, runs its version/help checks, and compares every archived byte and
-manifest entry with the trusted checkout/build inputs. It uploads no artifacts;
+manifest entry, source-inventory SBOM and unsigned assembly statement with the
+trusted checkout/build inputs. It uploads no artifacts;
 see [bundle candidates and remaining trust gates](release-bundles.md).
 
 The Python job installs pinned release-plz and Rust to run the real-tool release

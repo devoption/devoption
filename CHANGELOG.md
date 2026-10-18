@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Include a deterministic CycloneDX source-inventory SBOM, vendored Highlight.js
+  notices and digest-bound unsigned assembly provenance in local bundle
+  candidates; validate dependency identities, checksums and sidecars while
+  retaining incomplete coverage, authentication and publication gates
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Assemble repeatable local Ubuntu 24.04 amd64 preview bundle candidates with
   a versioned file/compatibility/dependency manifest, checksums and packaged
   executable smoke checks; reject mismatched, dirty or replaceable inputs while

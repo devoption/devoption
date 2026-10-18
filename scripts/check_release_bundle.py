@@ -11,6 +11,7 @@ import stat
 import tarfile
 
 from release_bundle import MAX_BINARY, TARGET, canonical, payload, sha256
+from release_inventory import SBOM, PROVENANCE, provenance
 
 
 def regular(path, limit):
@@ -27,14 +28,16 @@ def regular(path, limit):
 def check(repository, binary, output):
     manifest, files = payload(repository, binary)
     name = f"devoption-{manifest['platform_version']}-{TARGET}.tar.gz"
-    if output.is_symlink() or {p.name for p in output.iterdir()} != {name, "manifest.json", "SHA256SUMS"}:
-        raise ValueError("Candidate output must contain exactly its archive, manifest and checksums.")
+    if output.is_symlink() or {p.name for p in output.iterdir()} != {name, "manifest.json", "SHA256SUMS", SBOM, PROVENANCE}:
+        raise ValueError("Candidate output must contain exactly its archive, manifest, inventory, unsigned statement and checksums.")
     expected = files | {"manifest.json": canonical(manifest)}
     if regular(output / "manifest.json", 256 * 1024) != expected["manifest.json"]:
         raise ValueError("Candidate manifest differs from the trusted source/build inputs.")
     raw = regular(output / name, MAX_BINARY + 8 * 1024 * 1024)
     if regular(output / "SHA256SUMS", 1024) != f"{sha256(raw)}  {name}\n".encode():
         raise ValueError("Candidate archive checksum differs.")
+    if regular(output / SBOM, 2 * 1024 * 1024) != files[SBOM]:
+        raise ValueError("Candidate SBOM differs from the trusted source/build inputs.")
     seen = set()
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
         for entry in archive:
@@ -51,6 +54,10 @@ def check(repository, binary, output):
                     raise ValueError("Candidate member differs from the trusted source/build inputs.")
     if seen != set(expected):
         raise ValueError("Candidate is missing required members.")
+    statement = provenance(manifest, name, sha256(raw), canonical(manifest), files[SBOM],
+                           sha256(files["bin/devoption"]), sha256(files["rust-toolchain.toml"]))
+    if regular(output / PROVENANCE, 64 * 1024) != canonical(statement):
+        raise ValueError("Candidate unsigned provenance subject or materials differ.")
     return sha256(raw)
 
 
