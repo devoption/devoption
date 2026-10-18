@@ -153,7 +153,7 @@ Output is timestamped JSON with per-check results and the expected health body
 SHA-256, without response bodies, cookies or certificate contents. Exit 0 means these checks passed, 1 means at least one
 failed, and 2 means invalid command arguments. Review the hostname/address metadata
 before sharing the report publicly. Socket operations time out after five seconds
-and response bodies are limited to 64 KiB; system DNS resolution and slow streams
+and response bodies are limited to 128 KiB; system DNS resolution and slow streams
 are not subject to a whole-command deadline. Run one check at a time and interrupt
 it if necessary. Failed certificates, routing, redirects or health never count as
 a successful route, and the command does not retry or repair the installation.

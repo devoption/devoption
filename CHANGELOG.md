@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Raise the external HTTPS checker's bounded response limit to 128 KiB so the
+  current 90,219-byte sign-in page passes; retain oversized-response rejection
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
 - Reconcile the roadmap, architecture and accepted-decision index with implemented
   trusted Wasm builds, immutable releases, same-node deployment and local lifecycle
   evidence; preserve outstanding fresh-host/public DNS/ACME acceptance and broader
