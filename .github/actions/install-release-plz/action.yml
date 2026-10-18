@@ -1,0 +1,13 @@
+name: Install pinned release-plz
+description: Verify the fixed Ubuntu archive before extracting the preparation tool
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        curl --fail --silent --show-error --location \
+          https://github.com/release-plz/release-plz/releases/download/release-plz-v0.3.172/release-plz-x86_64-unknown-linux-musl.tar.gz \
+          --output "$RUNNER_TEMP/release-plz.tar.gz"
+        echo "db58a4668ce9ef0b6431e96a665715745e9a5d7f0b0b28a610034d94de3970df  $RUNNER_TEMP/release-plz.tar.gz" | sha256sum --check
+        mkdir "$RUNNER_TEMP/release-plz-tool"
+        tar -xzf "$RUNNER_TEMP/release-plz.tar.gz" -C "$RUNNER_TEMP/release-plz-tool"

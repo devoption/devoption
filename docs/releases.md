@@ -7,8 +7,10 @@ A read-only [release preparation dry run](release-preparation.md) can propose
 version/changelog changes with pinned release-plz in a disposable clone. It does
 not replace the steps below or authorize publication. It selects numbered preview
 proposals, preserves human notes and checks
-[version-bound release metadata](release-metadata.md). Release PR creation,
-publication eligibility and publication remain unfinished under #260.
+[version-bound release metadata](release-metadata.md). Its opt-in
+[draft PR writer](release-prs.md) retains the new commit's required CI and human
+merge control. Live writer acceptance, auto-merge policy, publication eligibility
+and publication remain unfinished under #260.
 
 The **Release check** workflow is deliberately read-only. It repeats CI and
 validates notes on `main`, showing them in the workflow summary. It does not

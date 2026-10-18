@@ -1,7 +1,17 @@
-name: Release preparation dry run
+name: Release preparation
 
 on:
   workflow_dispatch:
+    inputs:
+      proposal_date:
+        description: 'Proposal date, YYYY-MM-DD; reuse the same date when retrying'
+        required: true
+        type: string
+      create_draft:
+        description: 'Create or recover the identical bot-owned draft release PR after validation'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -29,13 +39,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Install checksum-pinned release-plz
-        run: |
-          curl --fail --silent --show-error --location \
-            https://github.com/release-plz/release-plz/releases/download/release-plz-v0.3.172/release-plz-x86_64-unknown-linux-musl.tar.gz \
-            --output "$RUNNER_TEMP/release-plz.tar.gz"
-          echo "db58a4668ce9ef0b6431e96a665715745e9a5d7f0b0b28a610034d94de3970df  $RUNNER_TEMP/release-plz.tar.gz" | sha256sum --check
-          mkdir "$RUNNER_TEMP/release-plz-tool"
-          tar -xzf "$RUNNER_TEMP/release-plz.tar.gz" -C "$RUNNER_TEMP/release-plz-tool"
+        uses: ./.github/actions/install-release-plz
       - name: Prepare offline inputs
         run: |
           rustup show active-toolchain
@@ -45,9 +49,12 @@ jobs:
           DEVOPTION_RELEASE_PLZ: ${{ runner.temp }}/release-plz-tool/release-plz
         run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
       - name: Generate a disposable proposal
+        env:
+          PROPOSAL_DATE: ${{ inputs.proposal_date }}
         run: |
           python3 scripts/release_plan.py \
             --channel preview \
+            --date "$PROPOSAL_DATE" \
             --release-plz "$RUNNER_TEMP/release-plz-tool/release-plz" \
             --output "$RUNNER_TEMP/release-proposal"
           {
@@ -63,4 +70,37 @@ jobs:
             echo '```'
             echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
+      - run: git diff --exit-code
+
+  draft:
+    name: Create an immutable draft release PR
+    needs: [checks, plan]
+    if: inputs.create_draft && github.ref == 'refs/heads/main' && github.repository == 'devoption/devoption'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install-release-plz
+      - name: Prepare offline inputs
+        run: |
+          rustup show active-toolchain
+          cargo fetch --locked
+      - name: Regenerate and create or recover the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_CREATE_DRAFT: ${{ inputs.create_draft }}
+          RELEASE_CHECKS_RESULT: ${{ needs.checks.result }}
+          RELEASE_PLAN_RESULT: ${{ needs.plan.result }}
+          PROPOSAL_DATE: ${{ inputs.proposal_date }}
+        run: |
+          python3 scripts/release_pr.py \
+            --release-plz "$RUNNER_TEMP/release-plz-tool/release-plz" \
+            --date "$PROPOSAL_DATE" >> "$GITHUB_STEP_SUMMARY"
       - run: git diff --exit-code
