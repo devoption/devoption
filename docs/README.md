@@ -2,7 +2,8 @@
 
 DevOption is a deployable software factory intended for individuals and teams.
 The current implementation is an owner-only development preview with loopback HTTP
-access and an explicit [HTTPS proxy mode](public-linux-install.md) awaiting cloud validation. An opt-in [Linux build workflow](web-app-builds.md) compiles the selected trusted
+access and an explicit [HTTPS proxy mode](public-linux-install.md) with
+[fresh cloud acceptance evidence](public-cloud-acceptance.md). An opt-in [Linux build workflow](web-app-builds.md) compiles the selected trusted
 Wasm app through the interface. An opt-in app runtime supports saved releases and same-node deployment. Team
 accounts and production hosting acceptance remain planned.
 
@@ -12,6 +13,7 @@ accounts and production hosting acceptance remain planned.
   [architecture](architecture.md), [decisions](decisions/README.md) and
   [task/handoff template](task-template.md); [priorities](../ROADMAP.md)
 - [First web app: install, build, deploy and maintain](first-web-app.md)
+- [Public cloud acceptance evidence](public-cloud-acceptance.md) and [issue reconciliation](single-node-acceptance-status.md)
 - [Clean local installation, app lifecycle and recovery evidence](clean-local-rehearsal.md)
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)

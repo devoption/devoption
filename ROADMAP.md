@@ -78,17 +78,19 @@ user-visible capability before moving to optional improvements.
 | Task | Current status and remaining acceptance | Dependencies |
 | --- | --- | --- |
 | [#229: Minimum web-app contract](https://github.com/devoption/devoption/issues/229) | Complete: selected WASIp2/Wasmtime contract, public app fixture and pinned source/dependency preparation. | First implementation-enabling decision |
-| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Implemented; [fresh source-built cloud/public HTTPS evidence](docs/public-cloud-acceptance.md) is recorded for review. | Can proceed independently of the runtime choice |
+| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Complete for the selected profile; [fresh source-built cloud/public HTTPS evidence](docs/public-cloud-acceptance.md) is merged. | Can proceed independently of the runtime choice |
 | [#231: Build from the project interface](https://github.com/devoption/devoption/issues/231) | Complete for the selected trusted app: real reviewed interface builds, durable outcomes/logs, verified component output and failure/cancel/restart evidence. | #229; #230 for public UI validation |
 | [#232: Release and deploy on the node](https://github.com/devoption/devoption/issues/232) | Complete for the selected Wasm profile: immutable releases, private deployment, health/log/stop, A → B → saved A, running/stopped reboot evidence. | #229 and #231 |
-| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | Implemented; [two public hostnames and ACME issuance/accelerated renewal](docs/public-cloud-acceptance.md) passed through updates/reboots. | #230 and #232 |
-| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | [Connected fresh-cloud lifecycle evidence](docs/public-cloud-acceptance.md) is recorded for review, including source compilation, external access, restore and reinstallation. No product release is approved. | #230–#233 |
+| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | Complete for the selected profile; [two public hostnames and ACME issuance/accelerated renewal](docs/public-cloud-acceptance.md) passed through updates/reboots. | #230 and #232 |
+| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | Complete for the selected profile; [connected fresh-cloud lifecycle evidence](docs/public-cloud-acceptance.md) is merged. No product release is approved. | #230–#233 |
 
 The series integrates the existing build [#17](https://github.com/devoption/devoption/issues/17),
 artifact [#18](https://github.com/devoption/devoption/issues/18), deployment
 [#19](https://github.com/devoption/devoption/issues/19) and installation/recovery
 [#20](https://github.com/devoption/devoption/issues/20) work. It does not restart
-those implementations. For this track, #229 resolves their native-only assumptions
+those implementations. The [criterion reconciliation](docs/single-node-acceptance-status.md)
+records completed installation/recovery, the superseded native experiment and
+#19's remaining deployment integration evidence. For this track, #229 resolves their native-only assumptions
 against the accepted [Wasm-first direction](docs/decisions/0001-platform-boundaries.md),
 and #230/#233 explicitly add public hosting beyond their earlier local-only scope.
 Unaffected integrity, authorization and recovery criteria remain applicable.

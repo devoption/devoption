@@ -6,7 +6,8 @@ approval, real offline compilation and saved results. It builds the trusted
 [ADR 0004](decisions/0004-first-wasm-web-app.md). It does **not** run or deploy the
 component. [The deployment runtime](web-app-deployments.md) validates imports and runs saved releases.
 Cloud infrastructure is unnecessary for this step: use a disposable Ubuntu 24.04
-x86_64 VM. Public DNS/ACME and fresh cloud installation remain later acceptance.
+x86_64 VM. The later [public cloud acceptance](public-cloud-acceptance.md) records
+fresh source installation, DNS/ACME and the connected lifecycle for this profile.
 
 ## Prepare the node
 
