@@ -98,7 +98,7 @@ class ToolTests(Fixture):
     def plan(self):
         before = git(self.root, "rev-parse", "HEAD")
         tags = git(self.root, "tag", "--list")
-        report, proposal = prepare(self.root, Path(os.environ["DEVOPTION_RELEASE_PLZ"]), date(2026, 1, 2))
+        report, proposal = prepare(self.root, Path(os.environ["DEVOPTION_RELEASE_PLZ"]), date(2026, 1, 2), "analysis")
         self.assertEqual(git(self.root, "status", "--porcelain"), "")
         self.assertEqual(git(self.root, "rev-parse", "HEAD"), before)
         self.assertEqual(git(self.root, "tag", "--list"), tags)

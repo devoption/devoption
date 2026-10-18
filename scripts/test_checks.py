@@ -22,6 +22,13 @@ NOTES = """# Changelog
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_numbered_previews_are_valid_but_development_versions_are_not(self):
+        notes = NOTES.replace("0.1.0", "0.1.0-preview.1")
+        self.assertIn("Add help", extract_notes("0.1.0-preview.1", "0.1.0-preview.1", notes))
+        for version in ["0.1.0-dev", "0.1.0-preview.0", "0.1.0-preview.01", "0.1.0-alpha.1"]:
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                extract_notes(version, version, NOTES.replace("0.1.0", version))
+
     def test_extracts_only_the_requested_release(self):
         notes = extract_notes("0.1.0", "0.1.0", NOTES)
         self.assertIn("Add help", notes)

@@ -1,4 +1,4 @@
-"""Run pinned release-plz update in a disposable clone; emit a proposal, never publish."""
+"""Run pinned release-plz in a disposable clone; emit a proposal, never publish."""
 
 import argparse
 from datetime import date
@@ -9,6 +9,8 @@ import re
 import subprocess
 import tempfile
 import tomllib
+
+from release_preview import preview_changelog, select_preview
 
 TOOL_VERSION = "release-plz 0.3.172"
 REPOSITORY_URL = "https://github.com/devoption/devoption"
@@ -57,6 +59,8 @@ def check_config(root, members):
     for package in packages:
         if package.get("version_group") != "platform":
             raise ValueError("All platform packages must share a version group.")
+        if package.get("changelog_path") != "CHANGELOG.md":
+            raise ValueError("All platform packages must reference the shared root changelog.")
         if any(key in package for key in required if key != "changelog_update"):
             raise ValueError("Package overrides cannot weaken preparation policy.")
     writers = [p for p in packages if p.get("changelog_update")]
@@ -66,7 +70,22 @@ def check_config(root, members):
         raise ValueError("The platform changelog must include every other crate.")
 
 
-def prepare(repository, executable, release_date):
+def nonversion_inputs(root, members):
+    """Compare parsed manifests/lockfile while allowing only the shared version to change."""
+    manifests = {}
+    for path in ["Cargo.toml", *members.values()]:
+        manifests[path] = tomllib.loads((root / path).read_text())
+    del manifests["Cargo.toml"]["workspace"]["package"]["version"]
+    lock = tomllib.loads((root / "Cargo.lock").read_text())
+    for package in lock["package"]:
+        if package["name"] in members:
+            del package["version"]
+    return manifests, lock
+
+
+def prepare(repository, executable, release_date, channel="preview"):
+    if channel not in {"preview", "analysis"}:
+        raise ValueError("Choose preview or analysis; stable promotion is not enabled.")
     repository = repository.resolve()
     if git(repository, "status", "--porcelain").strip():
         raise ValueError("Commit changes before preparing an exact-revision proposal.")
@@ -87,13 +106,28 @@ def prepare(repository, executable, release_date):
         git(scratch, "checkout", "--quiet", "--detach", source)
         before, members = workspace(scratch)
         check_config(scratch, members)
-        tags = git(scratch, "tag", "--list")
-        run([executable, "update", "--release-date", release_date.isoformat(),
-             "--repo-url", REPOSITORY_URL], scratch, env)
+        inputs = nonversion_inputs(scratch, members)
+        tags = git(scratch, "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags")
+        selection = None
+        if channel == "analysis":
+            run([executable, "update", "--release-date", release_date.isoformat(),
+                 "--repo-url", REPOSITORY_URL], scratch, env)
+        else:
+            selection = select_preview(scratch, before, source, git)
+            if selection["shipped_changes"]:
+                changelog = scratch / "CHANGELOG.md"
+                notes = preview_changelog(changelog.read_text(), selection["next_version"], release_date)
+                # set-version needs an existing release heading. Give it a temporary
+                # standalone section, then install the reviewed human notes unchanged.
+                changelog.write_text(f"# Changelog\n\n## [{before}] - {release_date.isoformat()}\n\n- Preparation.\n")
+                run([executable, "set-version", selection["next_version"]], scratch, env)
+                changelog.write_text(notes)
         after, updated_members = workspace(scratch)
         if updated_members != members:
             raise ValueError("Preparation changed workspace membership.")
-        if git(scratch, "tag", "--list") != tags or git(scratch, "rev-parse", "HEAD").strip() != source:
+        if nonversion_inputs(scratch, members) != inputs:
+            raise ValueError("Preparation changed dependency or manifest inputs beyond the platform version.")
+        if git(scratch, "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags") != tags or git(scratch, "rev-parse", "HEAD").strip() != source:
             raise ValueError("Preparation unexpectedly changed Git history or tags.")
         files = git(scratch, "diff", "--name-only").splitlines()
         allowed = {"Cargo.toml", "Cargo.lock", "CHANGELOG.md", *members.values()}
@@ -102,9 +136,15 @@ def prepare(repository, executable, release_date):
         patch = git(scratch, "diff", "--no-ext-diff", "--binary")
         report = {"source_commit": source, "release_date": release_date.isoformat(),
                   "tool": TOOL_VERSION, "current_version": before, "proposed_version": after,
-                  "changed_files": files, "publication_authorized": False,
-                  "limitations": ["Crate-based analysis does not cover all shipped files outside crates."]}
-        if "-" in after:
+                  "channel": channel, "changed_files": files, "publication_authorized": False,
+                  "limitations": ["Migration/support metadata and publication eligibility gates are not implemented."]}
+        if selection is not None:
+            report["preview_selection"] = selection
+            if after != selection["next_version"]:
+                raise ValueError("Tool output does not match the selected preview version.")
+        else:
+            report["limitations"].append("Crate-based analysis does not cover all shipped files outside crates.")
+        if channel == "analysis" and "-" in after:
             report["limitations"].append(
                 "Prerelease versions require explicit selection; this proposal does not advance or promote them.")
         return report, patch
@@ -115,13 +155,14 @@ def main():
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--release-plz", type=Path, required=True)
     parser.add_argument("--date", type=date.fromisoformat, default=date.today())
+    parser.add_argument("--channel", choices=("preview", "analysis"), default="preview")
     parser.add_argument("--output", type=Path, required=True, help="New directory outside the source checkout")
     args = parser.parse_args()
     repository = args.repository.resolve()
     output = args.output.resolve()
     if output.is_relative_to(repository) or output.exists():
         parser.error("Output must be a new directory outside the source checkout.")
-    report, patch = prepare(repository, args.release_plz, args.date)
+    report, patch = prepare(repository, args.release_plz, args.date, args.channel)
     output.mkdir(parents=True)
     (output / "report.json").write_text(json.dumps(report, indent=2) + "\n")
     (output / "proposal.patch").write_text(patch)

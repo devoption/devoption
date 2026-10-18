@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def extract_notes(version, package_version, changelog):
-    if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", version):
-        raise ValueError("Choose a stable version such as 0.1.0 (without a v prefix).")
+    if not re.fullmatch(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-preview\.[1-9][0-9]*)?", version):
+        raise ValueError("Choose a stable or numbered preview version (without a v prefix).")
     if version != package_version:
         raise ValueError("Release version must match workspace.package.version in Cargo.toml.")
     headings = list(re.finditer(r"^## .+$", changelog, re.M))

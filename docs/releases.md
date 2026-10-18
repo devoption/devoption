@@ -5,13 +5,15 @@ changelog is the record of current changes; it is not a release announcement.
 
 A read-only [release preparation dry run](release-preparation.md) can propose
 version/changelog changes with pinned release-plz in a disposable clone. It does
-not replace the steps below or authorize publication. Automatic preview numbering,
-release PR creation and publication remain unfinished under #260.
+not replace the steps below or authorize publication. It selects numbered preview
+proposals and preserves human notes; release PR creation, publication metadata and
+publication remain unfinished under #260.
 
 The **Release check** workflow is deliberately read-only. It repeats CI and
 validates notes on `main`, showing them in the workflow summary. It does not
 create a tag, GitHub release, binary distribution, or package registry upload.
-It should reject the current unreleased development version.
+It accepts stable or numbered preview notes and rejects the current unreleased
+development version.
 
 When a maintainer intentionally chooses to release:
 
