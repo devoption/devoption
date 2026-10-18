@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Run the pinned release-plz fixtures in ordinary read-only Ubuntu PR CI and
+  retain bounded subprocess failure diagnostics, covering the validation gap
+  found by the first opted-in release preparation run
+  ([#260](https://github.com/devoption/devoption/issues/260)).
+
 - Add an opt-in main-only draft release PR writer using the short-lived workflow
   token after source CI and metadata validation; restrict the immutable candidate
   to root version/lockfile/changelog changes, recover identical interrupted

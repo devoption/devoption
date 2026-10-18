@@ -19,8 +19,12 @@ REPOSITORY_URL = "https://github.com/devoption/devoption"
 
 
 def run(command, cwd, env=None):
-    return subprocess.run(command, cwd=cwd, env=env, check=True, text=True,
-                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=240).stdout
+    try:
+        return subprocess.run(command, cwd=cwd, env=env, check=True, text=True,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=240).stdout
+    except subprocess.CalledProcessError as error:
+        error.add_note((error.stderr or error.stdout or "No subprocess diagnostic output.").strip()[-4000:])
+        raise
 
 
 def git(root, *args):
