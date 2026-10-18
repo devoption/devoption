@@ -7,9 +7,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
-- Run the pinned release-plz fixtures in ordinary read-only Ubuntu PR CI and
-  retain bounded subprocess failure diagnostics, covering the validation gap
-  found by the first opted-in release preparation run
+- Use the checksum-pinned GNU/Linux release-plz build to avoid musl changelog
+  parser stack-limit failures; run its fixtures in ordinary read-only Ubuntu PR
+  CI and retain bounded subprocess failure diagnostics
   ([#260](https://github.com/devoption/devoption/issues/260)).
 
 - Add an opt-in main-only draft release PR writer using the short-lived workflow
