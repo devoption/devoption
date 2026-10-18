@@ -81,7 +81,10 @@ runs without cancelling an in-flight writer. A future publication workflow must
 share/reconcile this serialization and immutable identity contract before
 activation. Partial *publication* recovery is not implemented by PR retry logic.
 
-Local/API fixtures exercise these transitions without GitHub writes. The live
-writer remains unexercised until a maintainer deliberately dispatches an opted-in
-main run and reviews its result. Passing fixtures do not establish live token
-permissions, PR workflow approval or publication readiness.
+Local/API fixtures exercise these transitions without GitHub writes. The first
+opted-in [main run](https://github.com/devoption/devoption/actions/runs/39155120245)
+on 2026-10-18 passed source CI but failed release-plz analysis fixtures before
+the writer ran; no candidate branch or PR was created. The shared installer now
+uses the GNU/Linux build, and ordinary PR CI includes these fixtures. Live writer
+acceptance still requires a successful opted-in main run. Passing fixtures do not
+establish live token permissions, PR workflow approval or publication readiness.

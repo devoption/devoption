@@ -33,6 +33,13 @@ Both match the official GitHub release asset digests checked on 2026-10-18.
 This pins downloaded bytes; it is not build-provenance verification for DevOption
 bundles (tracked separately in #261).
 
+The GNU/Linux build replaces the musl build after the first opted-in
+[main run](https://github.com/devoption/devoption/actions/runs/39155120245)
+failed in four analysis fixtures before the writer ran. A diagnostic PR run
+reproduced `stack limit reached` while parsing the changelog template. Ordinary
+read-only PR CI now runs the real-tool fixtures as well, rather than skipping
+them until manual preparation.
+
 From a clean, committed checkout with locked dependencies available locally:
 
 ```sh
