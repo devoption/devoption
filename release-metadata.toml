@@ -1,0 +1,27 @@
+# Reviewed statements for the next proposal; this is not release approval.
+schema_version = 1
+version = "0.1.0-preview.1"
+channel = "preview"
+platforms = ["ubuntu-24.04-amd64"]
+
+[compatibility]
+installation = "fresh-only"
+upgrade_from = []
+data = "Use fresh platform state. Existing installations are not supported upgrade targets for this preview."
+configuration = "Use the operator-managed source installation instructions in docs/public-linux-install.md; no automatic configuration conversion is provided."
+
+[migration]
+required = false
+instructions = "No platform data or configuration migration is implemented. Do not reuse existing installation state as an upgrade procedure."
+
+[recovery]
+binary_rollback = false
+instructions = "Do not assume replacing the executable reverses data changes. The same-installation snapshot and staged restore in docs/same-node-recovery.md require the original external files and operator verification; they are not cross-version upgrade recovery."
+
+[support]
+status = "development-preview"
+warnings = [
+  "One owner and one trusted stateless Rust/WASIp2 app on a dedicated Ubuntu 24.04 amd64 node; arbitrary applications and hostile multi-tenant hosting are unsupported.",
+  "Source installation remains operator-managed. Published bundles, a verified bundle installer and supported platform upgrades are not available.",
+  "Preview metadata is not production-readiness evidence or permission to publish; the release approval gate under issue #21 still applies."
+]

@@ -58,6 +58,12 @@ Preview proposals move the existing human-written `Unreleased` body into a dated
 preview section, keeping historical sections byte-for-byte and leaving an empty
 `Unreleased` section. Missing change bullets, issue links, ambiguous sections or a
 future date block the proposal. Reviewers still assess note accuracy and coverage.
+The proposed section also requires a version-bound
+[release metadata record](release-metadata.md). Its support, compatibility,
+migration and recovery statements are appended as a checked block; the report
+records the exact metadata digest. Missing, stale or inconsistent metadata blocks
+a preview proposal before temporary version edits. No-release runs and raw
+analysis diagnostics do not claim a metadata-validated candidate.
 
 Preview selection requires full Git history and available platform tags. It
 compares the source with the tag matching its embedded workspace version and
@@ -97,7 +103,7 @@ Run all fixtures with the real pinned binary:
 
 ```sh
 DEVOPTION_RELEASE_PLZ=/absolute/path/to/release-plz \
-  python3 -m unittest discover -s scripts -p 'test_release_p*.py'
+  python3 -m unittest discover -s scripts -p 'test_release_*.py'
 ```
 
 Normal Python CI runs policy/boundary checks and skips the tool-dependent fixtures;
@@ -108,9 +114,6 @@ and failures.
 
 ## Remaining #260 work before enablement
 
-- Add checked-in migration, compatibility and support metadata. Missing required
-  metadata must block an actual candidate; the report records this remaining
-  gate and never marks a proposal eligible for publication.
 - Generate narrowly scoped bot-owned draft release PRs with issue-linked commits,
   required checks on their exact revision and a reviewed authentication approach.
   No auto-merge or repository-policy change is included here.

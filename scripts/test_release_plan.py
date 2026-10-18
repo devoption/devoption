@@ -14,6 +14,7 @@ from release_plan import check_config, git, prepare, workspace
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = (ROOT / "release-plz.toml").read_text()
 NAMES = [p["name"] for p in tomllib.loads(CONFIG)["package"]]
+METADATA = (ROOT / "release-metadata.toml").read_text()
 
 
 class Fixture(unittest.TestCase):
@@ -36,6 +37,7 @@ class Fixture(unittest.TestCase):
             '# Changelog\n\n## [Unreleased]\n\n## [0.2.0] - 2026-01-01\n\n'
             '- Initial fixture ([#260](https://github.com/devoption/devoption/issues/260)).\n')
         (self.root / "release-plz.toml").write_text(CONFIG)
+        self.metadata("0.2.1-preview.1")
         subprocess.run(["cargo", "generate-lockfile", "--offline"], cwd=self.root,
                        check=True, capture_output=True)
         git(self.root, "init", "--quiet")
@@ -49,6 +51,9 @@ class Fixture(unittest.TestCase):
     def commit(self, title):
         git(self.root, "add", ".")
         git(self.root, "commit", "--quiet", "-m", title, "-m", "Refs #260")
+
+    def metadata(self, version):
+        (self.root / "release-metadata.toml").write_text(METADATA.replace("0.1.0-preview.1", version))
 
     def change(self, title, name="devoption-cli"):
         path = self.root / "crates" / name / "src/lib.rs"

@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Require version-bound release metadata for preview proposals and validate its
+  supported platform, compatibility, migration and recovery limits; append the
+  checked statements to proposed notes and reject missing, stale or edited
+  metadata blocks in the read-only release check without enabling publication
+  ([#260](https://github.com/devoption/devoption/issues/260)).
+
 - Select automatic preview versions from complete Git/tag baselines and
   repository-wide shipped changes, including helpers and service templates;
   preserve human notes/history, validate numbered preview notes, and reject

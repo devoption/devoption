@@ -209,6 +209,7 @@ class PreviewToolTests(PreviewFixture):
     def test_real_tool_bootstraps_development_preview(self):
         git(self.root, "tag", "--delete", "v0.2.0")
         self.baseline("0.1.0-dev", tagged=False)
+        self.metadata("0.1.0-preview.1")
         self.notes()
         self.commit("feat: complete development fixture")
         report, _ = self.plan()
@@ -216,6 +217,7 @@ class PreviewToolTests(PreviewFixture):
 
     def test_real_tool_advances_existing_preview(self):
         self.baseline("0.3.0-preview.1")
+        self.metadata("0.3.0-preview.2")
         self.notes()
         self.change("fix: correct preview fixture")
         report, _ = self.plan()

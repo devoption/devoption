@@ -6,6 +6,8 @@ import re
 import sys
 import tomllib
 
+from release_metadata import validate_notes
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -38,11 +40,13 @@ def main():
         raise ValueError("Usage: python3 scripts/release_notes.py VERSION")
     with (ROOT / "Cargo.toml").open("rb") as manifest:
         version = tomllib.load(manifest)["workspace"]["package"]["version"]
-    print(extract_notes(sys.argv[1], version, (ROOT / "CHANGELOG.md").read_text()), end="")
+    notes = extract_notes(sys.argv[1], version, (ROOT / "CHANGELOG.md").read_text())
+    validate_notes(ROOT, version, notes)
+    print(notes, end="")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except ValueError as error:
+    except (ValueError, OSError) as error:
         sys.exit(str(error))
