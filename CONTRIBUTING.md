@@ -54,10 +54,16 @@ committed, use locked builds, and verify action updates against official upstrea
 release tags before pinning their full commit SHA. No registry publication is
 configured; the crate has `publish = false`.
 
-GitHub CI uses read-only permissions and no stored checkout credentials. It runs
-PR code only on GitHub-hosted runners with no repository secrets. Do not add
+Ordinary GitHub PR CI uses read-only permissions and no stored checkout
+credentials. It runs PR code only on GitHub-hosted runners with no repository
+secrets. Do not add
 `pull_request_target` execution of contributor code, self-hosted runners for
 untrusted PRs, or privileged publication jobs to ordinary PR checks.
+
+The separate [release preparation writer](docs/release-prs.md) is an opt-in,
+main-only manual job with limited branch/PR write permissions after read-only
+checks pass. It never runs on contributor PR events, grants no merge/publication
+authority, and does not bypass the new release PR's required checks.
 
 `main` requires PRs and passing CI, including for administrators, with no required
 approval count. See [the maintainer checklist](docs/maintainers.md) for the verified

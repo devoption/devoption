@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add an opt-in main-only draft release PR writer using the short-lived workflow
+  token after source CI and metadata validation; restrict the immutable candidate
+  to root version/lockfile/changelog changes, recover identical interrupted
+  creations, and preserve required PR checks and human merge/publication gates
+  ([#260](https://github.com/devoption/devoption/issues/260)).
+
 - Require version-bound release metadata for preview proposals and validate its
   supported platform, compatibility, migration and recovery limits; append the
   checked statements to proposed notes and reject missing, stale or edited

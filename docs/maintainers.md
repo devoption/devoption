@@ -40,8 +40,11 @@ changed no setting and does not establish when or by whom they were enabled.
 
 ## Settings that still need owner decisions
 
-The checked-in workflows explicitly declare `contents: read`, pin external
-actions to full SHAs and disable checkout credential persistence. That source
+Ordinary PR workflows and release proposal jobs explicitly declare
+`contents: read`, pin external actions to full SHAs and disable checkout credential
+persistence. The optional [trusted-main draft writer](release-prs.md) is the
+explicit exception: its opted-in job has limited contents/PR write access and
+issue read access, with no merge or publication operation. That source
 policy does not make the repository's default workflow token read-only or require
 every future action to be SHA-pinned.
 

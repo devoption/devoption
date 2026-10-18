@@ -1,21 +1,26 @@
 # Release preparation dry run
 
 The preparation work under [#260](https://github.com/devoption/devoption/issues/260)
-produces a reviewable preview version/changelog proposal. It does not create a
-release PR, merge, tag, GitHub release, bundle or registry upload. The existing
+produces a reviewable preview version/changelog proposal and can optionally
+[create a bot-owned draft release PR](release-prs.md). It does not merge, tag,
+create GitHub releases, distribute bundles or upload to a registry. The existing
 [release approval process](releases.md) and #21 remain applicable. There is still
 no published product release; the source version remains `0.1.0-dev`.
 
 ## Run a proposal
 
-After this workflow is merged, dispatch **Release preparation dry run** from
-`main`. It runs the existing full CI workflow first. Only successful checks allow
+Dispatch **Release preparation** from `main`, supply an explicit proposal date,
+and leave `create_draft` unchecked for the read-only run. It runs the existing
+full CI workflow first. Only successful checks allow
 the proposal job to run, against that run's exact checked-out commit, even if
 `main` advances later. The job installs a checksum-pinned release-plz 0.3.172,
 fetches locked Cargo inputs and runs the tool's disposable fixtures. Its summary
-contains a JSON report and proposed patch. Workflow permissions are read-only,
-checkout credentials are not persisted, and no forge token is supplied to the
-tool. Concurrent preparation runs queue rather than cancel each other.
+contains a JSON report and proposed patch. The checks/proposal jobs have read-only
+permissions, checkout credentials are not persisted, and no forge token is
+supplied to release-plz. Selecting `create_draft` authorizes a separate writer job
+with narrowly scoped write permissions; see its authentication and retry limits
+in [draft release PR generation](release-prs.md). Runs share a concurrency group;
+a newer dispatch does not cancel an in-flight run.
 
 For a local run, install that exact tool version from the
 [official release](https://github.com/release-plz/release-plz/releases/tag/release-plz-v0.3.172)
@@ -114,9 +119,8 @@ and failures.
 
 ## Remaining #260 work before enablement
 
-- Generate narrowly scoped bot-owned draft release PRs with issue-linked commits,
-  required checks on their exact revision and a reviewed authentication approach.
-  No auto-merge or repository-policy change is included here.
+- Exercise the opted-in draft writer live and review its exact-revision PR CI,
+  including GitHub's workflow-approval prompt. Fixtures do not prove live access.
 - Reconcile #21 with ongoing publication authority, serialize publication with
   preparation, and test duplicate-version, partial-publication and retry recovery
   against immutable artifact identities. Version proposals alone cannot do this.
