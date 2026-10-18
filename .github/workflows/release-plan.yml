@@ -1,0 +1,65 @@
+name: Release preparation dry run
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-release-preparation
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  plan:
+    name: Prepare an exact-revision proposal (no publication)
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Require main
+        run: test "$GITHUB_REF" = 'refs/heads/main'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install checksum-pinned release-plz
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/release-plz/release-plz/releases/download/release-plz-v0.3.172/release-plz-x86_64-unknown-linux-musl.tar.gz \
+            --output "$RUNNER_TEMP/release-plz.tar.gz"
+          echo "db58a4668ce9ef0b6431e96a665715745e9a5d7f0b0b28a610034d94de3970df  $RUNNER_TEMP/release-plz.tar.gz" | sha256sum --check
+          mkdir "$RUNNER_TEMP/release-plz-tool"
+          tar -xzf "$RUNNER_TEMP/release-plz.tar.gz" -C "$RUNNER_TEMP/release-plz-tool"
+      - name: Prepare offline inputs
+        run: |
+          rustup show active-toolchain
+          cargo fetch --locked
+      - name: Exercise release and no-release fixtures
+        env:
+          DEVOPTION_RELEASE_PLZ: ${{ runner.temp }}/release-plz-tool/release-plz
+        run: python3 -m unittest discover -s scripts -p test_release_plan.py
+      - name: Generate a disposable proposal
+        run: |
+          python3 scripts/release_plan.py \
+            --release-plz "$RUNNER_TEMP/release-plz-tool/release-plz" \
+            --output "$RUNNER_TEMP/release-proposal"
+          {
+            echo '## Release preparation proposal'
+            echo 'No PR, tag, release, or publication was created. Review under #260 and #21.'
+            echo '```json'
+            cat "$RUNNER_TEMP/release-proposal/report.json"
+            echo '```'
+            echo '<details><summary>Proposed version and changelog diff</summary>'
+            echo
+            echo '```diff'
+            cat "$RUNNER_TEMP/release-proposal/proposal.patch"
+            echo '```'
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - run: git diff --exit-code

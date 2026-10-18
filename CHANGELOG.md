@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a pinned release-plz configuration, disposable version/changelog proposals
+  and a read-only manual workflow gated by CI; exercise stable-version bumps,
+  no-release cases, retry/failure behavior and current preview limitations without
+  enabling release PR creation, tags or publication
+  ([#260](https://github.com/devoption/devoption/issues/260)).
+
 - Validate deployment port collisions, invocation identity and uncertain cleanup
   on disposable Ubuntu with a repeatable opt-in checker; reject absent or malformed
   invocation IDs in worker health and HTTPS route verification
