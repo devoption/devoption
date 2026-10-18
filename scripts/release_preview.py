@@ -98,7 +98,7 @@ def select_preview(root, current, source, git):
     return selection
 
 
-def preview_changelog(changelog, version, release_date):
+def preview_changelog(changelog, version, release_date, metadata_notes=None):
     headings = list(re.finditer(r"^## .+$", changelog, re.M))
     matches = [i for i, heading in enumerate(headings) if heading.group() == "## [Unreleased]"]
     if len(matches) != 1 or matches[0] != 0:
@@ -106,6 +106,12 @@ def preview_changelog(changelog, version, release_date):
     heading = headings[0]
     end = headings[1].start() if len(headings) > 1 else len(changelog)
     body = changelog[heading.end():end].strip()
+    if "devoption-release-metadata:" in body:
+        raise ValueError("Unreleased notes already contain a release metadata block; remove the stale block before preparing.")
+    # Check human change notes before metadata introduces its own bullets.
+    extract_notes(version, version, f"## [{version}] - {release_date.isoformat()}\n\n{body}\n")
+    if metadata_notes is not None:
+        body += "\n\n" + metadata_notes
     if any(h.group().startswith(f"## [{version}]") for h in headings):
         raise ValueError("Proposed version already has changelog notes; reconcile the existing proposal.")
     section = f"## [{version}] - {release_date.isoformat()}\n\n{body}\n\n"

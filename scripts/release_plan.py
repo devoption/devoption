@@ -11,6 +11,8 @@ import tempfile
 import tomllib
 
 from release_preview import preview_changelog, select_preview
+from release_metadata import FILENAME, load_metadata, render_metadata, validate_notes
+from release_notes import extract_notes
 
 TOOL_VERSION = "release-plz 0.3.172"
 REPOSITORY_URL = "https://github.com/devoption/devoption"
@@ -109,20 +111,28 @@ def prepare(repository, executable, release_date, channel="preview"):
         inputs = nonversion_inputs(scratch, members)
         tags = git(scratch, "for-each-ref", "--format=%(refname) %(objectname)", "refs/tags")
         selection = None
+        metadata_report = None
         if channel == "analysis":
             run([executable, "update", "--release-date", release_date.isoformat(),
                  "--repo-url", REPOSITORY_URL], scratch, env)
         else:
             selection = select_preview(scratch, before, source, git)
             if selection["shipped_changes"]:
+                metadata, digest = load_metadata(scratch, selection["next_version"])
                 changelog = scratch / "CHANGELOG.md"
-                notes = preview_changelog(changelog.read_text(), selection["next_version"], release_date)
+                notes = preview_changelog(changelog.read_text(), selection["next_version"], release_date,
+                                          render_metadata(metadata, digest))
+                metadata_report = {"path": FILENAME, "version": metadata["version"], "sha256": digest}
                 # set-version needs an existing release heading. Give it a temporary
                 # standalone section, then install the reviewed human notes unchanged.
                 changelog.write_text(f"# Changelog\n\n## [{before}] - {release_date.isoformat()}\n\n- Preparation.\n")
                 run([executable, "set-version", selection["next_version"]], scratch, env)
                 changelog.write_text(notes)
         after, updated_members = workspace(scratch)
+        if metadata_report is not None:
+            notes = extract_notes(after, after, (scratch / "CHANGELOG.md").read_text())
+            if validate_notes(scratch, after, notes) != metadata_report["sha256"]:
+                raise ValueError("Preparation changed release metadata after validation.")
         if updated_members != members:
             raise ValueError("Preparation changed workspace membership.")
         if nonversion_inputs(scratch, members) != inputs:
@@ -137,12 +147,14 @@ def prepare(repository, executable, release_date, channel="preview"):
         report = {"source_commit": source, "release_date": release_date.isoformat(),
                   "tool": TOOL_VERSION, "current_version": before, "proposed_version": after,
                   "channel": channel, "changed_files": files, "publication_authorized": False,
-                  "limitations": ["Migration/support metadata and publication eligibility gates are not implemented."]}
+                  "release_metadata": metadata_report,
+                  "limitations": ["Publication eligibility, provenance and approval gates remain separate and are not satisfied by metadata validation."]}
         if selection is not None:
             report["preview_selection"] = selection
             if after != selection["next_version"]:
                 raise ValueError("Tool output does not match the selected preview version.")
         else:
+            report["limitations"].append("Analysis diagnostics are not metadata-validated release proposals.")
             report["limitations"].append("Crate-based analysis does not cover all shipped files outside crates.")
         if channel == "analysis" and "-" in after:
             report["limitations"].append(

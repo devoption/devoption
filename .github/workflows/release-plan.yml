@@ -43,7 +43,7 @@ jobs:
       - name: Exercise release and no-release fixtures
         env:
           DEVOPTION_RELEASE_PLZ: ${{ runner.temp }}/release-plz-tool/release-plz
-        run: python3 -m unittest discover -s scripts -p 'test_release_p*.py'
+        run: python3 -m unittest discover -s scripts -p 'test_release_*.py'
       - name: Generate a disposable proposal
         run: |
           python3 scripts/release_plan.py \
