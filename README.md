@@ -14,7 +14,8 @@ reviewed deployment, health/log/stop controls and restart recovery on the same n
 [App hostnames](docs/app-hostnames.md) add a separate HTTPS route and visible local TLS status. Authentication
 currently supports one owner; team accounts are planned, not implemented.
 There is no published release. An explicit [HTTPS proxy setup](docs/public-linux-install.md)
-is available for validation; cloud DNS/ACME and reboot evidence remain pending.
+has [fresh cloud installation, public DNS/ACME and lifecycle evidence](docs/public-cloud-acceptance.md)
+for the selected trusted app on one Ubuntu node.
 
 ## Quick start
 

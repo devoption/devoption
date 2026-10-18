@@ -132,3 +132,12 @@ The component is compiled, not deployed or serving HTTP.
 ![Exact build review before single-use approval](build-review.jpg)
 
 ![Successful local compile and saved diagnostics](build-succeeded.jpg)
+
+## Public cloud acceptance
+
+The [fresh cloud acceptance report](../public-cloud-acceptance.md) identifies the
+source revision, real builds, public routing checks and lifecycle evidence. This
+capture shows saved A serving after reinstallation; the temporary node was
+subsequently removed.
+
+![Public HTTPS installation running restored saved A](public-cloud-release.png)

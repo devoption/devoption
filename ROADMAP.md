@@ -43,6 +43,10 @@ OS/state and prepared Linux binaries: real builds, two test-CA HTTPS hostnames,
 A → B → saved A, failed health, running/stopped reboots, staged recovery and
 data-preserving removal/reinstallation. It does not prove fresh platform
 compilation, public cloud DNS, ACME issuance/renewal or external reachability.
+A later [fresh cloud acceptance run](docs/public-cloud-acceptance.md) passed those
+steps, including accelerated certificate renewal, updates, reboot, same-node
+restore and data-preserving reinstall. Its single-node/trusted-app limits apply;
+product release approval remains separate.
 
 The supported app is one trusted stateless Rust/WASIp2 fixture on Ubuntu 24.04
 x86_64, with explicit operator-installed build and deployment support. General
@@ -74,11 +78,11 @@ user-visible capability before moving to optional improvements.
 | Task | Current status and remaining acceptance | Dependencies |
 | --- | --- | --- |
 | [#229: Minimum web-app contract](https://github.com/devoption/devoption/issues/229) | Complete: selected WASIp2/Wasmtime contract, public app fixture and pinned source/dependency preparation. | First implementation-enabling decision |
-| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Implemented and locally rehearsed: persistent service, canonical HTTPS origin, owner login/project creation and reboot. Fresh cloud/source installation and public DNS/ACME evidence remain open. | Can proceed independently of the runtime choice |
+| [#230: Install and log in through DNS](https://github.com/devoption/devoption/issues/230) | Implemented; [fresh source-built cloud/public HTTPS evidence](docs/public-cloud-acceptance.md) is recorded for review. | Can proceed independently of the runtime choice |
 | [#231: Build from the project interface](https://github.com/devoption/devoption/issues/231) | Complete for the selected trusted app: real reviewed interface builds, durable outcomes/logs, verified component output and failure/cancel/restart evidence. | #229; #230 for public UI validation |
 | [#232: Release and deploy on the node](https://github.com/devoption/devoption/issues/232) | Complete for the selected Wasm profile: immutable releases, private deployment, health/log/stop, A → B → saved A, running/stopped reboot evidence. | #229 and #231 |
-| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | Implemented and locally rehearsed through two test-CA hostnames, including updates/reboot and control separation. Public DNS and ACME issuance/renewal remain open. | #230 and #232 |
-| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | Runbook and combined fresh-OS/state local rehearsal exist. Fresh platform compilation and public cloud/DNS/ACME/external acceptance remain open; the external HTTPS checker alone does not satisfy them. | #230–#233 |
+| [#233: App DNS and HTTPS](https://github.com/devoption/devoption/issues/233) | Implemented; [two public hostnames and ACME issuance/accelerated renewal](docs/public-cloud-acceptance.md) passed through updates/reboots. | #230 and #232 |
+| [#234: Fresh-VM acceptance](https://github.com/devoption/devoption/issues/234) | [Connected fresh-cloud lifecycle evidence](docs/public-cloud-acceptance.md) is recorded for review, including source compilation, external access, restore and reinstallation. No product release is approved. | #230–#233 |
 
 The series integrates the existing build [#17](https://github.com/devoption/devoption/issues/17),
 artifact [#18](https://github.com/devoption/devoption/issues/18), deployment

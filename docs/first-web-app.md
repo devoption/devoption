@@ -7,9 +7,9 @@ rollback are available in the interface. There is no browser code editor,
 arbitrary framework build, database or app login in this first profile.
 
 Start with a disposable Ubuntu 24.04 x86_64 VM. A production VM is unnecessary
-for development validation. Public DNS/ACME and clean cloud installation remain
-pending acceptance under [#234](https://github.com/devoption/devoption/issues/234);
-this guide does not mark that issue complete.
+for development validation. The [public cloud acceptance](public-cloud-acceptance.md)
+records the source-built, public DNS/ACME and lifecycle run under
+[#234](https://github.com/devoption/devoption/issues/234), with its exact limits.
 
 ## 1. Install and sign in
 
@@ -197,16 +197,18 @@ Record each row as passed, failed or unperformed with exact revision and evidenc
 
 | Acceptance step | Existing evidence / remaining work |
 | --- | --- |
-| Install and HTTPS login | [Fresh local OS/state installation](clean-local-rehearsal.md); prepared binaries reused; clean cloud install pending |
+| Install and HTTPS login | [Fresh source-built cloud installation](public-cloud-acceptance.md#environment-and-source-installation) |
 | Create project and build A | [Real local interface builds](web-app-builds.md#local-evidence-and-remaining-limits) |
 | Save/deploy, failed candidate, return to A | [Local Wasmtime/systemd rehearsal](web-app-deployments.md#disposable-local-evidence) |
 | Two hostnames, A → B → A, reboot and stopped intent | [Local HTTPS rehearsal](app-hostnames.md#observed-ubuntu-rehearsal) |
-| Public DNS, ACME issuance/renewal, external access | Unperformed; requires separately supplied host/DNS authority |
+| Public DNS, ACME issuance/renewal, external access | [Public cloud results](public-cloud-acceptance.md#external-routing-and-certificate-lifecycle), including accelerated renewal |
 | Bounded same-node record snapshot and restore | [Workflow and validation scope](same-node-recovery.md); same-node recovery and combined removal/reinstallation passed locally |
 
 The [clean local run](clean-local-rehearsal.md) now connects these capabilities on
 one fresh OS/state installation. It reuses prepared Linux binaries/inputs and
-is not public cloud acceptance. Product release approval remains separate under #21.
+is not public cloud acceptance. The later [public cloud run](public-cloud-acceptance.md)
+also completed the connected lifecycle, restore and reinstallation. Product release
+approval remains separate under #21.
 
 ## Service generator validation
 
