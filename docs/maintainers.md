@@ -3,7 +3,8 @@
 ## Main branch protection
 
 With owner authorization under [#2](https://github.com/devoption/devoption/issues/2),
-GitHub branch protection was enabled and read back on 2026-10-10:
+GitHub branch protection was enabled on 2026-10-10 and read back again on
+2026-10-17 (America/New_York):
 
 - Changes to `main` require a pull request, including for administrators.
 - `Rust and repository checks` and `Issue and change documentation` must pass;
@@ -15,18 +16,40 @@ GitHub branch protection was enabled and read back on 2026-10-10:
 These settings live in GitHub, not in the workflow files. Review changes to
 workflows and validation scripts carefully; passing checks alone are not review.
 
+## Verified repository settings
+
+A read-only GitHub API check on 2026-10-17 (America/New_York) under
+[#256](https://github.com/devoption/devoption/issues/256) observed:
+
+| Setting | Observed state |
+| --- | --- |
+| Private vulnerability reporting | Enabled; use the private form in [SECURITY.md](../SECURITY.md) |
+| Secret scanning | Enabled |
+| Secret-scanning push protection | Enabled |
+| Dependabot security updates | Enabled |
+| GitHub Actions | Enabled; all actions allowed; repository SHA pinning requirement disabled |
+| Repository default workflow token permission | `write` |
+| Actions may approve pull requests | `true` |
+
+The values came from `GET /repos/devoption/devoption`,
+`GET /repos/devoption/devoption/private-vulnerability-reporting`,
+`GET /repos/devoption/devoption/actions/permissions` and
+`GET /repos/devoption/devoption/actions/permissions/workflow`. These are snapshots,
+not continuous enforcement or evidence that no secrets exist. This reconciliation
+changed no setting and does not establish when or by whom they were enabled.
+
 ## Settings that still need owner decisions
 
-Private vulnerability reporting, secret scanning, and push protection remain
-disabled. No unrelated security settings or credentials were changed. An owner
-can separately review and authorize the following:
+The checked-in workflows explicitly declare `contents: read`, pin external
+actions to full SHAs and disable checkout credential persistence. That source
+policy does not make the repository's default workflow token read-only or require
+every future action to be SHA-pinned.
 
-- Enable private vulnerability reporting and update `SECURITY.md` once verified.
-- Review secret scanning/push protection availability and Actions settings.
-  Keep default token permissions read-only and require approval for external
-  contributors' workflow runs as appropriate.
-
-These remaining settings are recommendations, not enabled protections.
+Under [#21](https://github.com/devoption/devoption/issues/21), review the observed
+write default, permission to approve PRs and unrestricted action policy. Decide
+whether to retain them or separately authorize changes. Review external-contributor
+workflow approval policy too; that setting was not verified in this pass. No
+settings change, contact address or response SLA is implied by this document.
 
 ## Verified upstream pins
 

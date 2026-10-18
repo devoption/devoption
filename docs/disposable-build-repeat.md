@@ -72,11 +72,13 @@ threshold and 4 GiB cap. No host cache cleanup was needed. Logs and metadata rem
 in the existing ignored rehearsal directory; unrelated apps and user data were
 retained. The approved disposable repository root remained empty.
 
-Issue #131 remains open: the diagnostic gap is resolved for this repeat, but there
-is still no accepted artifact or checksum from this runner. Any change to artifact
+At the end of this repeat, issue #131 remained open: the diagnostic gap was
+resolved, but there was no accepted artifact or checksum from this runner. Any change to artifact
 selection or the single-link policy needs explicit review; another VM build needs
 separate approval. No production runner, job event, release or deployment was added.
 
 The subsequent [artifact handoff slice](artifact-handoff.md) tests an independent
 private copy without changing this result or running another VM build. It retains
-the destination single-link requirement; supervisor integration remains pending.
+the destination single-link requirement. The later selected Wasm workflow does not
+retroactively validate this native experiment; see its
+[superseded disposition](single-node-acceptance-status.md#native-experiment-131).

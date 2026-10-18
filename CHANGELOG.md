@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Reconcile completed single-node/public-host acceptance and the superseded native
+  experiment, retaining #19's unproven deployment integration cases; refresh
+  security reporting and repository settings from read-only GitHub evidence,
+  including the distinction between workflow permissions and repository defaults
+  ([#256](https://github.com/devoption/devoption/issues/256)).
+
 - Record fresh source-built Ubuntu cloud acceptance for two public HTTPS
   hostnames, ACME issuance/accelerated renewal, real A/B builds, failed health,
   saved-release recovery, running/stopped reboots, snapshot restore and

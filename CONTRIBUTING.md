@@ -61,4 +61,4 @@ untrusted PRs, or privileged publication jobs to ordinary PR checks.
 
 `main` requires PRs and passing CI, including for administrators, with no required
 approval count. See [the maintainer checklist](docs/maintainers.md) for the verified
-settings and remaining owner decisions, including private security reporting.
+settings and remaining owner decisions about Actions permissions.
