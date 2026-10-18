@@ -14,6 +14,7 @@ accounts and production hosting acceptance remain planned.
   [task/handoff template](task-template.md); [priorities](../ROADMAP.md)
 - [First web app: install, build, deploy and maintain](first-web-app.md)
 - [Public cloud acceptance evidence](public-cloud-acceptance.md) and [issue reconciliation](single-node-acceptance-status.md)
+- [Deployment collision, invocation and cleanup evidence](deployment-identity-validation.md)
 - [Clean local installation, app lifecycle and recovery evidence](clean-local-rehearsal.md)
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)

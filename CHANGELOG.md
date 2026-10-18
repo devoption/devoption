@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Validate deployment port collisions, invocation identity and uncertain cleanup
+  on disposable Ubuntu with a repeatable opt-in checker; reject absent or malformed
+  invocation IDs in worker health and HTTPS route verification
+  ([#19](https://github.com/devoption/devoption/issues/19)).
+
 - Reconcile completed single-node/public-host acceptance and the superseded native
   experiment, retaining #19's unproven deployment integration cases; refresh
   security reporting and repository settings from read-only GitHub evidence,
