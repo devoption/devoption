@@ -49,6 +49,11 @@ only when all four jobs succeed; failure, cancellation, or skipping cannot pass
 that gate. `Issue and change documentation` remains a separate required status.
 This preserves branch protection without changing repository settings.
 
+The installation job also assembles a local preview bundle from the release
+executable, runs its version/help checks, and compares every archived byte and
+manifest entry with the trusted checkout/build inputs. It uploads no artifacts;
+see [bundle candidates and remaining trust gates](release-bundles.md).
+
 The Python job installs pinned release-plz and Rust to run the real-tool release
 fixtures on Ubuntu, including ordinary PRs. Local runs without
 `DEVOPTION_RELEASE_PLZ` still skip tool-dependent cases; use the pinned binary

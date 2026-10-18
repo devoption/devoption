@@ -5,6 +5,14 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Assemble repeatable local Ubuntu 24.04 amd64 preview bundle candidates with
+  a versioned file/compatibility/dependency manifest, checksums and packaged
+  executable smoke checks; reject mismatched, dirty or replaceable inputs while
+  leaving SBOM, authenticated provenance, installer and publication work gated
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 ## [0.1.0-preview.1] - 2026-10-18
 
 ### Changed
