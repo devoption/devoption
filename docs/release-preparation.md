@@ -1,8 +1,8 @@
 # Release preparation dry run
 
-This first slice of [#260](https://github.com/devoption/devoption/issues/260)
-adds a reviewable version/changelog proposal. It does not create a release PR,
-merge, tag, GitHub release, bundle or registry upload. The existing
+The preparation work under [#260](https://github.com/devoption/devoption/issues/260)
+produces a reviewable preview version/changelog proposal. It does not create a
+release PR, merge, tag, GitHub release, bundle or registry upload. The existing
 [release approval process](releases.md) and #21 remain applicable. There is still
 no published product release; the source version remains `0.1.0-dev`.
 
@@ -33,15 +33,17 @@ From a clean, committed checkout with locked dependencies available locally:
 ```sh
 python3 scripts/release_plan.py \
   --release-plz /absolute/path/to/release-plz \
+  --channel preview \
   --date 2026-10-18 \
   --output /tmp/devoption-release-proposal
 ```
 
 Use the intended proposal date; omitting `--date` uses the local current date.
 Choose a new output directory outside the source checkout. The script clones the
-exact source commit to temporary storage, runs `release-plz update` offline there,
-checks the resulting workspace/lockfile versions and allowed file changes, and
-writes `report.json` and `proposal.patch`. The original checkout, commits and tags
+exact source commit to temporary storage, selects a preview and runs
+`release-plz set-version` with Cargo offline mode there. It checks the resulting
+workspace/lockfile versions, unchanged dependency inputs and allowed file changes,
+then writes `report.json` and `proposal.patch`. The original checkout, commits and tags
 stay unchanged. A failed tool/check produces no successful output directory;
 retry with the same source, tags, tool and date produces the same proposal. This
 is not a test of partial *publication* recovery: no publication path exists here.
@@ -51,46 +53,64 @@ is not a test of partial *publication* recovery: no publication path exists here
 The [release-plz configuration](https://release-plz.dev/docs/config) uses Git tags
 matching `v{{ version }}`, rather than crates.io, as version baselines. All seven
 workspace crates inherit one workspace version, remain `publish = false`, and
-belong to the same version group. Only the CLI package writes the root changelog;
-its generated notes include changes from all the other crates. Existing human
-changelog entries are retained. Generated commit summaries still require review
-for accuracy, omissions, duplicate descriptions and issue links.
+belong to the same version group. All packages reference the shared root changelog.
+Preview proposals move the existing human-written `Unreleased` body into a dated
+preview section, keeping historical sections byte-for-byte and leaving an empty
+`Unreleased` section. Missing change bullets, issue links, ambiguous sections or a
+future date block the proposal. Reviewers still assess note accuracy and coverage.
 
-For stable-version fixtures, `fix` and `perf` changes select a patch, `feat` selects
-a minor even in 0.x, and a breaking `!` or `BREAKING CHANGE:` footer selects a minor
-in 0.x (a major after 1.0). Documentation-only changes do not trigger a release.
-Conventional PR titles continue to be checked by the existing contribution job.
-No library API compatibility guarantee is inferred: semver API checking is
-disabled for these internal, unpublished crates.
+Preview selection requires full Git history and available platform tags. It
+compares the source with the tag matching its embedded workspace version and
+records both commit IDs. That baseline must be an ancestor and its manifest must
+agree with the tag. Missing baselines, newer known versions or a conflicting
+target tag fail closed. An already prepared but untagged preview blocks another
+proposal until its publication is completed or explicitly reconciled; it never
+silently reuses or skips the version. Tags are trusted repository inputs here,
+not independent evidence of publication or artifact authenticity.
 
-**Preview selection is not implemented.** Actual pinned-tool fixtures show that
-an initial `0.1.0-dev` stays unchanged, and a tagged `0.3.0-preview.1` stays unchanged
-after a fix. The report flags this limitation; a nonempty changelog diff is not
-evidence of a new publishable version. The intended first distribution channel is
-preview, with an explicitly selected embedded version before building. Automatic
-preview numbering and stable promotion must be implemented and tested before
-publication automation is enabled.
+| Baseline | Next preview when shipped content changes |
+| --- | --- |
+| `X.Y.Z-dev`, with no platform tags | `X.Y.Z-preview.1` |
+| Tagged `X.Y.Z-preview.N` | `X.Y.Z-preview.(N+1)`; the base stays fixed throughout that preview series |
+| Tagged stable `X.Y.Z` | Next patch for fixes/other source changes, next minor for features, next minor for breaking changes in 0.x or next major after 1.0; append `-preview.1` |
+
+A breaking `!` or `BREAKING CHANGE:` footer takes precedence over features. The
+report records that classification even within a fixed preview series. Stable
+promotion is not available. The version is selected before any future binary
+build, and changes to embedded versions will require rebuilding and retesting.
+
+Change detection covers the entire repository, including Python helpers, service
+templates, toolchain/lockfiles, deletions and unknown paths. Exclusions are the
+named root documentation files, `docs/`, GitHub Markdown templates,
+`scripts/test_*` and standalone `crates/*/tests/` files. Other paths conservatively
+count as shipped content until a bundle inventory narrows that set. A `docs`
+commit that changes source still triggers a patch. Documentation/test-only or
+fully reverted net changes produce no patch and leave `Unreleased` notes alone.
+Conventional titles remain mandatory; API compatibility is not inferred.
+
+`--channel analysis` retains the original raw `release-plz update` diagnostics.
+Only the CLI generates its changelog, including other crates' commit summaries.
+That diagnostic mode still misses non-crate changes and leaves prerelease
+versions unchanged; its report explicitly retains those limitations.
 
 Run all fixtures with the real pinned binary:
 
 ```sh
 DEVOPTION_RELEASE_PLZ=/absolute/path/to/release-plz \
-  python3 -m unittest discover -s scripts -p test_release_plan.py
+  python3 -m unittest discover -s scripts -p 'test_release_p*.py'
 ```
 
-Normal Python CI runs the boundary checks and skips the tool-dependent fixtures;
+Normal Python CI runs policy/boundary checks and skips the tool-dependent fixtures;
 the manual proposal workflow requires them. Fixtures use disposable Git tags and
 small local crates, and test version groups, no-release behavior, breaking
-changes, prerelease limits, deterministic retries and failures.
+changes, preview numbering, helper-only changes, baselines, deterministic retries
+and failures.
 
 ## Remaining #260 work before enablement
 
-- Cover shipped files outside Cargo packages (for example Python helpers and
-  service templates). Crate-based release-plz analysis alone can miss their
-  changes; the report always records this limitation.
-- Select and implement automatic preview numbering and checked-in migration,
-  compatibility and support metadata. Missing required metadata must block an
-  actual candidate; this dry run never marks one eligible.
+- Add checked-in migration, compatibility and support metadata. Missing required
+  metadata must block an actual candidate; the report records this remaining
+  gate and never marks a proposal eligible for publication.
 - Generate narrowly scoped bot-owned draft release PRs with issue-linked commits,
   required checks on their exact revision and a reviewed authentication approach.
   No auto-merge or repository-policy change is included here.

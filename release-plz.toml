@@ -29,19 +29,25 @@ changelog_include = ["devoption-runtime", "devoption-builds", "devoption-project
 version_group = "platform"
 [[package]]
 name = "devoption-runtime"
+changelog_path = "CHANGELOG.md"
 version_group = "platform"
 [[package]]
 name = "devoption-builds"
+changelog_path = "CHANGELOG.md"
 version_group = "platform"
 [[package]]
 name = "devoption-projects"
+changelog_path = "CHANGELOG.md"
 version_group = "platform"
 [[package]]
 name = "devoption-registry"
+changelog_path = "CHANGELOG.md"
 version_group = "platform"
 [[package]]
 name = "devoption-server"
+changelog_path = "CHANGELOG.md"
 version_group = "platform"
 [[package]]
 name = "devoption-ui"
+changelog_path = "CHANGELOG.md"
 version_group = "platform"

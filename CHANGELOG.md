@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Select automatic preview versions from complete Git/tag baselines and
+  repository-wide shipped changes, including helpers and service templates;
+  preserve human notes/history, validate numbered preview notes, and reject
+  missing/stale baselines, collisions and unrelated dependency changes while
+  retaining the read-only preparation/publication boundary
+  ([#260](https://github.com/devoption/devoption/issues/260)).
+
 - Add a pinned release-plz configuration, disposable version/changelog proposals
   and a read-only manual workflow gated by CI; exercise stable-version bumps,
   no-release cases, retry/failure behavior and current preview limitations without
