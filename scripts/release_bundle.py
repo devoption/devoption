@@ -17,6 +17,7 @@ import tomllib
 from release_metadata import load_metadata, validate_notes
 from release_notes import extract_notes
 from release_plan import git, workspace
+from release_inventory import SBOM, PROVENANCE, VENDOR_FILES, inventory, provenance
 
 TARGET = "ubuntu-24.04-amd64"
 MAX_BINARY = 256 * 1024 * 1024
@@ -37,6 +38,7 @@ SOURCE_FILES = (
     "examples/systemd/caddy-devoption.service",
     *("scripts/" + name for name in HELPERS),
     *("docs/" + name for name in DOCUMENTS),
+    *VENDOR_FILES,
 )
 CADDY_VERSION = "2.11.7"
 CADDY_SHA512 = ("a7a433a1b133efc3c8d10eb0b99d52a24b5ef5c322dc77f5282182b1c0402139ab83f3"
@@ -100,6 +102,7 @@ def payload(repository, executable):
         raise ValueError("Proxy acquisition pin and installation instructions disagree.")
     files["bin/devoption"] = binary_bytes(executable)
     files["RELEASE-NOTES.md"] = notes.encode()
+    files[SBOM] = canonical(inventory(files, version, source, members))
     toolchain = tomllib.loads(files["rust-toolchain.toml"].decode())["toolchain"]["channel"]
     lock = tomllib.loads(files["Cargo.lock"].decode())
     runtimes = {}
@@ -109,9 +112,10 @@ def payload(repository, executable):
             raise ValueError("Expected one locked embedded runtime version: " + name)
         runtimes[name] = versions[0]
     manifest = {
-        "schema_version": 1, "platform_version": version, "source_commit": source,
+        "schema_version": 2, "platform_version": version, "source_commit": source,
         "target": TARGET, "channel": "preview", "publication_eligible": False,
-        "provenance": "not-attested", "sbom": "not-generated",
+        "provenance": "unsigned-assembly-statement",
+        "sbom": {"path": SBOM, "format": "CycloneDX-1.6", "scope": "source-inventory"},
         "components": {name: version for name in sorted(members)},
         "embedded_components": ["server", "CLI", "UI", "Wasmtime"],
         "embedded_runtime_versions": runtimes,
@@ -183,7 +187,10 @@ def assemble(repository, executable, output):
         write_archive(archive, files, manifest)
         archive_data = archive.read_bytes()
         digest = sha256(archive_data)
+        statement = provenance(manifest, name, digest, canonical(manifest), files[SBOM],
+                               sha256(files["bin/devoption"]), sha256(files["rust-toolchain.toml"]))
         outputs = {name: archive_data, "manifest.json": canonical(manifest),
+                   SBOM: files[SBOM], PROVENANCE: canonical(statement),
                    "SHA256SUMS": f"{digest}  {name}\n".encode()}
         output.mkdir(mode=0o700)  # Exclusive reservation; never replace an existing candidate.
         for filename, content in outputs.items():
