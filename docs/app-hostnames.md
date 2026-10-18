@@ -79,8 +79,9 @@ Preserve its writable certificate state across service/host restarts. Verify A/A
 CAA, inbound 80/443 and outbound DNS/HTTPS if issuance fails. Inspect bounded Caddy
 logs before retrying; repeated reinstalls can hit CA rate limits. Never use
 `tls internal`, a rehearsal CA, or disabled certificate verification in production.
-Actual public ACME issuance/renewal and DNS propagation remain deferred to the
-real-host acceptance pass; local CA evidence cannot establish those results.
+The [public cloud acceptance](public-cloud-acceptance.md) records real public DNS,
+issuance and accelerated renewal. Local CA evidence alone cannot establish those
+results; verify each installation separately.
 
 ## Use and diagnose the route
 

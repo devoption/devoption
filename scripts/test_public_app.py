@@ -120,6 +120,24 @@ class PublicAppTests(unittest.TestCase):
             self.assertEqual(code, 0 if passed else 1)
             self.assertEqual(json.loads(output.getvalue()), {'passed': passed})
 
+    def test_transport_accepts_current_page_size_but_keeps_a_fixed_body_limit(self):
+        # The source-built public sign-in page measured 90,219 bytes. Exercise
+        # real HTTP body decoding so a successful page cannot hit the old 64 KiB cap.
+        for size in (90219, 128 * 1024, 128 * 1024 + 1):
+            with self.subTest(size=size), \
+                 patch.object(checker.ssl, 'create_default_context') as context, \
+                 patch.object(checker.socket, 'create_connection'):
+                stream = context.return_value.wrap_socket.return_value.__enter__.return_value
+                stream.makefile.return_value = io.BytesIO(
+                    f'HTTP/1.1 200 OK\r\nContent-Length: {size}\r\n\r\n'.encode() + b'x' * size)
+                if size > 128 * 1024:
+                    with self.assertRaises(ValueError):
+                        checker.request('8.8.8.8', self.platform, '/sign-in')
+                else:
+                    status, _, body = checker.request('8.8.8.8', self.platform, '/sign-in')
+                    self.assertEqual(status, 200)
+                    self.assertEqual(len(body), size)
+
 
 if __name__ == '__main__':
     unittest.main()

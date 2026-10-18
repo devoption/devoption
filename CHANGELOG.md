@@ -7,6 +7,17 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Record fresh source-built Ubuntu cloud acceptance for two public HTTPS
+  hostnames, ACME issuance/accelerated renewal, real A/B builds, failed health,
+  saved-release recovery, running/stopped reboots, snapshot restore and
+  data-preserving reinstall; verify removal of the temporary node and only its
+  added DNS records, and link current capability summaries to the evidence
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
+- Raise the external HTTPS checker's bounded response limit to 128 KiB so the
+  current 90,219-byte sign-in page passes; retain oversized-response rejection
+  ([#234](https://github.com/devoption/devoption/issues/234)).
+
 - Reconcile the roadmap, architecture and accepted-decision index with implemented
   trusted Wasm builds, immutable releases, same-node deployment and local lifecycle
   evidence; preserve outstanding fresh-host/public DNS/ACME acceptance and broader

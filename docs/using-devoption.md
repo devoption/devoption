@@ -2,8 +2,8 @@
 
 DevOption is intended to be a deployable software factory for individuals and teams.
 The current preview supports one owner and a loopback HTTP listener. An explicit
-[HTTPS proxy mode](public-linux-install.md) supports one public origin; real cloud
-DNS/ACME and reboot validation remain pending. Start with the
+[HTTPS proxy mode](public-linux-install.md) supports one public origin; see the
+[fresh cloud acceptance evidence and limits](public-cloud-acceptance.md). Start with the
 [quick start](../README.md#quick-start) or the [private Ubuntu installation guide](private-linux-install.md).
 
 On Unix, `serve --data-dir /absolute/private/directory` optionally validates an

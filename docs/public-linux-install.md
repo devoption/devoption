@@ -4,8 +4,9 @@ This is the first public-platform slice of
 [#230](https://github.com/devoption/devoption/issues/230). The server now supports
 one configured HTTPS origin behind a local proxy. Projects, login and restart are
 covered by disposable integration tests and a [clean local VM rehearsal](clean-local-rehearsal.md),
-including reboot. A real cloud VM, public DNS and ACME issuance/renewal remain
-unperformed. [App builds](web-app-builds.md), [deployment](web-app-deployments.md) and
+including reboot. A [fresh cloud acceptance run](public-cloud-acceptance.md) also
+verified source installation, public DNS and ACME issuance/accelerated renewal.
+[App builds](web-app-builds.md), [deployment](web-app-deployments.md) and
 a [second app hostname](app-hostnames.md) are available as separate opt-in steps.
 The [private installation](private-linux-install.md) remains available unchanged.
 
@@ -180,7 +181,9 @@ and renews certificates for the configured public hostname and redirects HTTP to
 HTTPS. Its state and private keys persist in `/var/lib/caddy`; do not erase that
 state on restart or reinstall. Do not use `tls internal` or bypass certificate
 verification on the real server. The test fixture's private CA is not a public
-installation option. ACME issuance/renewal on this setup still needs live validation.
+installation option. Verify issuance and renewal for your own installation; the
+[recorded cloud run](public-cloud-acceptance.md#external-routing-and-certificate-lifecycle)
+does not establish another node's certificate lifecycle.
 
 Open `https://platform.example.com`, sign in, create a named project, reload the
 page and sign out. A private browser window must not access saved project content.
@@ -252,8 +255,9 @@ creation/logout and proxy-header stripping, and removes its files. It installs
 no trust root, calls no public ACME service and changes no DNS or system service.
 It passed locally on macOS with the upstream arm64 archive verified against its
 published SHA-512. The [Ubuntu system-service rehearsal](public-linux-rehearsal.md)
-also verified local-CA HTTPS, service restart and startup before login after reboot. Actual cloud
-DNS, public ACME and fresh-host validation remain pending; #230 stays open.
+also verified local-CA HTTPS, service restart and startup before login after reboot.
+The later [public cloud acceptance](public-cloud-acceptance.md) records actual
+source installation, public DNS/ACME and lifecycle checks for #230/#234.
 
 Upstream references: [Caddy reverse-proxy headers](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#headers),
 [automatic HTTPS](https://caddyserver.com/docs/automatic-https),

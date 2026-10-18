@@ -12,7 +12,7 @@ import sys
 
 from deployment_broker import hostname
 
-MAX_BODY = 65536
+MAX_BODY = 128 * 1024
 TIMEOUT = 5
 
 
@@ -33,7 +33,7 @@ def request(address, server_name, path, host=None):
                 response.begin()
                 body = response.read(MAX_BODY + 1)
                 if len(body) > MAX_BODY:
-                    raise ValueError('response exceeds 64 KiB')
+                    raise ValueError('response exceeds 128 KiB')
                 return response.status, response.getheader('Location'), body
 
 
