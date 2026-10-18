@@ -1,8 +1,9 @@
 # Authenticated bundle provenance
 
 This implements the opt-in signing workflow and verifier for
-[#261](https://github.com/devoption/devoption/issues/261). It is prepared for
-review; **positive live signing acceptance has not run**. It does not introduce
+[#261](https://github.com/devoption/devoption/issues/261). The first owner-approved
+live signing run passed on 2026-10-18; see the [acceptance evidence](#live-acceptance-evidence).
+It does not introduce
 an installer, supported upgrades, product publication or a recommended channel.
 The [candidate manifest](release-bundles.md) retains `publication_eligible: false`.
 
@@ -12,7 +13,7 @@ Repository policy in [AGENTS.md](../AGENTS.md) requires separate approval before
 creating credentials or publishing releases/packages. Obtain explicit owner
 approval for the OIDC signing request and GitHub attestation writes before a
 live opted-in run. Merging this code is not that approval. No stored secret,
-PAT, signing key, repository setting or paid service is created by this PR.
+PAT, signing key, repository setting or paid service is created by this workflow.
 
 After merge, the manual **Bundle provenance** workflow accepts a reviewed full
 main `source_commit` and a `sign` checkbox, default **false**. Without the checkbox,
@@ -51,8 +52,34 @@ The workflow uses the existing `platform-release-preparation` concurrency group
 without cancelling an in-flight operation. Immutable artifact retention, release
 publication/retry reconciliation and promotion remain later work. An opted-in
 run immediately verifies its proof, but retains no downloadable archive/proof
-artifact. Positive live acceptance and a reviewed candidate-retention path are
-required before claiming this supplies an installable distribution.
+artifact. A reviewed candidate-retention path is still required before claiming
+this supplies an installable distribution.
+
+## Live acceptance evidence
+
+The owner-approved [manual run 39176739455](https://github.com/devoption/devoption/actions/runs/39176739455)
+completed successfully on 2026-10-18 at 23:37 UTC with signing explicitly enabled:
+
+- Reviewed source and signer commit: `0de23b6da57aa26ad1b294d37019720cbe3c15b1`.
+- Platform version: `0.1.0-preview.1`; target: Ubuntu 24.04 amd64.
+- Archive: `devoption-0.1.0-preview.1-ubuntu-24.04-amd64.tar.gz`.
+- Archive SHA-256: `4238b375bda5f25030e425c01fc25e9a725c7b4558a70e20498138ba0be029ec`.
+- [GitHub attestation record 57213132](https://github.com/devoption/devoption/attestations/57213132).
+
+All reusable source CI checks passed. The signing job then passed its locked
+offline release build, installation fixtures, systemd checks, executable smoke
+checks and complete bundle comparison. GitHub OIDC signing and the attestation
+write succeeded. Immediate verification using the pinned CLI and policy below
+accepted the certificate identity, source/signer commit and exact archive, and
+reported `authenticated: true` with `publication_eligible: false`.
+
+This records one successful live acceptance run, not continuing authorization
+for additional signing runs. The default signing input remains false. The
+GitHub attestation record is retained, but the archive and local proof bundle
+were not uploaded as downloadable artifacts. Post-run verification of a retained
+archive, immutable retention/retry handling, installation from a distributed
+bundle, promotion and release publication remain unvalidated or unimplemented.
+No product release, version tag or registry publication was created.
 
 ## Verify a retained candidate
 
@@ -96,5 +123,6 @@ from compromised build dependencies is not established by this workflow.
 
 Policy tests simulate verifier output only to exercise argument and payload
 checks. Ordinary read-only Ubuntu PR CI separately installs the pinned CLI and
-requires it to reject a forged proof. Those tests do not establish positive live
-OIDC issuance, attestation write permissions or signer certificate acceptance.
+requires it to reject a forged proof. Those tests alone do not establish positive
+live OIDC issuance, attestation write permissions or signer certificate acceptance;
+the approved live run above supplies that acceptance evidence for its exact commit.

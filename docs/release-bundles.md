@@ -125,12 +125,13 @@ variables or caller-supplied URLs are copied into the statement.
 The statement describes **assembly**, not the executable's compilation, and makes
 no SLSA-level claim. It has no signature or trust root. An attacker can forge both
 it and an archive; the local comparison checker requires the trusted original
-checkout/build input. A future approved trusted-main workflow must bind locked
-compilation and packaged-binary tests to those exact subjects and authenticate
+checkout/build input. The separately approved trusted-main signing workflow binds
+locked compilation and packaged-binary tests to its archive subject and authenticates
 its workflow/source identity. Verification must check signatures, expected
 repository/workflow, reviewed source commit and subject digests before installer
 use. [GitHub attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
 can provide that authenticated identity. Attestation writes, signing/credential
 enablement and publication require separate approval. The
 [opt-in authenticated provenance workflow and verifier](bundle-provenance.md)
-prepare the next stage; positive live signing acceptance remains pending.
+passed its first approved live signing run; see the
+[acceptance evidence and remaining retention limits](bundle-provenance.md#live-acceptance-evidence).
