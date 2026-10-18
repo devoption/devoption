@@ -99,6 +99,8 @@ def ingress_status(config, record):
         return {**result, 'status': message}
     if not record or record['project'] != binding['project'] or record['intent'] != 'running':
         return report('App stopped or not deployed. Review and deploy a saved release before checking HTTPS.')
+    if not isinstance(record.get('invocation'), str) or not ID.fullmatch(record['invocation']):
+        return report('HTTPS route does not match the selected app. Check the exact hostname, upstream and release health.')
     try:
         context = ssl.create_default_context(cafile=binding.get('ca_file'))
         # Probe only the local ingress. DNS never chooses a destination for this privileged process.
@@ -319,6 +321,9 @@ def launch(config, release, validate=False):
 
 
 def health(config, expected, invocation):
+    # A missing marker and a missing systemd identity must never match as None.
+    if not isinstance(invocation, str) or not ID.fullmatch(invocation):
+        return False
     connection = http.client.HTTPConnection('127.0.0.1', config['port'], timeout=1)
     try:
         connection.request('GET', '/healthz', headers={'Connection': 'close'})

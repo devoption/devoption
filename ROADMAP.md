@@ -90,7 +90,8 @@ artifact [#18](https://github.com/devoption/devoption/issues/18), deployment
 [#20](https://github.com/devoption/devoption/issues/20) work. It does not restart
 those implementations. The [criterion reconciliation](docs/single-node-acceptance-status.md)
 records completed installation/recovery, the superseded native experiment and
-#19's remaining deployment integration evidence. For this track, #229 resolves their native-only assumptions
+[#19's completed deployment integration evidence](docs/deployment-identity-validation.md).
+For this track, #229 resolves their native-only assumptions
 against the accepted [Wasm-first direction](docs/decisions/0001-platform-boundaries.md),
 and #230/#233 explicitly add public hosting beyond their earlier local-only scope.
 Unaffected integrity, authorization and recovery criteria remain applicable.

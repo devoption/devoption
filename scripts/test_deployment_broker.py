@@ -1,6 +1,8 @@
 import importlib.util
 import json
 import os
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import threading
 from pathlib import Path
 import tempfile
 import unittest
@@ -136,6 +138,53 @@ class DeploymentTests(unittest.TestCase):
         with patch.object(broker,'stop_unit',side_effect=ValueError('unknown')):
             with self.assertRaises(ValueError): broker.dispatch(self.config,['stop'])
         self.assertEqual(broker.desired(self.config)['observed'],'stopping')
+
+
+class IdentityTests(unittest.TestCase):
+    def test_real_http_health_requires_nonempty_exact_invocation_and_fresh_unit(self):
+        fields = {'header': 'a'*32}
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                if fields['header'] is not None:
+                    self.send_header('X-DevOption-Invocation', fields['header'])
+                self.end_headers()
+                self.wfile.write(b'ok A')
+            def log_message(self, *_): pass
+        server = HTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        config = {'port': server.server_port}
+        with patch.object(broker, 'unit_state', return_value={'InvocationID': 'a'*32}) as state:
+            self.assertTrue(broker.health(config, 'ok A', 'a'*32))
+            for marker in [None, 'b'*32]:
+                fields['header'] = marker
+                self.assertFalse(broker.health(config, 'ok A', 'a'*32))
+            # Regression: absent HTTP header plus absent unit ID used to compare equal.
+            fields['header'] = None
+            state.return_value = {}
+            self.assertFalse(broker.health(config, 'ok A', None))
+            for identity in ['', 'invalid', 'a'*31, 42]:
+                self.assertFalse(broker.health(config, 'ok A', identity))
+            fields['header'] = 'a'*32
+            state.return_value = {'InvocationID': 'b'*32}
+            self.assertFalse(broker.health(config, 'ok A', 'a'*32))
+
+    def test_unconfirmed_stop_blocks_reset_and_replacement_launch(self):
+        for state in [{'ActiveState': 'active', 'ControlGroup': ''},
+                      {'ActiveState': 'inactive', 'ControlGroup': '/system.slice/devoption-app.service'},
+                      {}]:
+            with self.subTest(state=state), patch.object(broker, 'command') as command, patch.object(broker, 'unit_state', return_value=state):
+                with self.assertRaisesRegex(ValueError, 'stop is unconfirmed'):
+                    broker.stop_unit()
+                self.assertEqual(command.call_count, 1)
+                self.assertEqual(command.call_args.args[0][1], 'stop')
+                with patch.object(broker, 'load_release'):
+                    with self.assertRaisesRegex(ValueError, 'stop is unconfirmed'):
+                        broker.launch({'state': Path('/unused')}, 'a'*64)
+                self.assertFalse(any(call.args[0][0] == '/usr/bin/systemd-run' for call in command.call_args_list))
 
 
 if __name__ == '__main__': unittest.main()

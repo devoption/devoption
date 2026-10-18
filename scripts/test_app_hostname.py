@@ -52,6 +52,12 @@ class HostnameTests(unittest.TestCase):
         with patch.object(broker.socket,'create_connection',side_effect=ConnectionRefusedError):
             self.assertIn('ingress unavailable',broker.ingress_status(self.config,self.record)['status'])
 
+    def test_absent_or_invalid_saved_invocation_cannot_verify_https(self):
+        for invocation in [None, '', 'invalid']:
+            with self.subTest(invocation=invocation), patch.object(broker.socket, 'create_connection') as connect:
+                self.assertIn('does not match', broker.ingress_status(self.config, self.record | {'invocation': invocation})['status'])
+                connect.assert_not_called()
+
     def test_status_requires_selected_invocation_and_health_over_verified_tls(self):
         response=MagicMock(); response.status=200; response.read.return_value=b'ok A'; response.getheader.return_value='b'*32
         with patch.object(broker.ssl,'create_default_context') as context, patch.object(broker.socket,'create_connection') as connect, patch.object(broker.http.client,'HTTPResponse',return_value=response):

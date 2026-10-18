@@ -168,7 +168,10 @@ trusted source and dependencies on one disposable/controlled node.
 
 Run the [contribution checks](development.md#checks). The broker's filesystem,
 integrity, stale-configuration, failed-health and recovery tests are in
-`scripts/test_deployment_broker.py`. Browser-action tests cover fresh CSRF, single
+`scripts/test_deployment_broker.py`. [Deployment identity validation](deployment-identity-validation.md) records real
+Linux occupied-port, changed-invocation and surviving-cgroup checks, an explicit
+stop-refusal fault injection, and the opt-in replay command. Browser-action tests
+cover fresh CSRF, single
 submission, exact review input and ambiguous responses without retries.
 
 For explicitly authorized disposable runtime validation, compile the example app
