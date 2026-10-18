@@ -5,6 +5,13 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Changed
+
+- Record the first approved live bundle-signing run, GitHub attestation and
+  successful cryptographic verification, with the exact source/archive digest
+  and remaining retention/publication limits
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 ### Added
 
 - Prepare a main-only opt-in workflow that builds, tests and attests one bundle,
