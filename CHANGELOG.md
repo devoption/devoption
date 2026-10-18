@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Use the checksum-pinned GNU/Linux release-plz build to avoid musl changelog
+  parser stack-limit failures; run its fixtures in ordinary read-only Ubuntu PR
+  CI and retain bounded subprocess failure diagnostics
+  ([#260](https://github.com/devoption/devoption/issues/260)).
+
 - Add an opt-in main-only draft release PR writer using the short-lived workflow
   token after source CI and metadata validation; restrict the immutable candidate
   to root version/lockfile/changelog changes, recover identical interrupted

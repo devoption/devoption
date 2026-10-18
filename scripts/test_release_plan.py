@@ -4,17 +4,27 @@ from datetime import date
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import tomllib
 import unittest
 from unittest.mock import patch
 
-from release_plan import check_config, git, prepare, workspace
+from release_plan import check_config, git, prepare, run, workspace
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = (ROOT / "release-plz.toml").read_text()
 NAMES = [p["name"] for p in tomllib.loads(CONFIG)["package"]]
 METADATA = (ROOT / "release-metadata.toml").read_text()
+
+
+class DiagnosticTests(unittest.TestCase):
+    def test_failed_command_preserves_bounded_diagnostic_and_exception(self):
+        with self.assertRaises(subprocess.CalledProcessError) as caught:
+            run([sys.executable, "-c", "import sys; sys.stderr.write('x' * 5000 + 'failure detail'); sys.exit(7)"], ROOT)
+        self.assertEqual(caught.exception.returncode, 7)
+        self.assertEqual(len(caught.exception.__notes__[0]), 4000)
+        self.assertTrue(caught.exception.__notes__[0].endswith("failure detail"))
 
 
 class Fixture(unittest.TestCase):

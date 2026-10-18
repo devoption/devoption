@@ -25,13 +25,20 @@ a newer dispatch does not cancel an in-flight run.
 For a local run, install that exact tool version from the
 [official release](https://github.com/release-plz/release-plz/releases/tag/release-plz-v0.3.172)
 and verify the archive before executing it. The workflow pins the Ubuntu x86_64
-musl archive to SHA-256
-`db58a4668ce9ef0b6431e96a665715745e9a5d7f0b0b28a610034d94de3970df`.
+GNU/Linux archive to SHA-256
+`84b7013d164e1fc780b31dc9ef190977830599d6cb5ce81c993f6fcbd3cdc1aa`.
 The macOS ARM64 archive used for local verification has SHA-256
 `1b2019acd2f218730d85d9426387c872ee830e73261218b6863b6e814dde86b0`.
 Both match the official GitHub release asset digests checked on 2026-10-18.
 This pins downloaded bytes; it is not build-provenance verification for DevOption
 bundles (tracked separately in #261).
+
+The GNU/Linux build replaces the musl build after the first opted-in
+[main run](https://github.com/devoption/devoption/actions/runs/39155120245)
+failed in four analysis fixtures before the writer ran. A diagnostic PR run
+reproduced `stack limit reached` while parsing the changelog template. Ordinary
+read-only PR CI now runs the real-tool fixtures as well, rather than skipping
+them until manual preparation.
 
 From a clean, committed checkout with locked dependencies available locally:
 

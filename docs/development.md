@@ -49,6 +49,12 @@ only when all four jobs succeed; failure, cancellation, or skipping cannot pass
 that gate. `Issue and change documentation` remains a separate required status.
 This preserves branch protection without changing repository settings.
 
+The Python job installs pinned release-plz and Rust to run the real-tool release
+fixtures on Ubuntu, including ordinary PRs. Local runs without
+`DEVOPTION_RELEASE_PLZ` still skip tool-dependent cases; use the pinned binary
+when validating release preparation changes. Failed captured commands retain a
+bounded diagnostic in their traceback.
+
 Each job uses a fresh GitHub-hosted Ubuntu runner. Rust jobs fetch locked inputs
 before checking offline; no build cache or shared compiled artifacts are used.
 Parallel jobs reduce elapsed time but can use more total runner time because
