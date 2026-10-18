@@ -1,0 +1,13 @@
+name: Install pinned attestation verifier
+description: Verify the official GitHub CLI archive before using its cryptographic verifier
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        curl --fail --silent --show-error --location \
+          https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz \
+          --output "$RUNNER_TEMP/attestation-gh.tar.gz"
+        echo "bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386  $RUNNER_TEMP/attestation-gh.tar.gz" | sha256sum --check
+        mkdir "$RUNNER_TEMP/attestation-gh"
+        tar -xzf "$RUNNER_TEMP/attestation-gh.tar.gz" --strip-components=1 -C "$RUNNER_TEMP/attestation-gh"

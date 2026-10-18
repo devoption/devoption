@@ -65,6 +65,12 @@ main-only manual job with limited branch/PR write permissions after read-only
 checks pass. It never runs on contributor PR events, grants no merge/publication
 authority, and does not bypass the new release PR's required checks.
 
+The separate manual [bundle provenance workflow](docs/bundle-provenance.md) has
+an explicit signing opt-in after source CI. Its main-only signing job has OIDC
+and attestation permissions; ordinary PR checks remain read-only. Adding this
+workflow does not authorize its activation, issue credentials, or publish a
+product release. Live signing/attestation writes need separate owner approval.
+
 `main` requires PRs and passing CI, including for administrators, with no required
 approval count. See [the maintainer checklist](docs/maintainers.md) for the verified
 settings and remaining owner decisions about Actions permissions.

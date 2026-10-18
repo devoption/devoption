@@ -131,4 +131,6 @@ its workflow/source identity. Verification must check signatures, expected
 repository/workflow, reviewed source commit and subject digests before installer
 use. [GitHub attestations](https://docs.github.com/en/actions/concepts/security/artifact-attestations)
 can provide that authenticated identity. Attestation writes, signing/credential
-enablement and publication are not enabled by this implementation.
+enablement and publication require separate approval. The
+[opt-in authenticated provenance workflow and verifier](bundle-provenance.md)
+prepare the next stage; positive live signing acceptance remains pending.

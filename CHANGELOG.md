@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Prepare a main-only opt-in workflow that builds, tests and attests one bundle,
+  plus a pinned cryptographic verifier enforcing reviewed source/digest, workflow
+  identity, main ref, hosted runners and archive integrity; keep live signing
+  and attestation writes subject to separate approval
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Include a deterministic CycloneDX source-inventory SBOM, vendored Highlight.js
   notices and digest-bound unsigned assembly provenance in local bundle
   candidates; validate dependency identities, checksums and sidecars while
