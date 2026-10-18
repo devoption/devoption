@@ -71,11 +71,12 @@ def inventory(files, version, source, workspace_names):
     tags = re.findall(r"tag `([0-9]+\.[0-9]+\.[0-9]+)`", readme)
     if len(tags) != 1 or f"Highlight.js v{tags[0]}".encode() not in files[VENDOR + "highlight.min.js"][:200]:
         raise ValueError("Embedded Highlight.js version and reviewed vendor record disagree.")
-    highlight = f"pkg:npm/%40highlightjs/cdn-assets@{tags[0]}"
-    components.append({"type": "library", "bom-ref": highlight, "name": "@highlightjs/cdn-assets",
+    highlight = f"pkg:generic/highlight.js@{tags[0]}"
+    components.append({"type": "library", "bom-ref": highlight, "name": "Highlight.js",
                        "version": tags[0], "purl": highlight,
                        "hashes": [{"alg": "SHA-256", "content": digest(files[VENDOR + "highlight.min.js"])}],
                        "licenses": [{"license": {"id": "BSD-3-Clause"}}],
+                       "externalReferences": [{"type": "vcs", "url": f"https://github.com/highlightjs/cdn-release/tree/{tags[0]}"}],
                        "properties": [{"name": "devoption:hash-scope", "value": "vendored-browser-build"}]})
     # Payload files have distinct refs from packages; the executable is the metadata component.
     for path, content in sorted(files.items()):

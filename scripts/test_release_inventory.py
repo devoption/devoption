@@ -36,7 +36,7 @@ class InventoryTests(unittest.TestCase):
                 self.assertEqual(cargo[ref]["hashes"][0]["content"], package["checksum"])
             self.assertEqual(len(graph[ref]), len(package.get("dependencies", [])))
             self.assertTrue(set(graph[ref]) <= set(components))
-        self.assertIn("pkg:npm/%40highlightjs/cdn-assets@11.12.0", components)
+        self.assertIn("pkg:generic/highlight.js@11.12.0", components)
         self.assertEqual(bom["compositions"][0]["aggregate"], "incomplete")
         self.assertNotIn("/Users/", str(bom))
 
