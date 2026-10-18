@@ -82,9 +82,11 @@ jobs:
       - name: Install pinned Rust components for release fixtures
         run: rustup show active-toolchain
       - uses: ./.github/actions/install-release-plz
+      - uses: ./.github/actions/install-attestation-gh
       - run: python3 -m unittest discover -s scripts -p 'test_*.py'
         env:
           DEVOPTION_RELEASE_PLZ: ${{ runner.temp }}/release-plz-tool/release-plz
+          DEVOPTION_ATTEST_GH: ${{ runner.temp }}/attestation-gh/bin/gh
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.22.3'

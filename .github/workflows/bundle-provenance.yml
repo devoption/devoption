@@ -1,0 +1,87 @@
+name: Bundle provenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: 'Reviewed full main commit SHA; must match this run'
+        required: true
+        type: string
+      sign:
+        description: 'Separately approved OIDC signing and attestation writes (no release publication)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-release-preparation
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  sign:
+    name: Build, test and attest one main candidate
+    needs: checks
+    if: inputs.sign && github.ref == 'refs/heads/main' && github.repository == 'devoption/devoption'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require the reviewed exact-main context
+        env:
+          REVIEWED_SOURCE: ${{ inputs.source_commit }}
+          SOURCE_CHECKS: ${{ needs.checks.result }}
+          SIGN_APPROVED: ${{ inputs.sign }}
+        run: python3 scripts/verify_bundle_provenance.py --check-workflow "$REVIEWED_SOURCE"
+      - uses: ./.github/actions/install-attestation-gh
+      - name: Build the candidate from locked inputs
+        run: |
+          rustup show active-toolchain
+          cargo fetch --locked
+          cargo build --release --locked --offline
+          cargo test -p devoption-cli --test server --release --locked --offline installation
+          python3 scripts/check_systemd_unit.py target/release/devoption
+      - name: Assemble and compare the exact tested executable
+        run: |
+          python3 scripts/release_bundle.py --binary target/release/devoption --output "$RUNNER_TEMP/signed-candidate"
+          python3 scripts/check_release_bundle.py "$RUNNER_TEMP/signed-candidate" --binary target/release/devoption
+          git diff --exit-code
+      - name: Recheck source context before attestation
+        env:
+          REVIEWED_SOURCE: ${{ inputs.source_commit }}
+          SOURCE_CHECKS: ${{ needs.checks.result }}
+          SIGN_APPROVED: ${{ inputs.sign }}
+        run: python3 scripts/verify_bundle_provenance.py --check-workflow "$REVIEWED_SOURCE"
+      - name: Attest the archive built and tested in this job
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/signed-candidate/*.tar.gz
+          push-to-registry: false
+          create-storage-record: false
+      - name: Verify the authenticated identity and exact candidate
+        env:
+          REVIEWED_SOURCE: ${{ inputs.source_commit }}
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          read -r digest archive < "$RUNNER_TEMP/signed-candidate/SHA256SUMS"
+          version="${archive#devoption-}"
+          python3 scripts/verify_bundle_provenance.py \
+            --archive "$RUNNER_TEMP/signed-candidate/$archive" \
+            --bundle "$ATTESTATION_BUNDLE" --source "$REVIEWED_SOURCE" \
+            --sha256 "$digest" --version "${version%-ubuntu-24.04-amd64.tar.gz}" \
+            --gh "$RUNNER_TEMP/attestation-gh/bin/gh"
