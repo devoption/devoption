@@ -49,7 +49,8 @@ def prepare(repository, output):
     source = reservation['candidate']['source_commit']
     # Fetch only the exact public reserved source; no credentials or writes to a
     # remote repository. The previous executable is built from that real revision.
-    run('git', 'fetch', '--no-tags', '--depth', '1', 'origin', source, cwd=repository)
+    run('git', 'fetch', '--no-tags', '--depth', '1', 'origin',
+        source + ':refs/heads/codex/upgrade-fixture-previous', cwd=repository)
     for name in ('previous', 'candidate'):
         print('Preparing real executable fixture: ' + name, flush=True)
         checkout = output/name
