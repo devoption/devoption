@@ -66,10 +66,12 @@ class Reader:
                 return records
         raise ValueError("GitHub inventory exceeded its complete-scan bound.")
 
-    def state(self, target):
-        repository = self.get(PREFIX)
+    def require_draft_access(self, repository):
         if repository.get("full_name") != REPOSITORY or repository.get("permissions", {}).get("push") is not True:
             raise ValueError("Use existing authenticated push access so draft inventory is visible; no writes are made.")
+
+    def state(self, target):
+        self.require_draft_access(self.get(PREFIX))
         refs = self.get(PREFIX + "/git/matching-refs/tags/" + target["tag"])
         if not isinstance(refs, list) or len(refs) > 1000:
             raise ValueError("Expected a bounded tag inventory.")

@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Accept the approved retention workflow's scoped installation token without a
+  user-only repository permission field; preserve local planner access checks
+  and record the first live attempt's pre-write failure
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Record successful live signed-candidate upload, independent readback and local
   post-run verification with exact artifact/archive/proof identities and bounded
   retention limits ([#261](https://github.com/devoption/devoption/issues/261)).

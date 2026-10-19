@@ -44,9 +44,16 @@ def identifier(value):
 
 
 class Writer(Reader):
-    def __init__(self, gh):
+    def __init__(self, gh, repository, source):
+        require_workflow(repository, source)
         super().__init__(gh)
         self.rest = GitHub()
+
+    def require_draft_access(self, repository):
+        # The reviewed contents:write job grants draft access. Installation tokens
+        # omit the user-oriented permissions.push field returned for a PAT.
+        if repository.get("full_name") != REPOSITORY:
+            raise ValueError("Workflow token repository identity differs from the fixed repository.")
 
     def post(self, path, payload):
         if path not in ("git/refs", "releases"):
@@ -168,7 +175,7 @@ def main():
             raise ValueError("Reservation differs from the independently reviewed digest.")
         record = load(raw)
         with tempfile.TemporaryDirectory(prefix="devoption-retain-release-") as temporary:
-            print(json.dumps(retain(record, Writer(args.gh), Path(temporary), args.gh), indent=2))
+            print(json.dumps(retain(record, Writer(args.gh, root, args.workflow_commit), Path(temporary), args.gh), indent=2))
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError, tarfile.TarError,
             zipfile.BadZipFile, RuntimeError, NotImplementedError) as error:
         parser.exit(1, f"Candidate retention stopped: {error}\n")

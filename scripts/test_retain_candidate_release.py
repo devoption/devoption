@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from reconcile_candidate_release import PREFIX, expected
+from reconcile_candidate_release import PREFIX, Reader, expected
 from retain_candidate_release import WORKFLOW, Writer, require_workflow, retain
 import test_release_candidates as fixtures
 from test_bundle_provenance import GH_VERSION
@@ -173,8 +173,9 @@ class WriterTests(unittest.TestCase):
                     require_workflow(self.repository, self.source)
 
     def test_adapter_limits_write_routes_and_uploads_exact_bytes_to_fixed_host(self):
-        with patch.dict(os.environ, {"GH_TOKEN": "fixture-not-a-real-token"}):
-            writer = Writer(self.gh)
+        with patch.dict(os.environ, {"GH_TOKEN": "fixture-not-a-real-token"}), patch("retain_candidate_release.require_workflow") as guard:
+            writer = Writer(self.gh, self.repository, self.source)
+        guard.assert_called_once_with(self.repository, self.source)
         for path in ("merges", "releases/12", "git/refs/tags/vother"):
             with self.assertRaisesRegex(ValueError, "only creates"):
                 writer.post(path, {})
@@ -189,6 +190,40 @@ class WriterTests(unittest.TestCase):
         self.assertEqual(request.get_method(), "POST")
         self.assertEqual(request.data, self.transport.read_bytes())
         self.assertEqual(request.get_header("Content-type"), "application/zip")
+
+    def test_workflow_token_inventory_without_user_permissions_and_local_reader_stays_strict(self):
+        with patch.dict(os.environ, {"GH_TOKEN": "fixture-not-a-real-token"}), patch("retain_candidate_release.require_workflow"):
+            writer = Writer(self.gh, self.repository, self.source)
+        paths = []
+        def get(path):
+            paths.append(path)
+            if path == PREFIX:
+                return {"full_name": "devoption/devoption"}
+            if "/matching-refs/" in path:
+                return []
+            if path == PREFIX + "/releases?per_page=100&page=1":
+                return [self.remote.target | {"id": 12, "tag_name": self.remote.target["tag"]}]
+            if path == PREFIX + "/releases/12/assets?per_page=100&page=1":
+                return [self.remote.target["asset"] | {"id": 34}]
+            self.fail(path)
+        with patch.object(writer, "get", side_effect=get):
+            state = writer.state(self.remote.target)
+        self.assertEqual(state["releases"][0]["id"], 12)
+        self.assertEqual(state["releases"][0]["assets"][0]["id"], 34)
+        self.assertIn(PREFIX + "/releases/12/assets?per_page=100&page=1", paths)
+        with patch.object(writer, "get", return_value={"full_name": "other/repository"}):
+            with self.assertRaisesRegex(ValueError, "repository identity"):
+                writer.state(self.remote.target)
+        reader = Reader(self.gh)
+        with patch.object(reader, "get", return_value={"full_name": "devoption/devoption"}):
+            with self.assertRaisesRegex(ValueError, "draft inventory"):
+                reader.state(self.remote.target)
+
+    def test_writer_cannot_use_workflow_token_exception_outside_approved_context(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "approved exact-main"), patch("retain_candidate_release.GitHub") as client:
+                Writer(self.gh, self.repository, self.source)
+            client.assert_not_called()
 
 
 if __name__ == "__main__":
