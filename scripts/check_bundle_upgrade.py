@@ -17,6 +17,7 @@ import shutil
 import signal
 import socket
 import ssl
+import stat
 import subprocess
 import sys
 import tarfile
@@ -187,6 +188,33 @@ def enroll(binary):
 
 
 def check(directory):
+    if os.geteuid()!=0 or os.environ.get('DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE')!='1':
+        raise ValueError('Explicit disposable system host opt-in and root are required.')
+    host=FixtureHost()
+    host.preflight(Path('/'),1024**3)
+    for path in (STATE,PLATFORM,PROXY,'/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
+        if Path(path).exists() or Path(path).is_symlink():
+            raise ValueError('Disposable fixture requires an empty installation: '+path)
+    for who in ('devoption','caddy'):
+        if host.account(who) is not None:
+            raise ValueError('Disposable fixture accounts already exist.')
+    # Hosted runners make /opt writable for tool installation. Establish the
+    # production root-controlled parent only on this explicitly empty disposable
+    # host, then restore its exact original metadata even if the fixture fails.
+    opt=Path('/opt')
+    before=opt.lstat()
+    if not stat.S_ISDIR(before.st_mode):
+        raise ValueError('Disposable /opt must be a real directory.')
+    try:
+        os.chown(opt,0,0)
+        opt.chmod(0o755)
+        exercise(directory)
+    finally:
+        os.chown(opt,before.st_uid,before.st_gid)
+        opt.chmod(stat.S_IMODE(before.st_mode))
+
+
+def exercise(directory):
     if os.geteuid()!=0 or os.environ.get('DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE')!='1':
         raise ValueError('Explicit disposable system host opt-in and root are required.')
     host=FixtureHost()

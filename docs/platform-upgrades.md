@@ -165,6 +165,8 @@ per-connection local test CA for HTTPS and a disposable owner; it checks real
 owner/project/profile/repository persistence, restoration, interrupted activation,
 boot disablement and a controlled candidate-health rejection. It cleans its own
 accounts, units and state afterward. Ordinary CI permissions remain read-only;
+the runner's writable `/opt` parent is temporarily root-owned mode 0755 and its
+original metadata is restored after cleanup. Production parent checks stay strict.
 there are no production credentials, self-hosted runners, signing or publication
 steps. See [development checks](development.md#continuous-integration).
 

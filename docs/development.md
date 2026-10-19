@@ -74,6 +74,9 @@ run it on an existing installation or workstation**. It uses no repository secre
 production credentials, signing/publication rights or self-hosted runner. Trusted
 source builds establish fixture identity; production packet verification has no
 fixture bypass. See [upgrade scope and remaining acceptance](platform-upgrades.md).
+The hosted runner's writable `/opt` parent is temporarily made root-owned mode
+0755 during this explicit fixture, then restored to its original UID/GID/mode.
+Production installation/upgrade checks continue to reject writable ancestors.
 
 The Python job installs pinned release-plz and Rust to run the real-tool release
 fixtures on Ubuntu, including ordinary PRs. Local runs without
