@@ -164,11 +164,17 @@ Ubuntu runner with real root account/filesystem/systemd operations. It uses a
 per-connection local test CA for HTTPS and a disposable owner; it checks real
 owner/project/profile/repository persistence, restoration, interrupted activation,
 boot disablement and a controlled candidate-health rejection. It cleans its own
-accounts, units and state afterward. Ordinary CI permissions remain read-only;
-the runner's writable `/opt` parent is temporarily root-owned mode 0755 and its
+accounts, units and state afterward. The runner's writable `/opt` parent is
+temporarily root-owned mode 0755 and its
 original metadata is restored after cleanup. Production parent checks stay strict.
-there are no production credentials, self-hosted runners, signing or publication
+Ordinary CI permissions remain read-only; there are no production credentials,
+self-hosted runners, signing or publication
 steps. See [development checks](development.md#continuous-integration).
+
+The first complete [Ubuntu CI run](https://github.com/devoption/devoption/actions/runs/39334095577)
+passed this real-system fixture at 22:22 UTC on 2026-10-19, including cleanup.
+It also passed all 258 Python tests, 101 Node tests and required Rust/install
+checks at that revision. Current PR checks validate subsequent changes.
 
 This is base-upgrade implementation and fixture evidence. Real signed
 previous-to-candidate acceptance, reboot recovery of pending/completed transactions,

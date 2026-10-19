@@ -385,9 +385,14 @@ class Upgrade:
             raise
 
     def check(self, installer):
+        units = ('devoption-public.service', 'caddy-devoption.service')
+        if not all(self.host.active(unit) for unit in units):
+            raise ValueError('Both installed services must be active for upgrade readiness.')
         self.host.probe(installer.binary, installer.version)
         self.host.healthy(installer.hostname)
         self.host.public_health(installer.hostname)
+        if not all(self.host.active(unit) for unit in units):
+            raise ValueError('An installed service stopped during readiness checks.')
 
     def recover(self, confirm=False):
         if not confirm:

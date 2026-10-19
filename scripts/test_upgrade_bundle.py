@@ -88,6 +88,16 @@ class UpgradeTests(unittest.TestCase):
         self.assertTrue(self.host.running)
         self.assertEqual(self.saved.read_bytes(), b'original checkout bytes')
 
+    def test_matching_http_responses_cannot_hide_a_service_stopping(self):
+        def unhealthy_after_response(hostname):
+            if self.installer.path(RECEIPT).read_bytes()==canonical(self.candidate.identity):
+                self.host.running=False
+        self.host.public_health=unhealthy_after_response
+        with self.assertRaisesRegex(ValueError,'stopped during readiness'):
+            self.upgrade.apply()
+        self.assertEqual(self.upgrade.record()['phase'],'failed')
+        self.upgrade.recover(confirm=True)
+
     def test_power_interruption_after_unit_before_receipt_can_recover(self):
         original = self.upgrade.replace
         def interrupt(path, content, mode, allowed=None):
