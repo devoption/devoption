@@ -114,6 +114,12 @@ asset. Upload uses the fixed GitHub upload host without redirects; no delete,
 clobber, force-update or publish endpoint exists. Every returned object ID is
 checked against fresh state. Final readback re-verifies signatures and packet
 bytes and confirms the same tag, draft and asset identities before reporting success.
+Downloads select the documented media type for each API: the
+[Actions archive redirect](https://docs.github.com/en/rest/actions/artifacts#download-an-artifact)
+uses `application/vnd.github+json`, while
+[release asset bytes](https://docs.github.com/en/rest/releases/assets#get-a-release-asset)
+use `application/octet-stream`. Failures report a sanitized HTTP status without
+printing captured stderr, tokens or signed download URLs.
 
 Lost responses after tag, draft or asset creation are recovered by the next
 identical run. A matching complete retry performs no writes and verifies retained
@@ -132,3 +138,10 @@ passed every source check but stopped before tag/draft/upload writes because the
 workflow token did not satisfy the local planner's `permissions.push` check.
 The writer now uses its enforced workflow context instead. Successful live
 retention and an identical retry remain pending after this correction is merged.
+
+The [next approved attempt](https://github.com/devoption/devoption/actions/runs/39254096971)
+passed source CI and the corrected token check, then stopped before writes because
+the Actions archive endpoint rejected the release-asset media type (HTTP 415).
+Read-only local testing reproduced that response and successfully downloaded and
+cryptographically verified the same reserved ZIP using the corrected adapter.
+Live tag/draft/upload and identical-retry acceptance remain pending on corrected main.

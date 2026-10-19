@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -224,6 +225,34 @@ class WriterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "approved exact-main"), patch("retain_candidate_release.GitHub") as client:
                 Writer(self.gh, self.repository, self.source)
             client.assert_not_called()
+
+    def test_download_adapter_selects_actions_redirect_and_release_binary_media_types(self):
+        with patch.dict(os.environ, {"GH_TOKEN": "fixture-not-a-real-token"}), patch("retain_candidate_release.require_workflow"):
+            writer = Writer(self.gh, self.repository, self.source)
+        for path, media in (("actions/artifacts/56/zip", "application/vnd.github+json"),
+                            ("releases/assets/34", "application/octet-stream")):
+            with self.subTest(path=path):
+                destination = self.root / path.replace("/", "-")
+                def run(arguments, **kwargs):
+                    self.assertEqual(arguments, [writer.gh, "api", "--hostname", "github.com", "--method", "GET",
+                                                 PREFIX + "/" + path, "-H", "Accept: " + media])
+                    self.assertTrue(kwargs["check"])
+                    self.assertEqual(kwargs["timeout"], 120)
+                    kwargs["stdout"].write(self.transport.read_bytes())
+                with patch("retain_candidate_release.subprocess.run", side_effect=run):
+                    writer.download(path, destination)
+                self.assertEqual(destination.read_bytes(), self.transport.read_bytes())
+                with self.assertRaises(FileExistsError):
+                    writer.download(path, destination)
+
+    def test_download_error_reports_only_http_status_without_private_stderr(self):
+        with patch.dict(os.environ, {"GH_TOKEN": "fixture-not-a-real-token"}), patch("retain_candidate_release.require_workflow"):
+            writer = Writer(self.gh, self.repository, self.source)
+        failure = subprocess.CalledProcessError(1, "gh", stderr=b"private signed URL and token (HTTP 415)")
+        with patch("retain_candidate_release.subprocess.run", side_effect=failure):
+            with self.assertRaisesRegex(ValueError, "HTTP 415") as caught:
+                writer.download("actions/artifacts/56/zip", self.root / "failed.zip")
+        self.assertNotIn("private", str(caught.exception))
 
 
 if __name__ == "__main__":
