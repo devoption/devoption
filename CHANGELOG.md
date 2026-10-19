@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Record successful live signed-candidate upload, independent readback and local
+  post-run verification with exact artifact/archive/proof identities and bounded
+  retention limits ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Record the first approved live bundle-signing run, GitHub attestation and
   successful cryptographic verification, with the exact source/archive digest
   and remaining retention/publication limits
