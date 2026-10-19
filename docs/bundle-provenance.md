@@ -57,7 +57,8 @@ reconciliation and promotion remain later work. [Reviewed candidate reservations
 pin one retained identity per preview version in Git. The candidate-retention path
 below has fixture coverage and successful live upload/readback evidence.
 The [installer acceptance report](bundle-installer-acceptance.md) records real
-installation of these retained signed bytes and the remaining public TLS gate.
+installation of these retained signed bytes, including public DNS/ACME and reboot
+acceptance. The packet remains validation-only.
 
 ## Short-lived candidate retention
 
@@ -105,8 +106,9 @@ Expired, deleted or missing artifacts fail; no fallback or replacement is made.
 Actions artifacts require GitHub authentication to download and can expire or be
 deleted. This is bounded test retention, not permanent release storage. No
 repository retention setting is changed. [Cross-run candidate selection](release-candidates.md)
-now reserves identities in Git; remote publication reconciliation, promotion and
-channel/installer support remain pending. Each live signing/upload test requires owner approval;
+now reserves identities in Git. [Installer acceptance](bundle-installer-acceptance.md)
+is complete for the retained validation packet; promotion and a recommended
+publication channel remain pending. Each live signing/upload test requires owner approval;
 completed acceptance runs do not grant continuing authorization.
 
 ## Live acceptance evidence
@@ -134,8 +136,9 @@ for additional signing runs. The default signing input remains false. The
 GitHub attestation record is retained, but the archive and local proof bundle
 were not uploaded as downloadable artifacts. Post-run verification of a retained
 archive was outside that initial run; the separate retention acceptance below
-now covers it. Installation from a distributed bundle, promotion and release
-publication remain pending.
+now covers it. The [installer acceptance](bundle-installer-acceptance.md) also
+covers installation of those distributed bytes; promotion and release publication
+remain pending.
 No product release, version tag or registry publication was created.
 
 ### Retained-candidate acceptance

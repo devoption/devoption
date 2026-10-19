@@ -88,20 +88,64 @@ install the fixture CA into the host's global trust store. Repeat HTTPS checks
 after `systemctl restart` and `reboot`, comparing boot IDs and checking both units
 with `systemctl is-active` and `systemctl is-enabled`.
 
-## Limits and cleanup
+## Public DNS/ACME acceptance
+
+After separate owner approval, a second fresh installation completed the public
+TLS gate on 2026-10-19 UTC. It used stock DigitalOcean Ubuntu 24.04.5 amd64 image
+`247516813`, kernel `6.8.0-142-generic`, region `nyc3`, and size
+`s-1vcpu-2gb-amd` (1 vCPU / 2 GiB). The installer revision and all packet/verifier/
+proxy inputs were the same as above. No platform compilation or Rust toolchain
+was needed. One temporary A record supplied a dedicated hostname on one public
+IPv4 address; both authoritative DNS and the external resolver returned that
+address. SSH was restricted to the administrator source; 80/443 were public.
+
+| Check | Observed result |
+| --- | --- |
+| Fresh installation | Production signature/manifest verification, root installation, SSH PTY owner setup and systemd startup passed. |
+| Public HTTPS | At 21:26:57, external TLS 1.3 verified the hostname and Let's Encrypt chain using the normal system trust store, with no test CA, hosts override or verification bypass. Sign-in returned 200 and anonymous projects redirected to sign-in. |
+| Public application state | HTTPS challenge/sign-in, Secure/HttpOnly session, project/profile save and readback, sign-out and subsequent access rejection passed. These were protocol checks, not browser UI automation. |
+| Routing and isolation | HTTP redirected to the canonical HTTPS origin with 308; an unknown HTTP Host under valid SNI returned 421; unknown TLS SNI failed the verified handshake. The backend listened only on `127.0.0.1:3000`; external backend 3000 and Caddy admin 2019 connections failed. |
+| ACME renewal | Caddy logged `certificate renewed successfully` at 21:27:05. External verification at 21:27:33 confirmed a different trusted certificate serial and fingerprint. |
+| Identical reinstall | After restoring the original proxy configuration, normal `install` and `status` reported no missing files and an enrolled owner. Owner/project/profile hashes and the original proxy configuration were unchanged. |
+| Public reboot | A changed kernel boot ID confirmed reboot. Both services recovered active/enabled automatically; the same renewed certificate verified externally at 21:28:15. Owner login and saved project/profile reads passed, saved data/configuration hashes were unchanged, and the old session was invalidated. |
+
+Renewal used a temporary, administrator-controlled test change:
+`renew_interval 1m` and `renewal_window_ratio 0.999999` in Caddy's global options.
+These [documented renewal controls](https://caddyserver.com/docs/caddyfile/options#renewal-window-ratio)
+accelerated the renewal threshold during the short rehearsal. The generated
+Caddyfile was restored **byte-for-byte** immediately after observing renewal,
+before normal installer reconciliation and reboot. This is actual ACME renewal
+under an accelerated threshold, not evidence of months of unattended operation.
+The installer does not add these test settings.
+
+The initial leaf certificate SHA-256 was
+`370aebcb4b7c750ab25f12975007362a3232204d5e1c78f4a59206fb4a3a7fea`;
+the renewed and post-reboot certificate SHA-256 was
+`4cea412bb962f09cf2387bb850a06a7f8cf7671d9da234073b14a114f327f408`.
+
+Cleanup removed only the recorded new DNS record and this run's node. All 31
+pre-existing DNS records matched the saved baseline exactly. A subsequent
+DigitalOcean GET returned **404**, verifying node absence rather than only a
+deletion acknowledgement. The node existed for less than five minutes, at the
+provider-listed rate of $0.02083/hour, within the approved $1 compute cap. An
+existing SSH key was reused; existing keys, nodes and other DNS records were
+preserved. The temporary session file was removed, and raw infrastructure
+inventories and credentials are excluded from this report.
+
+## Limits and local cleanup
 
 This establishes privileged installation, deterministic completed-write recovery,
 identical retries and restart/reboot behavior for the retained validation packet.
-It does **not** establish public DNS, inbound internet reachability or public
-ACME issuance/renewal. That last external TLS acceptance needs an authorized
-disposable public host and hostname; paid infrastructure and DNS changes need
-their applicable separate approval. Existing unrelated cloud nodes were not used.
+The separately approved public run above also establishes public DNS, inbound
+HTTP/HTTPS and trusted ACME issuance/accelerated renewal for this Ubuntu/IPv4
+profile. IPv6, long-term operations and other platforms remain outside this run.
 
 The guest was powered off after testing and its loopback forwards were closed.
 The original rehearsal disk was preserved. Combined local rehearsal storage stayed
-below the existing 8 GiB cap. No cloud resources, public DNS, repository security
-settings, credentials for production, tags, release assets or publication state
-were changed. The packet remains an unpublished validation candidate with
+below the existing 8 GiB cap. That local run changed no cloud resources or public
+DNS; the later public run's temporary changes and cleanup are recorded above.
+Neither run changed repository security settings, tags, release assets or
+publication state. The packet remains an unpublished validation candidate with
 `publication_eligible: false`; upgrades and image distribution remain #263/#264.
 
 Repository checks passed: locked offline workspace build/tests, formatting,
