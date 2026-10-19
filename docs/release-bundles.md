@@ -1,5 +1,9 @@
 # Local platform bundle candidates
 
+The [verified Ubuntu installer](bundle-installation.md) can consume an explicitly
+selected signed validation packet. It reuses this immutable inventory and the
+separate provenance policy; unsigned local assembly alone is not installation trust.
+
 The offline assembler is part of
 [#261](https://github.com/devoption/devoption/issues/261). It packages a prepared
 numbered preview from a clean committed checkout on Ubuntu 24.04 amd64. It does

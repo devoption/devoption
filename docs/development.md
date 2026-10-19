@@ -55,6 +55,12 @@ executable, runs its version/help checks, and compares every archived byte and
 manifest entry, source-inventory SBOM and unsigned assembly statement with the
 trusted checkout/build inputs. It uploads no artifacts;
 see [bundle candidates and remaining trust gates](release-bundles.md).
+It then runs `python3 scripts/check_bundle_installer.py OUTPUT` against that
+trusted local assembly: disposable file placement, rendered-unit verification,
+real PTY owner setup, installed-binary readiness/restart and a state-preserving
+reinstall. No system accounts, host units or services are changed. Signature
+failure/acceptance policy is tested separately; real privileged installer and
+reboot acceptance remain subject to the [installer's validation limits](bundle-installation.md#validation-scope).
 
 The Python job installs pinned release-plz and Rust to run the real-tool release
 fixtures on Ubuntu, including ordinary PRs. Local runs without

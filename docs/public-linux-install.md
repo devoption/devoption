@@ -1,5 +1,10 @@
 # Single-node platform installation with HTTPS
 
+For installation without compiling DevOption, see the
+[verified bundle installer](bundle-installation.md). It currently requires an
+explicit validation candidate and preserves the host/publication approval gates.
+The source-based path below remains available.
+
 This is the first public-platform slice of
 [#230](https://github.com/devoption/devoption/issues/230). The server now supports
 one configured HTTPS origin behind a local proxy. Projects, login and restart are
