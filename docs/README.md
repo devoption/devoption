@@ -29,6 +29,7 @@ accounts and production hosting acceptance remain planned.
 - [Local platform bundle candidates and remaining trust gates](release-bundles.md)
 - [Opt-in authenticated bundle provenance and verification](bundle-provenance.md)
 - [Reviewed candidate reservations and immutable retry rules](release-candidates.md)
+- [Read-only draft retention and retry reconciliation plan](release-reconciliation.md)
 
 ## Implementation references
 
