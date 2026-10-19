@@ -56,7 +56,8 @@ without cancelling an in-flight operation. Release publication/retry
 reconciliation and promotion remain later work. [Reviewed candidate reservations](release-candidates.md)
 pin one retained identity per preview version in Git. The candidate-retention path
 below has fixture coverage and successful live upload/readback evidence.
-Installation from a distributed bundle remains unvalidated.
+The [installer acceptance report](bundle-installer-acceptance.md) records real
+installation of these retained signed bytes and the remaining public TLS gate.
 
 ## Short-lived candidate retention
 
