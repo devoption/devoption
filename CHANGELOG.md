@@ -18,6 +18,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Reserve reviewed signed preview candidates in an append-only Git catalog;
+  reverify the exact transport before atomic reservation, reconcile identical
+  retries without replacement and reject version/identity conflicts in PR CI
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Retain verified signed candidates for seven days under distinct run/attempt
   artifact IDs without replacement, then reverify downloaded archive/proof bytes
   in a separate read-only job; preserve live activation and publication gates

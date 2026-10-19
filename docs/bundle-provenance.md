@@ -53,7 +53,8 @@ Both pins were checked against official upstream release/tag metadata on
 
 The workflow uses the existing `platform-release-preparation` concurrency group
 without cancelling an in-flight operation. Release publication/retry
-reconciliation and promotion remain later work. The candidate-retention path
+reconciliation and promotion remain later work. [Reviewed candidate reservations](release-candidates.md)
+pin one retained identity per preview version in Git. The candidate-retention path
 below has fixture coverage and successful live upload/readback evidence.
 Installation from a distributed bundle remains unvalidated.
 
@@ -102,9 +103,9 @@ Expired, deleted or missing artifacts fail; no fallback or replacement is made.
 
 Actions artifacts require GitHub authentication to download and can expire or be
 deleted. This is bounded test retention, not permanent release storage. No
-repository retention setting is changed. Cross-run release identity reservation,
-publication reconciliation, promotion and channel/installer support remain
-outside this slice. Each live signing/upload test requires owner approval;
+repository retention setting is changed. [Cross-run candidate selection](release-candidates.md)
+now reserves identities in Git; remote publication reconciliation, promotion and
+channel/installer support remain pending. Each live signing/upload test requires owner approval;
 completed acceptance runs do not grant continuing authorization.
 
 ## Live acceptance evidence
