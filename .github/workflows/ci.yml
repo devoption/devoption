@@ -50,7 +50,7 @@ jobs:
   installation:
     name: Release build and installation checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,6 +70,12 @@ jobs:
           python3 scripts/release_bundle.py --binary target/release/devoption --output "$BUNDLE_OUTPUT"
           python3 scripts/check_release_bundle.py "$BUNDLE_OUTPUT" --binary target/release/devoption
           python3 scripts/check_bundle_installer.py "$BUNDLE_OUTPUT"
+      - name: Exercise prior-preview upgrade and full-state recovery on disposable runner
+        env:
+          UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture
+        run: |
+          python3 scripts/check_bundle_upgrade.py --prepare "$UPGRADE_FIXTURE"
+          sudo env DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE=1 python3 scripts/check_bundle_upgrade.py --disposable-system-host "$UPGRADE_FIXTURE"
       - run: git diff --exit-code
 
   scripts:

@@ -55,9 +55,9 @@ def verified_files(packet, record, gh, allow_validation):
         archive = transport.read(candidate["archive"])
     manifest = manifest_from_archive(archive, candidate["source_commit"], candidate["platform_version"])
     metadata = manifest["release_metadata"]
-    if (metadata["compatibility"]["installation"] != "fresh-only" or
-            metadata["compatibility"]["upgrade_from"] or metadata["migration"]["required"]):
-        raise ValueError("Installer supports fresh-only previews without migrations; use the upgrade contract for other versions.")
+    if (metadata["compatibility"]["installation"] not in ("fresh-only", "fresh-and-upgrade") or
+            metadata["migration"]["required"]):
+        raise ValueError("Installer supports fresh previews without migrations; use the upgrade contract for other versions.")
     # manifest_from_archive rejected unsafe paths/types, duplicates, wrong modes,
     # unexpected files and mismatched digests. Copy bytes ourselves; no extractall.
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as bundle:

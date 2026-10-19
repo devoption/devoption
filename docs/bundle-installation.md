@@ -155,7 +155,10 @@ files must match their verified bytes, ownership and mode, and are never replace
 owner, project/profile, repository and Caddy data are never overwritten. Repeated
 enrollment preserves the existing owner. A host-wide lock serializes mutations.
 Version or hostname changes are refused: use the future platform upgrade/configuration
-contract under #263 rather than treating reinstall as upgrade.
+contract under #263 rather than treating reinstall as upgrade. The
+[operator-triggered upgrade/recovery command](platform-upgrades.md) now implements
+the first unchanged-schema base-preview path; it requires an explicitly compatible
+signed target and has no unattended or publication operation.
 
 A completed atomic file commit can be resumed after interruption. Conflicting
 accounts/groups, corrupted files, changed units, symlinks, hard links or private

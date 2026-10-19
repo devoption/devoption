@@ -97,10 +97,15 @@ class Host:
                     continue
                 raise
             with listener:
+                # A stopped service can leave TIME_WAIT sockets. Match normal
+                # server rebinding without allowing a second live listener.
+                if platform.system() == "Linux":
+                    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 if family == socket.AF_INET6:
                     listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
                 try:
                     listener.bind((address, port))
+                    listener.listen(1)
                 except OSError as error:
                     if family == socket.AF_INET6 and error.errno == errno.EADDRNOTAVAIL:
                         continue  # An explicitly IPv4-only Ubuntu host is supported.

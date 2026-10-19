@@ -38,6 +38,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add operator-triggered same-schema preview upgrades with independent source/
+  target verification, offline verified state/configuration backup, versioned
+  activation, disabled boot during pending transactions and explicit full-state
+  recovery preserving displaced writes; add schema-2 compatibility declarations
+  and real prior/next executable, root/systemd recovery fixtures on disposable CI
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Add a verified Ubuntu 24.04 amd64 bundle installer with host/conflict preflight,
   versioned files, pinned proxy and hardened service configuration, SSH-only owner
   enrollment, safe interrupted/identical retries and data-preserving refusal of
