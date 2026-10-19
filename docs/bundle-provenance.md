@@ -11,7 +11,8 @@ The [candidate manifest](release-bundles.md) retains `publication_eligible: fals
 
 Repository policy in [AGENTS.md](../AGENTS.md) requires separate approval before
 creating credentials or publishing releases/packages. Obtain explicit owner
-approval for the OIDC signing request and GitHub attestation writes before a
+approval for the OIDC signing request, GitHub attestation writes and candidate
+artifact retention before a
 live opted-in run. Merging this code is not that approval. No stored secret,
 PAT, signing key, repository setting or paid service is created by this workflow.
 
@@ -35,7 +36,8 @@ revision even if main later advances; consumers must independently pin that SHA.
 The action uses GitHub's short-lived OIDC identity and workflow token. For this
 public repository, signed proof data may enter GitHub/Sigstore transparency
 infrastructure; attestation records are written to GitHub. This is the externally
-visible side effect that requires approval. No archive is uploaded, registry is
+visible side effect that requires approval. The verified archive and proof are
+also uploaded for seven-day test retention as described below. No registry is
 pushed, release is created, version tag is changed or branch is merged. The proof
 is not a substitute for the separate [#21 release gate](releases.md).
 
@@ -49,11 +51,60 @@ Both pins were checked against official upstream release/tag metadata on
 2026-10-18. See [GitHub's attestation documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
 
 The workflow uses the existing `platform-release-preparation` concurrency group
-without cancelling an in-flight operation. Immutable artifact retention, release
-publication/retry reconciliation and promotion remain later work. An opted-in
-run immediately verifies its proof, but retains no downloadable archive/proof
-artifact. A reviewed candidate-retention path is still required before claiming
-this supplies an installable distribution.
+without cancelling an in-flight operation. Release publication/retry
+reconciliation and promotion remain later work. The candidate-retention path
+below has fixture coverage but has not yet had an approved live upload/readback
+run. Installation from a distributed bundle also remains unvalidated.
+
+## Short-lived candidate retention
+
+After signing, `scripts/bundle_candidate.py stage` verifies private snapshots of
+the archive and proof with the existing cryptographic policy before creating a
+new packet directory. It checks the source and assembly checksum sidecars and
+refuses existing output, including partial output left by a failed attempt.
+The packet contains only the unchanged `.tar.gz`, `attestation.json` and
+`candidate.json`. The archive already contains its manifest, SBOM and notes;
+the adjacent unsigned assembly statement is not substituted for signed proof.
+
+Receipt schema 1 records the source commit, version, archive name/SHA-256, proof
+SHA-256, run ID/attempt, artifact name and `publication_eligible: false`.
+It is a transport receipt, not a signed release declaration or independent trust
+root. Its values must match the identity supplied independently to the checker.
+
+The workflow uploads this packet with checksum-pinned `actions/upload-artifact`
+v7.0.2, commit `cf430e030ddbb5b0abf93d22962f4752f3646cd9`, with seven-day retention
+and `overwrite: false`. Its name is `bundle-SOURCE_COMMIT-RUN_ID-RUN_ATTEMPT`.
+A collision fails instead of deleting or replacing earlier bytes. Rerunning the
+signing job creates a distinct attempt; it does not reserve a published version
+or prove that separately compiled candidates have identical bytes. Never select
+a candidate by a floating name, newest run or embedded version alone.
+
+A separate fresh job with only `contents: read` downloads the exact artifact ID
+returned by that successful upload using pinned `actions/download-artifact`
+v8.0.2, commit `9000827ccba6bdab643e8b6fd33ac0654aef8333`. These pins were checked
+against official upstream release tags on 2026-10-18. The download action fails
+on a transport digest mismatch. The checker then requires exactly the three
+packet files, compares receipt and both file digests with the signer job's
+outputs, and repeats cryptographic and complete archive verification on private
+snapshots. It does not compile, extract the platform tarball, execute its binary
+or grant signing/attestation permissions. Downloading the outer Actions ZIP is
+only transport unpacking. See the upstream [upload](https://github.com/actions/upload-artifact/tree/v7.0.2)
+and [download](https://github.com/actions/download-artifact/tree/v8.0.2) contracts.
+
+Only after successful readback does the run summary record the reviewed source,
+version, archive/proof digests, original signing attempt and artifact ID/URL.
+The separately labelled transport digest hashes the Actions ZIP, not the
+platform `.tar.gz`. A failed readback may leave an uploaded artifact; its
+existence alone is not acceptance. Retrying only the failed readback job reuses
+the original signing attempt and artifact ID, without signing or rebuilding.
+Expired, deleted or missing artifacts fail; no fallback or replacement is made.
+
+Actions artifacts require GitHub authentication to download and can expire or be
+deleted. This is bounded test retention, not permanent release storage. No
+repository retention setting is changed. Cross-run release identity reservation,
+publication reconciliation, promotion and channel/installer support remain
+outside this slice. Another live signing/upload test requires separate approval;
+the earlier one-run signing approval was already consumed.
 
 ## Live acceptance evidence
 
@@ -77,11 +128,30 @@ This records one successful live acceptance run, not continuing authorization
 for additional signing runs. The default signing input remains false. The
 GitHub attestation record is retained, but the archive and local proof bundle
 were not uploaded as downloadable artifacts. Post-run verification of a retained
-archive, immutable retention/retry handling, installation from a distributed
-bundle, promotion and release publication remain unvalidated or unimplemented.
+archive and the new retention path have not had live acceptance. Installation
+from a distributed bundle, promotion and release publication also remain pending.
 No product release, version tag or registry publication was created.
 
 ## Verify a retained candidate
+
+Obtain the exact artifact ID and the independently reviewed source, version,
+archive/proof digests, run ID and original signing attempt from the successful
+run summary. Download that ID from its Actions artifact URL before expiry; do
+not run code supplied inside the download. From a separately trusted checkout:
+
+```sh
+python3 scripts/bundle_candidate.py check \
+  --directory /absolute/path/to/downloaded-candidate \
+  --source REVIEWED_40_HEX_COMMIT --version 0.1.0-preview.1 \
+  --sha256 REVIEWED_64_HEX_ARCHIVE_SHA256 \
+  --proof-sha256 REVIEWED_64_HEX_PROOF_SHA256 \
+  --run-id REVIEWED_RUN_ID --attempt ORIGINAL_SIGNING_ATTEMPT \
+  --gh /absolute/path/to/trusted/gh
+```
+
+Do not derive these expected values from `candidate.json` in the download. The
+receipt is checked against them, not used to define them. For direct archive and
+proof verification without the transport receipt, use the command below.
 
 Use trusted, checksum-verified GitHub CLI 2.102.0 and this reviewed verifier.
 Independently obtain the owner-reviewed commit, version and archive SHA-256;

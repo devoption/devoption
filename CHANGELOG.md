@@ -14,6 +14,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Retain verified signed candidates for seven days under distinct run/attempt
+  artifact IDs without replacement, then reverify downloaded archive/proof bytes
+  in a separate read-only job; preserve live activation and publication gates
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Prepare a main-only opt-in workflow that builds, tests and attests one bundle,
   plus a pinned cryptographic verifier enforcing reviewed source/digest, workflow
   identity, main ref, hosted runners and archive integrity; keep live signing

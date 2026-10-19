@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       sign:
-        description: 'Separately approved OIDC signing and attestation writes (no release publication)'
+        description: 'Separately approved signing, attestations and seven-day candidate retention (no release publication)'
         required: false
         default: false
         type: boolean
@@ -32,6 +32,14 @@ jobs:
     if: inputs.sign && github.ref == 'refs/heads/main' && github.repository == 'devoption/devoption'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      artifact_id: ${{ steps.retain.outputs.artifact-id }}
+      artifact_url: ${{ steps.retain.outputs.artifact-url }}
+      artifact_digest: ${{ steps.retain.outputs.artifact-digest }}
+      version: ${{ steps.packet.outputs.platform_version }}
+      archive_sha256: ${{ steps.packet.outputs.archive_sha256 }}
+      proof_sha256: ${{ steps.packet.outputs.proof_sha256 }}
+      run_attempt: ${{ steps.packet.outputs.run_attempt }}
     permissions:
       contents: read
       id-token: write
@@ -73,15 +81,84 @@ jobs:
           subject-path: ${{ runner.temp }}/signed-candidate/*.tar.gz
           push-to-registry: false
           create-storage-record: false
-      - name: Verify the authenticated identity and exact candidate
+      - name: Verify and stage the exact signed candidate
+        id: packet
         env:
           REVIEWED_SOURCE: ${{ inputs.source_commit }}
           ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
-          read -r digest archive < "$RUNNER_TEMP/signed-candidate/SHA256SUMS"
-          version="${archive#devoption-}"
-          python3 scripts/verify_bundle_provenance.py \
-            --archive "$RUNNER_TEMP/signed-candidate/$archive" \
-            --bundle "$ATTESTATION_BUNDLE" --source "$REVIEWED_SOURCE" \
-            --sha256 "$digest" --version "${version%-ubuntu-24.04-amd64.tar.gz}" \
+          python3 scripts/bundle_candidate.py stage \
+            --directory "$RUNNER_TEMP/signed-candidate" \
+            --proof "$ATTESTATION_BUNDLE" --source "$REVIEWED_SOURCE" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "$RUNNER_TEMP/retained-candidate" \
             --gh "$RUNNER_TEMP/attestation-gh/bin/gh"
+      - name: Retain one immutable attempt for seven days
+        id: retain
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.packet.outputs.artifact_name }}
+          path: ${{ runner.temp }}/retained-candidate/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+          overwrite: false
+          include-hidden-files: false
+          archive: true
+
+  verify-retained:
+    name: Independently verify the retained candidate
+    needs: sign
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/install-attestation-gh
+      - name: Require a single immutable artifact ID
+        env:
+          ARTIFACT_ID: ${{ needs.sign.outputs.artifact_id }}
+        run: '[[ "$ARTIFACT_ID" =~ ^[1-9][0-9]*$ ]]'
+      - name: Download only the artifact produced by the successful signer
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.sign.outputs.artifact_id }}
+          path: ${{ runner.temp }}/downloaded-candidate
+          digest-mismatch: error
+      - name: Reverify downloaded bytes without building or executing them
+        env:
+          REVIEWED_SOURCE: ${{ inputs.source_commit }}
+          REVIEWED_VERSION: ${{ needs.sign.outputs.version }}
+          REVIEWED_DIGEST: ${{ needs.sign.outputs.archive_sha256 }}
+          REVIEWED_PROOF_DIGEST: ${{ needs.sign.outputs.proof_sha256 }}
+          SIGNED_ATTEMPT: ${{ needs.sign.outputs.run_attempt }}
+        run: |
+          python3 scripts/bundle_candidate.py check \
+            --directory "$RUNNER_TEMP/downloaded-candidate" \
+            --source "$REVIEWED_SOURCE" --version "$REVIEWED_VERSION" \
+            --sha256 "$REVIEWED_DIGEST" --proof-sha256 "$REVIEWED_PROOF_DIGEST" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$SIGNED_ATTEMPT" \
+            --gh "$RUNNER_TEMP/attestation-gh/bin/gh"
+      - name: Record the verified retained identity
+        env:
+          SOURCE: ${{ inputs.source_commit }}
+          VERSION: ${{ needs.sign.outputs.version }}
+          ARCHIVE_SHA256: ${{ needs.sign.outputs.archive_sha256 }}
+          PROOF_SHA256: ${{ needs.sign.outputs.proof_sha256 }}
+          ARTIFACT_ID: ${{ needs.sign.outputs.artifact_id }}
+          ARTIFACT_URL: ${{ needs.sign.outputs.artifact_url }}
+          TRANSPORT_SHA256: ${{ needs.sign.outputs.artifact_digest }}
+          SIGNED_ATTEMPT: ${{ needs.sign.outputs.run_attempt }}
+        run: |
+          python3 - <<'PYTHON'
+          import os
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("## Retained candidate verified\n\n")
+              for key in ("SOURCE", "VERSION", "ARCHIVE_SHA256", "PROOF_SHA256", "ARTIFACT_ID",
+                          "ARTIFACT_URL", "TRANSPORT_SHA256", "SIGNED_ATTEMPT"):
+                  summary.write(f"- {key}: {os.environ[key]}\n")
+              summary.write("\nSeven-day test retention; publication_eligible: false.\n")
+          PYTHON
