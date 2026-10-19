@@ -84,9 +84,10 @@ concurrent retries, interrupted records, tampering and Git audit rejection paths
 No new signing run, artifact upload, tag or GitHub release is created here.
 
 The [read-only remote reconciliation planner](release-reconciliation.md) now
-checks tag/draft/asset state and reports missing work without writes. Permanent
-byte retention, remote write/retry execution, complete installation from the
-bundle and channel promotion remain later work. Promotion
+checks tag/draft/asset state and reports missing work without writes. Its separately
+approved companion writer now implements long-lived draft retention and retries;
+live activation, complete installation from the bundle and channel promotion
+remain pending. Promotion
 must use the reserved archive digest without recompiling or silently renaming an
 embedded preview version. Stable manifests remain unsupported. The separate
 [#21 publication decision](releases.md) is still required before any release write.

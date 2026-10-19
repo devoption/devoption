@@ -3,7 +3,8 @@
 The manual **Release preparation** workflow can generate a narrowly scoped,
 bot-owned draft after source-revision CI and preview/metadata validation pass.
 This is part of [#260](https://github.com/devoption/devoption/issues/260).
-It creates no tags or releases and does not approve or merge PRs.
+It creates no tags or releases. Default draft mode does not approve or merge PRs;
+optional protected merging requires the separate policy described below.
 
 ## Run from main
 
@@ -19,7 +20,9 @@ requires successful checks and plan jobs. It regenerates the proposal from the
 same source revision rather than accepting a caller-supplied patch or artifact.
 It builds the expected Git tree locally, verifies the remote source and generated
 tree, and creates one issue-linked commit changing only the root `Cargo.toml`,
-`Cargo.lock` and `CHANGELOG.md`. All files retain mode `100644`. A no-release
+`Cargo.lock`, `CHANGELOG.md` and, when necessary, the version-only binding in
+`release-metadata.toml`. Reviewed support/migration statements are not generated
+or rewritten. All files retain mode `100644`. A no-release
 result creates no branch or PR.
 
 The immutable branch name is `codex/release-plz-VERSION`. PR titles and commit
@@ -53,7 +56,7 @@ Other token-triggered events generally do not launch workflows; this workflow
 uses only manual dispatch, so merging a release PR does not trigger another
 preparation run. Keep required branch-protection checks and up-to-date rules.
 
-Auto-merge remains disabled and unimplemented. Publication, stable promotion and
+Optional guarded auto-merge is implemented but disabled; see below. Publication, stable promotion and
 upgrades remain separately gated by [the release process](releases.md), #21 and
 the remaining distribution tasks. Merging this implementation does not dispatch
 the writer or approve a particular release candidate.
@@ -85,6 +88,38 @@ Local/API fixtures exercise these transitions without GitHub writes. The first
 opted-in [main run](https://github.com/devoption/devoption/actions/runs/39155120245)
 on 2026-10-18 passed source CI but failed release-plz analysis fixtures before
 the writer ran; no candidate branch or PR was created. The shared installer now
-uses the GNU/Linux build, and ordinary PR CI includes these fixtures. Live writer
-acceptance still requires a successful opted-in main run. Passing fixtures do not
-establish live token permissions, PR workflow approval or publication readiness.
+uses the GNU/Linux build, and ordinary PR CI includes these fixtures. The later
+[successful live run](https://github.com/devoption/devoption/actions/runs/39156408201)
+created bot-owned [PR #270](https://github.com/devoption/devoption/pull/270), which
+was reviewed and merged. Its exact-main Release check passed. This establishes
+live draft generation; it does not establish unattended merging or publication.
+
+## Optional guarded auto-merge
+
+`release-automation.toml` defaults `auto_merge_release_prs` to false. Activation
+requires an owner-approved policy PR, the separately authorized repository
+`allow_auto_merge` setting, and both `create_draft` and `auto_merge` dispatch inputs.
+No setting is changed automatically. On 2026-10-19 the repository setting was
+still disabled. This is an activation decision, not missing implementation.
+
+The script checks policy before creating a branch/PR. It requires protected main
+with both existing required checks, strict up-to-date requirements and enforcement
+for administrators. Only the regenerated identical bot-owned PR, branch, commit,
+narrow release tree, title and body can enter the path. Human or modified candidates
+and another actor's changed auto-merge request are rejected.
+
+After the guarded ready transition, checksum-pinned GitHub CLI 2.102.0 invokes
+normal squash auto-merge with the exact expected head SHA, without administrator
+override or branch deletion. GitHub queues pending required checks, or performs
+the ordinary protected merge if all requirements already pass. It does not
+manufacture checks, approve workflow runs, update stale branches or bypass review
+rules. Marking ready does not rerun unchanged source CI. An interrupted ready or
+queued transition can recover only the same candidate under the approved policy;
+default draft-only runs still reject ready/changed PRs.
+
+The CLI's [merge contract](https://cli.github.com/manual/gh_pr_merge) supplies the
+auto/expected-head behavior. GitHub's bot-PR workflow approval prompt still applies;
+fully unattended operation may need a separately approved authentication policy.
+No new credential is introduced to bypass that prompt. Fixtures exercise disabled
+policy/settings, missing protections, human or changed heads, ready/queued retries
+and already-passing checks. Live auto-merge has not been enabled or exercised.

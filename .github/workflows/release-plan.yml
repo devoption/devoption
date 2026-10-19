@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+      auto_merge:
+        description: 'Separately approved bot-only squash auto-merge; also requires checked-in and repository policy'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -88,6 +93,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - uses: ./.github/actions/install-release-plz
+      - uses: ./.github/actions/install-attestation-gh
       - name: Prepare offline inputs
         run: |
           rustup show active-toolchain
@@ -99,8 +105,12 @@ jobs:
           RELEASE_CHECKS_RESULT: ${{ needs.checks.result }}
           RELEASE_PLAN_RESULT: ${{ needs.plan.result }}
           PROPOSAL_DATE: ${{ inputs.proposal_date }}
+          RELEASE_AUTO_MERGE: ${{ inputs.auto_merge }}
         run: |
+          flags=()
+          if [[ "$RELEASE_AUTO_MERGE" == true ]]; then flags+=(--auto-merge); fi
           python3 scripts/release_pr.py \
             --release-plz "$RUNNER_TEMP/release-plz-tool/release-plz" \
-            --date "$PROPOSAL_DATE" >> "$GITHUB_STEP_SUMMARY"
+            --gh "$RUNNER_TEMP/attestation-gh/bin/gh" \
+            --date "$PROPOSAL_DATE" "${flags[@]}" >> "$GITHUB_STEP_SUMMARY"
       - run: git diff --exit-code

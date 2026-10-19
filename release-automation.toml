@@ -1,0 +1,4 @@
+# Enable only through an owner-approved policy PR and the repository's auto-merge setting.
+schema_version = 1
+auto_merge_release_prs = false
+merge_method = "squash"

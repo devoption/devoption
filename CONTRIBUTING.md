@@ -62,14 +62,20 @@ untrusted PRs, or privileged publication jobs to ordinary PR checks.
 
 The separate [release preparation writer](docs/release-prs.md) is an opt-in,
 main-only manual job with limited branch/PR write permissions after read-only
-checks pass. It never runs on contributor PR events, grants no merge/publication
-authority, and does not bypass the new release PR's required checks.
+checks pass. It never runs on contributor PR events. Default draft generation
+grants no merge/publication authority; optional bot-only merging requires the
+separate approved policy and preserves the new PR's required checks.
 
 The separate manual [bundle provenance workflow](docs/bundle-provenance.md) has
 an explicit signing opt-in after source CI. Its main-only signing job has OIDC
 and attestation permissions; ordinary PR checks remain read-only. Adding this
 workflow does not authorize its activation, issue credentials, or publish a
 product release. Live signing/attestation writes need separate owner approval.
+
+The separate manual [reserved-candidate retention writer](docs/release-reconciliation.md#approved-retention-writer)
+can create a reserved tag and unpublished validation draft, upload the unchanged
+verified ZIP and recover interrupted retries. It requires explicit tag/draft/upload
+approval and passing exact-main CI; implementation alone does not activate it.
 
 `main` requires PRs and passing CI, including for administrators, with no required
 approval count. See [the maintainer checklist](docs/maintainers.md) for the verified

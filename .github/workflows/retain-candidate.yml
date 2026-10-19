@@ -1,0 +1,70 @@
+name: Retain reserved candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      workflow_commit:
+        description: 'Reviewed full main SHA containing this writer; must match the run'
+        required: true
+        type: string
+      version:
+        description: 'Reserved preview version, without v prefix'
+        required: true
+        type: string
+      reservation_sha256:
+        description: 'Independently reviewed SHA-256 of the committed reservation JSON'
+        required: true
+        type: string
+      retain:
+        description: 'Separately approve the reserved tag, unpublished validation draft and unchanged ZIP upload'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-release-preparation
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  retain:
+    needs: checks
+    if: inputs.retain && github.ref == 'refs/heads/main' && github.repository == 'devoption/devoption'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/install-attestation-gh
+      - name: Retain or recover the verified reserved candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RETAIN_APPROVED: ${{ inputs.retain }}
+          RETAIN_CHECKS: ${{ needs.checks.result }}
+          REVIEWED_WORKFLOW: ${{ inputs.workflow_commit }}
+          REVIEWED_RESERVATION: ${{ inputs.reservation_sha256 }}
+          REVIEWED_VERSION: ${{ inputs.version }}
+        run: |
+          python3 scripts/retain_candidate_release.py \
+            --version "$REVIEWED_VERSION" --workflow-commit "$REVIEWED_WORKFLOW" \
+            --reservation-sha256 "$REVIEWED_RESERVATION" \
+            --gh "$RUNNER_TEMP/attestation-gh/bin/gh" > "$RUNNER_TEMP/retained-result.json"
+          {
+            echo '## Reserved candidate retained and verified (unpublished)'
+            echo '```json'
+            cat "$RUNNER_TEMP/retained-result.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - run: git diff --exit-code

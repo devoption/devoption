@@ -2,10 +2,10 @@
 
 The preparation work under [#260](https://github.com/devoption/devoption/issues/260)
 produces a reviewable preview version/changelog proposal and can optionally
-[create a bot-owned draft release PR](release-prs.md). It does not merge, tag,
+[create a bot-owned draft release PR](release-prs.md). Default proposal mode does not merge, tag,
 create GitHub releases, distribute bundles or upload to a registry. The existing
 [release approval process](releases.md) and #21 remain applicable. There is still
-no published product release; the source version remains `0.1.0-dev`.
+no published product release; the prepared source version is `0.1.0-preview.1`.
 
 ## Run a proposal
 
@@ -71,9 +71,11 @@ preview section, keeping historical sections byte-for-byte and leaving an empty
 `Unreleased` section. Missing change bullets, issue links, ambiguous sections or a
 future date block the proposal. Reviewers still assess note accuracy and coverage.
 The proposed section also requires a version-bound
-[release metadata record](release-metadata.md). Its support, compatibility,
+[release metadata record](release-metadata.md). Current-version metadata is bound
+to the selected preview automatically in the proposal; only its version changes.
+Its support, compatibility,
 migration and recovery statements are appended as a checked block; the report
-records the exact metadata digest. Missing, stale or inconsistent metadata blocks
+records the exact metadata digest. Missing, unrelated stale or inconsistent metadata blocks
 a preview proposal before temporary version edits. No-release runs and raw
 analysis diagnostics do not claim a metadata-validated candidate.
 
@@ -118,20 +120,25 @@ DEVOPTION_RELEASE_PLZ=/absolute/path/to/release-plz \
   python3 -m unittest discover -s scripts -p 'test_release_*.py'
 ```
 
-Normal Python CI runs policy/boundary checks and skips the tool-dependent fixtures;
-the manual proposal workflow requires them. Fixtures use disposable Git tags and
+Normal Python CI and the manual proposal workflow both install the pinned tool
+and run these fixtures. Local runs without `DEVOPTION_RELEASE_PLZ` skip the
+tool-dependent cases. Fixtures use disposable Git tags and
 small local crates, and test version groups, no-release behavior, breaking
 changes, preview numbering, helper-only changes, baselines, deterministic retries
 and failures.
 
-## Remaining #260 work before enablement
+## Implementation and activation status
 
-- Exercise the opted-in draft writer live and review its exact-revision PR CI,
-  including GitHub's workflow-approval prompt. Fixtures do not prove live access.
-- Reconcile #21 with ongoing publication authority, serialize publication with
-  preparation, and test duplicate-version, partial-publication and retry recovery
-  against immutable artifact identities. Version proposals alone cannot do this.
+- The [live draft writer](https://github.com/devoption/devoption/actions/runs/39156408201)
+  generated merged PR #270, and its exact-main Release check passed.
+- [Guarded optional auto-merge](release-prs.md#optional-guarded-auto-merge) is
+  implemented and covered by fixtures, but checked-in and repository policy remain
+  disabled. Enabling those policies or approving bot workflows is an owner decision.
+- Preparation, signing and [reserved-candidate retention](release-reconciliation.md)
+  share serialization. Retention retries reconcile exact immutable identities;
+  public publication remains separately gated by #21 and #261/#263.
 
-These are remaining implementation/approval gates, not actions authorized by a
-successful dry run. Bundle provenance, installer and platform upgrades remain
-under #261–#263.
+The [release status table](releases.md#delivery-status-against-the-six-issues)
+maps the original issues to actual delivered behavior and remaining work. Manual
+dispatch remains the default activation policy; version generation itself needs
+no manual Cargo version edits. Installer and platform upgrades remain #262/#263.

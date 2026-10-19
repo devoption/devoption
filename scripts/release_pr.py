@@ -14,6 +14,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from release_plan import git, prepare, run
 from release_preview import version_parts
+from release_metadata import FILENAME
 
 REPOSITORY = "devoption/devoption"
 BOT = "github-actions[bot]"
@@ -37,7 +38,7 @@ class GitHub:
         self.opener = build_opener(NoRedirect)
 
     def request(self, method, path, payload=None, missing=False):
-        request = Request(f"https://api.github.com/repos/{REPOSITORY}/{path}",
+        request = Request(f"https://api.github.com/repos/{REPOSITORY}" + ("/" + path if path else ""),
                           data=json.dumps(payload).encode() if payload is not None else None,
                           headers=self.headers, method=method)
         try:
@@ -50,6 +51,21 @@ class GitHub:
             if missing and error.code == 404:
                 return None
             raise ValueError(f"GitHub {method} {path.split('?')[0]} failed ({error.code}); reconcile remote state before retrying.") from error
+
+    def graphql(self, query, variables):
+        request = Request("https://api.github.com/graphql", data=json.dumps({"query": query, "variables": variables}).encode(),
+                          headers=self.headers, method="POST")
+        try:
+            with self.opener.open(request, timeout=30) as response:
+                raw = response.read(2097153)
+            if len(raw) > 2097152:
+                raise ValueError("GraphQL response exceeds its bound.")
+            result = json.loads(raw)
+            if result.get("errors") or not isinstance(result.get("data"), dict):
+                raise ValueError("GitHub rejected the guarded auto-merge transition; reconcile before retrying.")
+            return result["data"]
+        except HTTPError as error:
+            raise ValueError(f"GitHub auto-merge transition failed ({error.code}); no policy bypass is permitted.") from error
 
 
 def require_workflow(source):
@@ -66,8 +82,9 @@ def candidate(repository, executable, release_date):
     report, patch = prepare(repository, executable, release_date)
     if not report["changed_files"]:
         return None
-    if set(report["changed_files"]) != FILES or report["release_metadata"] is None:
-        raise ValueError("Drafts must contain only the validated root version, lockfile and changelog changes.")
+    changed = set(report["changed_files"])
+    if not FILES <= changed or changed - FILES - {FILENAME} or report["release_metadata"] is None:
+        raise ValueError("Drafts contain the root version, lockfile, changelog and optional version-only metadata binding.")
     source = report["source_commit"]
     with tempfile.TemporaryDirectory(prefix="devoption-release-pr-") as directory:
         scratch = Path(directory) / "source"
@@ -76,10 +93,10 @@ def candidate(repository, executable, release_date):
         subprocess.run(["git", "apply", "--whitespace=error", "-"], cwd=scratch, input=patch,
                        text=True, check=True, capture_output=True, timeout=30)
         git(scratch, "diff", "--check")
-        if set(git(scratch, "diff", "--name-only").splitlines()) != FILES:
+        if set(git(scratch, "diff", "--name-only").splitlines()) != changed:
             raise ValueError("Regenerated patch does not match its reported scope.")
         changes = []
-        for path in sorted(FILES):
+        for path in sorted(changed):
             if not git(scratch, "ls-files", "-s", "--", path).startswith("100644 "):
                 raise ValueError("Draft files must retain ordinary nonexecutable file modes.")
             content = (scratch / path).read_text()
@@ -87,7 +104,7 @@ def candidate(repository, executable, release_date):
                 raise ValueError("Draft file exceeds 256 KiB.")
             changes.append({"path": path, "mode": "100644", "type": "blob", "content": content})
         base_tree = git(scratch, "rev-parse", f"{source}^{{tree}}").strip()
-        git(scratch, "add", "--", *sorted(FILES))
+        git(scratch, "add", "--", *sorted(changed))
         tree = git(scratch, "write-tree").strip()
     version = report["proposed_version"]
     title = f"chore: prepare platform v{version}"
@@ -134,8 +151,8 @@ def verify_commit(api, sha, plan):
         raise ValueError("Existing candidate commit is not the identical bot-owned proposal; leave it untouched and reconcile manually.")
 
 
-def verify_pr(pr, sha, plan):
-    if (pr["state"] != "open" or pr["draft"] is not True or pr["user"]["login"] != BOT or
+def verify_pr(pr, sha, plan, allow_ready=False):
+    if (pr["state"] != "open" or (pr["draft"] is not True and not (allow_ready and pr["draft"] is False)) or pr["user"]["login"] != BOT or
             pr["head"]["ref"] != plan["branch"] or pr["head"]["sha"] != sha or
             pr["head"]["repo"]["full_name"] != REPOSITORY or pr["base"]["ref"] != "main" or
             pr["base"]["repo"]["full_name"] != REPOSITORY or
@@ -144,13 +161,16 @@ def verify_pr(pr, sha, plan):
     return pr["html_url"]
 
 
-def create_draft(plan, api):
+def create_draft(plan, api, allow_ready=False):
     require_workflow(plan["source"])
+    if allow_ready and os.environ.get("RELEASE_AUTO_MERGE") != "true":
+        raise ValueError("Recovering a ready release PR requires the separately opted-in auto-merge path.")
+    paths = {entry["path"] for entry in plan["changes"]}
     if (version_parts(plan["version"])[2] is None or plan["branch"] != PREFIX + plan["version"] or
-            len(plan["changes"]) != 3 or {entry["path"] for entry in plan["changes"]} != FILES or
+            len(plan["changes"]) != len(paths) or not FILES <= paths or paths - FILES - {FILENAME} or
             any(entry["mode"] != "100644" or entry["type"] != "blob" for entry in plan["changes"]) or
             any(not re.fullmatch(r"[0-9a-f]{40}", plan[key]) for key in ("base_tree", "tree"))):
-        raise ValueError("Draft writer scope must remain one preview branch and the three ordinary release files.")
+        raise ValueError("Draft writer scope must remain one preview branch and the narrow release/metadata files.")
     current(api, plan)
     issue = api.request("GET", "issues/260")
     if "pull_request" in issue:
@@ -183,7 +203,7 @@ def create_draft(plan, api):
         api.request("POST", "git/refs", {"ref": "refs/heads/" + plan["branch"], "sha": sha})
     current(api, plan)
     if existing:
-        return verify_pr(existing[0], sha, plan)
+        return verify_pr(existing[0], sha, plan, allow_ready=allow_ready)
     # No update/force/delete/merge endpoint is used. A lost response is reconciled on retry.
     pr = api.request("POST", "pulls", {"head": plan["branch"], "base": "main", "title": plan["title"],
                                        "body": plan["body"], "draft": True, "maintainer_can_modify": False})
@@ -194,6 +214,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release-plz", type=Path, required=True)
     parser.add_argument("--date", type=date.fromisoformat, required=True)
+    parser.add_argument("--auto-merge", action="store_true", help="Requires separate checked-in and repository policy approval")
+    parser.add_argument("--gh", type=Path, help="Checksum-pinned CLI, required only for approved auto-merge")
     args = parser.parse_args()
     root = Path.cwd()
     require_workflow(git(root, "rev-parse", "HEAD").strip())
@@ -201,7 +223,16 @@ def main():
     if plan is None:
         print("No shipped changes; no draft release PR created.")
     else:
-        print(f"Draft release PR (publication remains gated): {create_draft(plan, GitHub())}")
+        api = GitHub()
+        if args.auto_merge:
+            from release_auto_merge import check_policy, queue
+            if args.gh is None:
+                raise ValueError("Approved auto-merge requires the pinned --gh path.")
+            check_policy(root, api)  # Refuse disabled policy before creating a branch/PR.
+        url = create_draft(plan, api, allow_ready=args.auto_merge)
+        print(f"Release PR (publication remains gated): {url}")
+        if args.auto_merge:
+            print(f"Auto-merge: {queue(root, plan, url, api, args.gh)}")
 
 
 if __name__ == "__main__":
