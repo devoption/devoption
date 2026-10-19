@@ -18,6 +18,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Plan draft retention of the exact reserved candidate ZIP using read-only GitHub
+  tag/release/asset inspection; identify missing steps and reject conflicting or
+  incomplete retries without creating tags, releases or uploads
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Reserve reviewed signed preview candidates in an append-only Git catalog;
   reverify the exact transport before atomic reservation, reconcile identical
   retries without replacement and reject version/identity conflicts in PR CI
