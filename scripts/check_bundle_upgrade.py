@@ -36,7 +36,10 @@ PASSWORD = b'disposable-upgrade-fixture-only'
 
 
 def run(*args, cwd=None):
-    return subprocess.run(args, cwd=cwd, check=True, capture_output=True, timeout=240).stdout
+    result = subprocess.run(args, cwd=cwd, check=False, capture_output=True, timeout=240)
+    if result.returncode:
+        raise ValueError('Fixture command failed: ' + args[0] + '\n' + result.stderr[-8192:].decode(errors='replace'))
+    return result.stdout
 
 
 def prepare(repository, output):
@@ -48,6 +51,7 @@ def prepare(repository, output):
     # remote repository. The previous executable is built from that real revision.
     run('git', 'fetch', '--no-tags', '--depth', '1', 'origin', source, cwd=repository)
     for name in ('previous', 'candidate'):
+        print('Preparing real executable fixture: ' + name, flush=True)
         checkout = output/name
         run('git', 'clone', '--no-hardlinks', '--quiet', str(repository), str(checkout))
         if name == 'previous':

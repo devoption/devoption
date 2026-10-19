@@ -49,6 +49,13 @@ class UpgradeHost(Host):
     def enable(self):
         self.run('systemctl', 'enable', 'devoption-public.service', 'caddy-devoption.service')
 
+    def no_app_services(self):
+        for unit in ('devoption-build.service', 'devoption-app.service', 'devoption-app-validate.service'):
+            result = subprocess.run(['/usr/bin/systemctl', 'show', unit, '--property=LoadState', '--value'],
+                                    capture_output=True, timeout=10, check=False)
+            if result.returncode not in (0, 1, 4) or result.stdout.strip() != b'not-found':
+                raise ValueError('App/build units need their coordinated upgrade path: ' + unit)
+
     def probe(self, binary, version):
         result = self.run('runuser', '-u', 'devoption', '--', binary, '--version')
         if result.stdout != f'devoption {version}\n'.encode() or result.stderr:
@@ -194,10 +201,8 @@ class Upgrade:
         active, result = self.managed()
         if not active.owner():
             raise ValueError('An enrolled owner is required before upgrade.')
-        for name in ('/etc/devoption', '/etc/systemd/system/devoption-build.service',
-                     '/etc/systemd/system/devoption-app.service', '/etc/systemd/system/devoption-app-validate.service'):
-            if self.old.path(name).exists() or self.old.path(name).is_symlink():
-                raise ValueError('App/build opt-ins need their coordinated upgrade path; this path supports the base bundle installation only.')
+        self.base_profile()
+
         for path in self.roots.values():
             if path.stat().st_dev != self.old.path(STATE).stat().st_dev:
                 raise ValueError('Recovery requires platform/proxy state on the installer filesystem; separate mounts are unsupported.')
@@ -216,6 +221,13 @@ class Upgrade:
                 'installed_version': active.version, 'candidate_version': self.new.version,
                 'backup_bytes': total, 'publication_eligible': False, 'app_upgrades_supported': False,
                 'missing_files': result['missing_files']}
+
+    def base_profile(self):
+        self.host.no_app_services()
+        for name in ('/etc/devoption', '/etc/systemd/system/devoption-build.service',
+                     '/etc/systemd/system/devoption-app.service', '/etc/systemd/system/devoption-app-validate.service'):
+            if self.old.path(name).exists() or self.old.path(name).is_symlink():
+                raise ValueError('App/build opt-ins need their coordinated upgrade path; this path supports the base bundle installation only.')
 
     def initialize(self):
         parent = self.old.path(STATE + '/upgrades')
@@ -351,6 +363,7 @@ class Upgrade:
         if not record:
             raise ValueError('No matching upgrade attempt exists.')
         self.managed()
+        self.base_profile()
         if record['phase'] == 'restored':
             self.restart_previous()
             return self.preflight()

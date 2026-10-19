@@ -29,6 +29,7 @@ class UpgradeTests(unittest.TestCase):
         self.host.probe = lambda binary, version: self.assertTrue(self.installer.path(binary).is_file())
         self.host.public_health = lambda hostname: None
         self.host.enable = lambda: None
+        self.host.no_app_services = lambda: None
         self.installer.install()
         self.installer.enroll()
         self.installer.start()
@@ -253,3 +254,8 @@ class HostTests(unittest.TestCase):
         from subprocess import CompletedProcess
         with patch.object(host, 'run', side_effect=[CompletedProcess([],0),CompletedProcess([],0,stdout=b'ActiveState=inactive\nControlGroup=/foreign\n')]), self.assertRaisesRegex(ValueError,'unconfirmed'):
             host.stop()
+
+    def test_loaded_or_transient_workers_are_rejected_even_without_etc_unit_files(self):
+        from subprocess import CompletedProcess
+        with patch('upgrade_bundle.subprocess.run', return_value=CompletedProcess([],0,stdout=b'loaded\n')), self.assertRaisesRegex(ValueError,'coordinated upgrade'):
+            UpgradeHost().no_app_services()
