@@ -3,8 +3,9 @@
 This implements the opt-in signing workflow and verifier for
 [#261](https://github.com/devoption/devoption/issues/261). The first owner-approved
 live signing run passed on 2026-10-18; see the [acceptance evidence](#live-acceptance-evidence).
-It does not introduce
-an installer, supported upgrades, product publication or a recommended channel.
+Live retained-candidate upload and independent readback also passed on
+2026-10-19 UTC. This does not introduce an installer, supported upgrades, product
+publication or a recommended channel.
 The [candidate manifest](release-bundles.md) retains `publication_eligible: false`.
 
 ## Authority and activation
@@ -53,8 +54,8 @@ Both pins were checked against official upstream release/tag metadata on
 The workflow uses the existing `platform-release-preparation` concurrency group
 without cancelling an in-flight operation. Release publication/retry
 reconciliation and promotion remain later work. The candidate-retention path
-below has fixture coverage but has not yet had an approved live upload/readback
-run. Installation from a distributed bundle also remains unvalidated.
+below has fixture coverage and successful live upload/readback evidence.
+Installation from a distributed bundle remains unvalidated.
 
 ## Short-lived candidate retention
 
@@ -103,10 +104,12 @@ Actions artifacts require GitHub authentication to download and can expire or be
 deleted. This is bounded test retention, not permanent release storage. No
 repository retention setting is changed. Cross-run release identity reservation,
 publication reconciliation, promotion and channel/installer support remain
-outside this slice. Another live signing/upload test requires separate approval;
-the earlier one-run signing approval was already consumed.
+outside this slice. Each live signing/upload test requires owner approval;
+completed acceptance runs do not grant continuing authorization.
 
 ## Live acceptance evidence
+
+### Initial signing acceptance
 
 The owner-approved [manual run 39176739455](https://github.com/devoption/devoption/actions/runs/39176739455)
 completed successfully on 2026-10-18 at 23:37 UTC with signing explicitly enabled:
@@ -128,9 +131,48 @@ This records one successful live acceptance run, not continuing authorization
 for additional signing runs. The default signing input remains false. The
 GitHub attestation record is retained, but the archive and local proof bundle
 were not uploaded as downloadable artifacts. Post-run verification of a retained
-archive and the new retention path have not had live acceptance. Installation
-from a distributed bundle, promotion and release publication also remain pending.
+archive was outside that initial run; the separate retention acceptance below
+now covers it. Installation from a distributed bundle, promotion and release
+publication remain pending.
 No product release, version tag or registry publication was created.
+
+### Retained-candidate acceptance
+
+The owner-approved [manual run 39182230807](https://github.com/devoption/devoption/actions/runs/39182230807)
+completed successfully on 2026-10-19 at 00:53 UTC, with signing and seven-day
+candidate retention enabled for one run:
+
+- Reviewed source/signer commit: `a11c0619d98c14f43b41e3947e7f4f00a71dc2f0`.
+- Platform version: `0.1.0-preview.1`; target: Ubuntu 24.04 amd64.
+- Archive: `devoption-0.1.0-preview.1-ubuntu-24.04-amd64.tar.gz`.
+- Archive SHA-256: `0ee462ffb9048fbc08108693a5f17167516a5d4c676a71659f1601470aefd0a3`.
+- Proof SHA-256: `117ef3546eb26ff914159a99b1f8171709b11f90192ab86992105d2913eafb18`.
+- [GitHub attestation record 57224295](https://github.com/devoption/devoption/attestations/57224295).
+- [Actions artifact 12157370334](https://github.com/devoption/devoption/actions/runs/39182230807/artifacts/12157370334),
+  name `bundle-a11c0619d98c14f43b41e3947e7f4f00a71dc2f0-39182230807-1`.
+- Actions ZIP SHA-256: `c3c8ecd8e6d986397243b9be70a6c658eec3bcb5e3992fff20a435e4c3d688c3`.
+- Original signing attempt: `1`; service-reported expiry: `2026-10-26T00:53:30Z`.
+
+All source CI, locked offline release build, installation fixtures, executable
+checks, complete bundle comparison, OIDC signing, attestation write and private
+snapshot verification passed. Upload retained exactly the archive, proof and
+receipt. The separate read-only job downloaded the exact artifact ID and passed
+transport-digest, receipt, archive/proof digest and cryptographic verification.
+The run summary recorded the verified identity with publication eligibility false.
+
+After completion, the same artifact ID was downloaded locally. Its outer ZIP
+digest and exact three-file inventory were checked before writing those three
+transport files to a new directory. The trusted merged-source checker with pinned
+GitHub CLI 2.102.0 then passed against the source, version, archive/proof digests,
+run ID and original attempt taken from the successful signer logs. Neither the
+platform tarball nor its executable was extracted or executed during readback.
+
+This is one positive retention/readback acceptance, not permanent distribution
+or reproducible-compilation proof. Collision/tamper/missing-file/attempt checks
+retain fixture coverage; live overwrite, expiry/deletion and failed-job retry
+experiments were not performed. The artifact can expire or be deleted; the
+recorded identity remains useful evidence after its download URL stops working.
+No release, version tag, registry publication or repository setting was changed.
 
 ## Verify a retained candidate
 
