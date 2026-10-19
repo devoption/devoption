@@ -97,6 +97,13 @@ short-lived workflow token; it needs no signing, attestation, PR or settings rig
 Checkout credentials remain unpersisted. Context and clean-checkout checks bind
 the writer to the exact reviewed main dispatch and passing source CI. The reviewed
 reservation digest must match before constructing any client or write request.
+Unlike the local read-only planner, this writer does not require the REST
+repository response's user-oriented `permissions.push` field: GitHub App
+installation tokens can omit it. Its draft visibility follows from the reviewed
+job's `contents: write` grant and the enforced workflow context (see
+[GitHub's release access rules](https://docs.github.com/en/rest/releases/releases#list-releases)). It still checks
+the returned repository identity and fails on API errors; the local planner
+continues to require reported push access.
 
 Each invocation re-reads tag/draft/asset state instead of executing a saved plan.
 It verifies the original Actions artifact ID/name/digest/run/source, or downloads
@@ -119,3 +126,9 @@ End-to-end API-model fixtures cover full completion, identical retry, lost respo
 at all three write boundaries, original-artifact expiry, corrupt readback and
 conflicts. These tests make no remote writes. A live owner-approved tag/draft/upload
 acceptance run is still required before claiming this retention path has run on GitHub.
+
+The first approved [retention attempt](https://github.com/devoption/devoption/actions/runs/39252471232)
+passed every source check but stopped before tag/draft/upload writes because the
+workflow token did not satisfy the local planner's `permissions.push` check.
+The writer now uses its enforced workflow context instead. Successful live
+retention and an identical retry remain pending after this correction is merged.
