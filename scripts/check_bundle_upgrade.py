@@ -48,6 +48,12 @@ def prepare(repository, output):
     output.mkdir(mode=0o700)
     reservation = load((repository/'release-candidates/0.1.0-preview.1.json').read_bytes())
     source = reservation['candidate']['source_commit']
+    from release_plan import workspace
+    current, _ = workspace(repository)
+    number = re.fullmatch(r'0\.1\.0-preview\.([1-9][0-9]*)', current)
+    if number is None:
+        raise ValueError('Review the prior-source fixture before changing the release family.')
+    candidate_version = '0.1.0-preview.' + str(max(2, int(number[1])))
     # Fetch only the exact public reserved source; no credentials or writes to a
     # remote repository. The previous executable is built from that real revision.
     run('git', 'fetch', '--no-tags', '--depth', '1', 'origin',
@@ -59,11 +65,9 @@ def prepare(repository, output):
         if name == 'previous':
             run('git', 'checkout', '--quiet', '--detach', source, cwd=checkout)
         else:
-            from release_plan import workspace
-            current, _ = workspace(checkout)
             for filename in ('Cargo.toml', 'Cargo.lock'):
                 path = checkout/filename
-                path.write_text(path.read_text().replace('version = "'+current+'"', 'version = "0.1.0-preview.2"'))
+                path.write_text(path.read_text().replace('version = "'+current+'"', 'version = "'+candidate_version+'"'))
             path = checkout/'release-metadata.toml'
             raw = '''schema_version = 2
 version = "0.1.0-preview.2"
@@ -86,16 +90,19 @@ instructions = "Restore the verified offline backup and previous binary together
 status = "development-preview"
 warnings = ["Disposable CI source-build fixture; not signed, published or recommended."]
 '''
+            raw = raw.replace('version = "0.1.0-preview.2"', 'version = "'+candidate_version+'"', 1)
             path.write_text(raw)
-            metadata, digest = load_metadata(checkout, '0.1.0-preview.2')
+            metadata, digest = load_metadata(checkout, candidate_version)
             path = checkout/'CHANGELOG.md'
-            path.write_text(preview_changelog(path.read_text(), '0.1.0-preview.2', date(2026, 1, 1), render_metadata(metadata, digest)))
+            fixture_notes = '# Changelog\n\n## [Unreleased]\n\n- Disposable upgrade fixture ([#263](https://github.com/devoption/devoption/issues/263)).\n'
+            path.write_text(preview_changelog(fixture_notes, candidate_version, date(2026, 1, 1), render_metadata(metadata, digest)))
             run('git', 'add', 'Cargo.toml', 'Cargo.lock', 'release-metadata.toml', 'CHANGELOG.md', cwd=checkout)
             run('git', '-c', 'user.name=Disposable fixture', '-c', 'user.email=fixture@example.invalid',
                 'commit', '--quiet', '-m', 'test: prepare next preview fixture\n\nRefs #263', cwd=checkout)
         # Share only compiler artifacts; both archives snapshot their executable
         # immediately and bind it to the clean corresponding checkout.
         target = output/'target'
+        run('cargo', 'fetch', '--locked', cwd=checkout)
         run('cargo', 'build', '-p', 'devoption-cli', '--release', '--locked', '--offline',
             '--target-dir', str(target), cwd=checkout)
         assemble(checkout, target/'release/devoption', output/(name+'-bundle'))
@@ -113,7 +120,7 @@ class FixtureHost(UpgradeHost):
     fail_candidate_health = False
 
     def public_health(self, hostname):
-        if self.fail_candidate_health and b'preview.2' in Path(RECEIPT).read_bytes():
+        if self.fail_candidate_health and json.loads(Path(RECEIPT).read_bytes())['reservation']['candidate']['platform_version'] == self.candidate_version:
             raise ValueError('injected candidate health rejection')
         root = Path('/var/lib/caddy/data/caddy/pki/authorities/local/root.crt')
         for _ in range(30):
@@ -244,6 +251,7 @@ def exercise(directory):
                 'artifact':{'id':'1','transport_sha256':'0'*64}}
         installers.append(Installer(Path('/'),host,record,manifest,files,caddy,HOSTNAME))
     old,new=installers
+    host.candidate_version=new.version
     try:
         old.install(); enroll(Path(old.binary)); old.start(); host.public_health(HOSTNAME); host.enable()
         token,cookie=session()
@@ -259,7 +267,7 @@ def exercise(directory):
         original={p.name:p.read_bytes() for p in Path(PLATFORM+'/data').iterdir() if p.is_file()}
         transaction=Upgrade(old,new)
         assert transaction.apply()['phase']=='healthy'
-        assert run(new.binary,'--version')==b'devoption 0.1.0-preview.2\n'
+        assert run(new.binary,'--version')==f'devoption {new.version}\n'.encode()
         assert host.run('runuser','-u','devoption','--','git','-C',str(repository),'rev-parse','HEAD').stdout==prior_head
         assert request('/auth/session','POST',cookie=cookie)[0]==401
         token,cookie=session()
