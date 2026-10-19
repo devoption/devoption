@@ -50,11 +50,14 @@ def validate_metadata(data, version):
             if type(compatibility[key]) is not int or compatibility[key] != 1:
                 raise ValueError("Only unchanged data/configuration schema 1 is supported; migrations require a separate recovery contract.")
         match = re.fullmatch(r"(.+-preview\.)([1-9][0-9]*)", version)
-        previous = match[1] + str(int(match[2]) - 1)
+        sources = compatibility["upgrade_from"]
+        previous = (re.fullmatch(r"(.+-preview\.)([1-9][0-9]*)", sources[0])
+                    if isinstance(sources, list) and len(sources) == 1 and isinstance(sources[0], str) else None)
         mode = compatibility["installation"]
-        if not ((mode == "fresh-only" and compatibility["upgrade_from"] == []) or
-                (mode == "fresh-and-upgrade" and int(match[2]) > 1 and compatibility["upgrade_from"] == [previous])):
-            raise ValueError("Declare fresh-only, or fresh-and-upgrade from exactly the preceding preview of the same base version.")
+        if not ((mode == "fresh-only" and sources == []) or
+                (mode == "fresh-and-upgrade" and previous is not None and previous[1] == match[1] and
+                 int(previous[2]) < int(match[2]) and not previous[2].startswith('0'))):
+            raise ValueError("Declare fresh-only, or fresh-and-upgrade from one explicitly reviewed earlier preview of the same base version.")
     if data["migration"]["required"] is not False:
         raise ValueError("No platform migration is implemented; migration.required must be false.")
     if data["recovery"]["binary_rollback"] is not False:

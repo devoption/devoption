@@ -25,7 +25,7 @@ Statements must be trimmed, single-line text with no control characters, at most
 Schema 1 retains the original fresh-only policy and bytes for historical packets.
 Schema 2 adds integer `data_schema = 1` and `configuration_schema = 1` to
 `compatibility`. It permits either fresh-only with no source versions, or
-`installation = "fresh-and-upgrade"` with exactly the preceding numbered preview
+`installation = "fresh-and-upgrade"` with one explicitly reviewed earlier preview
 of the same base version in `upgrade_from`. The [operator upgrade path](platform-upgrades.md)
 implements that unchanged-schema base-installation profile with full offline
 backup/restore. It rejects source/custom/app-capable installations and migrations.

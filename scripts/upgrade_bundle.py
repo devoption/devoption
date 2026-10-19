@@ -16,6 +16,7 @@ import ssl
 import stat
 import subprocess
 import tempfile
+import time
 import uuid
 
 from install_bundle import Installer, STATE, PLATFORM, PROXY, installation_lock, verified_files, proxy_binary
@@ -30,6 +31,21 @@ UNIT = '/etc/systemd/system/devoption-public.service'
 RECEIPT = STATE + '/installation.json'
 PHASES = {'prepared', 'backed-up', 'activated', 'healthy', 'failed', 'restoring', 'restored'}
 TERMINAL = {'healthy', 'restored'}
+
+
+def sync_tree(root):
+    # copy_records fsyncs content before restoring UID/mode. Flush those final
+    # inode attributes too, before sealing a backup or moving a restored tree.
+    for path in sorted(root.rglob('*'), reverse=True):
+        if path.is_dir():
+            sync_directory(path)
+        else:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+    sync_directory(root)
 
 
 class UpgradeHost(Host):
@@ -63,15 +79,22 @@ class UpgradeHost(Host):
 
     def public_health(self, hostname):
         # Anonymous probes only; never request or store an owner password/session.
-        for path, expected in (('/sign-in', 200), ('/projects', 303)):
-            connection = http.client.HTTPSConnection(hostname, timeout=10, context=ssl.create_default_context())
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
             try:
-                connection.request('GET', path)
-                response = connection.getresponse()
-                if response.status != expected or (expected == 303 and response.getheader('Location') != '/sign-in'):
-                    raise ValueError('Public HTTPS readiness failed; inspect service and certificate status.')
-            finally:
-                connection.close()
+                for path, expected in (('/sign-in', 200), ('/projects', 303)):
+                    connection = http.client.HTTPSConnection(hostname, timeout=10, context=ssl.create_default_context())
+                    try:
+                        connection.request('GET', path)
+                        response = connection.getresponse()
+                        if response.status != expected or (expected == 303 and response.getheader('Location') != '/sign-in'):
+                            raise ValueError('Public readiness response differs.')
+                    finally:
+                        connection.close()
+                return
+            except (OSError, ValueError, http.client.HTTPException):
+                time.sleep(.5)  # Proxy/certificate startup is asynchronous.
+        raise ValueError('Public HTTPS readiness deadline exceeded; inspect service and certificate status.')
 
 
 class Upgrade:
@@ -95,7 +118,7 @@ class Upgrade:
                 compatibility['upgrade_from'] != [previous.version] or
                 any(compatibility[key] != 1 for key in ('data_schema', 'configuration_schema')) or
                 metadata['migration']['required'] or metadata['recovery']['binary_rollback']):
-            raise ValueError('Candidate must explicitly support this preceding preview with unchanged schema 1 and backup/restore recovery.')
+            raise ValueError('Candidate must explicitly support this reviewed source preview with unchanged schema 1 and backup/restore recovery.')
         # This path changes the platform version, not proxy/configuration profiles.
         before = {k: v for k, v in previous.output.items() if not k.startswith(previous.release + '/') and k != UNIT}
         after = {k: v for k, v in candidate.output.items() if not k.startswith(candidate.release + '/') and k != UNIT}
@@ -164,7 +187,7 @@ class Upgrade:
                   'backup_sha256': backup_sha256 if backup_sha256 is not None else before['backup_sha256'] if before else None}
         self.replace(self.journal, canonical(record), 0o600)
 
-    def managed(self):
+    def managed(self, recovery=False):
         # An interrupted atomic unit/receipt switch may contain either verified
         # identity. Accept no third variant and never execute saved commands.
         receipt = snapshot(self.old.path(RECEIPT), 16384)
@@ -183,6 +206,13 @@ class Upgrade:
             raise ValueError('Platform unit differs from both reviewed identities.')
         view.output[UNIT] = (unit, 0o644)
         view.dirs = self.old.dirs | self.new.dirs
+        if recovery:
+            # The candidate may have damaged live data or its permissions. Read
+            # no live data during recovery; validate immutable code/config and
+            # service identities, then preserve those trees by rename only.
+            view.dirs = {name: item for name, item in view.dirs.items()
+                         if not any(name == root or name.startswith(root + '/') for root in (PLATFORM, PROXY))}
+            view.owner = lambda: False
         result = view.preflight()
         for name, (content, mode) in self.old.output.items():
             if name != UNIT and not self.old.existing_file(name, content, mode):
@@ -198,15 +228,16 @@ class Upgrade:
         if starting and record is None:
             if self.old.path(RECEIPT).read_bytes() != canonical(self.old.identity):
                 raise ValueError('Previous reservation does not identify the installed version.')
-        active, result = self.managed()
-        if not active.owner():
+        pending = record is not None and record['phase'] not in TERMINAL
+        active, result = self.managed(recovery=pending)
+        if not pending and not active.owner():
             raise ValueError('An enrolled owner is required before upgrade.')
         self.base_profile()
 
-        for path in self.roots.values():
-            if path.stat().st_dev != self.old.path(STATE).stat().st_dev:
-                raise ValueError('Recovery requires platform/proxy state on the installer filesystem; separate mounts are unsupported.')
         if starting and record is None:
+            for path in self.roots.values():
+                if path.stat().st_dev != self.old.path(STATE).stat().st_dev:
+                    raise ValueError('Recovery requires platform/proxy state on the installer filesystem; separate mounts are unsupported.')
             if active is not self.old or self.old.path(UNIT).read_bytes() != self.old.output[UNIT][0]:
                 raise ValueError('Fresh upgrade requires the complete previous installation.')
             for unit in ('devoption-public.service', 'caddy-devoption.service'):
@@ -214,9 +245,14 @@ class Upgrade:
                     raise ValueError('Start and verify the existing platform/proxy before upgrading.')
             self.host.healthy(self.old.hostname)
             self.host.public_health(self.old.hostname)
-        records = inventory(self.roots, LIMIT, skip_locks=False)
-        total = sum(item.get('size', 0) for item in records.values())
-        self.host.preflight(self.root, 1024**3 + 3 * total + 2 * sum(len(v[0]) for v in self.new.output.values()))
+            records = inventory(self.roots, LIMIT, skip_locks=False)
+            total = sum(item.get('size', 0) for item in records.values())
+            self.host.preflight(self.root, 1024**3 + 3 * total + 2 * sum(len(v[0]) for v in self.new.output.values()))
+        elif (self.directory / 'backup.json').exists():
+            _, records = self.verified_backup()
+            total = sum(item.get('size', 0) for item in records.values())
+        else:
+            total = None
         return {'transaction': self.id, 'phase': record['phase'] if record else 'not-started',
                 'installed_version': active.version, 'candidate_version': self.new.version,
                 'backup_bytes': total, 'publication_eligible': False, 'app_upgrades_supported': False,
@@ -277,10 +313,7 @@ class Upgrade:
             raise ValueError('Installation receipt disappeared before backup sealing.')
         for name, content in self.configuration.items():
             self.replace(config / name, content, 0o600)
-        for path in sorted(self.backup.rglob('*'), reverse=True):
-            if path.is_dir():
-                sync_directory(path)
-        sync_directory(self.backup)
+        sync_tree(self.backup)
         raw = canonical({'plan': self.plan, 'records': records,
                          'configuration': {name: hashlib.sha256(content).hexdigest()
                                            for name, content in self.configuration.items()}})
@@ -362,7 +395,7 @@ class Upgrade:
         record = self.record()
         if not record:
             raise ValueError('No matching upgrade attempt exists.')
-        self.managed()
+        self.managed(recovery=True)
         self.base_profile()
         if record['phase'] == 'restored':
             self.restart_previous()
@@ -386,10 +419,7 @@ class Upgrade:
             restored = {name: stage / name for name in roots}
             if inventory(restored, LIMIT, skip_locks=False) != records:
                 raise ValueError('Staged restore differs from the verified backup.')
-            for path in sorted(stage.rglob('*'), reverse=True):
-                if path.is_dir():
-                    sync_directory(path)
-            sync_directory(stage)
+            sync_tree(stage)
             for name, destination in self.roots.items():
                 self.old.safe(destination)
                 # Preserve the displaced tree, including any post-backup writes.
@@ -397,6 +427,10 @@ class Upgrade:
                 if destination.exists() or destination.is_symlink():
                     if not destination.is_dir() or destination.is_symlink():
                         raise ValueError('Unsafe live state destination; manual recovery required.')
+                    info = destination.lstat()
+                    expected = self.host.account('devoption' if name == 'platform' else 'caddy')
+                    if (info.st_uid, info.st_gid) != expected:
+                        raise ValueError('Live state ownership differs; preserve it for manual inspection.')
                     os.rename(destination, stage / ('displaced-' + name))
                     sync_directory(destination.parent)
                     sync_directory(stage)

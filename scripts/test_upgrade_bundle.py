@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import ssl
 import sys
 import unittest
 from unittest.mock import patch
@@ -143,6 +144,19 @@ class UpgradeTests(unittest.TestCase):
             self.upgrade.recover(confirm=True)
         self.assertEqual(self.saved.read_bytes(), b'preserve current live bytes')
 
+    def test_restore_damaged_owner_and_live_data_permissions_from_verified_backup(self):
+        self.upgrade.apply()
+        owner=self.image/'var/lib/devoption/data/owner.bin'
+        owner.write_bytes(b'')
+        owner.chmod(0o644)
+        (self.image/'var/lib/devoption/data').chmod(0o755)
+        self.upgrade.phase('failed')
+        self.assertEqual(self.upgrade.preflight()['phase'],'failed')
+        self.upgrade.recover(confirm=True)
+        self.assertEqual(owner.read_bytes(),self.old_owner)
+        self.assertEqual(owner.stat().st_mode&0o777,0o600)
+        self.assertEqual(owner.parent.stat().st_mode&0o777,0o700)
+
     def test_foreign_files_units_receipts_and_symlinks_stop_before_backup(self):
         for path, data in [(self.installer.path(UNIT), b'foreign unit'),
                            (self.installer.path(RECEIPT), b'{}')]:
@@ -188,6 +202,9 @@ class UpgradeTests(unittest.TestCase):
         self.assertIn('same-schema upgrade from `0.1.0-preview.1`', rendered)
         self.assertIn('Binary rollback: unsupported', rendered)
         self.assertIn('Migration: none implemented', rendered)
+        later=deepcopy(metadata)
+        later['version']='0.1.0-preview.3'
+        validate_metadata(later,'0.1.0-preview.3')  # Explicitly skip an unpublished failed candidate.
         for key, value in [('upgrade_from', ['0.1.0-preview.1','0.1.0-preview.2']),
                            ('data_schema', True), ('configuration_schema', 2)]:
             bad = deepcopy(metadata)
@@ -259,3 +276,22 @@ class HostTests(unittest.TestCase):
         from subprocess import CompletedProcess
         with patch('upgrade_bundle.subprocess.run', return_value=CompletedProcess([],0,stdout=b'loaded\n')), self.assertRaisesRegex(ValueError,'coordinated upgrade'):
             UpgradeHost().no_app_services()
+
+    def test_public_readiness_waits_for_verified_proxy_startup(self):
+        from unittest.mock import MagicMock
+        signin=MagicMock()
+        signin.getresponse.return_value.status=200
+        projects=MagicMock()
+        projects.getresponse.return_value.status=303
+        projects.getresponse.return_value.getheader.return_value='/sign-in'
+        with patch('upgrade_bundle.http.client.HTTPSConnection',side_effect=[OSError('warming'),signin,projects]) as connection, patch('upgrade_bundle.time.sleep'):
+            UpgradeHost().public_health('platform.example.com')
+        self.assertEqual(connection.call_count,3)
+        self.assertTrue(connection.call_args.kwargs['context'].check_hostname)
+        signin.close.assert_called_once()
+        projects.close.assert_called_once()
+
+    def test_failed_tls_verification_cannot_pass_readiness(self):
+        with patch('upgrade_bundle.http.client.HTTPSConnection',side_effect=ssl.SSLCertVerificationError('untrusted')), \
+                patch('upgrade_bundle.time.monotonic',side_effect=[0,1,61]),patch('upgrade_bundle.time.sleep'),self.assertRaisesRegex(ValueError,'deadline exceeded'):
+            UpgradeHost().public_health('platform.example.com')

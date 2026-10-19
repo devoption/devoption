@@ -15,8 +15,10 @@ artifacts or permission to sign/publish a new packet.
 ## Supported compatibility boundary
 
 A candidate must use [release metadata schema 2](release-metadata.md), declare
-`installation = "fresh-and-upgrade"`, and list **exactly the preceding numbered
-preview of the same base version** in `upgrade_from`. Both `data_schema` and
+`installation = "fresh-and-upgrade"`, and list **one explicitly reviewed earlier
+preview of the same base version** in `upgrade_from`. This permits an explicitly
+declared path past a failed unpublished candidate; no skipped path is inferred.
+Both `data_schema` and
 `configuration_schema` must be integer `1`, `migration.required = false`, and
 `recovery.binary_rollback = false`. The legacy reserved `0.1.0-preview.1` schema-1
 packet is the initial schema-1 data/configuration baseline. Other schema-1 source
@@ -38,6 +40,12 @@ outbound HTTPS for the verifier's trust material.
 No candidate scripts or saved transaction commands run as an updater. Files are
 reconstructed from freshly verified packet bytes; the journal binds exact source,
 target, hostname and attempt identities. Old version directories are retained.
+Only the supplied previous/candidate version trees are admitted in `/opt/devoption`.
+Before a later pair, archive older terminal version trees outside that inventory,
+preserving their verified inputs and transaction backups. Unknown or conflicting
+trees stop preflight; the updater never deletes them or reuses a failed version
+for different bytes. Older recovery points need their original version tree restored
+to its recorded location before use. Automatic history/pruning is outside this path.
 
 ## Plan and apply
 
