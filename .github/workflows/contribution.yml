@@ -27,3 +27,7 @@ jobs:
       - run: python3 scripts/check_pr.py
         env:
           GH_TOKEN: ${{ github.token }}
+      - name: Require append-only candidate reservations
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 scripts/release_candidates.py audit --base "$BASE_SHA"

@@ -28,6 +28,7 @@ accounts and production hosting acceptance remain planned.
 - [Release process and approval gates](releases.md)
 - [Local platform bundle candidates and remaining trust gates](release-bundles.md)
 - [Opt-in authenticated bundle provenance and verification](bundle-provenance.md)
+- [Reviewed candidate reservations and immutable retry rules](release-candidates.md)
 
 ## Implementation references
 

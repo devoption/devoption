@@ -21,6 +21,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked --offline -- -D warnings
 python3 -m unittest discover -s scripts -p 'test_*.py'
 node --test scripts/test_*.cjs
+python3 scripts/release_candidates.py audit
 ```
 
 Workspace tests include [trusted leaf subprocess fixtures](process-supervision-fixtures.md)
@@ -66,3 +67,9 @@ before checking offline; no build cache or shared compiled artifacts are used.
 Parallel jobs reduce elapsed time but can use more total runner time because
 compilation/setup is repeated. The complete workspace test suite remains together
 so Cargo continues to discover new crates and tests automatically.
+
+The Python/Node job fetches full Git history and audits committed
+[candidate reservations](release-candidates.md), including their original source
+versions. The required contribution check additionally rejects edits or deletions
+of reservations already present in the PR base. Local append-only validation uses
+`python3 scripts/release_candidates.py audit --base REVIEWED_40_HEX_BASE_COMMIT`.
