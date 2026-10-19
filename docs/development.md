@@ -62,6 +62,19 @@ reinstall. No system accounts, host units or services are changed. Signature
 failure/acceptance policy is tested separately; real privileged installer and
 reboot acceptance remain subject to the [installer's validation limits](bundle-installation.md#validation-scope).
 
+The installation job also builds the exact reserved prior source and a disposable
+next-preview source fixture with real versioned executables, then runs
+`check_bundle_upgrade.py` on its fresh GitHub-hosted Ubuntu runner. Its explicit
+`sudo` mode creates real dedicated service identities, units, state and a local
+test CA, exercises the upgrade engine and full-state recovery, and removes those
+resources. It verifies owner/project/profile/repository persistence, interrupted
+activation, disabled boot during incomplete transactions and controlled failed-health
+recovery. This step is destructive to the fixture's reserved host paths: **never
+run it on an existing installation or workstation**. It uses no repository secrets,
+production credentials, signing/publication rights or self-hosted runner. Trusted
+source builds establish fixture identity; production packet verification has no
+fixture bypass. See [upgrade scope and remaining acceptance](platform-upgrades.md).
+
 The Python job installs pinned release-plz and Rust to run the real-tool release
 fixtures on Ubuntu, including ordinary PRs. Local runs without
 `DEVOPTION_RELEASE_PLZ` still skip tool-dependent cases; use the pinned binary

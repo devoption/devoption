@@ -27,8 +27,8 @@ def text(value, field):
 def validate_metadata(data, version):
     if not isinstance(data, dict) or set(data) != {"schema_version", "version", "channel", "platforms", *FIELDS}:
         raise ValueError("Release metadata has missing or unknown fields.")
-    if type(data["schema_version"]) is not int or data["schema_version"] != 1:
-        raise ValueError("Unsupported release metadata schema_version; expected integer 1.")
+    if type(data["schema_version"]) is not int or data["schema_version"] not in (1, 2):
+        raise ValueError("Unsupported release metadata schema_version; expected integer 1 or 2.")
     if not isinstance(version, str) or not re.fullmatch(
             r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-preview\.[1-9][0-9]*", version):
         raise ValueError("Release metadata currently supports numbered previews only; stable policy is not enabled.")
@@ -37,11 +37,24 @@ def validate_metadata(data, version):
     if data["channel"] != "preview" or data["platforms"] != ["ubuntu-24.04-amd64"]:
         raise ValueError("Release metadata must retain the supported preview/Ubuntu 24.04 amd64 profile.")
     for section, keys in FIELDS.items():
+        if section == "compatibility" and data["schema_version"] == 2:
+            keys = keys | {"data_schema", "configuration_schema"}
         if not isinstance(data[section], dict) or set(data[section]) != keys:
             raise ValueError(f"Release metadata {section} has missing or unknown fields.")
     compatibility = data["compatibility"]
-    if compatibility["installation"] != "fresh-only" or compatibility["upgrade_from"] != []:
-        raise ValueError("Supported platform upgrades are not implemented; metadata must specify fresh-only and no upgrade_from versions.")
+    if data["schema_version"] == 1:
+        if compatibility["installation"] != "fresh-only" or compatibility["upgrade_from"] != []:
+            raise ValueError("Schema 1 metadata must specify fresh-only and no upgrade_from versions.")
+    else:
+        for key in ("data_schema", "configuration_schema"):
+            if type(compatibility[key]) is not int or compatibility[key] != 1:
+                raise ValueError("Only unchanged data/configuration schema 1 is supported; migrations require a separate recovery contract.")
+        match = re.fullmatch(r"(.+-preview\.)([1-9][0-9]*)", version)
+        previous = match[1] + str(int(match[2]) - 1)
+        mode = compatibility["installation"]
+        if not ((mode == "fresh-only" and compatibility["upgrade_from"] == []) or
+                (mode == "fresh-and-upgrade" and int(match[2]) > 1 and compatibility["upgrade_from"] == [previous])):
+            raise ValueError("Declare fresh-only, or fresh-and-upgrade from exactly the preceding preview of the same base version.")
     if data["migration"]["required"] is not False:
         raise ValueError("No platform migration is implemented; migration.required must be false.")
     if data["recovery"]["binary_rollback"] is not False:
@@ -102,7 +115,10 @@ def render_metadata(data, digest):
     return "\n".join([
         START, "### Release compatibility and support", "",
         f'- Preview version: `{data["version"]}`; supported platform: Ubuntu 24.04 amd64.',
-        "- Installation: fresh only. Upgrades from earlier platform versions are unsupported.",
+        ("- Installation: fresh only. Upgrades from earlier platform versions are unsupported."
+         if data["compatibility"]["installation"] == "fresh-only" else
+         "- Installation: fresh or operator-triggered same-schema upgrade from " +
+         ", ".join(f'`{v}`' for v in data["compatibility"]["upgrade_from"]) + "."),
         f'- Data compatibility: {data["compatibility"]["data"]}',
         f'- Configuration compatibility: {data["compatibility"]["configuration"]}',
         f'- Migration: none implemented. {data["migration"]["instructions"]}',

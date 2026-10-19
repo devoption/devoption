@@ -22,6 +22,7 @@ accounts and production hosting acceptance remain planned.
 - [Private Ubuntu installation, backup and recovery](private-linux-install.md)
 - [Public-origin HTTPS installation and validation limits](public-linux-install.md)
 - [Verified Ubuntu bundle installer, safe retries and validation limits](bundle-installation.md)
+- [Same-schema preview upgrades and full-state recovery](platform-upgrades.md)
 - [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)
 - [Development setup and checks](development.md)
 - [Screenshot gallery](screenshots/gallery.md) and [capture guide](screenshots/README.md)
