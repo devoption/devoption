@@ -63,10 +63,18 @@ class Writer(Reader):
     def download(self, path, destination):
         if not re.fullmatch(r"(?:actions/artifacts/[1-9][0-9]*/zip|releases/assets/[1-9][0-9]*)", path):
             raise ValueError("Download must use one fixed-repository artifact/asset ID.")
+        # Actions returns a redirect using the JSON API media type; release assets
+        # require octet-stream to select bytes instead of asset metadata.
+        media_type = "application/vnd.github+json" if path.startswith("actions/") else "application/octet-stream"
         with destination.open("xb") as stream:
-            subprocess.run([self.gh, "api", "--hostname", "github.com", "--method", "GET",
-                            PREFIX + "/" + path, "-H", "Accept: application/octet-stream"],
-                           stdout=stream, stderr=subprocess.PIPE, check=True, timeout=120)
+            try:
+                subprocess.run([self.gh, "api", "--hostname", "github.com", "--method", "GET",
+                                PREFIX + "/" + path, "-H", "Accept: " + media_type],
+                               stdout=stream, stderr=subprocess.PIPE, check=True, timeout=120)
+            except subprocess.CalledProcessError as error:
+                status = re.search(rb"\(HTTP ([1-5][0-9]{2})\)", error.stderr or b"")
+                detail = "HTTP " + status[1].decode() if status else "gh request error"
+                raise ValueError(f"Candidate download failed ({detail}); reconcile remote state before retrying.") from error
         snapshot(destination, LIMIT)
 
     def upload(self, release_id, target, transport):

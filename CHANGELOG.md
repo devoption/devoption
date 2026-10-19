@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Select the Actions archive API media type separately from release-asset binary
+  downloads, fixing the live retention request's HTTP 415; report only sanitized
+  HTTP status on download failures
+  ([#261](https://github.com/devoption/devoption/issues/261)).
+
 - Accept the approved retention workflow's scoped installation token without a
   user-only repository permission field; preserve local planner access checks
   and record the first live attempt's pre-write failure
