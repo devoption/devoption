@@ -132,7 +132,8 @@ retry strategy. Runtime still validates its actual record format.
 `start` requires completed installation and an owner record, validates configuration,
 enables both services for boot and waits for the backend's unauthenticated `303`
 redirect to `/sign-in`. **That local check does not prove public TLS readiness.**
-The external curl should return a trusted HTTPS response and `303`. Verify browser
+Certificate issuance is asynchronous: wait for the external curl to return a
+trusted HTTPS response and `303`. Verify browser
 login, project persistence and sign-out, then reboot the disposable host and check
 both services/HTTPS again. Do not bypass certificate verification on a real host.
 
@@ -184,6 +185,8 @@ preserving owner bytes. It creates no system accounts, installs no host units an
 changes no system services. The separate [2026-10-19 disposable-host acceptance](bundle-installer-acceptance.md)
 exercised the retained signed packet with real root installation, completed-write
 interruption/resume, owner enrollment, state-preserving retries, local verified
-HTTPS and actual systemd restart/reboot. **Public DNS/ACME acceptance remains
-pending** on an authorized disposable public host. Local test-CA verification
-does not establish public certificate issuance or renewal.
+HTTPS and actual systemd restart/reboot. Its separately approved
+[public run](bundle-installer-acceptance.md#public-dnsacme-acceptance) also passed
+public DNS, trusted ACME issuance/accelerated renewal, HTTPS application checks
+and reboot/reinstall persistence on fresh Ubuntu/IPv4. These are validation-packet
+results; they do not change publication eligibility or add upgrade support.

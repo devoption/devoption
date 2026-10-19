@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Complete the signed installer's public DNS/HTTPS, ACME issuance/accelerated
+  renewal and reboot/reinstall acceptance on temporary Ubuntu infrastructure;
+  verify node deletion and exact DNS restoration, and retain the validation-only
+  publication boundary ([#262](https://github.com/devoption/devoption/issues/262)).
+
 - Record real signed-bundle installation, interrupted/identical retries, SSH owner
   setup, verified local HTTPS and systemd restart/reboot on disposable Ubuntu;
   reconcile installer status while retaining the public DNS/ACME acceptance gate

@@ -16,16 +16,15 @@ and work that has not been built.
 | --- | --- | --- |
 | [#260: Versioning and release PRs](https://github.com/devoption/devoption/issues/260) | Pinned release-plz; one workspace version; preview selection; metadata-bound notes; exact bot PR creation/retry; guarded optional squash auto-merge. [Live writer run](https://github.com/devoption/devoption/actions/runs/39156408201) generated [PR #270](https://github.com/devoption/devoption/pull/270), which merged; its [exact-main release check](https://github.com/devoption/devoption/actions/runs/39158246952) passed. Auto-merge has fixture coverage. | Implementation is complete with explicit activation gates: manual dispatch, checked-in auto-merge policy, repository setting and GitHub's bot-PR workflow approval. Auto-merge remains disabled; no setting or authority is changed by implementation. |
 | [#261: Bundles and provenance](https://github.com/devoption/devoption/issues/261) | Complete local bundle inventory, manifests, SBOM, signing, cryptographic verification, seven-day transport and append-only candidate reservation. [Live signing, long-lived retention and independent readback](bundle-provenance.md#retained-candidate-acceptance) passed. | Publish only eligible complete candidates after #21. A validation draft is not a recommended release; installer acceptance is tracked separately below. |
-| [#262: Bundle installer](https://github.com/devoption/devoption/issues/262) | Verified fresh-host bundle installer, immutable versioned files, dedicated accounts/units, pinned proxy, SSH enrollment and safe retries. [Real signed-packet installation, interruption/resume, identical retry, local HTTPS and systemd restart/reboot passed](bundle-installer-acceptance.md). | Public DNS/ACME acceptance needs an authorized disposable public host. The local test CA does not prove public issuance/renewal. The packet remains validation-only. |
+| [#262: Bundle installer](https://github.com/devoption/devoption/issues/262) | Verified fresh-host bundle installer, immutable versioned files, dedicated accounts/units, pinned proxy, SSH enrollment and safe retries. [Real signed-packet installation, interruption/resume, identical retry, public DNS/HTTPS/ACME renewal and systemd restart/reboot passed](bundle-installer-acceptance.md). Temporary public infrastructure was removed and DNS restored. | Installer acceptance is complete for the retained Ubuntu/IPv4 validation packet. Publication eligibility and platform upgrade support remain separate gates. |
 | [#263: Platform upgrades](https://github.com/devoption/devoption/issues/263) | Versioned metadata explicitly rejects unsupported upgrades. Existing hosted-app rollback is a separate capability. | Platform upgrade paths, backups/migrations/recovery acceptance and channel promotion are not implemented. |
 | [#264: DigitalOcean image](https://github.com/devoption/devoption/issues/264) | Existing public-node acceptance used a source build. | Reusable bundle-based image build, image hygiene, fresh-instance/upgrade tests, Marketplace review and a working launch destination are not implemented. |
 | [#259: End-to-end distribution](https://github.com/devoption/devoption/issues/259) | Tracks the shared version/bundle contract and the five workstreams above. | Remains open until the child outcomes and published-candidate install/upgrade/recovery path are demonstrated. |
 
-Closing #260 records completed version/PR automation, not completion of #261–#264
-or authorization to enable unattended merging. The next delivery boundary is
-public TLS acceptance of the working signed-bundle installer, followed by upgrades
-and image distribution. These are feature outcomes, not additional release-workflow
-planning slices.
+Completing version/PR automation and installer acceptance does not authorize
+unattended merging or publication. The next delivery boundary is platform upgrade
+and recovery support under #263, followed by image distribution under #264.
+These are feature outcomes, not additional release-workflow planning slices.
 
 A read-only [release preparation dry run](release-preparation.md) can propose
 version/changelog changes with pinned release-plz in a disposable clone. It does
