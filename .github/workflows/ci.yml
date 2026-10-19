@@ -69,6 +69,7 @@ jobs:
         run: |
           python3 scripts/release_bundle.py --binary target/release/devoption --output "$BUNDLE_OUTPUT"
           python3 scripts/check_release_bundle.py "$BUNDLE_OUTPUT" --binary target/release/devoption
+          python3 scripts/check_bundle_installer.py "$BUNDLE_OUTPUT"
       - run: git diff --exit-code
 
   scripts:

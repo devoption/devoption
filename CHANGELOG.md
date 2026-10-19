@@ -28,6 +28,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add a verified Ubuntu 24.04 amd64 bundle installer with host/conflict preflight,
+  versioned files, pinned proxy and hardened service configuration, SSH-only owner
+  enrollment, safe interrupted/identical retries and data-preserving refusal of
+  upgrades; exercise packaged-binary setup/restart in disposable Ubuntu CI paths
+  ([#262](https://github.com/devoption/devoption/issues/262)).
+
 - Complete opt-in candidate retention through exact tag/draft/ZIP upload and
   cryptographic readback, recovering interrupted writes and expired Actions
   transports without replacement; add guarded bot-only release PR auto-merge
