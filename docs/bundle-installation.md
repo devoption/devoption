@@ -181,6 +181,9 @@ into disposable paths through the production file-placement engine, verifies
 rendered units using systemd's parser, performs real PTY owner setup, checks
 loopback readiness, restarts that exact binary and repeats installation while
 preserving owner bytes. It creates no system accounts, installs no host units and
-changes no system services. **Real root installation, public DNS/ACME and reboot
-acceptance of this installer remain pending on an explicitly authorized disposable
-host.** Prior source-install rehearsals do not establish those results for this path.
+changes no system services. The separate [2026-10-19 disposable-host acceptance](bundle-installer-acceptance.md)
+exercised the retained signed packet with real root installation, completed-write
+interruption/resume, owner enrollment, state-preserving retries, local verified
+HTTPS and actual systemd restart/reboot. **Public DNS/ACME acceptance remains
+pending** on an authorized disposable public host. Local test-CA verification
+does not establish public certificate issuance or renewal.

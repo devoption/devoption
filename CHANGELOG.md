@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Record real signed-bundle installation, interrupted/identical retries, SSH owner
+  setup, verified local HTTPS and systemd restart/reboot on disposable Ubuntu;
+  reconcile installer status while retaining the public DNS/ACME acceptance gate
+  ([#262](https://github.com/devoption/devoption/issues/262)).
+
 - Select the Actions archive API media type separately from release-asset binary
   downloads, fixing the live retention request's HTTP 415; report only sanitized
   HTTP status on download failures
