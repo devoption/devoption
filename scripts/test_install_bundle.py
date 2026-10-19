@@ -1,6 +1,7 @@
 """Disposable filesystem/host models; no system account, service or real credential changes."""
 
 from copy import deepcopy
+import errno
 import hashlib
 import io
 import os
@@ -10,7 +11,7 @@ import subprocess
 import sys
 import tarfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from install_bundle import Installer, PLATFORM, STATE, fetch_packet, installation_lock, proxy_binary, verified_files
 from installer_host import Host
@@ -318,6 +319,17 @@ class InstallerTests(unittest.TestCase):
             with installation_lock(lock,owner=os.getuid()):
                 self.fail('Symlink lock accepted')
         self.assertEqual(sentinel.read_bytes(),b'preserve unrelated file')
+
+    def test_port_preflight_accepts_a_host_with_ipv6_disabled(self):
+        listener = MagicMock()
+        listener.__enter__.return_value = listener
+        def socket_for(family, kind):
+            if family == socket.AF_INET6:
+                raise OSError(errno.EAFNOSUPPORT,'IPv6 disabled on fixture host')
+            return listener
+        with patch('installer_host.socket.socket',side_effect=socket_for), patch('installer_host.socket.has_ipv6',True):
+            Host().free_port(3000)
+        listener.bind.assert_called_once_with(('0.0.0.0',3000))
 
 
 if __name__ == '__main__':

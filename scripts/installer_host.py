@@ -1,6 +1,7 @@
 """Dedicated Ubuntu/systemd adapter for the verified bundle installer."""
 
 import grp
+import errno
 import http.client
 import os
 from pathlib import Path
@@ -89,12 +90,20 @@ class Host:
         for family, address in ((socket.AF_INET, "0.0.0.0"), (socket.AF_INET6, "::")):
             if family == socket.AF_INET6 and not socket.has_ipv6:
                 continue
-            with socket.socket(family, socket.SOCK_STREAM) as listener:
+            try:
+                listener = socket.socket(family, socket.SOCK_STREAM)
+            except OSError as error:
+                if family == socket.AF_INET6 and error.errno in (errno.EAFNOSUPPORT, errno.EPROTONOSUPPORT):
+                    continue
+                raise
+            with listener:
                 if family == socket.AF_INET6:
                     listener.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
                 try:
                     listener.bind((address, port))
                 except OSError as error:
+                    if family == socket.AF_INET6 and error.errno == errno.EADDRNOTAVAIL:
+                        continue  # An explicitly IPv4-only Ubuntu host is supported.
                     raise ValueError(f"Required TCP port {port} is unavailable; do not stop unrelated listeners.") from error
 
     def active(self, service):
