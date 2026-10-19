@@ -32,11 +32,13 @@ matches the actual change: structural validation cannot prove English claims.
 
 ## Prepare and verify
 
-Before committing a release-affecting change, review the record for the next
-version selected by the [preview policy](release-preparation.md). Update its
-`version` and all affected statements explicitly. Do not automatically carry
-forward a record for a different version. The initial record targets
-`0.1.0-preview.1` while the real checkout remains at `0.1.0-dev`.
+Before committing a release-affecting change, review all affected statements.
+The record may describe the current workspace version or the next preview chosen
+by the [preview policy](release-preparation.md). For current-version policy,
+preparation changes only the top-level `version` inside its disposable clone and
+includes that binding in the generated PR. Other statements and comments retain
+their exact bytes. An unrelated old/future version is rejected. This removes
+manual version bookkeeping without inventing compatibility or migration claims.
 
 Validate the record without generating or publishing anything:
 
@@ -45,8 +47,9 @@ python3 scripts/release_metadata.py 0.1.0-preview.1
 ```
 
 The committed source supplies the metadata. Preview preparation validates it
-against the selected next version **before** invoking release-plz to change the
-temporary workspace version. A missing, stale or inconsistent record blocks the
+against the selected next version after the permitted version-only binding and
+**before** invoking release-plz to change the temporary workspace version.
+Unsupported statements, missing metadata or unrelated stale versions block the
 proposal and produces no successful output directory. A genuine no-release run
 creates no candidate and does not require next-version metadata; removing the
 metadata from a tagged baseline counts as a shipped change and therefore blocks

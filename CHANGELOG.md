@@ -18,6 +18,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Complete opt-in candidate retention through exact tag/draft/ZIP upload and
+  cryptographic readback, recovering interrupted writes and expired Actions
+  transports without replacement; add guarded bot-only release PR auto-merge
+  behind disabled owner/repository policy and reconcile release-effort status
+  ([#260](https://github.com/devoption/devoption/issues/260),
+  [#261](https://github.com/devoption/devoption/issues/261)).
+
 - Plan draft retention of the exact reserved candidate ZIP using read-only GitHub
   tag/release/asset inspection; identify missing steps and reject conflicting or
   incomplete retries without creating tags, releases or uploads

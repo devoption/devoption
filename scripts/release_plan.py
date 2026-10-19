@@ -11,7 +11,7 @@ import tempfile
 import tomllib
 
 from release_preview import preview_changelog, select_preview
-from release_metadata import FILENAME, load_metadata, render_metadata, validate_notes
+from release_metadata import FILENAME, prepare_metadata, render_metadata, validate_notes
 from release_notes import extract_notes
 
 TOOL_VERSION = "release-plz 0.3.172"
@@ -122,7 +122,7 @@ def prepare(repository, executable, release_date, channel="preview"):
         else:
             selection = select_preview(scratch, before, source, git)
             if selection["shipped_changes"]:
-                metadata, digest = load_metadata(scratch, selection["next_version"])
+                metadata, digest = prepare_metadata(scratch, before, selection["next_version"])
                 changelog = scratch / "CHANGELOG.md"
                 notes = preview_changelog(changelog.read_text(), selection["next_version"], release_date,
                                           render_metadata(metadata, digest))
@@ -145,6 +145,8 @@ def prepare(repository, executable, release_date, channel="preview"):
             raise ValueError("Preparation unexpectedly changed Git history or tags.")
         files = git(scratch, "diff", "--name-only").splitlines()
         allowed = {"Cargo.toml", "Cargo.lock", "CHANGELOG.md", *members.values()}
+        if channel == "preview":
+            allowed.add(FILENAME)
         if set(files) - allowed or git(scratch, "ls-files", "--others", "--exclude-standard").strip():
             raise ValueError("Preparation changed files outside version/changelog scope.")
         patch = git(scratch, "diff", "--no-ext-diff", "--binary")

@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlsplit
+import tomllib
 
 from release_pr import BOT, PREFIX, REPOSITORY, GitHub, candidate, create_draft
 from test_release_preview import PreviewFixture
@@ -253,6 +254,21 @@ class TransportTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("DEVOPTION_RELEASE_PLZ"), "set DEVOPTION_RELEASE_PLZ to the pinned binary")
 class CandidateTests(PreviewFixture):
+    def test_real_proposal_automatically_carries_current_metadata_into_four_file_pr(self):
+        self.notes()
+        metadata = self.root / "release-metadata.toml"
+        metadata.write_text(metadata.read_text().replace("0.2.1-preview.1", "0.2.0"))
+        reviewed = tomllib.loads(metadata.read_text())
+        self.change("fix: carry reviewed release statements")
+        plan = candidate(self.root, Path(os.environ["DEVOPTION_RELEASE_PLZ"]), date(2026, 1, 2))
+        self.assertEqual({entry["path"] for entry in plan["changes"]},
+                         {"Cargo.toml", "Cargo.lock", "CHANGELOG.md", "release-metadata.toml"})
+        proposed = next(entry["content"] for entry in plan["changes"] if entry["path"] == "release-metadata.toml")
+        self.assertEqual(tomllib.loads(proposed), reviewed | {"version": plan["version"]})
+        self.assertEqual(tomllib.loads(metadata.read_text()), reviewed)
+        with patch.dict(os.environ, environment(plan["source"])):
+            self.assertTrue(create_draft(plan, Remote(plan)).endswith("/321"))
+
     def test_real_proposal_builds_expected_tree_and_issue_linked_draft_payload(self):
         self.notes()
         self.change("fix: correct release fixture")

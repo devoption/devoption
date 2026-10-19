@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import release_notes
-from release_metadata import END, START, load_metadata, render_metadata, validate_metadata, validate_notes
+from release_metadata import END, START, load_metadata, prepare_metadata, render_metadata, validate_metadata, validate_notes
 from release_preview import preview_changelog
 from test_release_plan import Fixture, METADATA
 
@@ -41,6 +41,24 @@ class MetadataTests(unittest.TestCase):
                                ("migration", "instructions"), ("recovery", "instructions")]:
             self.assertIn(self.data[section][field], notes)
         self.assertIn(HUMAN, notes)
+
+    def test_preparation_automatically_binds_next_preview_without_editing_reviewed_statements(self):
+        before = self.path.read_bytes()
+        data, digest = prepare_metadata(self.root, VERSION, "0.1.0-preview.2")
+        self.assertEqual(data, self.data | {"version": "0.1.0-preview.2"})
+        self.assertEqual(self.path.read_bytes(), before.replace(VERSION.encode(), b"0.1.0-preview.2", 1))
+        self.assertEqual(load_metadata(self.root, "0.1.0-preview.2"), (data, digest))
+
+    def test_unrelated_metadata_and_unsupported_claims_cannot_be_carried_forward(self):
+        before = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "unrelated stale"):
+            prepare_metadata(self.root, "0.1.0-preview.8", "0.1.0-preview.9")
+        self.assertEqual(self.path.read_bytes(), before)
+        self.path.write_text(METADATA.replace("required = false", "required = true"))
+        bad = self.path.read_bytes()
+        with self.assertRaisesRegex(ValueError, "No platform migration"):
+            prepare_metadata(self.root, VERSION, "0.1.0-preview.2")
+        self.assertEqual(self.path.read_bytes(), bad)
 
     def test_missing_or_misspelled_fields_and_wrong_types_are_rejected(self):
         paths = [(field,) for field in self.data]

@@ -3,8 +3,9 @@
 The [#261](https://github.com/devoption/devoption/issues/261) planner compares a
 [committed candidate reservation](release-candidates.md) with GitHub tag, release
 and asset state. It proposes the missing steps for a validation draft. It has no
-writer, upload, deletion, tag creation, signing or publication operation. Existing
-Actions retention still expires; this planner does not preserve remote bytes.
+writer, upload, deletion, tag creation, signing or publication operation. Its
+separate opted-in writer is described below. Actions retention still expires;
+planning alone does not preserve remote bytes.
 
 ## Inspect a reserved candidate
 
@@ -71,6 +72,50 @@ and bytes. Do not execute operations from a saved stale plan.
 The reserved real ZIP was reverified locally and the first read-only inspection
 produced the missing-tag/draft/asset plan. Fixtures cover interrupted states,
 metadata conflicts, draft visibility, annotated tags and pagination failures.
-Positive remote draft/asset reuse and publication have not run. Permanent byte
-retention, the authorized writer and installation from the distributed bundle
-remain pending. The [#21 release gate](releases.md) still governs publication.
+Live draft/asset writes and reuse have not run. The companion writer now has
+end-to-end fixture coverage; installation from the distributed bundle remains
+pending. The [#21 release gate](releases.md) still governs publication.
+
+## Approved retention writer
+
+**Retain reserved candidate** now connects the entire path: required source CI,
+original artifact download, cryptographic verification, exact tag, unpublished
+validation draft, unchanged ZIP upload, and independent downloaded-byte verification.
+It does not rebuild, sign, publish the draft or change publication eligibility.
+Draft assets have no Actions seven-day expiry, but remain deletable by authorized
+repository users. This is long-lived retention, not a guarantee against deletion.
+
+Before dispatch, obtain explicit owner approval for the tag, draft and asset write.
+Select the reviewed full **current main workflow commit**, reserved version and
+SHA-256 of its committed reservation JSON. The artifact source commit inside that
+reservation can be older; it is never substituted with current main. The `retain`
+input defaults false. Without it, only read-only source CI runs. No live write is
+authorized by merging the implementation.
+
+The main-only writer job uses `contents: write` and `actions: read` with the
+short-lived workflow token; it needs no signing, attestation, PR or settings rights.
+Checkout credentials remain unpersisted. Context and clean-checkout checks bind
+the writer to the exact reviewed main dispatch and passing source CI. The reviewed
+reservation digest must match before constructing any client or write request.
+
+Each invocation re-reads tag/draft/asset state instead of executing a saved plan.
+It verifies the original Actions artifact ID/name/digest/run/source, or downloads
+an already matching retained asset when the original artifact has expired. No
+remote objects are created until the ZIP, proof and complete archive pass checks.
+The only write operations create the reserved ref, validation draft and absent ZIP
+asset. Upload uses the fixed GitHub upload host without redirects; no delete,
+clobber, force-update or publish endpoint exists. Every returned object ID is
+checked against fresh state. Final readback re-verifies signatures and packet
+bytes and confirms the same tag, draft and asset identities before reporting success.
+
+Lost responses after tag, draft or asset creation are recovered by the next
+identical run. A matching complete retry performs no writes and verifies retained
+bytes even after Actions expiry. Wrong tags, modified/published drafts, extra or
+unfinished assets, missing original bytes and failed verification stop without
+repairing or replacing remote state. Administrators can still change state after
+the final read; the workflow is not a sandbox against repository owners.
+
+End-to-end API-model fixtures cover full completion, identical retry, lost responses
+at all three write boundaries, original-artifact expiry, corrupt readback and
+conflicts. These tests make no remote writes. A live owner-approved tag/draft/upload
+acceptance run is still required before claiming this retention path has run on GitHub.

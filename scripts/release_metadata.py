@@ -60,7 +60,7 @@ def validate_metadata(data, version):
         raise ValueError("Release metadata support.warnings must not contain duplicates.")
 
 
-def load_metadata(root, version):
+def read_metadata(root):
     path = root / FILENAME
     if path.is_symlink() or not path.is_file():
         raise ValueError(f"A checked-in regular {FILENAME} file is required for a release proposal.")
@@ -72,8 +72,30 @@ def load_metadata(root, version):
         data = tomllib.loads(raw.decode("utf-8"))
     except (UnicodeError, tomllib.TOMLDecodeError) as error:
         raise ValueError("Release metadata must be valid UTF-8 TOML.") from error
+    return raw, data
+
+
+def load_metadata(root, version):
+    raw, data = read_metadata(root)
     validate_metadata(data, version)
     return data, hashlib.sha256(raw).hexdigest()
+
+
+def prepare_metadata(root, current, proposed):
+    """Carry reviewed statements forward, changing only the selected version in a disposable clone."""
+    raw, data = read_metadata(root)
+    if data.get("version") not in {current, proposed}:
+        raise ValueError("Metadata must describe current source or the selected preview; unrelated stale metadata is rejected.")
+    desired = data | {"version": proposed}
+    validate_metadata(desired, proposed)
+    if data["version"] != proposed:
+        pattern = rf'(?m)^(version\s*=\s*)(["\']){re.escape(current)}\2(?=\s*(?:#.*)?$)'
+        changed, count = re.subn(pattern, lambda match: match[1] + match[2] + proposed + match[2], raw.decode())
+        if count != 1 or tomllib.loads(changed) != desired:
+            raise ValueError("Metadata version must be an unambiguous top-level string; statements cannot be rewritten.")
+        raw = changed.encode()
+        (root / FILENAME).write_bytes(raw)
+    return desired, hashlib.sha256(raw).hexdigest()
 
 
 def render_metadata(data, digest):
