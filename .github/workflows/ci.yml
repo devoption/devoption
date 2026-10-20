@@ -50,7 +50,7 @@ jobs:
   installation:
     name: Release build and installation checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -76,6 +76,15 @@ jobs:
         run: |
           python3 scripts/check_bundle_upgrade.py --prepare "$UPGRADE_FIXTURE"
           sudo env DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE=1 python3 scripts/check_bundle_upgrade.py --disposable-system-host "$UPGRADE_FIXTURE"
+      - name: Reboot upgraded, interrupted and recovered installations in private QEMU guest
+        env:
+          UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture
+          REBOOT_REPORT: ${{ runner.temp }}/devoption-upgrade-reboot.json
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+          if [ -e /dev/kvm ]; then sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
+          python3 scripts/check_upgrade_reboot.py --fixtures "$UPGRADE_FIXTURE" --report "$REBOOT_REPORT"
       - run: git diff --exit-code
 
   scripts:

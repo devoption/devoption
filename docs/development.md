@@ -78,6 +78,21 @@ The hosted runner's writable `/opt` parent is temporarily made root-owned mode
 0755 during this explicit fixture, then restored to its original UID/GID/mode.
 Production installation/upgrade checks continue to reject writable ancestors.
 
+The same job installs QEMU/xorriso and runs `check_upgrade_reboot.py --fixtures
+FIXTURE_DIRECTORY --report NEW_REPORT_PATH` in an isolated guest. It verifies the
+SHA-256-pinned, dated Ubuntu image, creates a private disposable disk and performs
+four kernel boots: initial upgrade, completed-upgrade verification/interrupted
+activation, pending-transaction verification/recovery, then restored-installation
+verification. It checks TLS login and persisted project/profile/Git data, exact
+selected version, disabled pending services, and recovery retries. KVM access is
+granted only to the ephemeral runner user when available; otherwise QEMU uses
+software emulation. All boots share a ten-minute deadline. Missing/failed evidence
+or repeated boot IDs fail the required installation job. The runner kills/waits
+for a timed-out guest and deletes its temporary disks/shares/logs. This creates no
+cloud resources, exports no credentials, forwards no network ports and retains no
+owner/certificate data. The small JSON report records only stages, versions and
+kernel boot IDs. See [upgrade validation limits](platform-upgrades.md).
+
 The Python job installs pinned release-plz and Rust to run the real-tool release
 fixtures on Ubuntu, including ordinary PRs. Local runs without
 `DEVOPTION_RELEASE_PLZ` still skip tool-dependent cases; use the pinned binary

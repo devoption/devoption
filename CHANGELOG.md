@@ -38,6 +38,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Automate actual VM reboots after preview upgrade, interrupted activation and
+  full-state recovery, checking distinct kernel boots, TLS owner login, saved
+  project/profile/Git state and disabled pending services in isolated Ubuntu CI
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Add operator-triggered same-schema preview upgrades with independent source/
   target verification, offline verified state/configuration backup, versioned
   activation, disabled boot during pending transactions and explicit full-state
