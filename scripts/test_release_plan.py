@@ -15,7 +15,27 @@ from release_plan import check_config, git, prepare, run, workspace
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = (ROOT / "release-plz.toml").read_text()
 NAMES = [p["name"] for p in tomllib.loads(CONFIG)["package"]]
-METADATA = (ROOT / "release-metadata.toml").read_text()
+# Synthetic fresh-only baseline, independent of the real candidate's changing
+# version/support/upgrade policy. Schema-2 paths have their own explicit cases.
+METADATA = '''schema_version = 1
+version = "0.1.0-preview.1"
+channel = "preview"
+platforms = ["ubuntu-24.04-amd64"]
+[compatibility]
+installation = "fresh-only"
+upgrade_from = []
+data = "Use fresh disposable fixture state."
+configuration = "Use the disposable fixture configuration."
+[migration]
+required = false
+instructions = "No fixture migration is implemented."
+[recovery]
+binary_rollback = false
+instructions = "No fixture binary rollback is promised."
+[support]
+status = "development-preview"
+warnings = ["Synthetic release-tool fixture; not a supported product candidate."]
+'''
 
 
 class DiagnosticTests(unittest.TestCase):
