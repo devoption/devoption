@@ -176,8 +176,32 @@ passed this real-system fixture at 22:22 UTC on 2026-10-19, including cleanup.
 It also passed all 258 Python tests, 101 Node tests and required Rust/install
 checks at that revision. Current PR checks validate subsequent changes.
 
+CI additionally runs `scripts/check_upgrade_reboot.py` against those same two
+source-built bundles inside a fresh private QEMU Ubuntu guest. It checks a
+completed upgrade after reboot, interrupts a second attempt between unit and
+receipt writes, reboots and confirms both services remain disabled/inactive with
+their ports free, then explicitly recovers and reboots the restored installation.
+Owner login, session invalidation, project/profile/repository persistence, the
+running unit's executable version and installer/transaction records are checked.
+A completed recovery retry must preserve subsequent writes. Four distinct kernel
+boot IDs and every ordered stage are mandatory; timeout, missing/failed results
+or a repeated kernel identity fail CI.
+
+The runner downloads the [official dated Ubuntu minimal image](https://cloud-images.ubuntu.com/minimal/releases/noble/release-20261017/)
+and checks its reviewed SHA-256 before making an 8 GiB copy-on-write disk. It
+copies only fixture bundles, the pinned proxy and Python scripts into a read-only
+guest input share, with a separate private result share. No host home, credentials,
+SSH keys or forwarded ports are supplied. Cloud-init installs Git/sudo and a
+fixture-only boot service; the production updater is unchanged. Each guest reboot
+exits QEMU and starts a new kernel against the same disk. The host runner bounds
+all four boots to ten minutes, waits for QEMU termination and deletes the temporary
+disk, shares, owner/certificate state and logs on success or failure. Only a small
+non-secret JSON acceptance report survives. Never use the destructive `--guest`
+mode on an existing installation; use the host runner described in
+[development checks](development.md#continuous-integration).
+
 This is base-upgrade implementation and fixture evidence. Real signed
-previous-to-candidate acceptance, reboot recovery of pending/completed transactions,
+previous-to-candidate acceptance (including reboot with those signed packets),
 coordinated hosted-app state, migration recovery and notification/UI actions still
 need their own acceptance. Stable/channel promotion, canary duration/thresholds,
 a promotion stop mechanism and #21 publication reconciliation remain unimplemented.

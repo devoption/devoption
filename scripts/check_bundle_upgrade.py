@@ -221,17 +221,7 @@ def check(directory):
         opt.chmod(stat.S_IMODE(before.st_mode))
 
 
-def exercise(directory):
-    if os.geteuid()!=0 or os.environ.get('DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE')!='1':
-        raise ValueError('Explicit disposable system host opt-in and root are required.')
-    host=FixtureHost()
-    host.preflight(Path('/'),1024**3)
-    for path in (STATE,PLATFORM,PROXY,'/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
-        if Path(path).exists() or Path(path).is_symlink():
-            raise ValueError('Disposable fixture requires an empty installation: '+path)
-    for who in ('devoption','caddy'):
-        if host.account(who) is not None:
-            raise ValueError('Disposable fixture accounts already exist.')
+def fixture_installers(directory, host):
     with tarfile.open(directory/'caddy.tar.gz') as archive:
         raw=(directory/'caddy.tar.gz').read_bytes()
         assert hashlib.sha512(raw).hexdigest()==CADDY_SHA512
@@ -250,7 +240,21 @@ def exercise(directory):
         record={'schema_version':1,'candidate':identity(manifest['source_commit'],manifest['platform_version'],hashlib.sha256(archive_path.read_bytes()).hexdigest(),'0'*64,'1','1'),
                 'artifact':{'id':'1','transport_sha256':'0'*64}}
         installers.append(Installer(Path('/'),host,record,manifest,files,caddy,HOSTNAME))
-    old,new=installers
+    return installers
+
+
+def exercise(directory):
+    if os.geteuid()!=0 or os.environ.get('DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE')!='1':
+        raise ValueError('Explicit disposable system host opt-in and root are required.')
+    host=FixtureHost()
+    host.preflight(Path('/'),1024**3)
+    for path in (STATE,PLATFORM,PROXY,'/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
+        if Path(path).exists() or Path(path).is_symlink():
+            raise ValueError('Disposable fixture requires an empty installation: '+path)
+    for who in ('devoption','caddy'):
+        if host.account(who) is not None:
+            raise ValueError('Disposable fixture accounts already exist.')
+    old,new=fixture_installers(directory,host)
     host.candidate_version=new.version
     try:
         old.install(); enroll(Path(old.binary)); old.start(); host.public_health(HOSTNAME); host.enable()
