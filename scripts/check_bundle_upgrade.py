@@ -273,7 +273,7 @@ def exercise(directory):
         assert transaction.apply()['phase']=='healthy'
         assert run(new.binary,'--version')==f'devoption {new.version}\n'.encode()
         assert host.run('runuser','-u','devoption','--','git','-C',str(repository),'rev-parse','HEAD').stdout==prior_head
-        assert request('/auth/session','POST',cookie=cookie,timeout=timeout)[0]==401
+        assert request('/auth/session','POST',cookie=cookie)[0]==401
         token,cookie=session()
         assert b'Upgrade fixture project' in request('/projects',cookie=cookie)[1]
         assert request('/account/profile',cookie=cookie)[1]==b'Upgrade fixture owner'
