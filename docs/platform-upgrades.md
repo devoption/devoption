@@ -120,8 +120,10 @@ transaction, attempt, phase and observation time; it contains no hostname, comma
 packet path, owner state, password or backup contents. Keep the private journals
 and backups under their existing mode-0700 installer directory.
 
-The server reads only this fixed observation on an authenticated page request,
-using bounded, descriptor-relative, no-follow reads through root-controlled
+The server reads only this fixed observation on an authenticated page request
+when started with the bundle data/repository paths, port 3000 and a public origin.
+Other server configurations do not consume the installed host's observation. It uses
+bounded, descriptor-relative, no-follow reads through root-controlled
 parents. Unsafe ownership/modes, links, oversized/noncanonical/unknown records
 or future timestamps display unavailable status without host-path errors. It
 never reads the private journals. Missing records display **No reviewed update**;

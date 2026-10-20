@@ -364,6 +364,7 @@ fn manual_cookie_browser_fixture() {
                     true,
                     Arc::clone(&slot),
                     projects::routes(projects).merge(profile::routes(profile)),
+                    false,
                 )
                 .route(
                     "/probe",

@@ -24,7 +24,7 @@ fn app(configured: bool, slot: SharedSession) -> Router {
         Router::new()
     };
     protect(
-        page_routes(configured, Arc::clone(&slot), projects),
+        page_routes(configured, Arc::clone(&slot), projects, false),
         3000,
         slot,
     )
@@ -193,5 +193,26 @@ fn sign_in_and_unconfigured_preview_remain_public_but_host_checks_still_run_firs
             assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED);
             assert!(body.is_empty());
         }
+    }
+}
+
+#[test]
+fn host_notices_are_bound_to_the_bundle_installation_configuration() {
+    let data = Some(Path::new("/var/lib/devoption/data"));
+    let repositories = Some(Path::new("/var/lib/devoption/repositories"));
+    assert!(platform_installation(data, repositories, 3000, true));
+    for (d, r, p, public) in [
+        (None, repositories, 3000, true),
+        (
+            Some(Path::new("/tmp/other-owner")),
+            repositories,
+            3000,
+            true,
+        ),
+        (data, None, 3000, true),
+        (data, repositories, 3001, true),
+        (data, repositories, 3000, false),
+    ] {
+        assert!(!platform_installation(d, r, p, public));
     }
 }

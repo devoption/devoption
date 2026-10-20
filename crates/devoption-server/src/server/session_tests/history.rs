@@ -75,7 +75,7 @@ fn fixture(configured: bool) -> Fixture {
     )
     .unwrap();
     let app = protect(
-        page_routes(true, Arc::clone(&slot), projects::routes(projects)),
+        page_routes(true, Arc::clone(&slot), projects::routes(projects), false),
         3000,
         Arc::clone(&slot),
     );

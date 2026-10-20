@@ -341,7 +341,13 @@ fn run_with_roots(
                 .merge(profile.map(profile::routes).unwrap_or_default());
             #[cfg(not(unix))]
             let project_routes = Router::new();
-            let app = page_routes(configured, Arc::clone(&session), project_routes);
+            let installed = platform_installation(
+                data_directory,
+                repository_root,
+                port,
+                public_origin.is_some(),
+            );
+            let app = page_routes(configured, Arc::clone(&session), project_routes, installed);
             let origin = public_origin
                 .map(RequestOrigin::Public)
                 .unwrap_or(RequestOrigin::Local(address.port()));
@@ -360,7 +366,24 @@ fn run_with_roots(
         })
 }
 
-fn page_routes(configured: bool, session: SharedSession, project_routes: Router) -> Router {
+fn platform_installation(
+    data: Option<&Path>,
+    repositories: Option<&Path>,
+    port: u16,
+    public: bool,
+) -> bool {
+    data == Some(Path::new("/var/lib/devoption/data"))
+        && repositories == Some(Path::new("/var/lib/devoption/repositories"))
+        && port == 3000
+        && public
+}
+
+fn page_routes(
+    configured: bool,
+    session: SharedSession,
+    project_routes: Router,
+    _installed: bool,
+) -> Router {
     let mut pages = Router::new();
     for (path, page) in [
         ("/", Page::Home),
@@ -372,7 +395,7 @@ fn page_routes(configured: bool, session: SharedSession, project_routes: Router)
     ] {
         #[cfg(unix)]
         if configured && matches!(page, Page::Home) {
-            pages = pages.route(path, get(platform_updates::home));
+            pages = pages.route(path, get(move || platform_updates::home(_installed)));
             continue;
         }
         if configured && matches!(page, Page::Projects) {
