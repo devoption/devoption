@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Include the separate version-matched Wasmtime app worker in new schema-3
+  bundles, bind its bytes and locked runtime versions into verification/SBOM/
+  assembly provenance, and probe it during installation and base upgrades.
+  Preserve schema-2 packet verification and test the packaged worker with the
+  public WASIp2 example before signing; app-capable upgrades remain separate
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Show owner-only platform upgrade observations on Overview, including the running
   version, selected preview, exact transaction/result and SSH upgrade/recovery
   guidance. Publish bounded public notices from the verified root upgrader and

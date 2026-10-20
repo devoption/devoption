@@ -28,7 +28,8 @@ guards, not a sandbox against an operator forging local environment variables.
 
 The signed candidate is built once in that job from fetched locked inputs using
 the pinned Rust toolchain and offline release build. Release installation tests,
-systemd-unit checks, exact executable version/help checks and complete bundle
+systemd-unit checks, exact platform/worker version/help checks, a packaged-worker
+WASIp2 fixture smoke and complete bundle
 comparison run before signing. Source context is rechecked immediately before
 the attestation action. No caller-provided binary, artifact download or unsigned
 predicate is promoted into the signer. A run may sign the exact reviewed dispatch

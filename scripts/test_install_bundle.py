@@ -15,7 +15,7 @@ from unittest.mock import MagicMock, patch
 
 from install_bundle import Installer, PLATFORM, STATE, fetch_packet, installation_lock, proxy_binary, verified_files
 from installer_host import Host
-from release_bundle import CADDY_SHA512, CADDY_VERSION, canonical
+from release_bundle import CADDY_SHA512, CADDY_VERSION, canonical, RUNTIME
 import test_release_candidates as fixtures
 from test_bundle_provenance import GH_VERSION
 
@@ -61,6 +61,10 @@ class FixtureHost:
         assert (self.root / binary.lstrip('/')).is_file()
         self.calls.append(("validate",))
 
+    def runtime_probe(self, binary, version):
+        assert (self.root / binary.lstrip('/')).is_file()
+        self.calls.append(("runtime-probe", version))
+
     def reload(self):
         self.calls.append(("reload",))
 
@@ -101,6 +105,26 @@ class InstallerTests(unittest.TestCase):
     def build(self, record=None, hostname="platform.example.com"):
         return Installer(self.image, self.host, record or self.record, self.manifest,
                          self.content, b"pinned proxy fixture; never executed", hostname)
+
+    def test_dual_bundle_installs_worker_immutably_and_probes_before_reload(self):
+        self.manifest['schema_version'] = 3
+        self.content[RUNTIME] = b'verified worker bytes; host execution is modeled'
+        self.content['manifest.json'] = canonical(self.manifest)
+        installer = self.build()
+        self.host.runtime_probe = lambda binary, version: (_ for _ in ()).throw(ValueError('worker version mismatch'))
+        with self.assertRaisesRegex(ValueError, 'worker version'):
+            installer.install()
+        self.assertNotIn(('reload',), self.host.calls)
+        path = installer.path(installer.release + '/' + RUNTIME)
+        self.assertEqual(path.read_bytes(), self.content[RUNTIME])
+        self.assertEqual(path.stat().st_mode & 0o777, 0o755)
+        self.host.runtime_probe = lambda binary, version: self.host.calls.append(('runtime-probe', version))
+        installer.install()
+        self.assertIn(('runtime-probe', installer.version), self.host.calls)
+        path.write_bytes(b'changed worker')
+        with self.assertRaisesRegex(ValueError, 'differs'):
+            installer.install()
+        self.assertEqual(path.read_bytes(), b'changed worker')
 
     def test_fresh_install_enroll_start_and_identical_retry_preserve_data(self):
         before = self.installer.preflight()

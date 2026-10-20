@@ -12,7 +12,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from release_bundle import SOURCE_FILES, TARGET, canonical, write_archive
+from release_bundle import SOURCE_FILES, TARGET, canonical, write_archive, RUNTIME, file_mode, runtime_versions
 from release_inventory import SBOM
 from verify_bundle_provenance import GH_VERSION, IDENTITY, PREDICATE, WORKFLOW, require_workflow, verify
 
@@ -59,6 +59,42 @@ class VerificationTests(unittest.TestCase):
 
     def verify(self):
         return verify(self.archive, self.proof, SOURCE, self.digest, self.version, self.gh)
+
+    def schema_three(self):
+        self.files[RUNTIME] = b'authenticated worker fixture; never executed'
+        self.manifest.update(schema_version=3, embedded_components=['server', 'CLI', 'UI'],
+            app_runtime={'path': RUNTIME, 'version': self.version,
+                         'embedded_runtime_versions': runtime_versions(tomllib.loads(self.files['Cargo.lock'].decode()))},
+            cargo_lock_sha256=hashlib.sha256(self.files['Cargo.lock']).hexdigest())
+        self.manifest['files'] = [{'path': name, 'size': len(content), 'sha256': hashlib.sha256(content).hexdigest(),
+                                  'mode': f'{file_mode(name):04o}'} for name, content in sorted(self.files.items())]
+        self.repack()
+
+    def test_dual_executable_manifest_verifies_without_running_payloads(self):
+        self.schema_three()
+        with patch('verify_bundle_provenance.command', side_effect=[GH_VERSION.encode(), self.response()]) as command:
+            self.assertTrue(self.verify()['authenticated'])
+        self.assertEqual(command.call_count, 2)  # Pinned verifier only, never a bundle executable.
+        self.files[RUNTIME] += b'tampered'
+        self.repack()
+        with patch('verify_bundle_provenance.command', side_effect=[GH_VERSION.encode(), self.response()]):
+            with self.assertRaisesRegex(ValueError, 'digests/modes'):
+                self.verify()
+
+    def test_worker_descriptor_missing_bytes_wrong_versions_and_schema_downgrades_fail(self):
+        self.schema_three()
+        for change in ('missing', 'version', 'lock', 'path', 'downgrade'):
+            files, manifest = self.files.copy(), json.loads(json.dumps(self.manifest))
+            if change == 'missing': self.files.pop(RUNTIME)
+            elif change == 'version': self.manifest['app_runtime']['version'] = '9.0.0-preview.1'
+            elif change == 'lock': self.manifest['app_runtime']['embedded_runtime_versions']['wasmtime'] = '0.0.0'
+            elif change == 'path': self.manifest['app_runtime']['path'] = '../worker'
+            else: self.manifest['schema_version'] = 2
+            self.repack()
+            with self.subTest(change=change), patch('verify_bundle_provenance.command', side_effect=[GH_VERSION.encode(), self.response()]):
+                with self.assertRaises(ValueError): self.verify()
+            self.files, self.manifest = files, manifest
+        self.repack()
 
     def test_fixed_cryptographic_policy_precedes_manifest_processing(self):
         with patch("verify_bundle_provenance.command", side_effect=[GH_VERSION.encode(), self.response()]) as command:

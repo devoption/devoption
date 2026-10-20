@@ -29,7 +29,10 @@ versions are not inferred compatible.
 
 The hostname, dedicated accounts, proxy acquisition pin and configuration must
 match the existing installation. Only the platform unit's versioned executable
-path can change. Source installations, custom unit/configuration conversions,
+path can change. A schema-3 target also stages its authenticated worker in that
+version tree and probes its version before activation/readiness. A worker failure
+leaves the transaction failed and requires the same explicit full-state recovery;
+a legacy schema-2 previous installation needs no worker to recover. Source installations, custom unit/configuration conversions,
 separate state mounts, build/app opt-ins and migrations are refused before
 activation. Coordinated hosted-app/worker upgrades and sample-app acceptance
 remain open under #263. Do not delete an opt-in or rewrite a receipt to bypass

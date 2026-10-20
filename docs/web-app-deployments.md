@@ -27,6 +27,14 @@ sudo install -m 755 target/release/devoption-runtime /usr/local/libexec/devoptio
 sudo install -d -m 700 /var/lib/devoption-app
 ```
 
+For a verified schema-3 bundle, the worker is already at
+`/opt/devoption/releases/VERSION/bin/devoption-runtime`; use that exact immutable
+path as `worker` when preparing a new installation's configuration. It reports the
+same version as `bin/devoption`. The copy-from-source commands above apply to
+source installations; legacy schema-2 packets did not include the separate worker.
+This does not authorize changing an existing installation's configuration or
+bypassing the platform upgrader's app/build refusal. See [bundle contents](release-bundles.md#worker-acceptance-and-legacy-packets).
+
 Create root-owned `/etc/devoption/deployment.toml`, mode 0644, with these exact keys.
 Replace the example UID and paths with the existing build installation's values.
 Use canonical absolute paths with no links or whitespace. `state` and `worker`,

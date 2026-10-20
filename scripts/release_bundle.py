@@ -21,6 +21,23 @@ from release_inventory import SBOM, PROVENANCE, VENDOR_FILES, inventory, provena
 
 TARGET = "ubuntu-24.04-amd64"
 MAX_BINARY = 256 * 1024 * 1024
+RUNTIME = "bin/devoption-runtime"
+EXECUTABLES = {"bin/devoption", RUNTIME}
+
+
+def file_mode(name):
+    return 0o755 if name in EXECUTABLES else 0o644
+
+
+def runtime_versions(lock):
+    versions = {}
+    for name in ("wasmtime", "wasmtime-wasi", "wasmtime-wasi-http"):
+        found = [p["version"] for p in lock["package"] if p["name"] == name]
+        if len(found) != 1:
+            raise ValueError("Expected one locked embedded runtime version: " + name)
+        versions[name] = found[0]
+    return versions
+
 HELPERS = (
     "build_broker.py", "build_worker.py", "deployment_broker.py",
     "prepare_build_config.py", "prepare_platform_service.py",
@@ -87,7 +104,7 @@ def source_bytes(repository, source, path):
                           check=True, capture_output=True, timeout=30).stdout
 
 
-def payload(repository, executable):
+def payload(repository, executable, runtime=None):
     if git(repository, "status", "--porcelain").strip():
         raise ValueError("Commit changes before assembling an exact-source candidate.")
     source = git(repository, "rev-parse", "HEAD").strip()
@@ -101,24 +118,23 @@ def payload(repository, executable):
     if CADDY_VERSION not in instructions or CADDY_SHA512 not in instructions:
         raise ValueError("Proxy acquisition pin and installation instructions disagree.")
     files["bin/devoption"] = binary_bytes(executable)
+    runtime = runtime if runtime is not None else executable.with_name("devoption-runtime")
+    files[RUNTIME] = binary_bytes(runtime)
+    if sum(len(data) for data in files.values()) > MAX_BINARY:
+        raise ValueError("Combined executable/source payload exceeds the bundle budget.")
     files["RELEASE-NOTES.md"] = notes.encode()
     files[SBOM] = canonical(inventory(files, version, source, members))
     toolchain = tomllib.loads(files["rust-toolchain.toml"].decode())["toolchain"]["channel"]
     lock = tomllib.loads(files["Cargo.lock"].decode())
-    runtimes = {}
-    for name in ("wasmtime", "wasmtime-wasi", "wasmtime-wasi-http"):
-        versions = [p["version"] for p in lock["package"] if p["name"] == name]
-        if len(versions) != 1:
-            raise ValueError("Expected one locked embedded runtime version: " + name)
-        runtimes[name] = versions[0]
+    runtimes = runtime_versions(lock)
     manifest = {
-        "schema_version": 2, "platform_version": version, "source_commit": source,
+        "schema_version": 3, "platform_version": version, "source_commit": source,
         "target": TARGET, "channel": "preview", "publication_eligible": False,
         "provenance": "unsigned-assembly-statement",
         "sbom": {"path": SBOM, "format": "CycloneDX-1.6", "scope": "source-inventory"},
         "components": {name: version for name in sorted(members)},
-        "embedded_components": ["server", "CLI", "UI", "Wasmtime"],
-        "embedded_runtime_versions": runtimes,
+        "embedded_components": ["server", "CLI", "UI"],
+        "app_runtime": {"path": RUNTIME, "version": version, "embedded_runtime_versions": runtimes},
         "cargo_lock_sha256": sha256(files["Cargo.lock"]),
         "release_metadata_sha256": metadata_digest,
         "release_metadata": metadata,
@@ -133,7 +149,7 @@ def payload(repository, executable):
                       "sha512": CADDY_SHA512, "instructions": "docs/public-linux-install.md"},
         },
         "files": [{"path": path, "size": len(data), "sha256": sha256(data),
-                   "mode": "0755" if path == "bin/devoption" else "0644"}
+                   "mode": f"{file_mode(path):04o}"}
                   for path, data in sorted(files.items())],
     }
     if git(repository, "rev-parse", "HEAD").strip() != source or git(repository, "status", "--porcelain").strip():
@@ -153,6 +169,16 @@ def probe(binary, version):
         raise ValueError("Packaged executable help check failed.")
 
 
+def probe_runtime(binary, version):
+    environment = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
+    for flag, expected in (("--version", f"devoption-runtime {version}\n".encode()),
+                           ("--help", b"Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n")):
+        result = subprocess.run([str(binary), flag], env=environment, check=True,
+                                capture_output=True, timeout=10)
+        if result.stdout != expected or result.stderr:
+            raise ValueError("Packaged app runtime version/help differs from the selected platform.")
+
+
 def write_archive(path, files, manifest):
     entries = files | {"manifest.json": canonical(manifest)}
     with path.open("xb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
@@ -160,11 +186,11 @@ def write_archive(path, files, manifest):
             for name, content in sorted(entries.items()):
                 entry = tarfile.TarInfo(name)
                 entry.size = len(content)
-                entry.mode = 0o755 if name == "bin/devoption" else 0o644
+                entry.mode = file_mode(name)
                 archive.addfile(entry, io.BytesIO(content))
 
 
-def assemble(repository, executable, output):
+def assemble(repository, executable, output, runtime=None):
     require_host()
     repository = repository.resolve(strict=True)
     output = output.absolute()
@@ -174,7 +200,7 @@ def assemble(repository, executable, output):
     output = output.parent.resolve(strict=True) / output.name
     if output.is_relative_to(repository):
         raise ValueError("Output must be outside the source checkout.")
-    manifest, files = payload(repository, executable)
+    manifest, files = payload(repository, executable, runtime)
     name = f"devoption-{manifest['platform_version']}-{TARGET}.tar.gz"
     with tempfile.TemporaryDirectory(prefix="devoption-bundle-", dir=output.parent) as temporary:
         staging = Path(temporary)
@@ -183,6 +209,10 @@ def assemble(repository, executable, output):
         binary.chmod(0o700)
         # Execute only the snapshot whose bytes are subsequently archived.
         probe(binary, manifest["platform_version"])
+        worker = staging / "devoption-runtime"
+        worker.write_bytes(files[RUNTIME])
+        worker.chmod(0o700)
+        probe_runtime(worker, manifest["platform_version"])
         archive = staging / name
         write_archive(archive, files, manifest)
         archive_data = archive.read_bytes()
@@ -205,10 +235,12 @@ def main():
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     parser.add_argument("--binary", type=Path, required=True,
                         help="Trusted locally built release executable; its version/help will run")
+    parser.add_argument("--runtime", type=Path,
+                        help="Trusted locally built worker; defaults to devoption-runtime beside --binary")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        print(json.dumps(assemble(args.repository, args.binary, args.output), indent=2))
+        print(json.dumps(assemble(args.repository, args.binary, args.output, args.runtime), indent=2))
     except (ValueError, KeyError, OSError, subprocess.SubprocessError, tarfile.TarError) as error:
         parser.exit(1, f"Bundle not assembled: {error}\n")
 
