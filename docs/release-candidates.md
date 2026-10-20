@@ -20,8 +20,9 @@ separately approved [run 39369686068](https://github.com/devoption/devoption/act
 at merged main commit `cdc2df021bc518b5314ccf6e47f7a3cc89bf7c8f`. Its signature,
 independent Actions readback and local ZIP/proof verification passed; see
 [provenance evidence](bundle-provenance.md#preview2-signing-and-independent-readback).
-This is seven-day Actions retention, with no preview.2 tag or long-lived draft
-asset created. Preview.1's existing record is unchanged.
+The same original ZIP now has [verified long-lived draft retention](release-reconciliation.md#live-retention-evidence),
+including independent downloaded-byte verification. Preview.1's existing record
+is unchanged.
 
 ## Reserve and retry
 
@@ -94,8 +95,10 @@ No new signing run, artifact upload, tag or GitHub release is created here.
 The [read-only remote reconciliation planner](release-reconciliation.md) now
 checks tag/draft/asset state and reports missing work without writes. Its separately
 approved companion writer now implements long-lived draft retention and retries;
-live activation, complete installation from the bundle and channel promotion
-remain pending. Promotion
-must use the reserved archive digest without recompiling or silently renaming an
-embedded preview version. Stable manifests remain unsupported. The separate
-[#21 publication decision](releases.md) is still required before any release write.
+live retention evidence is recorded in that document. Signed-bundle installation
+and base-upgrade acceptance are recorded in
+[delivery status](releases.md#delivery-status-against-the-six-issues). Channel
+promotion remains pending and must use the reserved archive digest without
+recompiling or silently renaming an embedded preview version. Stable manifests remain unsupported. The separate
+[#21 publication decision](releases.md) is still required before product publication;
+validation-draft retention has its own explicit approval.

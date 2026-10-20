@@ -69,12 +69,11 @@ authorization. Remote state can change between requests and after the plan;
 future write logic must serialize work, re-read state and verify returned IDs
 and bytes. Do not execute operations from a saved stale plan.
 
-The reserved real ZIP was reverified locally and the first read-only inspection
-produced the missing-tag/draft/asset plan. Fixtures cover interrupted states,
-metadata conflicts, draft visibility, annotated tags and pagination failures.
-Live draft/asset writes and reuse have not run. The companion writer now has
-end-to-end fixture coverage; installation from the distributed bundle remains
-pending. The [#21 release gate](releases.md) still governs publication.
+The reserved packets have real signing/readback evidence and installer/base-upgrade
+acceptance; see [delivery status](releases.md#delivery-status-against-the-six-issues).
+The planner's fixtures cover interrupted states, metadata conflicts, draft visibility,
+annotated tags and pagination failures. The [#21 release gate](releases.md) still
+governs publication.
 
 ## Approved retention writer
 
@@ -128,20 +127,42 @@ unfinished assets, missing original bytes and failed verification stop without
 repairing or replacing remote state. Administrators can still change state after
 the final read; the workflow is not a sandbox against repository owners.
 
+## Live retention evidence
+
 End-to-end API-model fixtures cover full completion, identical retry, lost responses
 at all three write boundaries, original-artifact expiry, corrupt readback and
-conflicts. These tests make no remote writes. A live owner-approved tag/draft/upload
-acceptance run is still required before claiming this retention path has run on GitHub.
+conflicts. These fixtures make no remote writes.
 
-The first approved [retention attempt](https://github.com/devoption/devoption/actions/runs/39252471232)
-passed every source check but stopped before tag/draft/upload writes because the
-workflow token did not satisfy the local planner's `permissions.push` check.
-The writer now uses its enforced workflow context instead. Successful live
-retention and an identical retry remain pending after this correction is merged.
+The preview.1 [retention run](https://github.com/devoption/devoption/actions/runs/39291171277)
+passed upload and cryptographic readback on attempt 5, then verified the same bytes
+without writes on attempt 6. Its historical tag/draft required operator setup;
+that run alone did not prove workflow-token creation of those objects.
 
-The [next approved attempt](https://github.com/devoption/devoption/actions/runs/39254096971)
-passed source CI and the corrected token check, then stopped before writes because
-the Actions archive endpoint rejected the release-asset media type (HTTP 415).
-Read-only local testing reproduced that response and successfully downloaded and
-cryptographically verified the same reserved ZIP using the corrected adapter.
-Live tag/draft/upload and identical-retry acceptance remain pending on corrected main.
+Earlier attempts exposed two real adapter bugs: the
+[user-oriented permissions check](https://github.com/devoption/devoption/actions/runs/39252471232)
+rejected the workflow token, and the
+[Actions download request](https://github.com/devoption/devoption/actions/runs/39254096971)
+used the release-asset media type (HTTP 415). Both stopped before writes and were
+corrected. They are historical failures, not outstanding acceptance gates.
+
+The owner-approved preview.2 [retention run](https://github.com/devoption/devoption/actions/runs/39374411243)
+used workflow commit `ebe9ae3c9599f4d3cc7ed4a8fefc03a9f62a3f4d` and reservation
+SHA-256 `4deb180355e25e6bbe5072d4ba70c203dbe75dfd051e1852a6ff3cf993d65a94`.
+All exact-main checks passed. Attempt 1 created the correct tag and validation
+draft, then stopped because the immediate inventory did not return that draft.
+Attempt 2 reused those objects, uploaded the unchanged original ZIP and passed
+independent cryptographic readback. No operator-seeded object was needed for
+this candidate; the existing interrupted-run recovery path completed it. Attempt 3
+passed an identical retry using the same retained release/asset. A separate local
+download also passed the ZIP digest, signed proof and complete archive verifier.
+
+- Tag: `v0.1.0-preview.2`, source `cdc2df021bc518b5314ccf6e47f7a3cc89bf7c8f`.
+- Unpublished draft ID: `418039335`; asset ID: `658376378`.
+- ZIP: `devoption-0.1.0-preview.2-ubuntu-24.04-amd64.candidate.zip`, 1,926,009 bytes.
+- Transport SHA-256: `22e2659de42eeba2d00f1dbaf33742fa0b9fe7a4b0bd18e02aa92e94adc1e74a`.
+
+The [committed reservation](../release-candidates/0.1.0-preview.2.json) still binds
+the original archive/proof/source and signing run. The release remains a draft
+prerelease with no publication timestamp; the packet remains
+`publication_eligible: false`. Tag/draft creation, upload and readback are now live
+workflow evidence, not publication or proof of fully unattended operation.

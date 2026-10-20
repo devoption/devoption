@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Record approved preview.2 tag/draft/ZIP retention and cryptographic readback;
+  reconcile completed installer and base-upgrade evidence with the remaining
+  application, notification, promotion and image acceptance criteria
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Verify the exact signed preview.1-to-preview.2 base upgrade through production
   CLI commands, corrupt-input refusal, four real kernel boots and full-state
   interrupted-activation recovery with saved owner/project/profile/Git state;

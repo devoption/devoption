@@ -197,8 +197,9 @@ Local readback downloaded only [artifact 12241247027](https://github.com/devopti
 compared its ZIP digest with GitHub's artifact metadata and reverified archive/proof
 identity with pinned GitHub CLI 2.102.0 before reserving it. The artifact's reported
 expiry is `2026-10-27T04:41:57Z`. No version tag, release asset or product release
-was created by this signing run. Long-lived draft retention requires its separate
-tag/draft/upload approval. The metadata's build-time acceptance warning is retained
+was created by this signing run. After separate owner approval,
+[long-lived draft retention and readback](release-reconciliation.md#live-retention-evidence)
+preserved the exact original ZIP. The metadata's build-time acceptance warning is retained
 unchanged; [signed upgrade/reboot acceptance](bundle-upgrade-acceptance.md) is recorded
 separately without replacing or rewriting signed bytes.
 

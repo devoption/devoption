@@ -7,13 +7,13 @@ recovery point, activates the candidate and checks private/public readiness.
 It has no publication or unattended-upgrade operation. Operator approval of a PR
 is not approval to run it on an existing server.
 
-The currently retained `0.1.0-preview.1` packet remains fresh-only. There is no
-signed upgrade target in a long-lived draft yet. The separately approved signed
-preview.2 Actions packet and [real signed upgrade/reboot acceptance](bundle-upgrade-acceptance.md)
-now establish the base preview.1-to-preview.2 path. Its exact identity is in the
-[candidate catalog](release-candidates.md); preserve the original packet before
-its seven-day transport expires. Ordinary CI still builds real previous/next
-source executables as disposable fixtures; these are not signed release artifacts.
+The retained `0.1.0-preview.1` packet remains fresh-only. The separately approved
+preview.2 packet and [real signed upgrade/reboot acceptance](bundle-upgrade-acceptance.md)
+establish the base preview.1-to-preview.2 path. Both exact packets are preserved in
+long-lived unpublished validation drafts; see [retention evidence](release-reconciliation.md#live-retention-evidence)
+and the [candidate catalog](release-candidates.md). Ordinary CI still builds real
+previous/next source executables as disposable fixtures; these are not signed
+release artifacts.
 
 ## Supported compatibility boundary
 
