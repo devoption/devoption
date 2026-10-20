@@ -62,9 +62,13 @@ def boot_checkpoint(value, stage):
     os.sync()
 
 
-def guest(directory):
+def require_guest():
     if os.geteuid() != 0 or os.environ.get('DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE') != '1':
         raise ValueError('Guest requires root and explicit disposable fixture opt-in.')
+
+
+def guest(directory):
+    require_guest()
     from check_bundle_upgrade import FixtureHost, fixture_installers, enroll, request, session, run
     from install_bundle import PLATFORM
     from upgrade_bundle import Upgrade, UNIT
@@ -293,6 +297,9 @@ if __name__ == '__main__':
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
     if args.guest and not args.fixtures and not args.report:
+        # Reject accidental host invocation before installing the guest-only
+        # failure handler: it powers off the authorized disposable VM.
+        require_guest()
         try:
             guest(args.guest)
         except BaseException:

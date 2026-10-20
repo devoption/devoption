@@ -1,10 +1,19 @@
 """The reboot evidence gate must reject incomplete or same-kernel results."""
 import unittest
+from unittest.mock import patch
 
-from check_upgrade_reboot import STAGES, validate_report
+from check_upgrade_reboot import STAGES, require_guest, validate_report
 
 
 class RebootEvidenceTests(unittest.TestCase):
+    def test_guest_requires_both_root_and_explicit_disposable_opt_in(self):
+        for uid, environment in ((1000, {}), (0, {}), (1000, {'DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE': '1'})):
+            with patch('os.geteuid', return_value=uid), patch.dict('os.environ', environment, clear=True):
+                with self.assertRaises(ValueError):
+                    require_guest()
+        with patch('os.geteuid', return_value=0), patch.dict('os.environ', {'DEVOPTION_DISPOSABLE_UPGRADE_FIXTURE': '1'}, clear=True):
+            require_guest()
+
     def record(self):
         return {'success': True, 'stages': list(STAGES), 'boot_ids': [
             f'00000000-0000-0000-0000-{number:012d}' for number in range(4)]}
