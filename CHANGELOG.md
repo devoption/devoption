@@ -5,6 +5,13 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Changed
+
+- Reserve the owner-approved signed preview.2 candidate after exact-main checks,
+  independent Actions readback and local cryptographic verification, retaining
+  its exact archive/proof/transport identities and false publication eligibility
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 ### Added
 
 - Add explicit signed-packet upgrade/reboot acceptance using independently
