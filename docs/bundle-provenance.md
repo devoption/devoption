@@ -181,6 +181,29 @@ No release, version tag, registry publication or repository setting was changed.
 
 ## Verify a retained candidate
 
+### Preview.2 signing and independent readback
+
+The separately owner-approved [run 39369686068](https://github.com/devoption/devoption/actions/runs/39369686068)
+passed on 2026-10-20 for exact main commit
+`cdc2df021bc518b5314ccf6e47f7a3cc89bf7c8f`, preparing `0.1.0-preview.2`.
+All prerequisite CI, locked release build, packaged-executable checks, OIDC
+attestation, immutable seven-day retention and independent download/reverification
+passed. The [attestation record](https://github.com/devoption/devoption/attestations/57651818)
+binds the archive digest in the [preview.2 reservation](../release-candidates/0.1.0-preview.2.json).
+That canonical record contains the exact archive/proof digests, original attempt,
+Actions artifact ID and transport ZIP digest.
+
+Local readback downloaded only [artifact 12241247027](https://github.com/devoption/devoption/actions/runs/39369686068/artifacts/12241247027),
+compared its ZIP digest with GitHub's artifact metadata and reverified archive/proof
+identity with pinned GitHub CLI 2.102.0 before reserving it. The artifact's reported
+expiry is `2026-10-27T04:41:57Z`. No version tag, release asset or product release
+was created by this signing run. Long-lived draft retention requires its separate
+tag/draft/upload approval. The metadata's build-time acceptance warning is retained
+unchanged; [signed upgrade/reboot acceptance](bundle-upgrade-acceptance.md) is recorded
+separately without replacing or rewriting signed bytes.
+
+### Verification command
+
 Obtain the exact artifact ID and the independently reviewed source, version,
 archive/proof digests, run ID and original signing attempt from the successful
 run summary. Download that ID from its Actions artifact URL before expiry; do
@@ -231,7 +254,7 @@ option is exposed. The pinned policy additionally requires:
 Only after successful cryptographic verification does the tool inspect the archive.
 It never extracts or executes it. It rejects unsafe, duplicate, unexpected or
 missing members, unnormalized modes/ownership/timestamps, inconsistent file hashes,
-incorrect source/version/target, and mismatched fresh-only release metadata.
+incorrect source/version/target, and mismatched version-bound preview metadata.
 Success reports authenticated identity/integrity while keeping publication
 eligibility false. It does not establish application correctness, complete SBOM
 coverage, vulnerability safety or upgrade compatibility, and makes no SLSA level

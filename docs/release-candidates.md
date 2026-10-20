@@ -15,6 +15,14 @@ See its [exact record](../release-candidates/0.1.0-preview.1.json) and
 Earlier or later builds with the same embedded version are not automatically
 selected. Once this record is merged, a different candidate needs a new version.
 
+The [preview.2 record](../release-candidates/0.1.0-preview.2.json) selects the
+separately approved [run 39369686068](https://github.com/devoption/devoption/actions/runs/39369686068)
+at merged main commit `cdc2df021bc518b5314ccf6e47f7a3cc89bf7c8f`. Its signature,
+independent Actions readback and local ZIP/proof verification passed; see
+[provenance evidence](bundle-provenance.md#preview2-signing-and-independent-readback).
+This is seven-day Actions retention, with no preview.2 tag or long-lived draft
+asset created. Preview.1's existing record is unchanged.
+
 ## Reserve and retry
 
 Independently review the source commit, version, archive/proof digests, original

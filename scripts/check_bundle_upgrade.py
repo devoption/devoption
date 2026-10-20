@@ -135,12 +135,12 @@ class FixtureHost(UpgradeHost):
         raise ValueError('Disposable proxy TLS did not become ready.')
 
 
-def request(path, method='GET', body=None, csrf=None, cookie='', context=None):
+def request(path, method='GET', body=None, csrf=None, cookie='', context=None, timeout=5):
     context = context or ssl.create_default_context(cafile='/var/lib/caddy/data/caddy/pki/authorities/local/root.crt')
     class Connection(http.client.HTTPSConnection):
         def connect(self):
-            self.sock = context.wrap_socket(socket.create_connection(('127.0.0.1',443),timeout=5),server_hostname=HOSTNAME)
-    connection = Connection(HOSTNAME,timeout=5,context=context)
+            self.sock = context.wrap_socket(socket.create_connection(('127.0.0.1',443),timeout=timeout),server_hostname=HOSTNAME)
+    connection = Connection(HOSTNAME,timeout=timeout,context=context)
     headers = {'Host':HOSTNAME, 'Origin':'https://'+HOSTNAME, 'Cookie':cookie}
     if body is not None:
         headers['Content-Type'] = 'application/x-www-form-urlencoded' if path=='/auth/sign-in' else 'text/plain;charset=UTF-8'
@@ -154,23 +154,23 @@ def request(path, method='GET', body=None, csrf=None, cookie='', context=None):
         connection.close()
 
 
-def session():
+def session(timeout=5):
     from urllib.parse import urlencode
-    status,_,token,cookie = request('/auth/challenge','POST')
+    status,_,token,cookie = request('/auth/challenge','POST',timeout=timeout)
     assert status==204
-    status,_,token,cookie = request('/auth/sign-in','POST',urlencode({'password':PASSWORD.decode()}),token,cookie.split(';')[0])
+    status,_,token,cookie = request('/auth/sign-in','POST',urlencode({'password':PASSWORD.decode()}),token,cookie.split(';')[0],timeout=timeout)
     assert status==204 and 'Secure' in cookie and 'HttpOnly' in cookie
     cookie=cookie.split(';')[0]
-    status,_,token,_=request('/auth/session','POST',cookie=cookie)
+    status,_,token,_=request('/auth/session','POST',cookie=cookie,timeout=timeout)
     assert status==204 and token
     return token,cookie
 
 
-def enroll(binary):
+def enroll(binary, timeout=30):
     pid, terminal=pty.fork()
     if pid==0:
         os.execvp('runuser',['runuser','-u','devoption','--',str(binary),'setup','--data-dir',PLATFORM+'/data'])
-    deadline=time.monotonic()+30
+    deadline=time.monotonic()+timeout
     try:
         pending=[b'New owner password (15+ characters): ',b'Confirm owner password: ']
         received=b''

@@ -2,12 +2,14 @@
 
 Host mode exports only copied fixture inputs and a private result directory.
 Guest mode is destructive and is only installed by this runner in a fresh VM.
-Neither mode verifies signed releases or changes the production upgrade CLI.
+Optional signed-packet mode uses the production verifier and upgrade CLI; it
+does not change their policy or authorize signing/publication.
 """
 import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -67,14 +69,21 @@ def require_guest():
         raise ValueError('Guest requires root and explicit disposable fixture opt-in.')
 
 
-def guest(directory):
+def guest(directory, signed=False):
     require_guest()
     from check_bundle_upgrade import FixtureHost, fixture_installers, enroll, request, session, run
     from install_bundle import PLATFORM
     from upgrade_bundle import Upgrade, UNIT
-    host = FixtureHost()
+    if signed:
+        from functools import partial
+        request, session = partial(request, timeout=30), partial(session, timeout=30)
+        import signed_upgrade_fixture as packets
+        old, new = packets.installers(directory)
+        host = old.host
+    else:
+        host = FixtureHost()
+        old, new = fixture_installers(directory, host)
     host.preflight(Path('/'), 1024**3)
-    old, new = fixture_installers(directory, host)
     host.candidate_version = new.version
     repository = Path(PLATFORM + '/repositories/reboot-checkout')
     sentinel = Path(PLATFORM + '/repositories/reboot-sentinel')
@@ -107,7 +116,20 @@ def guest(directory):
                      '/opt/devoption', '/etc/caddy', UNIT, '/etc/systemd/system/caddy-devoption.service'):
             assert not Path(path).exists() and not Path(path).is_symlink()
         assert host.account('devoption') is None and host.account('caddy') is None
-        old.install(); enroll(Path(old.binary)); old.start(); host.public_health(old.hostname); host.enable()
+        if signed:
+            corrupt = directory/'corrupt.zip'
+            raw = bytearray((directory/'candidate.zip').read_bytes()); raw[-1] ^= 1
+            corrupt.write_bytes(raw)
+            packets.command(directory, 'plan', candidate_packet=corrupt, expect_failure=True)
+            corrupt.unlink()
+            assert not Path('/var/lib/devoption-installer').exists()
+            packets.install(directory)
+        else:
+            old.install()
+        enroll(Path(old.binary), timeout=150 if signed else 30); old.start()
+        if signed:
+            packets.trust_guest_ca()
+        host.public_health(old.hostname); host.enable()
         token, cookie = session()
         assert request('/projects', 'POST', 'Reboot fixture project', token, cookie)[0] == 204
         assert request('/account/profile', 'POST', 'Reboot fixture owner', token, cookie)[0] == 204
@@ -118,17 +140,19 @@ def guest(directory):
                  '--quiet', '--allow-empty', '-m', 'reboot fixture')
         value['repository_head'] = host.run('runuser', '-u', 'devoption', '--', 'git', '-C', str(repository), 'rev-parse', 'HEAD').stdout.decode().strip()
         value['cookie'] = persistent_state(value)
-        assert Upgrade(old, new).apply()['phase'] == 'healthy'
+        if signed:
+            assert packets.command(directory, 'plan')['phase'] == 'not-started'
+        assert (packets.command(directory, 'apply') if signed else Upgrade(old, new).apply())['phase'] == 'healthy'
         value['cookie'] = persistent_state(value)
         boot_checkpoint(value, 'upgraded')
     elif value['stages'] == STAGES[:1]:
         running(new.version)
-        assert Upgrade(old, new).preflight()['phase'] == 'healthy'
+        assert (packets.command(directory, 'status') if signed else Upgrade(old, new).preflight())['phase'] == 'healthy'
         assert request('/auth/session', 'POST', cookie=value['cookie'])[0] == 401
         persistent_state(value)
         # A write after the backup must disappear from the recovered live tree.
         sentinel.write_bytes(b'post-upgrade data')
-        assert Upgrade(old, new).recover(confirm=True)['phase'] == 'restored'
+        assert (packets.command(directory, 'recover') if signed else Upgrade(old, new).recover(confirm=True))['phase'] == 'restored'
         persistent_state(value)
         transaction = Upgrade(old, new, attempt=2)
         replace = transaction.replace
@@ -153,7 +177,7 @@ def guest(directory):
             host.free_port(port)
         transaction = Upgrade(old, new, attempt=2)
         assert transaction.record()['phase'] == 'backed-up'
-        assert transaction.recover(confirm=True)['phase'] == 'restored'
+        assert (packets.command(directory, 'recover', attempt=2) if signed else transaction.recover(confirm=True))['phase'] == 'restored'
         running(old.version)
         value['cookie'] = persistent_state(value)
         boot_checkpoint(value, 'recovered')
@@ -162,14 +186,20 @@ def guest(directory):
         assert request('/auth/session', 'POST', cookie=value['cookie'])[0] == 401
         persistent_state(value)
         transaction = Upgrade(old, new, attempt=2)
-        assert transaction.preflight()['phase'] == 'restored'
+        assert (packets.command(directory, 'status', attempt=2) if signed else transaction.preflight())['phase'] == 'restored'
         # A completed retry must not restore the obsolete snapshot over new data.
         sentinel.write_bytes(b'write after recovery reboot')
-        transaction.recover(confirm=True)
+        if signed:
+            packets.command(directory, 'recover', attempt=2)
+        else:
+            transaction.recover(confirm=True)
         assert sentinel.read_bytes() == b'write after recovery reboot'
         boot_checkpoint(value, 'complete')
         result = {'success': True, 'stages': value['stages'], 'boot_ids': value['boot_ids'],
                   'previous': old.version, 'candidate': new.version}
+        if signed:
+            result.update(authenticated_packets=True, previous_identity=old.record, candidate_identity=new.record,
+                          corrupt_packet_rejected=True, production_cli=True)
         validate_report(result)
         write(REPORT, result)
         host.run('systemctl', 'poweroff')
@@ -192,11 +222,16 @@ def image(path):
         raise ValueError('Ubuntu fixture image SHA-256 differs from the reviewed pin.')
 
 
-def host(directory, output):
+def host(directory, output, signed=False, gh=None, boot_timeout=600):
     # No host root, SSH key, forwarded port, production installation or credential
     # is needed. QEMU receives only these private copied inputs/output, not $HOME.
     if output.exists():
         raise ValueError('Use a fresh report path; stale evidence cannot pass.')
+    if not 600 <= boot_timeout <= 3600:
+        raise ValueError('Use a bounded boot timeout between 600 and 3600 seconds.')
+    if signed:
+        import signed_upgrade_fixture as packets
+        old, new = packets.installers(directory, gh)
     with tempfile.TemporaryDirectory(prefix='devoption-upgrade-reboot-') as temporary:
         root = Path(temporary)
         inputs, results = root/'inputs', root/'results'
@@ -205,14 +240,18 @@ def host(directory, output):
         for path in Path(__file__).resolve().parent.glob('*.py'):
             shutil.copyfile(path, scripts/path.name)
         fixtures = inputs/'fixtures'; fixtures.mkdir()
-        for name in ('previous', 'candidate'):
-            shutil.copytree(directory/(name+'-bundle'), fixtures/(name+'-bundle'))
+        if signed:
+            for name in ('previous.json', 'candidate.json', 'previous.zip', 'candidate.zip', 'gh.tar.gz'):
+                shutil.copyfile(directory/name, fixtures/name)
+        else:
+            for name in ('previous', 'candidate'):
+                shutil.copytree(directory/(name+'-bundle'), fixtures/(name+'-bundle'))
         shutil.copyfile(directory/'caddy.tar.gz', fixtures/'caddy.tar.gz')
         base = root/'base.img'; image(base)
         subprocess.run(['qemu-img', 'create', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(root/'disk.qcow2'), '8G'], check=True)
         seed = root/'seed'; seed.mkdir()
         (seed/'meta-data').write_text('instance-id: devoption-upgrade-reboot\nlocal-hostname: upgrade-fixture\n')
-        (seed/'user-data').write_text('''#cloud-config
+        user_data = '''#cloud-config
 users: []
 disable_root: true
 ssh_deletekeys: false
@@ -241,10 +280,24 @@ runcmd:
   - [sh, -c, 'apt-get update && apt-get install -y --no-install-recommends git sudo']
   - [systemctl, daemon-reload]
   - [systemctl, enable, --now, --no-block, devoption-upgrade-reboot-fixture.service]
+'''
+        if signed:
+            user_data = user_data.replace('--guest /opt/upgrade-fixture/fixtures', '--guest /opt/upgrade-fixture/fixtures --signed-packets')
+            user_data = user_data.replace('      Type=oneshot\n', '      Type=oneshot\n      TimeoutStartSec=900\n')
+            user_data = user_data.replace('git sudo', 'git sudo ca-certificates')
+            user_data = user_data.replace('runcmd:\n', '''runcmd:
+  - [sh, -c, 'echo "127.0.0.1 platform.upgrade.localhost" >> /etc/hosts']
 ''')
-        subprocess.run(['xorriso', '-as', 'mkisofs', '-quiet', '-output', str(root/'seed.iso'),
+        (seed/'user-data').write_text(user_data)
+        if shutil.which('xorriso'):
+            subprocess.run(['xorriso', '-as', 'mkisofs', '-quiet', '-output', str(root/'seed.iso'),
                         '-volid', 'cidata', '-joliet', '-rock', str(seed)], check=True)
-        command = ['qemu-system-x86_64', '-machine', 'q35,accel=kvm:tcg', '-cpu', 'max',
+        elif platform.system() == 'Darwin':
+            subprocess.run(['hdiutil', 'makehybrid', '-iso', '-joliet', '-default-volume-name', 'cidata', '-o', str(root/'seed.iso'), str(seed)], check=True, capture_output=True)
+        else:
+            raise ValueError('Install xorriso for the disposable VM seed.')
+        accelerator = 'tcg' if platform.system() == 'Darwin' else 'kvm:tcg'
+        command = ['qemu-system-x86_64', '-machine', 'q35,accel='+accelerator, '-cpu', 'max',
                    '-smp', '2', '-m', '2048', '-display', 'none', '-monitor', 'none',
                    '-serial', 'file:'+str(root/'serial.log'), '-no-reboot',
                    '-drive', 'if=virtio,format=qcow2,file='+str(root/'disk.qcow2'),
@@ -254,7 +307,7 @@ runcmd:
                    '-virtfs', 'local,path='+str(results)+',mount_tag=output,security_model=mapped-xattr']
         # Each power cycle starts a new QEMU process against the same private
         # disk. -no-reboot makes guest reboot exit, proving a real kernel boot.
-        deadline = time.monotonic()+600
+        deadline = time.monotonic()+boot_timeout
         with (root/'qemu.log').open('wb') as log:
             for boot in range(4):
                 print(f'Starting disposable upgrade VM boot {boot+1}/4', flush=True)
@@ -284,6 +337,8 @@ runcmd:
                         raise
                     if boot != 3:
                         raise ValueError('Unexpected early reboot result.')
+                    if signed:
+                        packets.validate_report(result, old.record, new.record)
                     output.write_text(json.dumps(result, indent=2)+'\n')
                     print('Actual VM reboot acceptance passed: upgraded, interrupted, recovered; four distinct kernel boots.')
                     return
@@ -295,13 +350,16 @@ if __name__ == '__main__':
     parser.add_argument('--guest', type=Path)
     parser.add_argument('--fixtures', type=Path)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--signed-packets', action='store_true')
+    parser.add_argument('--gh', type=Path, help='Trusted host verifier for signed inputs; required in host signed mode')
+    parser.add_argument('--boot-timeout', type=int, default=600)
     args = parser.parse_args()
     if args.guest and not args.fixtures and not args.report:
         # Reject accidental host invocation before installing the guest-only
         # failure handler: it powers off the authorized disposable VM.
         require_guest()
         try:
-            guest(args.guest)
+            guest(args.guest, args.signed_packets)
         except BaseException:
             import traceback
             traceback.print_exc()
@@ -309,6 +367,8 @@ if __name__ == '__main__':
             subprocess.run(['systemctl', 'poweroff'], check=False, timeout=30)
             raise
     elif args.fixtures and args.report and not args.guest:
-        host(args.fixtures.resolve(strict=True), args.report.resolve())
+        if args.signed_packets and args.gh is None:
+            parser.error('Signed host mode requires --gh for independent packet verification before boot.')
+        host(args.fixtures.resolve(strict=True), args.report.resolve(), args.signed_packets, args.gh, args.boot_timeout)
     else:
         parser.error('Select --fixtures DIR --report NEW_FILE, or explicit disposable --guest DIR.')
