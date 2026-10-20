@@ -29,10 +29,15 @@ class VerificationTests(unittest.TestCase):
         self.gh.write_text("fixture path only; command calls mocked")
         self.proof = self.root / "proof.json"
         self.proof.write_text('{"forged":true}')
-        self.version = tomllib.loads((ROOT / "release-metadata.toml").read_text())["version"]
+        # Most policy tests follow the current candidate. Historical upgrade
+        # tests can supply their explicitly versioned synthetic source policy.
+        metadata_raw = getattr(self, 'fixture_metadata', None)
+        metadata_raw = metadata_raw.encode() if metadata_raw is not None else (ROOT / 'release-metadata.toml').read_bytes()
+        self.version = tomllib.loads(metadata_raw.decode())["version"]
         self.name = f"devoption-{self.version}-{TARGET}.tar.gz"
         self.archive = self.root / self.name
         self.files = {name: (ROOT / name).read_bytes() for name in SOURCE_FILES}
+        self.files['release-metadata.toml'] = metadata_raw
         self.files |= {"bin/devoption": b"policy fixture; never executed", "RELEASE-NOTES.md": b"fixture", SBOM: b"{}"}
         metadata = tomllib.loads(self.files["release-metadata.toml"].decode())
         self.manifest = {"schema_version": 2, "source_commit": SOURCE, "platform_version": self.version,

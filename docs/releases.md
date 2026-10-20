@@ -1,9 +1,10 @@
 # Preparing a release
 
 There is no published product release. The prepared source version is
-`0.1.0-preview.1`; its signed validation candidate is recorded in the
-[candidate catalog](release-candidates.md). Preparation and validation are not
-publication approval.
+`0.1.0-preview.2`, with reviewed schema-2 metadata for the preview.1 base-bundle
+upgrade path. Only preview.1 has a retained signed validation packet in the
+[candidate catalog](release-candidates.md); preview.2 signing and signed upgrade
+acceptance remain pending. Preparation and validation are not publication approval.
 
 ## Delivery status against the six issues
 
@@ -17,7 +18,7 @@ and work that has not been built.
 | [#260: Versioning and release PRs](https://github.com/devoption/devoption/issues/260) | Pinned release-plz; one workspace version; preview selection; metadata-bound notes; exact bot PR creation/retry; guarded optional squash auto-merge. [Live writer run](https://github.com/devoption/devoption/actions/runs/39156408201) generated [PR #270](https://github.com/devoption/devoption/pull/270), which merged; its [exact-main release check](https://github.com/devoption/devoption/actions/runs/39158246952) passed. Auto-merge has fixture coverage. | Implementation is complete with explicit activation gates: manual dispatch, checked-in auto-merge policy, repository setting and GitHub's bot-PR workflow approval. Auto-merge remains disabled; no setting or authority is changed by implementation. |
 | [#261: Bundles and provenance](https://github.com/devoption/devoption/issues/261) | Complete local bundle inventory, manifests, SBOM, signing, cryptographic verification, seven-day transport and append-only candidate reservation. [Live signing, long-lived retention and independent readback](bundle-provenance.md#retained-candidate-acceptance) passed. | Publish only eligible complete candidates after #21. A validation draft is not a recommended release; installer acceptance is tracked separately below. |
 | [#262: Bundle installer](https://github.com/devoption/devoption/issues/262) | Verified fresh-host bundle installer, immutable versioned files, dedicated accounts/units, pinned proxy, SSH enrollment and safe retries. [Real signed-packet installation, interruption/resume, identical retry, public DNS/HTTPS/ACME renewal and systemd restart/reboot passed](bundle-installer-acceptance.md). Temporary public infrastructure was removed and DNS restored. | Installer acceptance is complete for the retained Ubuntu/IPv4 validation packet. Publication eligibility and platform upgrade support remain separate gates. |
-| [#263: Platform upgrades](https://github.com/devoption/devoption/issues/263) | [Operator-triggered same-schema base-preview upgrades](platform-upgrades.md), independent packet verification, locked offline backup, versioned activation, health checks, interrupted-state handling and explicit full-state recovery. Metadata schema 2 declares one reviewed earlier preview and unchanged schema 1. | Signed prior-to-candidate/reboot acceptance, coordinated hosted-app upgrades, migration recovery, notification/UI actions and channel promotion remain pending. No compatible signed target or automatic stable promotion exists. |
+| [#263: Platform upgrades](https://github.com/devoption/devoption/issues/263) | [Operator-triggered same-schema base-preview upgrades](platform-upgrades.md), independent packet verification, locked offline backup, versioned activation, health checks, interrupted-state handling and explicit full-state recovery. Actual source-built upgrade/interruption/recovery reboots passed in [Ubuntu VM CI](https://github.com/devoption/devoption/actions/runs/39353960717). Preview.2 metadata declares preview.1 as its sole source with unchanged schema 1. | Signed prior-to-candidate/reboot acceptance, coordinated hosted-app upgrades, migration recovery, notification/UI actions and channel promotion remain pending. No compatible signed target or automatic stable promotion exists. |
 | [#264: DigitalOcean image](https://github.com/devoption/devoption/issues/264) | Existing public-node acceptance used a source build. | Reusable bundle-based image build, image hygiene, fresh-instance/upgrade tests, Marketplace review and a working launch destination are not implemented. |
 | [#259: End-to-end distribution](https://github.com/devoption/devoption/issues/259) | Tracks the shared version/bundle contract and the five workstreams above. | Remains open until the child outcomes and published-candidate install/upgrade/recovery path are demonstrated. |
 
@@ -51,20 +52,20 @@ the exact ZIP. It requires explicit tag/draft/upload approval and does not close
 When a maintainer intentionally chooses to release:
 
 1. Open a release issue first and make a topic branch/draft PR. Choose a stable
-   numbered preview such as `0.1.0-preview.1`; publication is not automated here.
+   numbered preview such as `0.1.0-preview.2`; publication is not automated here.
    Review and commit its support/migration metadata before generating the proposal;
    the generator binds current-version statements to the selected preview.
-2. Set `workspace.package.version` in `Cargo.toml`, run `cargo generate-lockfile
-   --offline`, and commit the updated lockfile. Update README version/status
-   wording as appropriate. Keep `publish = false` unless a separate reviewed
-   issue explicitly introduces registry publishing.
+2. Apply the exact generated preview proposal to its reviewed topic branch. It
+   updates the shared workspace/lockfile version without changing dependency
+   inputs, binds metadata and generates the new dated notes. Keep `publish = false`;
+   version preparation does not enable registry publishing.
 3. Move the relevant `Unreleased` entries to a section named exactly
-   `## [0.1.0-preview.1] - YYYY-MM-DD`, using the actual release date. Leave `Unreleased`
+   `## [0.1.0-preview.2] - YYYY-MM-DD`, using the actual release date. Leave `Unreleased`
    for later changes. Notes need real change bullets and repository issue links;
    describe limitations and any breaking changes honestly. Prefer applying the
    generated proposal, which retains the human notes and adds the required
    metadata block, over manually constructing that block.
-4. Run all [development checks](development.md#checks) and `python3 scripts/release_notes.py 0.1.0-preview.1`.
+4. Run all [development checks](development.md#checks) and `python3 scripts/release_notes.py 0.1.0-preview.2`.
    The script rejects mismatched versions, missing/duplicate sections, invalid
    or future dates, notes without issue links and missing/stale metadata blocks.
    Review the output; automation
@@ -76,17 +77,17 @@ When a maintainer intentionally chooses to release:
    and push the new tag (never move an existing tag). For example:
 
    ```sh
-   git tag -a v0.1.0-preview.1 <reviewed-commit-sha> -m 'DevOption 0.1.0-preview.1'
-   git push origin refs/tags/v0.1.0-preview.1
+   git tag -a v0.1.0-preview.2 <reviewed-commit-sha> -m 'DevOption 0.1.0-preview.2'
+   git push origin refs/tags/v0.1.0-preview.2
    ```
 
 7. From a checkout of that tag, extract the exact notes and use them to create a
    **draft** GitHub release, using existing maintainer authentication:
 
    ```sh
-   python3 scripts/release_notes.py 0.1.0-preview.1 > /tmp/devoption-release-notes.md
-   gh release create v0.1.0-preview.1 --repo devoption/devoption --verify-tag --draft --prerelease \
-     --title 'DevOption 0.1.0-preview.1' --notes-file /tmp/devoption-release-notes.md
+   python3 scripts/release_notes.py 0.1.0-preview.2 > /tmp/devoption-release-notes.md
+   gh release create v0.1.0-preview.2 --repo devoption/devoption --verify-tag --draft --prerelease \
+     --title 'DevOption 0.1.0-preview.2' --notes-file /tmp/devoption-release-notes.md
    ```
 
 8. Review the draft, then deliberately publish it in GitHub. Record the release

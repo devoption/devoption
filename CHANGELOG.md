@@ -5,7 +5,14 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+## [0.1.0-preview.2] - 2026-10-19
+
 ### Changed
+
+- Prepare the preview.2 base-bundle candidate with schema-2 metadata declaring
+  preview.1 as its sole supported upgrade source, unchanged data/configuration
+  schemas, bounded full-state recovery and pending signed-packet acceptance
+  ([#263](https://github.com/devoption/devoption/issues/263)).
 
 - Complete the signed installer's public DNS/HTTPS, ACME issuance/accelerated
   renewal and reboot/reinstall acceptance on temporary Ubuntu infrastructure;
@@ -95,6 +102,23 @@ Entries describe implemented changes, not the roadmap.
   executable smoke checks; reject mismatched, dirty or replaceable inputs while
   leaving SBOM, authenticated provenance, installer and publication work gated
   ([#261](https://github.com/devoption/devoption/issues/261)).
+
+<!-- devoption-release-metadata:start -->
+### Release compatibility and support
+
+- Preview version: `0.1.0-preview.2`; supported platform: Ubuntu 24.04 amd64.
+- Installation: fresh or operator-triggered same-schema upgrade from `0.1.0-preview.1`.
+- Data compatibility: Fresh installation or operator-triggered upgrade of a verified 0.1.0-preview.1 base bundle installation with unchanged data schema 1; preserve owner, projects, profile and repositories through the verified offline backup/restore procedure in docs/platform-upgrades.md.
+- Configuration compatibility: Unchanged configuration schema 1 on dedicated Ubuntu 24.04 amd64 with the same hostname, service identities and pinned proxy; source installations, custom configuration, separate state mounts and app/build opt-ins are unsupported upgrade sources.
+- Migration: none implemented. No data or configuration migration is required or executed for the declared base-bundle path. Any schema or configuration conversion requires a separately reviewed upgrade contract; do not bypass preflight.
+- Binary rollback: unsupported. Use explicit full-state recovery in docs/platform-upgrades.md with both verified packets and the sealed offline backup (initial limit 256 MiB and 20,000 entries). Recovery causes downtime and removes post-backup writes from the live view while preserving displaced trees privately; replacing only the executable is not recovery.
+- Support status: development preview.
+- Warning: One owner and one trusted stateless Rust/WASIp2 app on a dedicated Ubuntu 24.04 amd64 node; arbitrary applications and hostile multi-tenant hosting are unsupported.
+- Warning: Verified bundle installation and same-schema base upgrades are implemented; signed preview.1-to-preview.2 packet acceptance remains pending. Source-built Ubuntu/systemd/TLS and actual reboot fixtures do not replace signed-candidate validation.
+- Warning: Upgrades refuse app/build opt-ins and migrations. Operator login/data checks and a maintenance window are required; unattended upgrades and stable/channel promotion are unavailable.
+- Warning: Preview metadata is not production-readiness evidence or permission to publish; the release approval gate under issue #21 still applies.
+- Metadata SHA-256: `c8ad6958c29a9ba525de162563bdcbc076c6a5e00b97be784c96d4b4cdf3139a` (metadata identity, not artifact provenance).
+<!-- devoption-release-metadata:end -->
 
 ## [0.1.0-preview.1] - 2026-10-18
 

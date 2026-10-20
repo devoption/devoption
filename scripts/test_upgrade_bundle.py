@@ -15,9 +15,11 @@ from release_bundle import canonical
 from release_metadata import validate_metadata, render_metadata
 import test_install_bundle as fixtures
 from upgrade_bundle import Upgrade, UpgradeHost, UNIT, RECEIPT
+from test_release_plan import METADATA
 
 
 class UpgradeTests(unittest.TestCase):
+    fixture_metadata = METADATA
     repack = fixtures.InstallerTests.repack
     response = fixtures.InstallerTests.response
     commit = fixtures.InstallerTests.commit
