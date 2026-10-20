@@ -66,8 +66,9 @@ remain refused. Notification/UI, stable/channel/canary thresholds and a promotio
 stop mechanism remain open under #263. The manifest/receipt still says
 `publication_eligible: false`; acceptance does not rewrite it.
 
-Preview.2's Actions packet has seven-day retention. A preview.2 version tag and
-long-lived unpublished draft/asset were not created; that writer needs its
-separate explicit approval. The build-time metadata/notes remain byte-identical,
+After separate owner approval, the same preview.2 ZIP was preserved with its
+version tag and a long-lived unpublished validation draft/asset; see
+[retention evidence](release-reconciliation.md#live-retention-evidence).
+The build-time metadata/notes remain byte-identical,
 including their then-pending acceptance warning. No product release, package,
 production upgrade or repository security-setting change was performed.
