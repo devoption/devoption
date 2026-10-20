@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Verify the exact signed preview.1-to-preview.2 base upgrade through production
+  CLI commands, corrupt-input refusal, four real kernel boots and full-state
+  interrupted-activation recovery with saved owner/project/profile/Git state;
+  remove the local VM and retain the remaining release gates
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Reserve the owner-approved signed preview.2 candidate after exact-main checks,
   independent Actions readback and local cryptographic verification, retaining
   its exact archive/proof/transport identities and false publication eligibility

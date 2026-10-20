@@ -91,7 +91,10 @@ or repeated boot IDs fail the required installation job. The runner kills/waits
 for a timed-out guest and deletes its temporary disks/shares/logs. This creates no
 cloud resources, exports no credentials, forwards no network ports and retains no
 owner/certificate data. The small JSON report records only stages, versions and
-kernel boot IDs. See [upgrade validation limits](platform-upgrades.md).
+kernel boot IDs. An explicit [signed-packet rehearsal](platform-upgrades.md#signed-packet-rehearsal)
+uses the production verifier/CLI against independently reviewed packets; ordinary
+PR CI keeps source-built fixtures and requires no artifact access or signing rights.
+See [signed acceptance and remaining limits](bundle-upgrade-acceptance.md).
 
 The Python job installs pinned release-plz and Rust to run the real-tool release
 fixtures on Ubuntu, including ordinary PRs. Local runs without
