@@ -141,3 +141,10 @@ capture shows saved A serving after reinstallation; the temporary node was
 subsequently removed.
 
 ![Public HTTPS installation running restored saved A](public-cloud-release.png)
+
+**Platform update observation**
+
+Synthetic reviewed-candidate notice in the disposable browser fixture. This is
+interface evidence, not a signed candidate or executed upgrade.
+
+![Owner platform update observation](platform-update.jpg)

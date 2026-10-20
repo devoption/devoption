@@ -101,6 +101,45 @@ window. `status` reports recorded phase/version and remaining payload files; its
 Identical completed `apply` retries recheck/restart the selected installation and
 finish boot enablement without taking another backup or replacing saved data.
 
+## Owner notification and operator action
+
+Builds containing this interface show **DevOption updates** on the signed-in
+Overview page, after the project action. The page reports the running binary's
+version and the administrator-selected candidate, recorded phase, attempt,
+transaction and archive/source identities. Expand **Review upgrade and recovery
+steps** for the SSH workflow above. The operator runs the existing production
+`plan`, `apply`, `status` and confirmed `recover` commands with the full reviewed
+arguments; the web service gains no service-control or sudo capability.
+
+The production upgrader writes a small root-owned observation at
+`/var/lib/devoption-updates/notice.json` after a successful preflight and each
+journal phase. It creates a root-owned mode-0755 directory and atomically replaces
+its mode-0644 file under the existing installer lock. Unsafe destinations stop
+preflight before service/data mutation. The record contains only version/digest,
+transaction, attempt, phase and observation time; it contains no hostname, command,
+packet path, owner state, password or backup contents. Keep the private journals
+and backups under their existing mode-0700 installer directory.
+
+The server reads only this fixed observation on an authenticated page request
+when started with the bundle data/repository paths, port 3000 and a public origin.
+Other server configurations do not consume the installed host's observation. It uses
+bounded, descriptor-relative, no-follow reads through root-controlled
+parents. Unsafe ownership/modes, links, oversized/noncanonical/unknown records
+or future timestamps display unavailable status without host-path errors. It
+never reads the private journals. Missing records display **No reviewed update**;
+this is not a claim that the server is current. Non-Linux source previews have no
+installed-host observation. The displayed version comes from the running binary,
+not the notice. A different version/result or an observation older than 15 minutes
+asks for a fresh SSH check; recorded success is not continuous health monitoring.
+Use **Refresh status** to reload the saved observation, not to discover, download
+or activate a candidate. No background release feed or unattended update runs.
+
+The previously retained preview.1 and preview.2 executables predate this interface.
+Updating the trusted checkout can write observations but cannot add UI to those
+immutable binaries. A later reviewed candidate needs a new version and its own
+signing/acceptance; do not replace either retained packet. The current installed
+base-upgrade boundary still rejects app/build opt-ins and migrations.
+
 ## Recovery point and full-state restore
 
 Transactions live under `/var/lib/devoption-installer/upgrades/TRANSACTION_ID/`
@@ -244,8 +283,9 @@ input shares and private owner/certificate/session state are removed afterward.
 
 The [signed-packet base upgrade/reboot rehearsal](bundle-upgrade-acceptance.md)
 now passed for the cataloged preview.1-to-preview.2 pair. Coordinated hosted-app
-state, migration recovery and notification/UI actions still
-need their own acceptance. Stable/channel promotion, canary duration/thresholds,
+state and migration recovery still need their own acceptance. The owner
+notification/SSH action flow above has rendering/authentication/fault coverage
+and is checked after the real disposable-system upgrade in CI. Stable/channel promotion, canary duration/thresholds,
 a promotion stop mechanism and #21 publication reconciliation remain unimplemented.
 Missing evidence cannot enable promotion: metadata still rejects stable and every
 packet/transaction remains `publication_eligible: false`.

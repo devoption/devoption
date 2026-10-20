@@ -199,7 +199,7 @@ def check(directory):
         raise ValueError('Explicit disposable system host opt-in and root are required.')
     host=FixtureHost()
     host.preflight(Path('/'),1024**3)
-    for path in (STATE,PLATFORM,PROXY,'/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
+    for path in (STATE,PLATFORM,PROXY,'/var/lib/devoption-updates','/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
         if Path(path).exists() or Path(path).is_symlink():
             raise ValueError('Disposable fixture requires an empty installation: '+path)
     for who in ('devoption','caddy'):
@@ -248,7 +248,7 @@ def exercise(directory):
         raise ValueError('Explicit disposable system host opt-in and root are required.')
     host=FixtureHost()
     host.preflight(Path('/'),1024**3)
-    for path in (STATE,PLATFORM,PROXY,'/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
+    for path in (STATE,PLATFORM,PROXY,'/var/lib/devoption-updates','/opt/devoption','/etc/caddy',UNIT,'/etc/systemd/system/caddy-devoption.service'):
         if Path(path).exists() or Path(path).is_symlink():
             raise ValueError('Disposable fixture requires an empty installation: '+path)
     for who in ('devoption','caddy'):
@@ -269,7 +269,7 @@ def exercise(directory):
                  '-c','user.email=fixture@example.invalid','commit','--quiet','--allow-empty','-m','prior release fixture')
         prior_head=host.run('runuser','-u','devoption','--','git','-C',str(repository),'rev-parse','HEAD').stdout
         original={p.name:p.read_bytes() for p in Path(PLATFORM+'/data').iterdir() if p.is_file()}
-        transaction=Upgrade(old,new)
+        transaction=Upgrade(old,new,notify=True)
         assert transaction.apply()['phase']=='healthy'
         assert run(new.binary,'--version')==f'devoption {new.version}\n'.encode()
         assert host.run('runuser','-u','devoption','--','git','-C',str(repository),'rev-parse','HEAD').stdout==prior_head
@@ -277,13 +277,24 @@ def exercise(directory):
         token,cookie=session()
         assert b'Upgrade fixture project' in request('/projects',cookie=cookie)[1]
         assert request('/account/profile',cookie=cookie)[1]==b'Upgrade fixture owner'
+        status, home, _, _ = request('/', cookie=cookie)
+        assert status == 200 and b'Upgrade completed' in home
+        assert new.version.encode() in home and new.record['candidate']['archive_sha256'].encode() in home
+        assert transaction.id.encode() in home and b'Review upgrade and recovery steps' in home
+        from upgrade_notice import NOTICE
+        notice=json.loads(Path(NOTICE).read_bytes())
+        assert notice['phase']=='healthy' and notice['transaction']==transaction.id
+        assert Path(NOTICE).stat().st_uid==0 and Path(NOTICE).stat().st_mode&0o777==0o644
+        # A root notice never grants browser execution or bypasses owner auth.
+        assert request('/')[0]==303
+        assert request('/', 'POST', csrf=token, cookie=cookie)[0] == 405
         saved.write_bytes(b'post-upgrade bytes')
         transaction.recover(confirm=True)
         assert saved.read_bytes()==b'original repository bytes'
         assert original=={p.name:p.read_bytes() for p in Path(PLATFORM+'/data').iterdir() if p.is_file()}
         assert host.run('runuser','-u','devoption','--','git','-C',str(repository),'rev-parse','HEAD').stdout==prior_head
         session()
-        transaction=Upgrade(old,new,attempt=2)
+        transaction=Upgrade(old,new,attempt=2,notify=True)
         replace=transaction.replace
         def interrupt(path,*args,**kwargs):
             replace(path,*args,**kwargs)
@@ -296,7 +307,7 @@ def exercise(directory):
         for unit in ('devoption-public.service','caddy-devoption.service'):
             assert subprocess.run(['systemctl','is-enabled',unit],capture_output=True).stdout.strip()==b'disabled'
         transaction.recover(confirm=True); session()
-        transaction=Upgrade(old,new,attempt=3)
+        transaction=Upgrade(old,new,attempt=3,notify=True)
         host.fail_candidate_health=True
         try: transaction.apply()
         except ValueError as error: assert 'injected candidate health' in str(error)
@@ -313,7 +324,7 @@ def exercise(directory):
         for path in (UNIT,'/etc/systemd/system/caddy-devoption.service'):
             Path(path).unlink(missing_ok=True)
         host.reload()
-        for path in ('/opt/devoption',PLATFORM,PROXY,STATE,'/etc/caddy'):
+        for path in ('/opt/devoption',PLATFORM,PROXY,STATE,'/etc/caddy','/var/lib/devoption-updates'):
             if Path(path).exists(): shutil.rmtree(path)
         for who in ('devoption','caddy'):
             if host.account(who) is not None:

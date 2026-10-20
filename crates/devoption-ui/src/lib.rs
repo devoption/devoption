@@ -11,13 +11,17 @@ pub enum Page {
 }
 
 mod auth;
+mod platform_updates;
 mod profile;
+pub use platform_updates::{PlatformUpdates, UpgradeNotice};
 mod projects;
 pub use projects::{
     BuildAttemptView, BuildExecutionView, BuildHistoryView, BuildLogView, DeploymentView,
     FileEntry, FilePreview, HistoryAvailability, PreparationCheck, PreparationView, ProjectSection,
     ProjectSummary, ReleaseView, RepositoryFilesView, RepositorySummary,
 };
+
+const HOME: &str = r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your source code, builds and app releases.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#;
 
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
@@ -198,7 +202,20 @@ enum ProjectView<'a> {
     Preparation(&'a ProjectSummary<'a>, &'a PreparationView<'a>),
 }
 
+pub fn render_platform_home(updates: &PlatformUpdates) -> String {
+    render_page_with_updates(Page::Home, true, None, Some(updates))
+}
+
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
+    render_page_with_updates(page, account_available, projects, None)
+}
+
+fn render_page_with_updates(
+    page: Page,
+    account_available: bool,
+    projects: Option<ProjectView<'_>>,
+    updates: Option<&PlatformUpdates>,
+) -> String {
     if matches!(page, Page::SignIn) {
         return auth::render(account_available);
     }
@@ -316,7 +333,10 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             projects::detail_with_creation(project, available, creation, section)
         }
     });
-    let (appearance_current, content) = if let Some(content) = project_content.as_deref() {
+    let update_content = updates.map(|view| format!("{}{}", HOME, platform_updates::content(view)));
+    let (appearance_current, content) = if let Some(content) =
+        project_content.as_deref().or(update_content.as_deref())
+    {
         ("", content)
     } else if path == "/settings/appearance" {
         (" aria-current=\"page\"", APPEARANCE_CONTROLS)
@@ -325,9 +345,7 @@ fn render_page(page: Page, account_available: bool, projects: Option<ProjectView
             "",
             match page {
                 Page::Profile => profile::CONTENT,
-                Page::Home => {
-                    r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your source code, builds and app releases.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
-                }
+                Page::Home => HOME,
                 Page::Releases => {
                     r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and publishing are not implemented. Your saved projects and repositories are available in Projects.</p><a class="action-button" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
                 }
