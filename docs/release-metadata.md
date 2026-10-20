@@ -13,7 +13,7 @@ The validator rejects unknown/missing keys and unsupported schema versions.
 | Section | Required fields and current policy |
 | --- | --- |
 | Root | Integer `schema_version = 1` or `2`, exact numbered preview `version`, `channel = "preview"`, and the single supported platform identifier in `platforms` |
-| `compatibility` | `installation = "fresh-only"`, empty `upgrade_from`, and nonempty `data` and `configuration` statements |
+| `compatibility` | Schema 1: `installation = "fresh-only"`, empty `upgrade_from`; schema 2: the fresh-only or reviewed upgrade policy below. Both require nonempty `data` and `configuration` statements. |
 | `migration` | Boolean `required = false` and nonempty `instructions` explaining the current migration limitation |
 | `recovery` | Boolean `binary_rollback = false` and nonempty `instructions` explaining recovery limits |
 | `support` | `status = "development-preview"` and 1–10 distinct, nonempty `warnings` |
@@ -54,7 +54,7 @@ metadata and historical release notes are not rewritten by upgrade implementatio
 Validate the record without generating or publishing anything:
 
 ```sh
-python3 scripts/release_metadata.py 0.1.0-preview.1
+python3 scripts/release_metadata.py 0.1.0-preview.2
 ```
 
 The committed source supplies the metadata. Preview preparation validates it
@@ -78,7 +78,7 @@ After applying a proposal in its reviewed branch, the existing read-only command
 checks version/date/change notes and requires exactly the current metadata block:
 
 ```sh
-python3 scripts/release_notes.py 0.1.0-preview.1
+python3 scripts/release_notes.py 0.1.0-preview.2
 ```
 
 Missing, modified, duplicated or stale blocks fail before notes are printed.

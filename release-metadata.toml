@@ -1,27 +1,30 @@
 # Reviewed statements for the next proposal; this is not release approval.
-schema_version = 1
-version = "0.1.0-preview.1"
+schema_version = 2
+version = "0.1.0-preview.2"
 channel = "preview"
 platforms = ["ubuntu-24.04-amd64"]
 
 [compatibility]
-installation = "fresh-only"
-upgrade_from = []
-data = "Use fresh platform state. Existing installations are not supported upgrade targets for this preview."
-configuration = "Use the operator-managed source installation instructions in docs/public-linux-install.md; no automatic configuration conversion is provided."
+installation = "fresh-and-upgrade"
+upgrade_from = ["0.1.0-preview.1"]
+data_schema = 1
+configuration_schema = 1
+data = "Fresh installation or operator-triggered upgrade of a verified 0.1.0-preview.1 base bundle installation with unchanged data schema 1; preserve owner, projects, profile and repositories through the verified offline backup/restore procedure in docs/platform-upgrades.md."
+configuration = "Unchanged configuration schema 1 on dedicated Ubuntu 24.04 amd64 with the same hostname, service identities and pinned proxy; source installations, custom configuration, separate state mounts and app/build opt-ins are unsupported upgrade sources."
 
 [migration]
 required = false
-instructions = "No platform data or configuration migration is implemented. Do not reuse existing installation state as an upgrade procedure."
+instructions = "No data or configuration migration is required or executed for the declared base-bundle path. Any schema or configuration conversion requires a separately reviewed upgrade contract; do not bypass preflight."
 
 [recovery]
 binary_rollback = false
-instructions = "Do not assume replacing the executable reverses data changes. The same-installation snapshot and staged restore in docs/same-node-recovery.md require the original external files and operator verification; they are not cross-version upgrade recovery."
+instructions = "Use explicit full-state recovery in docs/platform-upgrades.md with both verified packets and the sealed offline backup (initial limit 256 MiB and 20,000 entries). Recovery causes downtime and removes post-backup writes from the live view while preserving displaced trees privately; replacing only the executable is not recovery."
 
 [support]
 status = "development-preview"
 warnings = [
   "One owner and one trusted stateless Rust/WASIp2 app on a dedicated Ubuntu 24.04 amd64 node; arbitrary applications and hostile multi-tenant hosting are unsupported.",
-  "Source installation remains operator-managed. Published bundles, a verified bundle installer and supported platform upgrades are not available.",
+  "Verified bundle installation and same-schema base upgrades are implemented; signed preview.1-to-preview.2 packet acceptance remains pending. Source-built Ubuntu/systemd/TLS and actual reboot fixtures do not replace signed-candidate validation.",
+  "Upgrades refuse app/build opt-ins and migrations. Operator login/data checks and a maintenance window are required; unattended upgrades and stable/channel promotion are unavailable.",
   "Preview metadata is not production-readiness evidence or permission to publish; the release approval gate under issue #21 still applies."
 ]

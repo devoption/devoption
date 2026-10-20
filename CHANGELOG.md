@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Prepare the preview.2 base-bundle candidate with schema-2 metadata declaring
+  preview.1 as its sole supported upgrade source, unchanged data/configuration
+  schemas, bounded full-state recovery and pending signed-packet acceptance
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Complete the signed installer's public DNS/HTTPS, ACME issuance/accelerated
   renewal and reboot/reinstall acceptance on temporary Ubuntu infrastructure;
   verify node deletion and exact DNS restoration, and retain the validation-only
