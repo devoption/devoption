@@ -517,3 +517,15 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 }
 .file-display { position: relative; }
 .file-display input[type="radio"] { width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; margin: 0; }
+
+/* Upgrade observations are secondary to project work; details stay collapsed. */
+.platform-update { margin-bottom: 2.5rem; max-width: 54rem; overflow-wrap: anywhere; }
+.platform-update p { margin-top: .75rem; }
+.platform-update h3, .platform-update details { margin-top: 1.25rem; }
+.platform-update .section-heading { align-items: start; flex-wrap: wrap; gap: 1rem; }
+.platform-update .section-heading p { margin-top: .5rem; }
+.platform-update summary { cursor: pointer; }
+.platform-update ol { padding-left: 1.5rem; }
+.platform-update li { margin-top: .75rem; }
+.platform-update dt { margin-top: .75rem; color: var(--color-muted); }
+.platform-update dd { margin-left: 0; }

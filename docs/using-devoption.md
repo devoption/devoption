@@ -255,3 +255,13 @@ Omitting `--public-origin` preserves the existing private Host/Origin policy.
 For a separate app URL on the same server, follow [app hostnames](app-hostnames.md).
 The project Releases page shows the configured URL and local TLS/routing status;
 public DNS and external reachability still need operator verification.
+
+## DevOption updates
+
+On a configured server, Overview shows the running DevOption version and any
+reviewed upgrade observation selected by the server administrator. Expand
+**Review upgrade and recovery steps** for the operator's SSH actions. Refresh
+reloads the saved status; it does not check a remote release feed or start an
+upgrade. A stale or unavailable observation needs an administrator check. See
+[platform upgrades](platform-upgrades.md#owner-notification-and-operator-action)
+for support limits, full command arguments and recovery/data-loss guidance.

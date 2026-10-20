@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Show owner-only platform upgrade observations on Overview, including the running
+  version, selected preview, exact transaction/result and SSH upgrade/recovery
+  guidance. Publish bounded public notices from the verified root upgrader and
+  reject unsafe, malformed, stale or mismatched observations as actionable status
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Record approved preview.2 tag/draft/ZIP retention and cryptographic readback;
   reconcile completed installer and base-upgrade evidence with the remaining
   application, notification, promotion and image acceptance criteria

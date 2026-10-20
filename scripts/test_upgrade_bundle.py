@@ -16,6 +16,7 @@ from release_metadata import validate_metadata, render_metadata
 import test_install_bundle as fixtures
 from upgrade_bundle import Upgrade, UpgradeHost, UNIT, RECEIPT
 from test_release_plan import METADATA
+from upgrade_notice import NOTICE
 
 
 class UpgradeTests(unittest.TestCase):
@@ -75,6 +76,54 @@ class UpgradeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'new --attempt'):
             self.upgrade.apply()
         self.assertEqual(Upgrade(self.installer, self.candidate, attempt=2).apply()['phase'], 'healthy')
+
+    def test_owner_notice_follows_verified_plan_upgrade_and_full_state_recovery(self):
+        self.upgrade.notify = True
+        path = self.installer.path(NOTICE)
+        self.assertFalse(path.exists())
+        self.upgrade.preflight(starting=True)
+        notice = json.loads(path.read_bytes())
+        self.assertEqual(notice['phase'], 'not-started')
+        self.assertEqual(notice['candidate_archive_sha256'], self.candidate.record['candidate']['archive_sha256'])
+        self.assertEqual(notice['candidate_source_commit'], self.candidate.record['candidate']['source_commit'])
+        self.assertEqual(notice['transaction'], self.upgrade.id)
+        self.assertFalse(notice['publication_eligible'])
+        self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+        self.assertEqual(path.parent.stat().st_mode & 0o777, 0o755)
+        for mode, phase in [(self.upgrade.apply, 'healthy'),
+                            (lambda: self.upgrade.recover(confirm=True), 'restored')]:
+            mode()
+            self.assertEqual(json.loads(path.read_bytes())['phase'], phase)
+        self.assertEqual(self.saved.read_bytes(), b'original checkout bytes')
+        # Public observations contain no owner state, hostnames, inputs or commands.
+        self.assertEqual(set(json.loads(path.read_bytes())), {'schema_version', 'previous_version',
+            'candidate_version', 'candidate_archive_sha256', 'candidate_source_commit', 'transaction',
+            'attempt', 'phase', 'checked_at', 'publication_eligible'})
+
+    def test_notice_stop_refusal_failure_interruption_and_unsafe_destination(self):
+        self.upgrade.notify = True
+        path = self.installer.path(NOTICE)
+        self.upgrade.preflight(starting=True)
+        before = path.read_bytes()
+        path.chmod(0o666)
+        with self.assertRaisesRegex(ValueError, 'Unsafe upgrade notice'):
+            self.upgrade.apply()
+        self.assertFalse(self.upgrade.directory.exists())
+        self.assertTrue(self.host.running)
+        path.chmod(0o644)
+        path.unlink()
+        path.symlink_to(self.saved)
+        with self.assertRaises(ValueError):
+            self.upgrade.apply()
+        self.assertEqual(self.saved.read_bytes(), b'original checkout bytes')
+        path.unlink()
+        path.write_bytes(before); path.chmod(0o644)
+        with patch.object(self.host, 'probe', side_effect=ValueError('controlled startup failure')):
+            with self.assertRaisesRegex(ValueError, 'startup failure'):
+                self.upgrade.apply()
+        self.assertEqual(json.loads(path.read_bytes())['phase'], 'failed')
+        self.upgrade.recover(confirm=True)
+        self.assertEqual(json.loads(path.read_bytes())['phase'], 'restored')
 
     def test_startup_failure_keeps_backup_and_explicit_recovery_restores_previous(self):
         def health(binary, version):

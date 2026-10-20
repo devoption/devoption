@@ -26,6 +26,7 @@ from release_bundle import canonical
 from release_candidates import load
 from release_metadata import validate_metadata
 from verify_bundle_provenance import snapshot, unique_object
+from upgrade_notice import publish as publish_notice
 
 UNIT = '/etc/systemd/system/devoption-public.service'
 RECEIPT = STATE + '/installation.json'
@@ -98,8 +99,9 @@ class UpgradeHost(Host):
 
 
 class Upgrade:
-    def __init__(self, previous, candidate, attempt=1):
+    def __init__(self, previous, candidate, attempt=1, notify=False):
         self.old, self.new = previous, candidate
+        self.notify = notify
         self.root, self.host = previous.root, previous.host
         if candidate.root != self.root or candidate.host is not self.host or previous.hostname != candidate.hostname:
             raise ValueError('Use the same host and hostname for both verified installations.')
@@ -186,6 +188,11 @@ class Upgrade:
         record = {'plan': self.plan, 'phase': phase,
                   'backup_sha256': backup_sha256 if backup_sha256 is not None else before['backup_sha256'] if before else None}
         self.replace(self.journal, canonical(record), 0o600)
+        self.notice(phase)
+
+    def notice(self, phase):
+        if self.notify:
+            publish_notice(self.old, self.new, self.id, self.plan['attempt'], phase)
 
     def managed(self, recovery=False):
         # An interrupted atomic unit/receipt switch may contain either verified
@@ -253,6 +260,7 @@ class Upgrade:
             total = sum(item.get('size', 0) for item in records.values())
         else:
             total = None
+        self.notice(record['phase'] if record else 'not-started')
         return {'transaction': self.id, 'phase': record['phase'] if record else 'not-started',
                 'installed_version': active.version, 'candidate_version': self.new.version,
                 'backup_bytes': total, 'publication_eligible': False, 'app_upgrades_supported': False,
@@ -405,6 +413,7 @@ class Upgrade:
         if record['phase'] == 'restored':
             self.restart_previous()
             return self.preflight()
+        self.notice('restoring')
         self.host.stop()
         # Before sealing a backup there were no candidate writes to live state.
         if not (self.directory / 'backup.json').exists():
@@ -484,7 +493,7 @@ def main():
             manifest, files = verified_files(getattr(args, label + '_packet'), record, args.gh, args.allow_validation_candidate)
             installers.append(Installer(Path('/'), host, record, manifest, files,
                                         proxy_binary(args.caddy_archive, manifest), args.hostname))
-        upgrade = Upgrade(*installers, attempt=args.attempt)
+        upgrade = Upgrade(*installers, attempt=args.attempt, notify=True)
         host.preflight(Path('/'), 1024**3)
         with installation_lock('/run/lock/devoption-installer.lock'):
             if args.mode == 'apply':

@@ -68,8 +68,10 @@ next-preview source fixture with real versioned executables, then runs
 `sudo` mode creates real dedicated service identities, units, state and a local
 test CA, exercises the upgrade engine and full-state recovery, and removes those
 resources. It verifies owner/project/profile/repository persistence, interrupted
-activation, disabled boot during incomplete transactions and controlled failed-health
-recovery. This step is destructive to the fixture's reserved host paths: **never
+activation, disabled boot during incomplete transactions, controlled failed-health
+recovery and owner-only upgrade observations in the candidate server. The latter
+checks exact transaction/archive identities and refusal of browser mutation
+requests. This step is destructive to the fixture's reserved host paths: **never
 run it on an existing installation or workstation**. It uses no repository secrets,
 production credentials, signing/publication rights or self-hosted runner. Trusted
 source builds establish fixture identity; production packet verification has no

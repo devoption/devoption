@@ -9,7 +9,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 
 | Page or state | Path | Capture state | File |
 | --- | --- | --- | --- |
-| Overview | `/` | Signed in | `home.jpg` |
+| Overview | `/` | Signed in; no installed-host observation | `home.jpg` |
+| Platform update | `/` | Synthetic reviewed preview notice; 1280 × 1000 | `platform-update.jpg` |
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
 | Project overview | `/projects/{id}` | Example application; repository list, checkout locations collapsed; 1280 × 900 | `project-details.jpg` |
@@ -155,3 +156,12 @@ disposable Caddy CA. The isolated browser accepts only that CA intermediate key;
 separate protocol checks verify the full chain. No system trust or public DNS
 changes are involved. Restore the valid trust file after capturing the intentional
 certificate failure.
+
+For `platform-update.jpg`, add `DEVOPTION_BROWSER_UPGRADE=not-started` to the
+browser fixture command and use 1280 × 1000. This test-binary-only flag supplies
+a synthetic preview.2-to-preview.3 observation with fixed sample digests and a
+42-second age. It creates no host notice, signed packet or upgrade. The production
+binary has no such override. Other supported fixture values are `healthy`, `failed`
+and `restored`; do not describe these captures as real upgrade evidence. Capture
+`home.jpg` without this flag, at the default dimensions. Verify both disclosures
+and the SSH guidance at narrow widths; no browser action executes the updater.

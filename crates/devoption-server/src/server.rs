@@ -26,6 +26,8 @@ mod auth;
 #[cfg(unix)]
 mod input;
 #[cfg(unix)]
+mod platform_updates;
+#[cfg(unix)]
 mod profile;
 #[cfg(unix)]
 mod projects;
@@ -368,6 +370,11 @@ fn page_routes(configured: bool, session: SharedSession, project_routes: Router)
         ("/settings/appearance", Page::Appearance),
         ("/settings/profile", Page::Profile),
     ] {
+        #[cfg(unix)]
+        if configured && matches!(page, Page::Home) {
+            pages = pages.route(path, get(platform_updates::home));
+            continue;
+        }
         if configured && matches!(page, Page::Projects) {
             continue;
         }
