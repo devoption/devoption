@@ -200,6 +200,44 @@ non-secret JSON acceptance report survives. Never use the destructive `--guest`
 mode on an existing installation; use the host runner described in
 [development checks](development.md#continuous-integration).
 
+### Signed-packet rehearsal
+
+The same disposable runner accepts `--signed-packets` with independently reviewed
+`previous.json`, `candidate.json`, `previous.zip`, `candidate.zip`, `caddy.tar.gz`
+and the pinned Linux verifier `gh.tar.gz` in a private input directory. Obtain
+records from the trusted catalog/reviewed signer identities, never from downloaded
+self-descriptions. Both packets must authenticate on the host before any VM is
+created; every guest boot reauthenticates them with the pinned verifier. No
+source-built archive or synthetic reservation is substituted in this mode.
+
+```sh
+python3 scripts/check_upgrade_reboot.py \
+  --fixtures /private/signed-upgrade-inputs --signed-packets \
+  --gh /trusted/gh --report /private/new-signed-upgrade-report.json \
+  --boot-timeout 3600
+```
+
+The fixture runs production `install_bundle.py install` and upgrade `plan`,
+`apply`, `status` and confirmed `recover` commands. A corrupt candidate must fail
+at the transport-digest gate before managed state exists. The controlled
+unit/receipt interruption still uses the verified engine directly for fault
+injection; subsequent recovery uses the production CLI. Login, data, stopped
+pending services, retries and four distinct kernel boots retain the same checks.
+The report must also match both independently authenticated reservation identities
+and confirm signed inputs/production CLI/corruption rejection. Missing or different
+evidence fails the runner.
+
+Only the private guest maps the fixture hostname to loopback and installs its
+generated local CA into its OS trust store, so production HTTPS readiness uses
+normal certificate/hostname validation. No production TLS or signature bypass is
+added. Owner setup still uses a PTY with the public disposable fixture password;
+no password or session is retained in the host report. macOS uses its built-in
+`hdiutil` seed builder and software emulation; Linux uses xorriso and KVM when
+available. The explicit boot budget can be 600–3600 seconds for signed verification
+and software emulation; ordinary CI keeps its ten-minute bound. The signed guest's
+fixture service has a bounded 15-minute start deadline. Temporary guest disks,
+input shares and private owner/certificate/session state are removed afterward.
+
 This is base-upgrade implementation and fixture evidence. Real signed
 previous-to-candidate acceptance (including reboot with those signed packets),
 coordinated hosted-app state, migration recovery and notification/UI actions still

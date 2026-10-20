@@ -5,6 +5,13 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Add explicit signed-packet upgrade/reboot acceptance using independently
+  authenticated prior/candidate packets, the production installer/upgrader CLI,
+  normal guest TLS trust and exact-identity evidence checks
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 ## [0.1.0-preview.2] - 2026-10-19
 
 ### Changed
