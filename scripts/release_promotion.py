@@ -10,7 +10,8 @@ import re
 import subprocess
 import tomllib
 
-from release_candidates import load, validate, verify_transport
+from install_bundle import verified_files
+from release_candidates import load, validate
 from release_bundle import canonical
 from verify_bundle_provenance import snapshot, unique_object
 
@@ -181,7 +182,9 @@ def main():
     try:
         _, before = read_policy()
         record = load(snapshot(args.reservation, 8192))
-        verify_transport(args.packet, record, args.gh)
+        manifest, _ = verified_files(args.packet, record, args.gh, True)
+        if manifest['schema_version'] != 3:
+            raise ValueError('Readiness requires a schema-3 packet with the bundled app worker.')
         reports = {case: sha(snapshot(args.reports / (case + '.json'), LIMIT)) for case in CHECKS}
         result = evaluate(record, args.channel, document(args.acceptance), document(args.canary),
                           args.app_sha256, datetime.now(timezone.utc).timestamp(), reports)

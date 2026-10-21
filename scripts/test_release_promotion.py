@@ -77,6 +77,21 @@ class PromotionTests(unittest.TestCase):
         self.assertIn(b'Transport ZIP differs from reviewed digest', result.stderr)
         self.assertNotIn(b'readiness_passed', result.stdout)
 
+    def test_cli_requires_bundled_worker_even_if_old_packet_authenticates(self):
+        reservation = self.root / 'reservation.json'
+        reservation.write_bytes(canonical(self.record))
+        args = ['release_promotion.py', '--reservation', str(reservation), '--packet', 'packet.zip',
+                '--gh', 'gh', '--channel', 'preview', '--app-sha256', self.app,
+                '--acceptance', 'missing.json', '--canary', 'missing.json', '--reports', 'missing']
+        with patch.object(sys, 'argv', args), \
+                patch.object(gate, 'verified_files', return_value=({'schema_version': 2}, {})) as verified, \
+                patch.object(gate, 'document') as evidence, \
+                self.assertRaises(SystemExit) as stopped, patch.object(sys, 'stderr'):
+            gate.main()
+        self.assertEqual(stopped.exception.code, 1)
+        verified.assert_called_once()
+        evidence.assert_not_called()
+
     def test_checked_in_stop_and_unsupported_stable_are_independent_blockers(self):
         self.observation = self.canary(86400)
         self.policy.write_bytes(gate.POLICY.read_bytes())
