@@ -205,7 +205,7 @@ class PromotionTests(unittest.TestCase):
         self.assertFalse(report['samples'][0]['probes']['sample_app']['passed'])
 
     def test_collector_identity_switch_and_default_stop_prevent_requests(self):
-        calls = iter(('initial', 'before', 'changed'))
+        calls = iter(('same', 'same', 'changed'))
         with self.assertRaisesRegex(ValueError, 'identity changed'):
             self.collect(inspect=lambda: next(calls))
         (self.root / 'canary.json').unlink()
@@ -216,6 +216,14 @@ class PromotionTests(unittest.TestCase):
                                   self.root / 'canary.json', lambda: 'same', self.policy)
             request.assert_not_called()
         self.assertFalse((self.root / 'canary.json').exists())
+
+    def test_collector_restart_between_samples_invalidates_continuous_window(self):
+        calls = iter(('same', 'same', 'same', 'restarted'))
+        with self.assertRaisesRegex(ValueError, 'since observation started'):
+            self.collect(inspect=lambda: next(calls))
+        report = gate.document(self.root / 'canary.json')
+        self.assertEqual(len(report['samples']), 1)
+        self.assertFalse(report['complete'])
 
     def test_probe_checks_redirect_health_body_and_tls_failure(self):
         with patch.object(collector, 'request', side_effect=[(200, None, b'login'),

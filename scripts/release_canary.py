@@ -142,7 +142,7 @@ def collect(record, channel, app_sha, platform, app, output, inspect, policy_pat
     policy, checksum = read_policy(policy_path)
     if policy['stopped']:
         raise ValueError('Promotion stopped; no canary requests made.')
-    inspect()
+    identity = inspect()
     with output.open('xb') as stream:  # Never adopt stale/partial output from a previous collection.
         os.fchmod(stream.fileno(), 0o600)
     start = time.monotonic()
@@ -161,6 +161,8 @@ def collect(record, channel, app_sha, platform, app, output, inspect, policy_pat
         if abs(at - wall_start - elapsed) > 5:
             raise ValueError('Wall clock changed during observation.')
         before = inspect()
+        if before != identity:
+            raise ValueError('Service identity changed since observation started.')
         results = probe(platform, app)
         if inspect() != before:
             raise ValueError('Service identity changed during probes.')
