@@ -55,6 +55,11 @@ executable, runs its version/help checks, and compares every archived byte and
 manifest entry, source-inventory SBOM and unsigned assembly statement with the
 trusted checkout/build inputs. It uploads no artifacts;
 see [bundle candidates and remaining trust gates](release-bundles.md).
+It also builds the public locked WASIp2 fixture and runs
+`check_bundle_runtime.py` against the separately packaged worker snapshot: version,
+component validation, owned-invocation health, routing and bounded process cleanup.
+The worker's digest/mode and schema-3 descriptor are verified separately; historical
+schema-2 packets stay supported without inventing a runtime member.
 It then runs `python3 scripts/check_bundle_installer.py OUTPUT` against that
 trusted local assembly: disposable file placement, rendered-unit verification,
 real PTY owner setup, installed-binary readiness/restart and a state-preserving

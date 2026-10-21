@@ -10,7 +10,7 @@ from pathlib import Path
 import stat
 import tarfile
 
-from release_bundle import MAX_BINARY, TARGET, canonical, payload, sha256
+from release_bundle import MAX_BINARY, TARGET, canonical, payload, sha256, file_mode
 from release_inventory import SBOM, PROVENANCE, provenance
 
 
@@ -25,8 +25,8 @@ def regular(path, limit):
     return data
 
 
-def check(repository, binary, output):
-    manifest, files = payload(repository, binary)
+def check(repository, binary, output, runtime=None):
+    manifest, files = payload(repository, binary, runtime)
     name = f"devoption-{manifest['platform_version']}-{TARGET}.tar.gz"
     if output.is_symlink() or {p.name for p in output.iterdir()} != {name, "manifest.json", "SHA256SUMS", SBOM, PROVENANCE}:
         raise ValueError("Candidate output must contain exactly its archive, manifest, inventory, unsigned statement and checksums.")
@@ -45,7 +45,7 @@ def check(repository, binary, output):
                 raise ValueError("Candidate has an unexpected, repeated or nonregular member.")
             seen.add(entry.name)
             content = expected[entry.name]
-            mode = 0o755 if entry.name == "bin/devoption" else 0o644
+            mode = file_mode(entry.name)
             if (entry.size != len(content) or entry.mode != mode or
                     (entry.uid, entry.gid, entry.mtime, entry.uname, entry.gname) != (0, 0, 0, "", "")):
                 raise ValueError("Candidate member size or normalized metadata differs.")
@@ -65,10 +65,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
     parser.add_argument("--binary", type=Path, required=True)
+    parser.add_argument("--runtime", type=Path)
     parser.add_argument("--repository", type=Path, default=Path.cwd())
     args = parser.parse_args()
     try:
         print("Verified local candidate against trusted source/build inputs: " +
-              check(args.repository, args.binary, args.output))
+              check(args.repository, args.binary, args.output, args.runtime))
     except (ValueError, KeyError, OSError, tarfile.TarError) as error:
         parser.exit(1, f"Bundle check failed: {error}\n")

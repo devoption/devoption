@@ -17,7 +17,7 @@ import time
 import zipfile
 
 from deployment_broker import hostname as valid_hostname
-from release_bundle import CADDY_SHA512, CADDY_VERSION, MAX_BINARY, canonical
+from release_bundle import CADDY_SHA512, CADDY_VERSION, MAX_BINARY, canonical, RUNTIME, file_mode
 from release_candidates import load, verify_transport
 from verify_bundle_provenance import manifest_from_archive, snapshot
 from installer_host import Host
@@ -132,7 +132,7 @@ class Installer:
         self.caddy = "/opt/devoption/proxy/caddy-" + CADDY_VERSION
         self.identity = {"schema_version": 1, "reservation": record, "hostname": hostname,
                          "platform_port": 3000, "proxy_sha512": CADDY_SHA512}
-        self.output = {self.release + "/" + name: (data, 0o755 if name == "bin/devoption" else 0o644)
+        self.output = {self.release + "/" + name: (data, file_mode(name))
                        for name, data in files.items()}
         unit = files["examples/systemd/devoption-public.service"].decode()
         unit = unit.replace("/opt/devoption/devoption", self.binary).replace("platform.example.com", hostname)
@@ -150,6 +150,10 @@ class Installer:
             while str(parent).startswith("/opt/devoption/"):
                 self.dirs[str(parent)] = (0o755, "root")
                 parent = parent.parent
+
+    def runtime_probe(self):
+        if self.manifest['schema_version'] == 3:
+            self.host.runtime_probe(self.release + '/' + RUNTIME, self.version)
 
     def path(self, name):
         return self.root / name.lstrip("/")
@@ -283,6 +287,7 @@ class Installer:
         for name, (content, mode) in self.output.items():
             self.write(name, content, mode)
         self.host.validate(self.binary, self.caddy, self.hostname)
+        self.runtime_probe()
         self.host.reload()
         return self.preflight()
 

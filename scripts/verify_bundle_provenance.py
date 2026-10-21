@@ -13,7 +13,7 @@ import tarfile
 import tempfile
 import tomllib
 
-from release_bundle import MAX_BINARY, TARGET, SOURCE_FILES
+from release_bundle import MAX_BINARY, TARGET, SOURCE_FILES, RUNTIME, file_mode, runtime_versions
 from release_inventory import SBOM
 from release_metadata import validate_metadata
 from release_plan import git
@@ -79,6 +79,7 @@ def manifest_from_archive(raw, source, version):
     seen = set()
     records = {}
     metadata_raw = None
+    lock_raw = None
     total = 0
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
         for member in archive:
@@ -86,7 +87,7 @@ def manifest_from_archive(raw, source, version):
             if (not member.isfile() or member.name in seen or path.is_absolute() or
                     ".." in path.parts or str(path) != member.name or str(path) == "."):
                 raise ValueError("Archive contains unsafe or repeated members.")
-            mode = 0o755 if member.name == "bin/devoption" else 0o644
+            mode = file_mode(member.name)
             if (member.mode != mode or (member.uid, member.gid, member.mtime, member.uname, member.gname) !=
                     (0, 0, 0, "", "")):
                 raise ValueError("Archive member metadata is not normalized.")
@@ -105,18 +106,32 @@ def manifest_from_archive(raw, source, version):
                     raise ValueError("Archive manifest exceeds its limit.")
                 with archive.extractfile(member) as stream:
                     manifest = json.loads(stream.read(), object_pairs_hook=unique_object)
+            if member.name == "Cargo.lock":
+                if member.size > 2 * 1024 * 1024:
+                    raise ValueError("Archive lockfile exceeds its limit.")
+                with archive.extractfile(member) as stream:
+                    lock_raw = stream.read()
             if member.name == "release-metadata.toml":
                 if member.size > 32768:
                     raise ValueError("Archive release metadata exceeds its limit.")
                 with archive.extractfile(member) as stream:
                     metadata_raw = stream.read()
     if (not isinstance(manifest, dict) or type(manifest.get("schema_version")) is not int or
-            manifest["schema_version"] != 2 or manifest.get("source_commit") != source or
+            manifest["schema_version"] not in (2, 3) or manifest.get("source_commit") != source or
             manifest.get("platform_version") != version or manifest.get("target") != TARGET or
             manifest.get("publication_eligible") is not False):
         raise ValueError("Authenticated manifest does not match the reviewed preview candidate.")
     validate_metadata(manifest["release_metadata"], version)
     required = {*SOURCE_FILES, "bin/devoption", "RELEASE-NOTES.md", SBOM}
+    if manifest["schema_version"] == 3:
+        required.add(RUNTIME)
+        if (lock_raw is None or hashlib.sha256(lock_raw).hexdigest() != manifest.get("cargo_lock_sha256") or
+                manifest.get("embedded_components") != ["server", "CLI", "UI"] or
+                manifest.get("app_runtime") != {"path": RUNTIME, "version": version,
+                    "embedded_runtime_versions": runtime_versions(tomllib.loads(lock_raw.decode()))}):
+            raise ValueError("Authenticated app runtime descriptor or locked identity differs.")
+    elif "app_runtime" in manifest:
+        raise ValueError("Legacy bundles cannot declare an app runtime payload.")
     declared = manifest.get("files")
     if (not isinstance(declared, list) or len(declared) != len(required) or
             seen != required | {"manifest.json"}):

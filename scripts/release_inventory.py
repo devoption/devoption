@@ -107,6 +107,9 @@ def inventory(files, version, source, workspace_names):
 def provenance(manifest, archive_name, archive_digest, manifest_bytes, sbom_bytes, binary_digest, toolchain_digest):
     """Describe assembly of a caller-supplied binary; do not claim compilation or CI identity."""
     source = manifest["source_commit"]
+    runtime = ([{"name": record["path"], "digest": {"sha256": record["sha256"]}}
+                for record in manifest["files"] if record["path"] == "bin/devoption-runtime"]
+               if manifest["schema_version"] == 3 else [])
     return {
         "_type": "https://in-toto.io/Statement/v1",
         "subject": [{"name": name, "digest": {"sha256": value}} for name, value in (
@@ -123,7 +126,7 @@ def provenance(manifest, archive_name, archive_digest, manifest_bytes, sbom_byte
                     {"name": "Cargo.lock", "digest": {"sha256": manifest["cargo_lock_sha256"]}},
                     {"name": "rust-toolchain.toml", "digest": {"sha256": toolchain_digest}},
                     {"name": "release-metadata.toml", "digest": {"sha256": manifest["release_metadata_sha256"]}},
-                ],
+                ] + runtime,
             },
             "runDetails": {"builder": {"id": REPOSITORY + "/blob/" + source + "/scripts/release_bundle.py"}},
         },

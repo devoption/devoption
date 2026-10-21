@@ -16,6 +16,20 @@ install an upgrade or change release eligibility. Do not use it to overwrite a
 source installation. The installer itself runs from a separately reviewed trusted
 checkout, not code extracted from the downloaded packet.
 
+## Packaged app worker
+
+New bundle schema-3 candidates also install `bin/devoption-runtime` under the
+same immutable `/opt/devoption/releases/VERSION/` tree, root-owned mode 0755.
+The installer copies only authenticated archive bytes and probes the worker's
+version as the unprivileged platform identity before reloading services. Existing
+files are never replaced on retry. Legacy schema-2 packets remain base-only and
+have no worker; verification does not invent one from historical metadata.
+
+This does not install app broker configuration, sudo rules or app units. Use the
+[deployment runbook](web-app-deployments.md) to prepare an explicitly authorized
+new app-capable installation. Existing app/build installations still require the
+coordinated upgrade path under #263.
+
 ## Prepare the dedicated host and inputs
 
 Use Ubuntu 24.04 amd64, systemd, cgroup v2, existing administrator/SSH access and

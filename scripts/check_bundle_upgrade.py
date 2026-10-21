@@ -101,11 +101,17 @@ warnings = ["Disposable CI source-build fixture; not signed, published or recomm
                 'commit', '--quiet', '-m', 'test: prepare next preview fixture\n\nRefs #263', cwd=checkout)
         # Share only compiler artifacts; both archives snapshot their executable
         # immediately and bind it to the clean corresponding checkout.
-        target = output/'target'
+        target = repository/'target'  # Reuse locked compiler artifacts, including Wasmtime, within this disposable job.
         run('cargo', 'fetch', '--locked', cwd=checkout)
-        run('cargo', 'build', '-p', 'devoption-cli', '--release', '--locked', '--offline',
+        run('cargo', 'build', *(['-p', 'devoption-cli'] if name == 'previous' else ['--workspace']), '--release', '--locked', '--offline',
             '--target-dir', str(target), cwd=checkout)
-        assemble(checkout, target/'release/devoption', output/(name+'-bundle'))
+        if name == 'previous':
+            # Preserve the historical distribution layout. This exact reviewed
+            # prior source is already trusted for compilation above.
+            run('python3', str(checkout/'scripts/release_bundle.py'), '--binary',
+                str(target/'release/devoption'), '--output', str(output/(name+'-bundle')), cwd=checkout)
+        else:
+            assemble(checkout, target/'release/devoption', output/(name+'-bundle'), target/'release/devoption-runtime')
     import urllib.request
     url = 'https://github.com/caddyserver/caddy/releases/download/v2.11.7/caddy_2.11.7_linux_amd64.tar.gz'
     with urllib.request.urlopen(url, timeout=60) as response:

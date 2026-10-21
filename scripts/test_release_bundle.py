@@ -11,7 +11,7 @@ import tarfile
 from unittest.mock import patch
 
 from check_release_bundle import check
-from release_bundle import SOURCE_FILES, assemble, binary_bytes, probe, sha256
+from release_bundle import SOURCE_FILES, assemble, binary_bytes, probe, probe_runtime, sha256, RUNTIME
 from release_inventory import SBOM, PROVENANCE
 from release_metadata import load_metadata, render_metadata
 from release_plan import git
@@ -44,8 +44,10 @@ class BundleTests(Fixture):
         data[:7] = b"\x7fELF\x02\x01\x01"
         data[16:20] = b"\x03\x00\x3e\x00"
         self.binary.write_bytes(data)
+        self.runtime = self.root / "devoption-runtime"
+        self.runtime.write_bytes(data)
         # Build output is deliberately ignored, like target/ in the real repository.
-        (self.root / ".gitignore").write_text("fixture-elf\n")
+        (self.root / ".gitignore").write_text("fixture-elf\ndevoption-runtime\n")
         self.commit("test: ignore compiled fixture")
         self.output = self.root.parent / (self.root.name + "-candidate")
         self.addCleanup(self.clean_output)
@@ -56,9 +58,10 @@ class BundleTests(Fixture):
             shutil.rmtree(self.output)
 
     def assemble(self, output=None):
-        with patch("release_bundle.require_host"), patch("release_bundle.probe") as check:
+        with patch("release_bundle.require_host"), patch("release_bundle.probe") as check, patch("release_bundle.probe_runtime") as runtime_check:
             result = assemble(self.root, self.binary, output or self.output)
             self.assertEqual(check.call_count, 1)
+            self.assertEqual(runtime_check.call_count, 1)
         return result
 
     def test_repeatable_complete_payload_and_manifest(self):
@@ -70,7 +73,7 @@ class BundleTests(Fixture):
         self.assertEqual(manifest["release_metadata"]["compatibility"]["upgrade_from"], [])
         with tarfile.open(self.output / first["archive"]) as archive:
             members = archive.getmembers()
-            self.assertEqual({m.name for m in members}, {*SOURCE_FILES, "bin/devoption", "RELEASE-NOTES.md", "manifest.json", SBOM})
+            self.assertEqual({m.name for m in members}, {*SOURCE_FILES, "bin/devoption", RUNTIME, "RELEASE-NOTES.md", "manifest.json", SBOM})
             self.assertEqual(archive.extractfile("manifest.json").read(), (self.output / "manifest.json").read_bytes())
             for record in manifest["files"]:
                 entry = archive.getmember(record["path"])
@@ -195,6 +198,34 @@ class BundleTests(Fixture):
         fake.chmod(0o700)
         with self.assertRaisesRegex(ValueError, "selected version"):
             probe(fake, self.version)
+
+    def test_worker_is_required_and_its_bytes_and_inventory_are_verified(self):
+        first = self.assemble()
+        manifest = json.loads((self.output / "manifest.json").read_bytes())
+        self.assertEqual(manifest['schema_version'], 3)
+        self.assertEqual(manifest['app_runtime']['path'], RUNTIME)
+        self.assertEqual(manifest['app_runtime']['version'], self.version)
+        self.assertEqual(manifest['embedded_components'], ['server', 'CLI', 'UI'])
+        record = next(r for r in manifest['files'] if r['path'] == RUNTIME)
+        self.assertEqual(record['mode'], '0755')
+        self.assertEqual(record['sha256'], sha256(self.runtime.read_bytes()))
+        statement = json.loads((self.output / PROVENANCE).read_bytes())
+        materials = statement['predicate']['buildDefinition']['resolvedDependencies']
+        self.assertIn({'name': RUNTIME, 'digest': {'sha256': record['sha256']}}, materials)
+        self.runtime.write_bytes(self.runtime.read_bytes() + b'changed worker')
+        with self.assertRaisesRegex(ValueError, 'manifest differs'):
+            check(self.root, self.binary, self.output)
+        self.clean_output(); self.runtime.unlink()
+        with self.assertRaises(OSError):
+            self.assemble()
+        self.assertFalse(self.output.exists())
+
+    def test_worker_probe_failure_never_publishes_candidate(self):
+        with patch('release_bundle.require_host'), patch('release_bundle.probe'), \
+                patch('release_bundle.probe_runtime', side_effect=ValueError('wrong worker version')):
+            with self.assertRaisesRegex(ValueError, 'worker version'):
+                assemble(self.root, self.binary, self.output)
+        self.assertFalse(self.output.exists())
 
     def test_unsupported_host_is_rejected_before_reading_inputs(self):
         with patch("release_bundle.platform.system", return_value="Darwin"):

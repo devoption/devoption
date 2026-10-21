@@ -60,16 +60,24 @@ jobs:
       - run: cargo fetch --locked
       - name: Check private source-install fixtures
         run: |
-          cargo build --release --locked --offline
+          cargo build --workspace --release --locked --offline
           cargo test -p devoption-cli --test server --release --locked --offline installation
           python3 scripts/check_systemd_unit.py target/release/devoption
       - name: Assemble and inspect the exact release executable
         env:
           BUNDLE_OUTPUT: ${{ runner.temp }}/devoption-bundle-candidate
         run: |
-          python3 scripts/release_bundle.py --binary target/release/devoption --output "$BUNDLE_OUTPUT"
-          python3 scripts/check_release_bundle.py "$BUNDLE_OUTPUT" --binary target/release/devoption
+          python3 scripts/release_bundle.py --binary target/release/devoption --runtime target/release/devoption-runtime --output "$BUNDLE_OUTPUT"
+          python3 scripts/check_release_bundle.py "$BUNDLE_OUTPUT" --binary target/release/devoption --runtime target/release/devoption-runtime
           python3 scripts/check_bundle_installer.py "$BUNDLE_OUTPUT"
+      - name: Serve the public WASIp2 fixture with the packaged app worker
+        env:
+          BUNDLE_OUTPUT: ${{ runner.temp }}/devoption-bundle-candidate
+        run: |
+          rustup target add wasm32-wasip2
+          cargo fetch --manifest-path examples/web-app/Cargo.toml --locked
+          cargo build --manifest-path examples/web-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/worker-smoke"
+          python3 scripts/check_bundle_runtime.py "$BUNDLE_OUTPUT" --binary target/release/devoption --runtime target/release/devoption-runtime --component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
       - name: Exercise prior-preview upgrade and full-state recovery on disposable runner
         env:
           UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture

@@ -60,14 +60,20 @@ jobs:
         run: |
           rustup show active-toolchain
           cargo fetch --locked
-          cargo build --release --locked --offline
+          cargo build --workspace --release --locked --offline
           cargo test -p devoption-cli --test server --release --locked --offline installation
           python3 scripts/check_systemd_unit.py target/release/devoption
       - name: Assemble and compare the exact tested executable
         run: |
-          python3 scripts/release_bundle.py --binary target/release/devoption --output "$RUNNER_TEMP/signed-candidate"
-          python3 scripts/check_release_bundle.py "$RUNNER_TEMP/signed-candidate" --binary target/release/devoption
+          python3 scripts/release_bundle.py --binary target/release/devoption --runtime target/release/devoption-runtime --output "$RUNNER_TEMP/signed-candidate"
+          python3 scripts/check_release_bundle.py "$RUNNER_TEMP/signed-candidate" --binary target/release/devoption --runtime target/release/devoption-runtime
           git diff --exit-code
+      - name: Serve the public WASIp2 fixture with the packaged app worker
+        run: |
+          rustup target add wasm32-wasip2
+          cargo fetch --manifest-path examples/web-app/Cargo.toml --locked
+          cargo build --manifest-path examples/web-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/worker-smoke"
+          python3 scripts/check_bundle_runtime.py "$RUNNER_TEMP/signed-candidate" --binary target/release/devoption --runtime target/release/devoption-runtime --component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
       - name: Recheck source context before attestation
         env:
           REVIEWED_SOURCE: ${{ inputs.source_commit }}

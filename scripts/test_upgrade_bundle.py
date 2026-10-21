@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from install_bundle import Installer
 from installer_host import Host
-from release_bundle import canonical
+from release_bundle import canonical, RUNTIME
 from release_metadata import validate_metadata, render_metadata
 import test_install_bundle as fixtures
 from upgrade_bundle import Upgrade, UpgradeHost, UNIT, RECEIPT
@@ -52,6 +52,27 @@ class UpgradeTests(unittest.TestCase):
         self.candidate = Installer(self.image, self.host, record, manifest, self.content,
                                    self.installer.output[self.installer.caddy][0], self.installer.hostname)
         self.upgrade = Upgrade(self.installer, self.candidate)
+
+    def test_new_worker_failure_stops_activation_and_recovers_legacy_without_worker(self):
+        manifest = deepcopy(self.candidate.manifest)
+        manifest['schema_version'] = 3
+        files = self.content | {RUNTIME: b'verified candidate worker; fixture never executes it'}
+        files['manifest.json'] = canonical(manifest)
+        candidate = Installer(self.image, self.host, self.candidate.record, manifest, files,
+                              self.installer.output[self.installer.caddy][0], self.installer.hostname)
+        transaction = Upgrade(self.installer, candidate)
+        self.host.runtime_probe = lambda binary, version: (_ for _ in ()).throw(ValueError('wrong worker identity'))
+        with self.assertRaisesRegex(ValueError, 'worker identity'):
+            transaction.apply()
+        self.assertEqual(transaction.record()['phase'], 'failed')
+        self.assertFalse(self.host.running)
+        self.assertEqual(self.installer.path(RECEIPT).read_bytes(), canonical(self.installer.identity))
+        self.assertEqual(transaction.recover(confirm=True)['phase'], 'restored')
+        self.assertEqual(self.saved.read_bytes(), b'original checkout bytes')
+        self.host.runtime_probe = lambda binary, version: None
+        accepted = Upgrade(self.installer, candidate, attempt=2)
+        self.assertEqual(accepted.apply()['phase'], 'healthy')
+        self.assertEqual(candidate.path(candidate.release + '/' + RUNTIME).stat().st_mode & 0o777, 0o755)
 
     def test_success_retry_and_explicit_full_state_recovery(self):
         result = self.upgrade.apply()

@@ -376,6 +376,7 @@ class Upgrade:
                 if name.startswith(self.new.release + '/'):
                     self.new.write(name, content, mode)
             self.host.probe(self.new.binary, self.new.version)
+            self.new.runtime_probe()
             self.switch(self.new)
             self.phase('activated')
             self.host.start()
@@ -397,6 +398,7 @@ class Upgrade:
         if not all(self.host.active(unit) for unit in units):
             raise ValueError('Both installed services must be active for upgrade readiness.')
         self.host.probe(installer.binary, installer.version)
+        installer.runtime_probe()
         self.host.healthy(installer.hostname)
         self.host.public_health(installer.hostname)
         if not all(self.host.active(unit) for unit in units):

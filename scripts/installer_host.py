@@ -126,6 +126,11 @@ class Host:
                  "XDG_CONFIG_HOME=/var/lib/caddy/config", caddy, "adapt", "--config", "/etc/caddy/Caddyfile",
                  "--adapter", "caddyfile", "--validate")
 
+    def runtime_probe(self, binary, version):
+        result = self.run('runuser', '-u', 'devoption', '--', binary, '--version')
+        if result.stdout != f'devoption-runtime {version}\n'.encode() or result.stderr:
+            raise ValueError('Installed app runtime version differs from the verified platform.')
+
     def reload(self):
         self.run("systemctl", "daemon-reload")
 
