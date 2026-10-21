@@ -24,6 +24,9 @@ node --test scripts/test_*.cjs
 python3 scripts/release_candidates.py audit
 ```
 
+Python checks include the [release readiness and canary fault matrix](release-readiness.md#validation-and-remaining-scope).
+Its simulated observation clock tests policy boundaries; it is not live canary evidence.
+
 Workspace tests include [trusted leaf subprocess fixtures](process-supervision-fixtures.md)
 on Unix and require `/usr/bin/python3`; these exercise real TERM/KILL handling
 without launching repository workloads.

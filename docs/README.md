@@ -33,6 +33,7 @@ accounts and production hosting acceptance remain planned.
 - [Opt-in authenticated bundle provenance and verification](bundle-provenance.md)
 - [Reviewed candidate reservations and immutable retry rules](release-candidates.md)
 - [Candidate retention planning, approved writer and retry recovery](release-reconciliation.md)
+- [Candidate readiness, canary thresholds and promotion stop](release-readiness.md)
 
 ## Implementation references
 

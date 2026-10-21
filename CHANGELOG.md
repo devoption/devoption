@@ -38,6 +38,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add read-only candidate readiness checks and an identity-bound HTTPS canary
+  collector, with minimum observation windows, complete acceptance/report
+  digests, per-route latency/failure limits and a default-on promotion stop.
+  Preserve immutable packet identity and false publication eligibility;
+  stable publication and app-upgrade acceptance remain gated
+  ([#263](https://github.com/devoption/devoption/issues/263)).
+
 - Add explicit signed-packet upgrade/reboot acceptance using independently
   authenticated prior/candidate packets, the production installer/upgrader CLI,
   normal guest TLS trust and exact-identity evidence checks

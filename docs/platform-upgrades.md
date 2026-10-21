@@ -288,7 +288,10 @@ The [signed-packet base upgrade/reboot rehearsal](bundle-upgrade-acceptance.md)
 now passed for the cataloged preview.1-to-preview.2 pair. Coordinated hosted-app
 state and migration recovery still need their own acceptance. The owner
 notification/SSH action flow above has rendering/authentication/fault coverage
-and is checked after the real disposable-system upgrade in CI. Stable/channel promotion, canary duration/thresholds,
-a promotion stop mechanism and #21 publication reconciliation remain unimplemented.
-Missing evidence cannot enable promotion: metadata still rejects stable and every
-packet/transaction remains `publication_eligible: false`.
+and is checked after the real disposable-system upgrade in CI. The read-only
+[candidate readiness policy and canary collector](release-readiness.md) implement
+bounded duration/coverage, failure/latency thresholds, complete acceptance evidence
+and a checked-in promotion stop. They do not supply the missing app-upgrade
+evidence or activate stable/publication policy. Missing evidence cannot pass;
+metadata still rejects stable and every packet/transaction/readiness result
+remains `publication_eligible: false`. The #21 publication decision remains open.
