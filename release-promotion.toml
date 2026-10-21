@@ -1,0 +1,10 @@
+# Read-only readiness checks. Changing this file grants no publication authority.
+schema_version = 1
+stopped = true
+automatic_publication = false
+preview_seconds = 3600
+stable_seconds = 86400
+max_gap_seconds = 90
+max_age_seconds = 86400
+p95_latency_ms = 2000
+max_failures = 0
