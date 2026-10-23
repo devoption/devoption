@@ -150,9 +150,12 @@ Each request creates a fresh Store/component. Limits are one 64 MiB linear memor
 covering instantiation, handler and complete response. Fuel and epoch interruption
 bound guest code; a wall deadline bounds asynchronous host I/O.
 
-The HTTP adapter admits 16 connections and one active guest request, with no
-waiting guest queue. It accepts HTTP/1 requests with a five-second input deadline,
-16 KiB headers and a 64 KiB body. Ambiguous lengths, transfer encoding and
+The HTTP adapter admits 16 connections and one active guest request. After input
+is read, requests wait up to 250 milliseconds for serial guest admission; at most
+15 requests can wait behind an active guest, within the connection limit.
+Admission expiry returns 503 without extending the guest execution deadline.
+Connections beyond the limit are closed. It accepts HTTP/1 requests with a
+five-second input deadline, 16 KiB headers and a 64 KiB body. Ambiguous lengths, transfer encoding and
 absolute-form request targets are rejected. Each connection serves one request
 and closes; chunked uploads, upgrades and streaming responses are not supported.
 Responses are buffered with 16 KiB headers and a 1 MiB body cap. Traps/overflow

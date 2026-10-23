@@ -9,6 +9,7 @@ import concurrent.futures
 import http.client
 import socket
 import time
+import threading
 
 
 def request(port, path, method='GET', headers=None):
@@ -28,6 +29,22 @@ def raw(port, data, expected):
 
 
 def check(port, fixture):
+    # Synchronize sends after connecting: independent short requests should wait
+    # briefly for serial guest execution rather than spuriously fail admission.
+    barrier = threading.Barrier(7)
+    def burst_request(_):
+        connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+        try:
+            connection.connect()
+            barrier.wait(timeout=5)
+            connection.request('GET', '/healthz')
+            response = connection.getresponse()
+            return response.status, response.read(1025)
+        finally:
+            connection.close()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
+        results = list(executor.map(burst_request, range(7)))
+    assert results == [(200, f'ok {fixture}'.encode())] * 7, results
     if fixture != 'probes':
         assert request(port,'/healthz') == (200, f'ok {fixture}'.encode())
         code,body = request(port,'/')
@@ -44,7 +61,9 @@ def check(port, fixture):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             sleeping=executor.submit(request,port,'/sleep')
             time.sleep(.3)
+            started = time.monotonic()
             assert request(port,'/healthz')[0] == 503
+            assert .2 <= time.monotonic() - started < 2
             assert sleeping.result()[0] == 504
         assert request(port,'/healthz') == (200,b'ok probes')
     raw(port,b'GET / HTTP/1.1\r\nHost: app\r\nX-Large: '+b'x'*17000+b'\r\n\r\n',431)

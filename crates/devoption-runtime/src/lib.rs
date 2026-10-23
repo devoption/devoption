@@ -42,6 +42,14 @@ const HEADERS: usize = 16 * 1024;
 const INPUT: usize = 64 * 1024;
 const OUTPUT: usize = 1024 * 1024;
 const DEADLINE: Duration = Duration::from_secs(5);
+const ADMISSION_WAIT: Duration = Duration::from_millis(250);
+
+async fn admit(admission: &Semaphore) -> Option<tokio::sync::SemaphorePermit<'_>> {
+    tokio::time::timeout(ADMISSION_WAIT, admission.acquire())
+        .await
+        .ok()?
+        .ok()
+}
 
 struct DenyNetwork;
 impl WasiHttpHooks for DenyNetwork {
@@ -272,9 +280,9 @@ async fn connection(mut stream: TcpStream, pre: ProxyPre<State>, admission: Arc<
     let response = match tokio::time::timeout(DEADLINE, receive(&mut stream)).await {
         Err(_) => failure(408),
         Ok(Err(code)) => failure(code),
-        Ok(Ok(request)) => match admission.try_acquire() {
-            Err(_) => failure(503),
-            Ok(_permit) => match tokio::time::timeout(DEADLINE, invoke(&pre, request)).await {
+        Ok(Ok(request)) => match admit(&admission).await {
+            None => failure(503),
+            Some(_permit) => match tokio::time::timeout(DEADLINE, invoke(&pre, request)).await {
                 Err(_) => failure(504),
                 Ok(Err(error))
                     if matches!(
@@ -372,6 +380,56 @@ pub fn run(path: &std::path::Path, port: u16, validate_only: bool) -> wasmtime::
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn short_burst_waits_and_keeps_guest_execution_serial() {
+        let admission = Arc::new(Semaphore::new(1));
+        let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let initial = admission.acquire().await.unwrap();
+        let mut requests = Vec::new();
+        for _ in 0..7 {
+            let admission = admission.clone();
+            let active = active.clone();
+            requests.push(tokio::spawn(async move {
+                let _permit = admit(&admission).await.expect("short burst admitted");
+                assert_eq!(active.fetch_add(1, std::sync::atomic::Ordering::SeqCst), 0);
+                tokio::task::yield_now().await;
+                assert_eq!(active.fetch_sub(1, std::sync::atomic::Ordering::SeqCst), 1);
+            }));
+        }
+        tokio::task::yield_now().await;
+        assert!(requests.iter().all(|request| !request.is_finished()));
+        drop(initial);
+        for request in requests {
+            request.await.unwrap();
+        }
+        assert_eq!(admission.available_permits(), 1);
+    }
+
+    #[tokio::test]
+    async fn admission_expires_without_stealing_or_leaking_the_execution_permit() {
+        let admission = Semaphore::new(1);
+        let active = admission.acquire().await.unwrap();
+        assert!(admit(&admission).await.is_none());
+        assert_eq!(admission.available_permits(), 0);
+        drop(active);
+        drop(admit(&admission).await.expect("recovers after overload"));
+        assert_eq!(admission.available_permits(), 1);
+        admission.close();
+        assert!(admit(&admission).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn cancelled_waiter_does_not_block_following_requests() {
+        let admission = Arc::new(Semaphore::new(1));
+        let active = admission.acquire().await.unwrap();
+        let waiting = admission.clone();
+        let request = tokio::spawn(async move { admit(&waiting).await.is_some() });
+        tokio::task::yield_now().await;
+        request.abort();
+        assert!(request.await.unwrap_err().is_cancelled());
+        drop(active);
+        assert!(admit(&admission).await.is_some());
+    }
     #[test]
     fn rejects_native_core_modules_and_oversized_artifacts_before_compilation() {
         for bytes in [
