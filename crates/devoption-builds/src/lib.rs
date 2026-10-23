@@ -134,10 +134,7 @@ impl BuildPlan {
                 Some(input.binary.as_str()) == input.source.binary()
             }
             devoption_registry::cargo_inputs::SourceTarget::Cdylib { name } => {
-                input.package == "devoption-web-fixture"
-                    && name == "devoption_web_fixture"
-                    && input.binary == *name
-                    && input.rust_version == "1.99.0"
+                input.binary == *name && input.rust_version == "1.99.0"
             }
         };
         if input.package != input.source.package() || !target_matches {
@@ -175,7 +172,7 @@ impl BuildPlan {
 
     pub fn artifact_path(&self) -> String {
         if self.is_wasm() {
-            "wasm32-wasip2/release/devoption_web_fixture.wasm".into()
+            format!("wasm32-wasip2/release/{}.wasm", self.0.binary)
         } else {
             format!("release/{}", self.0.binary)
         }

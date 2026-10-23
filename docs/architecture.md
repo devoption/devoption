@@ -39,7 +39,8 @@ Use focused references for details rather than loading every subsystem:
   saved attempts and bounded checkpoints through fresh catalog scoping checks.
   [Supervision decisions](build-supervision.md) track stop reasons and grace
   without delivering signals or asserting cleanup.
-  [Complete snapshots](source-snapshots.md) retain verified source bytes; the Linux build adapter uses them for the selected trusted app.
+  [Complete snapshots](source-snapshots.md) retain verified source bytes; the Linux build adapter uses their validated package/library identities for
+  [trusted standalone Wasm apps](web-app-builds.md#application-identity-and-assets).
 - [Registry contracts](registry-contract.md), [Cargo inputs](cargo-inputs.md) and
   [source proofs](cargo-source-proof.md) validate supplied data; they do not provide
   acquisition, registry hosting or build permission.

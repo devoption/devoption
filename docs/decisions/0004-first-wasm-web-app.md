@@ -95,6 +95,17 @@ If the fixture exceeds them, report measurements and make a focused policy chang
 do not silently increase them or relabel a failed build successful. Compiling the
 DevOption host and Wasmtime itself is platform installation, outside a guest job.
 
+## General application identity and assets (#295)
+
+The original fixture identity above is no longer an admission restriction. The
+[build guide](../web-app-builds.md#application-identity-and-assets) owns the current
+standalone-library naming and packaged-asset contract, demonstrated by the public
+[static-site example](../../examples/static-site/). The planner, execution adapter
+and installed compiler worker derive the package/library/output identity from the
+reviewed manifest instead of hard-coding the fixture. Exact source, dependency,
+review and artifact integrity boundaries remain in force. This change adds no
+runtime filesystem/network access, additional target kinds or frontend toolchain.
+
 ## Hosting and capability contract
 
 Run one app worker in a separate unprivileged OS identity from the owner store and

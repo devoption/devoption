@@ -6,12 +6,14 @@ Never invoke this directly as an alternative to the broker's isolation.
 """
 import os
 from pathlib import Path
+import re
 import selectors
 import socket
 import stat
 import subprocess
 import sys
 import time
+import tomllib
 
 LIMIT = 1048576
 ARTIFACT_LIMIT = 4194304
@@ -21,6 +23,38 @@ class WorkerFailure(Exception):
     def __init__(self, code, message):
         super().__init__(message)
         self.code = code
+
+
+def build_target(manifest):
+    """Select only a conventional library from the already reviewed source.
+
+    The Rust snapshot validator owns full manifest/lock/source admission. Repeat
+    the target shape checks here so this worker never selects another target or
+    accepts an argument/path supplied outside the read-only source mount.
+    """
+    if len(manifest) > 65536:
+        raise WorkerFailure(126, 'compiler manifest rejected')
+    try:
+        value = tomllib.loads(manifest.decode('utf-8'))
+        package, library = value['package'], value['lib']
+        name, target = package['name'], library['name']
+        if (set(value) - {'package', 'lib', 'dependencies'}
+                or set(package) != {'name', 'version', 'edition', 'build'}
+                or set(library) != {'name', 'crate-type'}
+                or not isinstance(name, str) or not isinstance(target, str)
+                or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_-]{0,127}', name)
+                or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,127}', target)
+                or target != name.replace('-', '_')
+                or library['crate-type'] != ['cdylib']
+                or package['build'] is not False
+                or package['edition'] not in ('2021', '2024')):
+            raise ValueError('unsupported target')
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        raise WorkerFailure(126, 'compiler manifest rejected') from None
+    command = ['/toolchain/bin/cargo', 'build', '--release', '--locked', '--offline',
+               '--target', 'wasm32-wasip2', '--package', name, '--lib']
+    artifact = Path('wasm32-wasip2/release') / f'{target}.wasm'
+    return command, artifact
 
 
 def read_component_candidate(path):
@@ -84,8 +118,8 @@ def main():
         'CARGO_INCREMENTAL': '0', 'CARGO_BUILD_JOBS': '1',
         'RUSTC_WRAPPER': '', 'RUSTC_WORKSPACE_WRAPPER': '',
     }
-    command = ['/toolchain/bin/cargo', 'build', '--release', '--locked', '--offline',
-               '--target', 'wasm32-wasip2', '--package', 'devoption-web-fixture', '--lib']
+    with Path('/source/Cargo.toml').open('rb') as source:
+        command, artifact_path = build_target(source.read(65537))
     child = subprocess.Popen(command, cwd='/source', env=environment,
                              stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                              stderr=subprocess.STDOUT)
@@ -110,7 +144,7 @@ def main():
                     raise WorkerFailure(125, 'compiler output limit reached')
         if child.wait(timeout=max(0.1, deadline - time.monotonic())) != 0:
             return 1
-        artifact = root / 'target/wasm32-wasip2/release/devoption_web_fixture.wasm'
+        artifact = root / 'target' / artifact_path
         data = read_component_candidate(artifact)
         # The supervisor retains an independent copy only after complete cgroup stop.
         sys.stdout.buffer.write(data)
