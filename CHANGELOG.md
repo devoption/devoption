@@ -44,6 +44,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add optional verified-client-certificate and exact-leaf access control for the
+  administrative HTTPS proxy, with explicit protected/public generation choices,
+  operator revocation/recovery instructions and real pinned-proxy rejection tests.
+  Keep owner authentication and certificate-free public app routing independent
+  ([#302](https://github.com/devoption/devoption/issues/302)).
+
 - Add read-only candidate readiness checks and an identity-bound HTTPS canary
   collector, with minimum observation windows, complete acceptance/report
   digests, per-route latency/failure limits and a default-on promotion stop.

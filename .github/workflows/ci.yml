@@ -63,6 +63,27 @@ jobs:
           cargo build --workspace --release --locked --offline
           cargo test -p devoption-cli --test server --release --locked --offline installation
           python3 scripts/check_systemd_unit.py target/release/devoption
+      - name: Verify ordinary and protected HTTPS access through the pinned proxy
+        env:
+          DEVOPTION_TEST_CADDY: ${{ runner.temp }}/devoption-proxy-test/caddy
+        run: |
+          python3 - <<'PYTHON'
+          import hashlib, io, os, sys, tarfile, urllib.request
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from release_bundle import CADDY_SHA512, CADDY_VERSION
+          url = f'https://github.com/caddyserver/caddy/releases/download/v{CADDY_VERSION}/caddy_{CADDY_VERSION}_linux_amd64.tar.gz'
+          with urllib.request.urlopen(url, timeout=30) as response:
+              raw = response.read(256 * 1024 * 1024 + 1)
+          if hashlib.sha512(raw).hexdigest() != CADDY_SHA512:
+              raise ValueError('Proxy fixture checksum mismatch.')
+          binary = Path(os.environ['DEVOPTION_TEST_CADDY'])
+          binary.parent.mkdir(mode=0o700)
+          with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
+              binary.write_bytes(archive.extractfile('caddy').read())
+          binary.chmod(0o700)
+          PYTHON
+          cargo test -p devoption-cli --test server --release --locked --offline public_https_proxy -- --ignored --nocapture
       - name: Assemble and inspect the exact release executable
         env:
           BUNDLE_OUTPUT: ${{ runner.temp }}/devoption-bundle-candidate

@@ -35,6 +35,7 @@ This starts an unconfigured development preview. For saved projects and optional
 existing-repository inspection, follow [owner setup and usage](docs/using-devoption.md) or the
 [private Ubuntu installation guide](docs/private-linux-install.md).
 The server binds to loopback. Use the explicit [HTTPS proxy setup](docs/public-linux-install.md)
+with optional [device-certificate access control](docs/public-linux-install.md#optional-protected-administrative-access)
 for public-origin validation; never expose the backend HTTP port.
 Run `cargo run --locked --offline -- --help` for command options.
 

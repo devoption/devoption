@@ -49,6 +49,140 @@ trusted local processes may reach the backend. This TCP loopback arrangement doe
 not authenticate the proxy against other local users: use a dedicated VM without
 untrusted shell users or workloads. Future app hosting must preserve this boundary.
 
+## Optional protected administrative access
+
+The standard proxy above provides HTTPS plus DevOption owner authentication.
+For a device-certificate gate before any administrative HTTP content, use the
+review-only hostname generator with Caddy **2.11.7** client authentication. This
+is an operator-managed mTLS access policy, not browser SSO, team enrollment or a
+claim of comprehensive zero-trust certification.
+
+The gate requires both a chain verified against the configured private client CA
+and an exact allowed client leaf certificate. Owner sign-in, session expiry and
+Origin/CSRF checks still apply after TLS admission. A certificate alone never
+creates a DevOption session or owner. HTTP identity headers are not credentials;
+the proxy strips client/SSL identity and forwarding header families upstream.
+Public app hostnames have their own TLS policy and do not request client certs.
+
+### Prepare certificate inputs separately
+
+Use your approved certificate issuance process to obtain a client CA certificate
+and one distinct client certificate/key per authorized device. Certificates need
+client-auth usage and a short, maintained validity period. Import the device's
+certificate/private key through the browser or OS certificate manager, using a
+protected, encrypted export format when transport is necessary. Test on the actual
+browser/device before relying on this route. No certificate issuance or enrollment
+is performed by the generator, installer or server. Do not put a CA private key or
+device private key on the proxy; Caddy only needs public certificates.
+
+Install the client CA PEM and a PEM bundle containing only explicitly permitted
+client leaf certificates at these example paths. Keep both files and every parent
+root-owned and non-writable by the platform, apps or other users; Caddy must be
+able to read them. For example, after reviewing the public certificate inputs:
+
+```sh
+sudo install -d -m 755 -o root -g root /etc/caddy/access
+sudo install -m 644 -o root -g root client-ca.pem /etc/caddy/access/client-ca.pem
+sudo install -m 644 -o root -g root allowed-clients.pem /etc/caddy/access/allowed-clients.pem
+```
+
+Do not use the public server certificate CA bundle as the client CA. The client CA
+and public HTTPS server certificate serve separate purposes. Public server TLS
+continues using normal ACME issuance/renewal; never disable server verification.
+
+Keep this small policy file in private operator configuration:
+
+```toml
+client_ca_file = "/etc/caddy/access/client-ca.pem"
+allowed_clients_file = "/etc/caddy/access/allowed-clients.pem"
+```
+
+Only those two fields and canonical absolute ASCII file-path syntax are accepted.
+The generator does not inspect or authenticate the files at those target paths;
+the real proxy's validation/startup checks the certificate inputs. A missing or
+invalid input cannot fall back to ungated access. An empty allowlist accepts no
+clients (or refuses activation), rather than trusting every certificate from the CA.
+
+### Generate and activate a protected route
+
+For a platform without an app binding, save that policy as `platform-access.toml`:
+
+```sh
+python3 scripts/configure_app_hostname.py \
+  --platform-only \
+  --platform-hostname platform.example.com \
+  --platform-port 3000 \
+  --platform-access-policy ./platform-access.toml \
+  --output ./protected-proxy-review
+```
+
+This creates a new private review directory and `Caddyfile`; it installs nothing,
+issues no credentials and changes no DNS. Existing output is never overwritten.
+`--platform-only` requires protection. When adding an app, use the same policy with
+[the two-host generator](app-hostnames.md); keep the policy under operator control
+and pass it on every regeneration. The alternative `--public-platform` is an
+explicit choice to generate an administrative route without a certificate gate.
+Do not select it to work around a certificate or recovery problem.
+
+Keep backend ports private, the dedicated-node trust boundary above, strict
+SNI/Host checking, and the existing service/storage/owner settings. Review and back
+up the current proxy configuration and public certificate-policy inputs. Validate
+as the actual Caddy service user before replacement:
+
+```sh
+test ! -e /etc/caddy/Caddyfile.review
+test ! -L /etc/caddy/Caddyfile.review
+sudo install -m 644 -o root -g root ./protected-proxy-review/Caddyfile /etc/caddy/Caddyfile.review
+sudo -u caddy env XDG_DATA_HOME=/var/lib/caddy/data XDG_CONFIG_HOME=/var/lib/caddy/config \
+  /usr/local/bin/caddy adapt --config /etc/caddy/Caddyfile.review --adapter caddyfile --validate >/dev/null
+```
+
+The staging file is root-controlled and Caddy-readable; the original review
+directory remains private. Validation must read the installed certificate inputs
+successfully. Do not activate an invalid configuration. After retaining the
+reviewed prior configuration and certificate-policy inputs, install this validated
+staging file at `/etc/caddy/Caddyfile` with root ownership/mode 0644 and restart the
+existing Caddy service; its admin API remains disabled. Perform allowed and denied external
+checks before treating the installation as ready. A full proxy restart can briefly
+interrupt the app route too; it does not stop or redeploy the app worker.
+
+### Revoke, rotate and recover
+
+Remove a device's exact leaf certificate from the allowlist, validate the intended
+configuration and **restart the proxy** to end old connections and TLS sessions.
+Merely editing a PEM file does not update a running verifier. Prove the removed
+device is denied even with its existing platform cookie, another permitted device
+can still sign in, and the public app still works. No CRL/OCSP lookup or automatic
+device enrollment is added. For rotation, temporarily allow the reviewed old and
+new leafs, test the new device, then remove the old leaf and restart again.
+
+Maintain independent administrator SSH/console access. Recover by restoring a
+reviewed CA/allowlist or authorizing a replacement device through the established
+issuance process, rather than exposing the backend or removing client auth. Avoid
+restoring revoked identities unintentionally. Back up the access policy, CA public
+certificate, allowed leaf bundle and reviewed Caddyfile separately: the bounded
+app-state snapshot does not collect these proxy files or device/issuer keys.
+
+This optional source/configuration profile does not change the signed installer's
+default public proxy template. Its current base-upgrade/reinstall contract expects
+managed configuration bytes; it may refuse a customized protected installation.
+Do not replace the gate with the default template to pass that check. Protected
+profile upgrade acceptance remains separate.
+
+### Validation scope
+
+The ignored `public_https_proxy` integration test exercises ordinary and protected
+routes through the pinned Caddy binary and an actual configured DevOption server.
+Disposable certificates cover permitted-device owner login, absent/untrusted/
+unlisted/expired/wrong-usage denial, forged-header and cross-host attempts, missing
+and empty trust inputs, revocation/restart with an otherwise valid session cookie,
+and independent certificate-free app access. CI runs this explicitly on Linux.
+The test uses local server trust only and removes its temporary keys/trust; it does
+not establish public DNS, ACME or real browser-device enrollment for a new host.
+
+Upstream references: [Caddy client authentication and leaf verifier](https://caddyserver.com/docs/caddyfile/directives/tls#client_auth)
+and the [pinned connection-policy implementation](https://github.com/caddyserver/caddy/blob/v2.11.7/modules/caddytls/connpolicy.go).
+
 ## Build the reviewed source
 
 As the administrator's unprivileged build user, select the reviewed commit:
