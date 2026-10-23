@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Allow short HTTP request bursts to wait up to 250 milliseconds for the single
+  guest execution slot, within the existing 16-connection limit. Preserve serial
+  execution, bounded overload rejection and guest resource limits
+  ([#304](https://github.com/devoption/devoption/issues/304)).
+
 - Build trusted standalone WASIp2 apps using validated package/library identities
   instead of fixed fixture names. Add an embedded HTML/CSS/JavaScript example,
   target/approval regression tests and disposable Linux broker/runtime checks;
