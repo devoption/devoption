@@ -53,6 +53,13 @@ only when all four jobs succeed; failure, cancellation, or skipping cannot pass
 that gate. `Issue and change documentation` remains a separate required status.
 This preserves branch protection without changing repository settings.
 
+The installation job downloads Caddy using the existing exact version/checksum
+pin and explicitly runs the ignored `public_https_proxy` test. It uses loopback
+ports and temporary server/client certificates without installing trust or host
+services. Both ordinary and protected access are checked, including certificate
+verification/leaf authorization, real owner login, revocation after proxy restart,
+forged-header/cross-host rejection and independent public-app routing.
+
 The installation job also assembles a local preview bundle from the release
 executable, runs its version/help checks, and compares every archived byte and
 manifest entry, source-inventory SBOM and unsigned assembly statement with the

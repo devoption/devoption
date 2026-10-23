@@ -21,8 +21,16 @@ python3 scripts/configure_app_hostname.py \
   --app-hostname app.example.com \
   --project YOUR_32_CHARACTER_PROJECT_ID \
   --platform-port 3000 \
+  --public-platform \
   --output ./hostname-review
 ```
+
+The example explicitly selects an administrative route with ordinary HTTPS and
+owner authentication. To retain [protected device access](public-linux-install.md#optional-protected-administrative-access),
+replace `--public-platform` with `--platform-access-policy ./platform-access.toml`.
+The CLI requires one of these choices; omitting both is an error. The same client
+CA and exact leaf allowlist gate applies only to the platform hostname. Never
+replace an installed protected Caddyfile with an ungated generated copy.
 
 Use the existing platform's actual loopback port. The command creates a new
 review directory containing `deployment.toml` and `Caddyfile`; it installs nothing,

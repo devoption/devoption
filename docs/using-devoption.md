@@ -53,6 +53,12 @@ For private Ubuntu source installation, see the
 unprivileged systemd example, same-port SSH forwarding, persistent owner storage,
 and the scope of [CI and disposable Ubuntu VM validation](linux-rehearsal.md).
 
+For HTTPS administrative access, an optional
+[device-certificate gate](public-linux-install.md#optional-protected-administrative-access)
+can reject unauthorized connections before sign-in content is served. A permitted
+device must still sign in as the owner. This proxy policy does not add app users,
+team roles, browser SSO or agent credentials to the server.
+
 ## HTTP authentication in the current preview
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`
