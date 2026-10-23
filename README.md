@@ -8,7 +8,8 @@ repository creation, attachment, [file browsing in Code](docs/repository-files.m
 and Git status inspection,
 [source preparation checks](docs/build-preparation.md) in Builds or the CLI,
 owner sign-in, and appearance preferences. An opt-in [Linux build runner](docs/web-app-builds.md)
-can build the selected trusted Wasm web app through review and approval in the interface.
+can build trusted standalone Wasm HTTP apps with embedded assets through review
+and approval in the interface.
 The opt-in [private app runtime](docs/web-app-deployments.md) adds saved releases,
 reviewed deployment, health/log/stop controls and restart recovery on the same node.
 [App hostnames](docs/app-hostnames.md) add a separate HTTPS route and visible local TLS status. Authentication

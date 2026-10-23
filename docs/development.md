@@ -70,6 +70,16 @@ reinstall. No system accounts, host units or services are changed. Signature
 failure/acceptance policy is tested separately; real privileged installer and
 reboot acceptance remain subject to the [installer's validation limits](bundle-installation.md#validation-scope).
 
+The installation job additionally runs `check_named_web_app.py` with explicit
+`--disposable-system-host`. It refuses existing build helpers/configuration,
+prepares and verifies the public static site's offline dependencies, temporarily
+installs the real build broker/worker, and builds two independently named-app
+revisions inside the existing systemd limits. It verifies exact CSS/JavaScript
+responses and A → B → saved A through the locally built runtime, then stops the
+unit and removes its installed files. This proves compiler/runtime compatibility,
+not full project UI, immutable-release promotion, HTTPS or reboot acceptance.
+Never run this privileged fixture on an existing installation or workstation.
+
 The installation job also builds the exact reserved prior source and a disposable
 next-preview source fixture with real versioned executables, then runs
 `check_bundle_upgrade.py` on its fresh GitHub-hosted Ubuntu runner. Its explicit

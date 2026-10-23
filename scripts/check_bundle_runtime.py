@@ -23,7 +23,7 @@ from release_plan import workspace
 from verify_bundle_provenance import snapshot
 
 
-def smoke(binary, component, version):
+def smoke(binary, component, version, *, revision='A', assets=()):
     probe_runtime(binary, version)
     raw = snapshot(component, 4 * 1024 * 1024)
     with tempfile.TemporaryDirectory(prefix='devoption-worker-smoke-') as temporary:
@@ -48,7 +48,7 @@ def smoke(binary, component, version):
                     connection.request('GET', '/healthz')
                     response = connection.getresponse()
                     body = response.read(1025)
-                    if (response.status == 200 and body == b'ok A' and
+                    if (response.status == 200 and body == f'ok {revision}'.encode() and
                             response.getheader('X-DevOption-Invocation') == environment['INVOCATION_ID']):
                         break
                 except (OSError, http.client.HTTPException):
@@ -58,7 +58,7 @@ def smoke(binary, component, version):
                 time.sleep(.1)
             else:
                 raise ValueError('Packaged worker fixture readiness deadline exceeded.')
-            for method, path, status, body in [('GET', '/', 200, b'DevOption app revision A'),
+            for method, path, status, body in [('GET', '/', 200, f'DevOption app revision {revision}'.encode()),
                                                ('GET', '/missing', 404, b'Not found'),
                                                ('POST', '/', 405, b'Method not allowed')]:
                 connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
@@ -69,6 +69,18 @@ def smoke(binary, component, version):
                     if (child.poll() is not None or response.status != status or body not in content or
                             response.getheader('X-DevOption-Invocation') != environment['INVOCATION_ID']):
                         raise ValueError('Packaged worker fixture routing or invocation differs.')
+                finally:
+                    connection.close()
+            for path, content_type, expected in assets:
+                connection = http.client.HTTPConnection('127.0.0.1', port, timeout=5)
+                try:
+                    connection.request('GET', path)
+                    response = connection.getresponse()
+                    content = response.read(len(expected) + 1)
+                    if (response.status != 200 or content != expected or
+                            response.getheader('Content-Type') != content_type or
+                            response.getheader('X-DevOption-Invocation') != environment['INVOCATION_ID']):
+                        raise ValueError('Named app asset bytes, type or invocation differs.')
                 finally:
                     connection.close()
         finally:

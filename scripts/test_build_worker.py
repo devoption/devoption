@@ -3,7 +3,37 @@ from pathlib import Path
 import os
 import tempfile
 import unittest
-from build_worker import ARTIFACT_LIMIT, WorkerFailure, read_component_candidate
+from build_worker import ARTIFACT_LIMIT, WorkerFailure, build_target, read_component_candidate
+
+
+class TargetTests(unittest.TestCase):
+    def test_existing_and_named_apps_select_only_their_library_artifact(self):
+        for directory, package, library in [('web-app', 'devoption-web-fixture', 'devoption_web_fixture'),
+                                             ('static-site', 'sample-site', 'sample_site')]:
+            manifest = Path('examples', directory, 'Cargo.toml').read_bytes()
+            command, artifact = build_target(manifest)
+            self.assertEqual(command, ['/toolchain/bin/cargo', 'build', '--release', '--locked',
+                                       '--offline', '--target', 'wasm32-wasip2', '--package', package, '--lib'])
+            self.assertEqual(artifact, Path(f'wasm32-wasip2/release/{library}.wasm'))
+
+    def test_paths_extra_targets_and_argument_substitution_are_rejected(self):
+        original = Path('examples/static-site/Cargo.toml').read_bytes()
+        mutations = [
+            original.replace(b'sample-site', value) for value in
+            (b'../other', b'--all', b'other/site', b'other site', b'other\\nsite', b'x' * 129)
+        ] + [
+            original.replace(b'sample_site', b'other'),
+            original.replace(b'build = false', b'build = true'),
+            original.replace(b'crate-type = ["cdylib"]', b'crate-type = ["cdylib", "rlib"]'),
+            original.replace(b'[lib]', b'[lib]\npath = "other.rs"'),
+            original.replace(b'[lib]', b'[lib]\nname2 = "other"'),
+            original + b'\n[[bin]]\nname = "other"\n',
+            original + b'\n[workspace]\n',
+            b'package = "bad"\nlib = []', b'\xff', b'x' * 65537,
+        ]
+        for manifest in mutations:
+            with self.subTest(manifest=manifest[:100]), self.assertRaises(WorkerFailure):
+                build_target(manifest)
 
 
 class ArtifactTests(unittest.TestCase):

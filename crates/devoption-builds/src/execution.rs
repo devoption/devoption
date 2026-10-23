@@ -348,6 +348,11 @@ pub fn prepare(
             config.vendor_hash,
             inputs::describe_tree(&config.vendor)?.1,
         );
+        let package = source.package().to_owned();
+        let binary = match source.target() {
+            devoption_registry::cargo_inputs::SourceTarget::Cdylib { name } => name.clone(),
+            _ => return Err(io::Error::other("build execution requires a Wasm library")),
+        };
         let plan = BuildPlan::validate(
             PlanInput {
                 project,
@@ -358,8 +363,8 @@ pub fn prepare(
                 rust_version: "1.99.0".into(),
                 cargo_executable: "/toolchain/bin/cargo".into(),
                 work_directory: directory.to_str().ok_or_else(error)?.into(),
-                package: "devoption-web-fixture".into(),
-                binary: "devoption_web_fixture".into(),
+                package,
+                binary,
                 environment,
                 limits: Limits {
                     elapsed_seconds: 60,

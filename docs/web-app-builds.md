@@ -1,13 +1,55 @@
 # Build the first web app through the interface
 
 The opt-in Linux runner connects project source, immutable review, explicit owner
-approval, real offline compilation and saved results. It builds the trusted
-[`examples/web-app`](../examples/web-app/) WASIp2 fixture selected by
-[ADR 0004](decisions/0004-first-wasm-web-app.md). It does **not** run or deploy the
+approval, real offline compilation and saved results. It builds trusted standalone WASIp2 HTTP libraries using the narrow manifest
+contract below. The original [`examples/web-app`](../examples/web-app/) fixture
+from [ADR 0004](decisions/0004-first-wasm-web-app.md) remains supported;
+[`examples/static-site`](../examples/static-site/) demonstrates another app identity
+with packaged assets. It does **not** run or deploy the
 component. [The deployment runtime](web-app-deployments.md) validates imports and runs saved releases.
 Cloud infrastructure is unnecessary for this step: use a disposable Ubuntu 24.04
 x86_64 VM. The later [public cloud acceptance](public-cloud-acceptance.md) records
 fresh source installation, DNS/ACME and the connected lifecycle for this profile.
+
+## Application identity and assets
+
+Each reviewed app is a standalone package with a committed Cargo v4 lockfile,
+`build = false`, edition 2021 or 2024, conventional `src/lib.rs`, and exactly one
+`cdylib` target. `[lib].name` must match the package name with hyphens replaced by
+underscores. Package and library names are bounded to 128 ASCII characters; names
+start with a letter or underscore, with digits allowed afterward and hyphens only
+in the package. Dependency requirements remain exact pins with a complete verified
+offline bundle. Workspaces, extra targets, custom library paths, custom Cargo
+configuration and unsupported manifest fields remain rejected.
+
+The source snapshot supplies the package/library identity to both review and
+execution. The command remains fixed apart from that validated package:
+
+```text
+build --release --locked --offline --target wasm32-wasip2 --package sample-site --lib
+```
+
+The selected output is `wasm32-wasip2/release/<library>.wasm`. The installed worker
+independently derives the same conventional target from its read-only source
+manifest; browser input cannot select commands, target paths or compiler flags.
+Updating the worker changes the installed configuration fingerprint and requires
+fresh review. The immutable release artifact remains `component.wasm` with its
+source/review/toolchain/dependency provenance; the runtime does not depend on the
+original Cargo output filename.
+
+Package assets as committed regular files and embed them with `include_str!` or
+`include_bytes!`. The [static-site example](../examples/static-site/) uses explicit
+HTTP routes and correct content types for HTML, CSS and JavaScript. All committed
+asset paths and bytes are captured in the source snapshot; edits or an app rename
+invalidate prior reviews/approvals. Rebuild to update embedded assets. No runtime
+filesystem access, arbitrary URL-to-file mapping, Node pipeline or asset fetching
+is added.
+
+Existing bounds still apply: at most 128 source files, 512 KiB per file, 4 MiB
+for the complete source snapshot including Git metadata, 4 MiB per component and
+1 MiB per HTTP response. Larger sites need measured, separately reviewed changes;
+this contract does not silently expand those limits. Runtime HTTP compatibility
+validation is still required before deployment.
 
 ## Prepare the node
 
@@ -29,7 +71,8 @@ these four directories, such as under `/opt/devoption/inputs`.
    checkout directly under the selected repository root. Commit its three files
    (`Cargo.toml`, `Cargo.lock`, `src/lib.rs`) with your normal Git identity.
    Git metadata must not be group/other writable. The app package and library
-   names are currently fixed by ADR 0004; arbitrary app targets are unsupported.
+   names may instead follow the standalone library contract below. Do not rename
+   a real application to the fixture names.
 2. Prepare the pinned toolchain and target using your normal verified Rust
    installation procedure. Select its real toolchain directory, not rustup shims.
 3. As the platform account, use the pinned Cargo to prepare the fixture's locked

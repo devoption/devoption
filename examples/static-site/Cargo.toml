@@ -1,0 +1,12 @@
+[package]
+name = "sample-site"
+version = "0.1.0"
+edition = "2021"
+build = false
+
+[lib]
+name = "sample_site"
+crate-type = ["cdylib"]
+
+[dependencies]
+wasip2 = "=1.0.1"

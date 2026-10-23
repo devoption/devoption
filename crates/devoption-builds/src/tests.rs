@@ -475,7 +475,15 @@ fn cdylib_snapshot_cannot_enter_the_native_plan_or_approval_path() {
     input.dependencies = dependencies(&input.source);
     input.package = input.source.package().into();
     input.binary = input.source.package().into();
-    rejected(&catalog, input, Error::TargetMismatch);
+    let plan = BuildPlan::validate(input, &catalog).unwrap();
+    assert!(plan.is_wasm());
+    assert!(matches!(
+        crate::review_context::ReviewContext::validate(
+            &plan,
+            crate::review_context::tests::input(&plan)
+        ),
+        Err(crate::review_context::Error::Policy)
+    ));
 }
 
 #[test]
@@ -524,4 +532,147 @@ fn selected_web_app_plan_uses_only_the_pinned_wasip2_target() {
     );
     input.rust_version = "1.98.0".into();
     assert!(BuildPlan::validate(input, &catalog).is_err());
+}
+
+fn static_site_input(name: &str, css: &[u8]) -> (Catalog, PlanInput) {
+    let (catalog, mut input) = fixture();
+    let manifest = include_str!("../../../examples/static-site/Cargo.toml")
+        .replace("sample-site", name)
+        .replace("sample_site", &name.replace('-', "_"));
+    let lock =
+        include_str!("../../../examples/static-site/Cargo.lock").replace("sample-site", name);
+    input.source = source_snapshot::tests::ProofFixture::with_files(&[
+        ("Cargo.toml", manifest.as_bytes()),
+        ("Cargo.lock", lock.as_bytes()),
+        (
+            "src/lib.rs",
+            include_bytes!("../../../examples/static-site/src/lib.rs"),
+        ),
+        (
+            "assets/index.html",
+            include_bytes!("../../../examples/static-site/assets/index.html"),
+        ),
+        ("assets/site.css", css),
+        (
+            "assets/site.js",
+            include_bytes!("../../../examples/static-site/assets/site.js"),
+        ),
+    ])
+    .verify()
+    .unwrap();
+    input.commit = input.source.commit().into();
+    input.dependencies = dependencies(&input.source);
+    input.package = input.source.package().into();
+    input.binary = name.replace('-', "_");
+    input.rust_version = "1.99.0".into();
+    (catalog, input)
+}
+
+#[test]
+fn named_wasm_app_binds_library_command_artifact_and_all_asset_bytes() {
+    let css = include_bytes!("../../../examples/static-site/assets/site.css");
+    let (catalog, input) = static_site_input("sample-site", css);
+    let plan = BuildPlan::validate(input.clone(), &catalog).unwrap();
+    assert_eq!(
+        plan.artifact_path(),
+        "wasm32-wasip2/release/sample_site.wasm"
+    );
+    assert_eq!(
+        plan.cargo_arguments(),
+        [
+            "build",
+            "--release",
+            "--locked",
+            "--offline",
+            "--target",
+            "wasm32-wasip2",
+            "--package",
+            "sample-site",
+            "--lib"
+        ]
+    );
+    assert_eq!(plan.details().source.files().len(), 6);
+    for (package, binary) in [
+        ("devoption-web-fixture", "sample_site"),
+        ("sample-site", "devoption_web_fixture"),
+        ("../other", "sample_site"),
+        ("sample-site", "../other"),
+    ] {
+        let mut changed = input.clone();
+        changed.package = package.into();
+        changed.binary = binary.into();
+        assert!(BuildPlan::validate(changed, &catalog).is_err());
+    }
+    let (_, mut changed) = static_site_input("sample-site", b"body { color: navy; }\n");
+    changed.project = input.project;
+    changed.repository = input.repository;
+    let changed = BuildPlan::validate(changed, &catalog).unwrap();
+    assert!(plan != changed);
+    assert!(plan.details().source.sha256() != changed.details().source.sha256());
+}
+
+#[test]
+fn named_wasm_approval_is_invalidated_by_a_rename_or_asset_edit() {
+    use crate::{
+        approvals::{Approvals, OwnerId},
+        jobs::{BuildJob, JobId},
+        review_context::{Policy, ReviewContext},
+    };
+    let environment = [
+        ("PATH", "/toolchain/bin:/usr/bin"),
+        ("RUSTC", "/toolchain/bin/rustc"),
+        ("HOME", "/job/home"),
+        ("CARGO_HOME", "/job/cargo"),
+        ("CARGO_TARGET_DIR", "/job/target"),
+        ("TMPDIR", "/job/tmp"),
+        ("LANG", "C.UTF-8"),
+        ("CARGO_NET_OFFLINE", "true"),
+        ("CARGO_INCREMENTAL", "0"),
+        ("CARGO_BUILD_JOBS", "1"),
+        ("RUSTC_WRAPPER", ""),
+        ("RUSTC_WORKSPACE_WRAPPER", ""),
+    ];
+    let make = |name, css: &[u8]| {
+        let (catalog, mut input) = static_site_input(name, css);
+        input.cargo_executable = "/toolchain/bin/cargo".into();
+        input.limits.log_bytes = 1_048_576;
+        input.environment = environment
+            .iter()
+            .map(|(name, value)| EnvironmentEntry {
+                name: (*name).into(),
+                value: (*value).into(),
+            })
+            .collect();
+        let plan = BuildPlan::validate(input, &catalog).unwrap();
+        let mut context = crate::review_context::tests::input(&plan);
+        context.policy = Policy::WasmBuildV1;
+        context.rustc.path = "/toolchain/bin/rustc".into();
+        let context = ReviewContext::validate(&plan, context).unwrap();
+        (BuildJob::queued(JobId::from_bytes([7; 16]), plan), context)
+    };
+    let owner = OwnerId::from_bytes([1; 16]);
+    let (original, context) = make("sample-site", b"body {}\n");
+    for (name, css) in [
+        ("other-site", b"body {}\n".as_slice()),
+        ("sample-site", b"body { color: navy; }\n"),
+    ] {
+        let approvals = Approvals::default();
+        let handle = approvals
+            .approve(owner, &original, context.clone())
+            .unwrap();
+        let (changed, fresh) = make(name, css);
+        // Isolate the source edit: do not accidentally test a catalog/owner change.
+        let mut plan = changed.plan().clone();
+        plan.0.project = original.plan().details().project;
+        plan.0.repository = original.plan().details().repository;
+        let changed = BuildJob::queued(original.id(), plan);
+        assert_eq!(
+            approvals.consume(&handle, owner, &changed, &fresh),
+            Err(approvals::Error::ReviewChanged)
+        );
+        assert_eq!(
+            approvals.consume(&handle, owner, &original, &context),
+            Err(approvals::Error::Inactive(approvals::Status::Invalidated))
+        );
+    }
 }

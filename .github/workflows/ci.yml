@@ -78,6 +78,8 @@ jobs:
           cargo fetch --manifest-path examples/web-app/Cargo.toml --locked
           cargo build --manifest-path examples/web-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/worker-smoke"
           python3 scripts/check_bundle_runtime.py "$BUNDLE_OUTPUT" --binary target/release/devoption --runtime target/release/devoption-runtime --component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
+      - name: Build and serve a named app with embedded assets on the disposable runner
+        run: python3 scripts/check_named_web_app.py --disposable-system-host --runtime target/release/devoption-runtime
       - name: Exercise prior-preview upgrade and full-state recovery on disposable runner
         env:
           UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture

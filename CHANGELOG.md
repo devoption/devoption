@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Build trusted standalone WASIp2 apps using validated package/library identities
+  instead of fixed fixture names. Add an embedded HTML/CSS/JavaScript example,
+  target/approval regression tests and disposable Linux broker/runtime checks;
+  preserve existing source, artifact and runtime limits
+  ([#295](https://github.com/devoption/devoption/issues/295)).
+
 - Include the separate version-matched Wasmtime app worker in new schema-3
   bundles, bind its bytes and locked runtime versions into verification/SBOM/
   assembly provenance, and probe it during installation and base upgrades.

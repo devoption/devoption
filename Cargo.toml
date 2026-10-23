@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/devoption-runtime", "crates/devoption-builds", "crates/devoption-cli", "crates/devoption-projects", "crates/devoption-registry", "crates/devoption-server", "crates/devoption-ui"]
-exclude = ["examples/web-app"]
+exclude = ["examples/web-app", "examples/static-site"]
 resolver = "3"
 
 [workspace.package]
