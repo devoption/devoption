@@ -408,6 +408,13 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
                 .as_ref()
                 .filter(|r| r.project == project && Instant::now() < r.expires)
             {
+                view.review_records = state["releases"].as_array().and_then(|releases| {
+                    releases
+                        .iter()
+                        .find(|r| r["release"] == review.release)
+                        .and_then(|r| r["records"]["grant_sha256"].as_str())
+                        .map(str::to_owned)
+                });
                 view.review = Some((
                     review.token.clone(),
                     review.release.clone(),

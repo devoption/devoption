@@ -5,6 +5,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import threading
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
+import stat
 import unittest
 from unittest.mock import patch
 
@@ -139,8 +141,90 @@ class DeploymentTests(unittest.TestCase):
             with self.assertRaises(ValueError): broker.dispatch(self.config,['stop'])
         self.assertEqual(broker.desired(self.config)['observed'],'stopping')
 
+    def record_binding(self):
+        grant = {'app_id':self.receipt['project'], 'collection':'notes', 'user':'recordworker',
+                 'socket_dir':'/run/record-db', 'database':'records',
+                 'fields':{'label':{'required':True,'max_chars':100}}}
+        self.config['records'] = {'grant':grant, 'bytes':broker.canonical(grant),
+                                  'identity':{'user':'recordworker','uid':20001,'gid':20001}}
+        for key in ('owner_data','history','repositories'):
+            self.config[key] = Path(self.temp.name)/key
+        self.config['worker'] = Path('/usr/local/libexec/devoption-app-worker')
+
+    def test_record_promotion_snapshots_exact_grant_and_revocation_preserves_saved_bytes(self):
+        ordinary = self.promote()
+        self.record_binding()
+        release = self.promote()
+        self.assertNotEqual(ordinary,release)
+        manifest = broker.load_release(self.config,release)
+        self.assertEqual(manifest['records']['grant_sha256'],broker.digest(self.config['records']['bytes']))
+        snapshot = self.config['state']/release/'records.json'
+        original = snapshot.read_bytes()
+        self.config['records']['bytes'] += b'\n'
+        with patch.object(broker,'stop_unit') as stop:
+            with self.assertRaisesRegex(ValueError,'revoked or changed'):
+                broker.launch(self.config,release)
+            stop.assert_not_called()
+        self.assertEqual(snapshot.read_bytes(),original)
+        self.assertNotIn('records',broker.load_release(self.config,ordinary))
+        snapshot.chmod(0o600);snapshot.write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError,'saved record grant changed'):
+            broker.load_release(self.config,release)
+
+    def test_record_identity_and_namespace_are_bound_and_unit_mounts_are_read_only(self):
+        self.record_binding()
+        release = self.promote()
+        with patch.object(broker,'stop_unit'), patch.object(broker,'command') as command:
+            broker.launch(self.config,release)
+        args = command.call_args.args[0]
+        mounts = [a for a in args if a.startswith('--property=BindReadOnlyPaths=')]
+        self.assertEqual(len(mounts),1)
+        self.assertIn('/component.wasm',mounts[0]);self.assertIn('/records-grant.json',mounts[0])
+        self.assertIn('/run/record-db',mounts[0])
+        self.assertIn('--property=User=20001',args)
+        self.assertIn('--property=RestrictAddressFamilies=AF_INET AF_UNIX',args)
+        self.assertNotIn('--property=DynamicUser=yes',args)
+        self.assertIn('--property=ProtectSystem=strict',args)
+        self.assertEqual(args[-6:],[str(self.config['worker']),'records-worker','/component.wasm',str(self.config['port']),'serve','/records-grant.json'])
+        with patch.object(broker,'stop_unit'), patch.object(broker,'command') as command:
+            broker.launch(self.config,release,True)
+        args=command.call_args.args[0]
+        self.assertIn('--property=PrivateNetwork=yes',args)
+        self.assertFalse(any('/run/record-db' in a for a in args))
+        self.config['records']['identity']['uid'] += 1
+        with self.assertRaises(ValueError): broker.check_record_release(self.config,broker.load_release(self.config,release))
+
+    def test_grant_for_another_project_does_not_enable_import_or_snapshot(self):
+        self.record_binding()
+        self.config['records']['grant']['app_id']='f'*32
+        release=self.promote()
+        self.assertNotIn('records',broker.load_release(self.config,release))
+        self.assertFalse((self.config['state']/release/'records.json').exists())
+
 
 class IdentityTests(unittest.TestCase):
+    def test_record_identity_rejects_login_privilege_groups_and_writable_socket_ancestors(self):
+        with tempfile.TemporaryDirectory() as temp:
+            socket_dir=Path(temp).resolve()
+            grant={'user':'recordworker','socket_dir':str(socket_dir)}
+            account=SimpleNamespace(pw_uid=20001,pw_gid=20001,pw_shell='/usr/sbin/nologin')
+            info=SimpleNamespace(st_uid=0,st_gid=0,st_mode=stat.S_IFDIR|0o755)
+            with patch.object(broker.pwd,'getpwnam',return_value=account), patch.object(broker.os,'getgrouplist',return_value=[20001]), patch.object(Path,'lstat',return_value=info):
+                self.assertEqual(broker.record_identity(grant,1000),{'user':'recordworker','uid':20001,'gid':20001})
+                for uid in (0,1,1000):
+                    account.pw_uid=uid
+                    with self.assertRaises(ValueError): broker.record_identity(grant,1000)
+                account.pw_uid=20001;account.pw_shell='/bin/bash'
+                with self.assertRaises(ValueError): broker.record_identity(grant,1000)
+                account.pw_shell='/usr/sbin/nologin';info.st_mode=stat.S_IFDIR|0o777
+                with self.assertRaises(ValueError): broker.record_identity(grant,1000)
+                info.st_mode=stat.S_IFDIR|0o755;info.st_uid=1000
+                with self.assertRaises(ValueError): broker.record_identity(grant,1000)
+                info.st_uid=20001
+                with self.assertRaises(ValueError): broker.record_identity(grant,1000)
+            with patch.object(broker.pwd,'getpwnam',return_value=account), patch.object(broker.os,'getgrouplist',return_value=[20001,0]):
+                with self.assertRaises(ValueError): broker.record_identity(grant,1000)
+
     def test_real_http_health_requires_nonempty_exact_invocation_and_fresh_unit(self):
         fields = {'header': 'a'*32}
         class Handler(BaseHTTPRequestHandler):
@@ -181,7 +265,7 @@ class IdentityTests(unittest.TestCase):
                     broker.stop_unit()
                 self.assertEqual(command.call_count, 1)
                 self.assertEqual(command.call_args.args[0][1], 'stop')
-                with patch.object(broker, 'load_release'):
+                with patch.object(broker, 'load_release', return_value={}):
                     with self.assertRaisesRegex(ValueError, 'stop is unconfirmed'):
                         broker.launch({'state': Path('/unused')}, 'a'*64)
                 self.assertFalse(any(call.args[0][0] == '/usr/bin/systemd-run' for call in command.call_args_list))

@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Bind optional app record grants to immutable saved releases and deployment
+  review, including exact schema/identity digests, a dedicated non-login service
+  user and read-only Unix socket/grant mounts. Refuse changed grants on restart
+  and preserve stateless saved-release recovery; add disposable Linux broker
+  acceptance and refresh the grant review capture
+  ([#308](https://github.com/devoption/devoption/issues/308)).
+
 - Add an explicitly opted-in local WASIp2 host capability for schema-validated,
   app-scoped append-only PostgreSQL records with confirmed-commit results and
   retry deduplication. Preserve the stateless deployment profile and denied guest

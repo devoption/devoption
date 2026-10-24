@@ -89,9 +89,13 @@ Never run this privileged fixture on an existing installation or workstation.
 
 The same job builds checksum-pinned PostgreSQL from official source in runner
 temporary storage and runs [the scoped record proof](app-records.md#disposable-local-proof)
-using a generic WASIp2 fixture. Its peer-authenticated temporary cluster has only
-a private Unix socket; no host service, login password, remote database or secret
-is used. This tests the experimental opt-in worker, not managed deployment grants.
+using a generic WASIp2 fixture. The first proof uses a private Unix socket and no
+host service or login password. A second, explicitly disposable Linux checker
+then installs the real broker, creates only its reserved non-login app/database
+test identities and private systemd services, and verifies managed grants,
+revocation/restart refusal and saved stateless recovery. It refuses existing
+deployment files/units/identities and removes only its fixture resources after
+stopping them. No remote database or production secret is used.
 
 The installation job also builds the exact reserved prior source and a disposable
 next-preview source fixture with real versioned executables, then runs
