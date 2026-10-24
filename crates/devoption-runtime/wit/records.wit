@@ -1,0 +1,12 @@
+package devoption:app@0.1.0;
+
+/// One operator-selected append-only collection. No SQL, reads or destinations.
+interface records {
+    enum write-outcome { created, replayed }
+    enum write-error { invalid, conflict, unavailable, denied }
+    /// Canonical lowercase UUID retry ID and a bounded JSON object of strings/null.
+    /// Success means PostgreSQL acknowledged COMMIT; unavailable may be ambiguous.
+    append: func(id: string, payload: string) -> result<write-outcome, write-error>;
+}
+
+world record-imports { import records; }

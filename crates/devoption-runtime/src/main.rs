@@ -11,6 +11,26 @@ fn main() -> std::process::ExitCode {
         }
         _ => {}
     }
+    if let [command, path, port, mode, grant] = args.as_slice()
+        && command == "records-worker"
+        && ["serve", "validate"].contains(&mode.as_str())
+    {
+        let Ok(port) = port.parse::<u16>() else {
+            return std::process::ExitCode::from(2);
+        };
+        return match devoption_runtime::run_with_records(
+            std::path::Path::new(path),
+            port,
+            mode == "validate",
+            std::path::Path::new(grant),
+        ) {
+            Ok(()) => std::process::ExitCode::SUCCESS,
+            Err(_) => {
+                eprintln!("Record worker failed");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     let [command, path, port, mode] = args.as_slice() else {
         return std::process::ExitCode::from(2);
     };

@@ -145,6 +145,10 @@ including loopback, private addresses and metadata endpoints. The outbound HTTP
 implementation is compiled without the default send-request feature and explicitly
 returns request-denied.
 
+The separate [experimental record host capability](app-records.md) is a local
+proof path only; this managed deployment profile does not enable its import or
+grant access to PostgreSQL.
+
 Each request creates a fresh Store/component. Limits are one 64 MiB linear memory,
 16 tables/instances, 10,000 table elements, 10 million fuel units and five seconds
 covering instantiation, handler and complete response. Fuel and epoch interruption
