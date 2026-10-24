@@ -16,6 +16,7 @@ import stat
 import socket
 import ssl
 import ipaddress
+import pwd
 import subprocess
 import sys
 import time
@@ -126,7 +127,7 @@ def configuration():
     protected(BROKER)
     raw = read_regular(CONFIG, 16384, 0)
     config = tomllib.loads(raw.decode())
-    if set(config) - {'ingress'} != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
+    if set(config) - {'ingress', 'records'} != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
         raise ValueError('unexpected configuration')
     if type(config['uid']) is not int or config['uid'] <= 0 or int(os.environ.get('SUDO_UID', '-1')) != config['uid']:
         raise ValueError('caller not configured owner')
@@ -152,8 +153,62 @@ def configuration():
         if 'ca_file' in config['ingress']:
             protected(Path(config['ingress']['ca_file']))
             trust = read_regular(Path(config['ingress']['ca_file']), 65536, 0)
-    config['fingerprint'] = digest(raw + trust + read_regular(BROKER, 65536, 0) + read_regular(config['worker'], 256*1024*1024, 0))
+    record_bytes = b''
+    if 'records' in config:
+        binding = config['records']
+        if not isinstance(binding, dict) or set(binding) != {'grant_file'}:
+            raise ValueError('unexpected record binding')
+        grant_path = Path(binding['grant_file'])
+        if not re.fullmatch(r'/[A-Za-z0-9_./-]+', str(grant_path)):
+            raise ValueError('invalid record grant path')
+        protected(grant_path)
+        record_bytes = read_regular(grant_path, 32768, 0)
+        grant = json.loads(record_bytes)
+        if not isinstance(grant, dict) or not ID.fullmatch(grant.get('app_id', '')):
+            raise ValueError('invalid record app identity')
+        if config.get('ingress') and grant['app_id'] != config['ingress']['project']:
+            raise ValueError('record app must match hostname binding')
+        identity = record_identity(grant, config['uid'])
+        config['records'] = {'grant_file': grant_path, 'bytes': record_bytes,
+                             'grant': grant, 'identity': identity}
+        record_bytes += canonical(identity)
+    config['fingerprint'] = digest(raw + trust + record_bytes + read_regular(BROKER, 65536, 0) + read_regular(config['worker'], 256*1024*1024, 0))
     return config
+
+
+def record_identity(grant, owner_uid):
+    user = grant.get('user')
+    if not isinstance(user, str) or not re.fullmatch(r'[a-z_][a-z0-9_]{0,30}', user):
+        raise ValueError('invalid record service user')
+    account = pwd.getpwnam(user)
+    if account.pw_uid < 100 or account.pw_uid == owner_uid or account.pw_shell not in ('/usr/sbin/nologin', '/sbin/nologin', '/bin/false'):
+        raise ValueError('record worker requires a distinct non-login service identity')
+    directory = Path(grant.get('socket_dir', ''))
+    if not directory.is_absolute() or directory.resolve() != directory or len(str(directory)) > 80:
+        raise ValueError('invalid record socket directory')
+    groups = os.getgrouplist(user, account.pw_gid)
+    if account.pw_gid == 0 or set(groups) != {account.pw_gid}:
+        raise ValueError('record service identity must have only its dedicated primary group')
+    for path in [directory, *directory.parents]:
+        info = path.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid in (owner_uid, account.pw_uid) or info.st_mode & 0o002 or (info.st_gid in groups and info.st_mode & 0o020):
+            raise ValueError('record socket path must not be writable by platform/app identities')
+    return {'user': user, 'uid': account.pw_uid, 'gid': account.pw_gid}
+
+
+def record_policy(config, project):
+    binding = config.get('records')
+    if not binding or binding['grant']['app_id'] != project:
+        return None
+    return {'version': 1, 'grant_sha256': digest(binding['bytes']), **binding['identity']}
+
+
+def check_record_release(config, manifest):
+    policy = manifest.get('records')
+    if policy is None:
+        return
+    if policy != record_policy(config, manifest['project']):
+        raise ValueError('record grant revoked or changed; promote and review a new release')
 
 
 def atomic(path, value):
@@ -201,6 +256,13 @@ def load_release(config, release):
     component = read_regular(directory / 'component.wasm', MAX_COMPONENT, 0)
     if digest(component) != manifest['artifact_sha256'] or len(component) != manifest['artifact_bytes']:
         raise ValueError('release artifact changed')
+    if 'records' in manifest:
+        policy = manifest['records']
+        if not isinstance(policy, dict) or set(policy) != {'version', 'grant_sha256', 'user', 'uid', 'gid'} or type(policy['version']) is not int or policy['version'] != 1 or not isinstance(policy.get('grant_sha256'), str) or not HEX.fullmatch(policy['grant_sha256']) or type(policy['uid']) is not int or policy['uid'] < 100 or type(policy['gid']) is not int or policy['gid'] <= 0 or not isinstance(policy['user'], str):
+            raise ValueError('invalid saved record policy')
+        grant = read_regular(directory/'records.json', 32768, 0)
+        if digest(grant) != policy['grant_sha256']:
+            raise ValueError('saved record grant changed')
     return manifest
 
 
@@ -266,6 +328,9 @@ def promote(config, job, expected, provenance):
         if not HEX.fullmatch(receipt[key]): raise ValueError('invalid provenance')
     if not re.fullmatch(r'[0-9a-f]{40}', receipt['commit']): raise ValueError('invalid commit')
     manifest = {**receipt, 'policy': POLICY, 'runtime': 'wasmtime-49.0.3'}
+    records = record_policy(config, receipt['project'])
+    if records:
+        manifest['records'] = records
     encoded = canonical(manifest)
     release = digest(encoded)
     destination = config['state'] / release
@@ -277,9 +342,12 @@ def promote(config, job, expected, provenance):
     temporary = config['state'] / (release + '.pending')
     temporary.mkdir(mode=0o700)
     try:
-        for name, data in [('component.wasm', component), ('manifest.json', encoded)]:
+        files = [('component.wasm', component), ('manifest.json', encoded)]
+        if records:
+            files.append(('records.json', config['records']['bytes']))
+        for name, data in files:
             with (temporary / name).open('xb') as stream:
-                os.chmod(stream.name, 0o444 if name == 'component.wasm' else 0o400); stream.write(data); stream.flush(); os.fsync(stream.fileno())
+                os.chmod(stream.name, 0o444 if name in ('component.wasm', 'records.json') else 0o400); stream.write(data); stream.flush(); os.fsync(stream.fileno())
         fd = os.open(temporary, os.O_RDONLY)
         try: os.fsync(fd)
         finally: os.close(fd)
@@ -295,9 +363,11 @@ def promote(config, job, expected, provenance):
 
 
 def launch(config, release, validate=False):
-    load_release(config, release)
+    manifest = load_release(config, release)
+    check_record_release(config, manifest)
     unit = VALIDATE_UNIT if validate else UNIT
     stop_unit(unit)
+    mounts = [f'{config["state"] / release / "component.wasm"}:/component.wasm']
     properties = [
         'DynamicUser=yes', 'NoNewPrivileges=yes', 'CapabilityBoundingSet=',
         'ProtectSystem=strict', 'ProtectHome=yes', 'PrivateTmp=yes', 'PrivateDevices=yes',
@@ -307,16 +377,27 @@ def launch(config, release, validate=False):
         'LimitCORE=0', 'TimeoutStopSec=5', 'KillMode=control-group', 'Restart=no', 'UMask=0077',
         'RestrictAddressFamilies=AF_INET', 'IPAddressDeny=any', 'IPAddressAllow=localhost',
         'SocketBindDeny=any', f'SocketBindAllow=ipv4:tcp:{config["port"]}',
-        f'BindReadOnlyPaths={config["state"] / release / "component.wasm"}:/component.wasm',
         'InaccessiblePaths=' + ' '.join('-'+str(config[k]) for k in ['state', 'owner_data', 'history', 'repositories', 'build_work']),
         'RuntimeDirectory=devoption-app-validate' if validate else 'RuntimeDirectory=devoption-app',
         'RuntimeDirectoryPreserve=yes', 'StandardOutput=null', 'StandardError=null',
     ]
     if validate: properties += ['RuntimeMaxSec=30', 'PrivateNetwork=yes']
+    if manifest.get('records'):
+        identity = manifest['records']
+        properties.remove('DynamicUser=yes')
+        properties.remove('RestrictAddressFamilies=AF_INET')
+        properties += [f'User={identity["uid"]}', f'Group={identity["gid"]}',
+                       'RestrictAddressFamilies=AF_INET AF_UNIX']
+        mounts.append(f'{config["state"] / release / "records.json"}:/records-grant.json')
+        if not validate:
+            mounts.append(config['records']['grant']['socket_dir'])
+    properties.append('BindReadOnlyPaths='+' '.join(mounts))
     args = ['/usr/bin/systemd-run', '--quiet', '--collect', '--unit='+unit]
     if validate: args += ['--wait']
     for prop in properties: args += ['--property='+prop]
-    args += [str(config['worker']), 'app-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve']
+    args += [str(config['worker']), 'records-worker' if manifest.get('records') else 'app-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve']
+    if manifest.get('records'):
+        args.append('/records-grant.json')
     command(args, 37 if validate else 5)
 
 

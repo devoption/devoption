@@ -121,7 +121,7 @@ def generate(source, output, binding, platform_access=None):
     raw = source.read_text()
     config = tomllib.loads(raw)
     required = {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}
-    if set(config) - {'ingress'} != required:
+    if set(config) - {'ingress', 'records'} != required:
         raise ValueError('expected the existing deployment configuration')
     if type(config['port']) is not int or not 1024 <= config['port'] <= 65535:
         raise ValueError('invalid private app port')
@@ -129,6 +129,10 @@ def generate(source, output, binding, platform_access=None):
     # Serialize only the fixed schema. Existing binding is replaced in the staged
     # copy; installation remains a separate operator-reviewed action.
     text = ''.join(f'{key} = {json.dumps(config[key])}\n' for key in sorted(required))
+    if 'records' in config:
+        if not isinstance(config['records'], dict) or set(config['records']) != {'grant_file'} or not isinstance(config['records']['grant_file'], str) or not re.fullmatch(r'/[A-Za-z0-9_./-]+', config['records']['grant_file']):
+            raise ValueError('invalid existing record grant binding')
+        text += '\n[records]\ngrant_file = ' + json.dumps(config['records']['grant_file']) + '\n'
     text += '\n[ingress]\n' + ''.join(f'{key} = {json.dumps(value)}\n' for key, value in binding.items())
     output.mkdir(mode=0o700)
     (output/'deployment.toml').write_text(text)

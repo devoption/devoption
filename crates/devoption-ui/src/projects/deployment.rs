@@ -12,6 +12,7 @@ pub struct DeploymentView {
     pub releases: Vec<ReleaseView>,
     pub builds: Vec<(String, String)>,
     pub review: Option<(String, String, String, String)>,
+    pub review_records: Option<String>,
 }
 pub struct ReleaseView {
     pub provenance: String,
@@ -46,6 +47,9 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
             );
         }
         if let Some((token, release, health, fingerprint)) = &view.review {
+            if let Some(grant) = &view.review_records {
+                html.push_str(&format!("<h3>App storage grant</h3><p>This release can append validated records to its operator-selected PostgreSQL collection. It cannot read, update, delete or run SQL. Grant SHA-256: <code>{}</code>. Approval includes this storage access.</p>", escaped(grant)));
+            }
             html.push_str(&format!(r#"<h3>Review deployment</h3><dl class="build-identities"><div><dt>Release</dt><dd><code>{}</code></dd></div><div><dt>Health check</dt><dd><code>GET /healthz → 200 {}</code></dd></div><div><dt>Private listener</dt><dd><code>127.0.0.1:{}</code></dd></div><div><dt>Installed runtime configuration SHA-256</dt><dd><code>{}</code></dd></div></dl><p>WasiHttpV1: Wasmtime 49.0.3. No guest files, environment or outbound network. One request at a time, 64 MiB guest memory, 10 million fuel units and five seconds per request. Worker: one CPU, 512 MiB RAM, no swap, 64 tasks. Startup health must pass in 30 seconds.</p><p>This replaces the current app. A healthy approved app resumes after platform restart; a stopped app stays stopped. Approval is single-use and expires in five minutes.</p><button class="action-button" data-deploy-action="approve" data-value="{}">Approve and deploy</button>"#, escaped(release),escaped(health),view.port,escaped(fingerprint),escaped(token)));
         }
         html.push_str("<h3>Saved releases</h3><p>Select a release and the exact response expected from its health check. To return to an earlier version, review and deploy that saved release again.</p>");
@@ -128,5 +132,39 @@ mod tests {
         let page = content(&project, &view);
         assert!(page.contains("Approve and deploy"));
         assert!(page.contains("&lt;health&gt;"));
+        view.review_records = Some("<grant>".into());
+        let page = content(&project, &view);
+        assert!(page.contains("Approval includes this storage access."));
+        assert!(page.contains("&lt;grant&gt;"));
+    }
+
+    #[test]
+    #[ignore = "explicit synthetic review screenshot fixture"]
+    fn manual_records_review_fixture() {
+        let project = ProjectSummary {
+            id: [1; 16],
+            name: "Example application",
+            repositories: vec![],
+        };
+        let view = DeploymentView {
+            enabled: true,
+            port: 15000,
+            status: "Healthy saved app; reviewing a storage-enabled candidate.".into(),
+            ingress: Some((
+                "https://app.example.test".into(),
+                "Synthetic screenshot fixture; no external requests or deployment actions.".into(),
+            )),
+            current: Some("ab".repeat(32)),
+            review: Some((
+                "cd".repeat(16),
+                "ef".repeat(32),
+                "ok records".into(),
+                "12".repeat(32),
+            )),
+            review_records: Some("34".repeat(32)),
+            ..Default::default()
+        };
+        let path = std::env::var_os("DEVOPTION_REVIEW_CAPTURE_HTML").expect("explicit output path");
+        std::fs::write(path, crate::render_deployment(&project, &view)).unwrap();
     }
 }

@@ -44,6 +44,15 @@ class HostnameTests(unittest.TestCase):
             with self.assertRaises(ValueError): broker.start(self.config | {'fingerprint':'f'},'release','ok A','f')
             launch.assert_not_called()
 
+    def test_hostname_regeneration_preserves_existing_operator_record_binding(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);source=root/'source.toml'
+            fields=dict(uid=1000,build_work='/builds',state='/state',worker='/worker',port=15000,owner_data='/owner',history='/history',repositories='/repositories')
+            source.write_text(''.join(f'{k}={json.dumps(v)}\n' for k,v in fields.items())+'\n[records]\ngrant_file="/etc/devoption/records.json"\n')
+            generate(source,root/'generated',self.binding)
+            import tomllib
+            self.assertEqual(tomllib.loads((root/'generated/deployment.toml').read_text())['records'],{'grant_file':'/etc/devoption/records.json'})
+
     def test_status_explains_stopped_certificate_and_connection_failures(self):
         self.assertIsNone(broker.ingress_status({},None))
         self.assertIn('not deployed',broker.ingress_status(self.config,None)['status'])

@@ -1,12 +1,12 @@
 # Experimental app-scoped append-only records
 
-This is a local opt-in implementation slice under [#306](https://github.com/devoption/devoption/issues/306)
-and [#293](https://github.com/devoption/devoption/issues/293), **not an installed
-platform deployment capability**. The normal `app-worker`, release manifest,
-deployment broker, runtime fingerprint and systemd profile remain stateless.
-Do not install this worker path on an existing platform or grant it database
-access until a subsequent reviewed integration binds the grant and service policy
-to deployment approval. This command is for trusted disposable local proof only.
+This opt-in implementation under [#306](https://github.com/devoption/devoption/issues/306)
+and [#308](https://github.com/devoption/devoption/issues/308) provides a bounded
+host capability for one trusted app. The default `app-worker` remains stateless.
+The managed broker can bind an operator-installed grant to a saved release and
+deployment review. It does not provision PostgreSQL, identities, credentials or
+schema, and does not authorize activation on an existing installation. Remote
+managed databases remain outside this slice under #293.
 
 ## Guest contract
 
@@ -96,6 +96,66 @@ deadline remain. No pool, retry loop or persistent guest state is introduced.
 These guarantees assume a correctly administered PostgreSQL server and reliable
 storage; they do not prove backups, replication or disaster recovery.
 
+## Managed broker installation boundary
+
+After separately authorized database/schema/service-identity provisioning, the
+operator may add this table to root-owned `/etc/devoption/deployment.toml`:
+
+```toml
+[records]
+grant_file = "/etc/devoption/app-records.json"
+```
+
+The grant and every ancestor must be canonical, root-owned and protected from
+other-user writes. Mode 0600 is appropriate for this private configuration.
+It contains no password: this first path uses PostgreSQL peer authentication
+with a database role matching the existing OS service identity. Use a dedicated
+non-login service account with UID at least 100, distinct from root and the
+platform owner, a dedicated primary group and no supplementary groups. Its
+PostgreSQL runtime role must be separate from the migration/owner role and have
+only CONNECT/schema USAGE/table INSERT+SELECT. Never grant it table ownership,
+DDL, UPDATE, DELETE or platform database access.
+
+The socket directory must exist, be canonical and traversable by the service
+identity; neither platform nor app identity may own or write it or its ancestors.
+No ancestor may be world-writable. Use the database service's protected directory,
+not a caller-controlled temporary directory. No socket credential or database
+network port is exposed to the guest.
+
+Promotion for the matching project snapshots the exact grant into root-private
+release storage and includes its SHA-256 and service UID/GID in the immutable
+manifest. New releases from other projects and saved stateless releases receive
+no grant. Raw grant bytes and resolved service identity also enter the installed
+runtime fingerprint. Review displays the storage permission and exact grant
+digest before approval. Changed/revoked grants or identities require a newly
+promoted release and a fresh review; old reviews/restart intent cannot restore
+that access. Restoring a saved **stateless** release remains possible through a
+fresh review and never adds the records import.
+
+The broker retains existing memory/CPU/task, read-only filesystem and network
+limits. It substitutes the dedicated service UID/GID for DynamicUser, adds the
+host's AF_UNIX transport, and mounts only immutable component/grant files and
+the configured database socket directory read-only. Validation links the import
+and validates schema without connecting or executing the guest. It keeps its
+private network and omits the socket mount. A running guest still denies all
+standard files/environment/socket/DNS/outgoing-HTTP operations.
+
+A running worker snapshots its grant; editing/removing the file alone does not
+instantly revoke that worker. An operator revoking access must stop the owned app
+unit as well. Restart reconciliation refuses changed policy and leaves stopped
+intent. Health checks establish guest HTTP health, not database availability;
+verify a real app write before declaring a storage-enabled deployment accepted.
+Database failure returns unavailable from append while the app may still serve
+static pages and health responses.
+
+Back up both PostgreSQL data (using PostgreSQL-aware backup/restore) and platform
+configuration/immutable releases before installation. Do not copy a live data
+directory as a database backup. Restoring a component does not roll back or erase
+its rows. Keep schema/data backward compatible with saved releases; production
+backup scheduling, retention, credential rotation and disaster recovery require
+operator configuration and are not automatically installed here. Preserve
+database data during rollback; never drop it to recover a prior stateless app.
+
 ## Disposable local proof
 
 Use existing PostgreSQL binaries, a non-root OS account and the pinned Rust
@@ -129,3 +189,13 @@ target/debug/devoption-runtime records-worker COMPONENT PORT serve GRANT.json
 or executing guest code. The old `app-worker ... validate` rejects components
 importing records. These local commands do not provide the broker's Linux
 service confinement. Do not treat them as production installation instructions.
+
+`scripts/check_managed_records.py --disposable-system-host` additionally exercises
+the real installed broker and systemd profile on a fresh Linux runner, including
+peer-authenticated writes through a dedicated non-login runtime role, guest
+denials, restart recovery, changed-grant refusal and return to a saved stateless
+release. It refuses existing deployment files, reserved units/identities and its
+reserved fixture root. It temporarily creates only its own test identities,
+database and files, uses no passwords, and cleans them up after stopping its units.
+See CI for exact built fixture arguments. Never run it on a workstation or live
+installation.
