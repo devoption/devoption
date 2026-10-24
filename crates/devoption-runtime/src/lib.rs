@@ -1,5 +1,7 @@
 //! WASIp2 HTTP host for the separately supervised private app worker.
 //! No owner store, inherited environment, filesystem preopens or outbound grants.
+mod records;
+
 use http_body_util::{BodyExt, Full, Limited};
 use hyper::{Request, Response, body::Bytes};
 use std::{future::Future, sync::Arc, time::Duration};
@@ -81,6 +83,8 @@ struct State {
     table: ResourceTable,
     limits: StoreLimits,
     hooks: DenyNetwork,
+    records: Option<Arc<records::Grant>>,
+    record_call_used: bool,
 }
 impl WasiView for State {
     fn ctx(&mut self) -> WasiCtxView<'_> {
@@ -102,6 +106,10 @@ impl WasiHttpView for State {
 
 /// Compilation and world validation only; this does not instantiate guest code.
 fn prepare(bytes: &[u8]) -> wasmtime::Result<ProxyPre<State>> {
+    prepare_with_records(bytes, false)
+}
+
+fn prepare_with_records(bytes: &[u8], records_enabled: bool) -> wasmtime::Result<ProxyPre<State>> {
     wasmtime::ensure!(
         bytes.len() <= 4 * 1024 * 1024 && bytes.starts_with(b"\0asm\x0d\0\x01\0"),
         "expected bounded component bytes"
@@ -115,12 +123,19 @@ fn prepare(bytes: &[u8]) -> wasmtime::Result<ProxyPre<State>> {
     // no files, environment or network; unknown non-WASI imports still fail.
     wasmtime_wasi::p2::add_to_linker_async(&mut linker)?;
     wasmtime_wasi_http::p2::add_only_http_to_linker_async(&mut linker)?;
+    if records_enabled {
+        records::devoption::app::records::add_to_linker::<
+            State,
+            wasmtime::component::HasSelf<State>,
+        >(&mut linker, |s| s)?;
+    }
     ProxyPre::new(linker.instantiate_pre(&component)?)
 }
 
 async fn invoke(
     pre: &ProxyPre<State>,
     request: Request<Full<Bytes>>,
+    records: Option<Arc<records::Grant>>,
 ) -> wasmtime::Result<Response<Bytes>> {
     let stdout = MemoryOutputPipe::new(32 * 1024);
     let stderr = MemoryOutputPipe::new(32 * 1024);
@@ -139,6 +154,8 @@ async fn invoke(
             http,
             table: ResourceTable::new(),
             hooks: DenyNetwork,
+            records,
+            record_call_used: false,
             limits: StoreLimitsBuilder::new()
                 .memory_size(64 * 1024 * 1024)
                 .memories(1)
@@ -276,25 +293,32 @@ fn failure(status: u16) -> Response<Bytes> {
         .body(Bytes::from_static(b"Application request unavailable\n"))
         .expect("fixed response")
 }
-async fn connection(mut stream: TcpStream, pre: ProxyPre<State>, admission: Arc<Semaphore>) {
+async fn connection(
+    mut stream: TcpStream,
+    pre: ProxyPre<State>,
+    admission: Arc<Semaphore>,
+    records: Option<Arc<records::Grant>>,
+) {
     let response = match tokio::time::timeout(DEADLINE, receive(&mut stream)).await {
         Err(_) => failure(408),
         Ok(Err(code)) => failure(code),
         Ok(Ok(request)) => match admit(&admission).await {
             None => failure(503),
-            Some(_permit) => match tokio::time::timeout(DEADLINE, invoke(&pre, request)).await {
-                Err(_) => failure(504),
-                Ok(Err(error))
-                    if matches!(
-                        error.downcast_ref::<wasmtime::Trap>(),
-                        Some(wasmtime::Trap::Interrupt)
-                    ) =>
-                {
-                    failure(504)
+            Some(_permit) => {
+                match tokio::time::timeout(DEADLINE, invoke(&pre, request, records)).await {
+                    Err(_) => failure(504),
+                    Ok(Err(error))
+                        if matches!(
+                            error.downcast_ref::<wasmtime::Trap>(),
+                            Some(wasmtime::Trap::Interrupt)
+                        ) =>
+                    {
+                        failure(504)
+                    }
+                    Ok(Err(_)) => failure(502),
+                    Ok(Ok(response)) => response,
                 }
-                Ok(Err(_)) => failure(502),
-                Ok(Ok(response)) => response,
-            },
+            }
         },
     };
     log(&format!("request completed: {}", response.status()));
@@ -335,6 +359,26 @@ async fn connection(mut stream: TcpStream, pre: ProxyPre<State>, admission: Arc<
 
 /// Invoked only in the separately supervised worker. Listener is loopback-only.
 pub fn run(path: &std::path::Path, port: u16, validate_only: bool) -> wasmtime::Result<()> {
+    run_inner(path, port, validate_only, None)
+}
+
+/// Experimental local proof entry point, intentionally absent from the broker.
+pub fn run_with_records(
+    path: &std::path::Path,
+    port: u16,
+    validate_only: bool,
+    grant: &std::path::Path,
+) -> wasmtime::Result<()> {
+    let records = Arc::new(records::Grant::load(grant)?);
+    run_inner(path, port, validate_only, Some(records))
+}
+
+fn run_inner(
+    path: &std::path::Path,
+    port: u16,
+    validate_only: bool,
+    records: Option<Arc<records::Grant>>,
+) -> wasmtime::Result<()> {
     use std::io::Read;
     let file = std::fs::File::open(path)?;
     wasmtime::ensure!(
@@ -343,7 +387,11 @@ pub fn run(path: &std::path::Path, port: u16, validate_only: bool) -> wasmtime::
     );
     let mut bytes = Vec::new();
     file.take(4 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
-    let pre = prepare(&bytes)?;
+    let pre = if records.is_some() {
+        prepare_with_records(&bytes, true)?
+    } else {
+        prepare(&bytes)?
+    };
     if validate_only {
         return Ok(());
     }
@@ -366,9 +414,10 @@ pub fn run(path: &std::path::Path, port: u16, validate_only: bool) -> wasmtime::
                 if let Ok(permit) = connections.clone().try_acquire_owned() {
                     let pre = pre.clone();
                     let admission = admission.clone();
+                    let records = records.clone();
                     tokio::spawn(async move {
                         let _permit = permit;
-                        connection(stream, pre, admission).await;
+                        connection(stream, pre, admission, records).await;
                     });
                 }
             }

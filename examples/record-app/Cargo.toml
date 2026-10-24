@@ -1,0 +1,12 @@
+[package]
+name = "devoption-record-fixture"
+version = "0.1.0"
+edition = "2021"
+build = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasip2 = "=1.0.1"
+wit-bindgen = { version = "=0.46.0", default-features = false, features = ["macros"] }

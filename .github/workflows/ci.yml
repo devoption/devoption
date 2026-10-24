@@ -101,6 +101,22 @@ jobs:
           python3 scripts/check_bundle_runtime.py "$BUNDLE_OUTPUT" --binary target/release/devoption --runtime target/release/devoption-runtime --component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
       - name: Build and serve a named app with embedded assets on the disposable runner
         run: python3 scripts/check_named_web_app.py --disposable-system-host --runtime target/release/devoption-runtime
+      - name: Prove scoped record writes with disposable Unix-only PostgreSQL
+        run: |
+          PG_PROOF_ROOT="$RUNNER_TEMP/app-records-postgres"
+          mkdir -p "$PG_PROOF_ROOT/source"
+          curl --fail --location --silent --show-error https://ftp.postgresql.org/pub/source/v18.6/postgresql-18.6.tar.bz2 -o "$PG_PROOF_ROOT/source.tar.bz2"
+          echo "555610c24d53e4316da5b7d3fc25c279d96856d5e0e23ee308c328c5fa881d9f  $PG_PROOF_ROOT/source.tar.bz2" | sha256sum --check
+          tar -xf "$PG_PROOF_ROOT/source.tar.bz2" -C "$PG_PROOF_ROOT/source" --strip-components=1
+          (
+            cd "$PG_PROOF_ROOT/source"
+            ./configure --prefix="$PG_PROOF_ROOT/installed" --without-icu --without-readline --without-zlib > "$PG_PROOF_ROOT/configure.log"
+            make -j2 > "$PG_PROOF_ROOT/build.log"
+            make install > "$PG_PROOF_ROOT/install.log"
+          )
+          cargo fetch --manifest-path examples/record-app/Cargo.toml --locked
+          cargo build --manifest-path examples/record-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/record-smoke"
+          python3 scripts/check_app_records.py --pg-bin "$PG_PROOF_ROOT/installed/bin" --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"
       - name: Exercise prior-preview upgrade and full-state recovery on disposable runner
         env:
           UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture

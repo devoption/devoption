@@ -37,6 +37,8 @@ accounts and production hosting acceptance remain planned.
 
 ## Implementation references
 
+- [Experimental app-scoped append-only PostgreSQL records](app-records.md)
+
 - [Local mutation and execution trust contract](execution-trust.md)
 - [Owner setup and deferred browser enrollment](local-enrollment.md)
 - [Display-name Profile page](profile.md)

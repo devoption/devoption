@@ -87,6 +87,12 @@ unit and removes its installed files. This proves compiler/runtime compatibility
 not full project UI, immutable-release promotion, HTTPS or reboot acceptance.
 Never run this privileged fixture on an existing installation or workstation.
 
+The same job builds checksum-pinned PostgreSQL from official source in runner
+temporary storage and runs [the scoped record proof](app-records.md#disposable-local-proof)
+using a generic WASIp2 fixture. Its peer-authenticated temporary cluster has only
+a private Unix socket; no host service, login password, remote database or secret
+is used. This tests the experimental opt-in worker, not managed deployment grants.
+
 The installation job also builds the exact reserved prior source and a disposable
 next-preview source fixture with real versioned executables, then runs
 `check_bundle_upgrade.py` on its fresh GitHub-hosted Ubuntu runner. Its explicit

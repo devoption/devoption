@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add an explicitly opted-in local WASIp2 host capability for schema-validated,
+  app-scoped append-only PostgreSQL records with confirmed-commit results and
+  retry deduplication. Preserve the stateless deployment profile and denied guest
+  networking; managed deployment grants remain a follow-up
+  ([#306](https://github.com/devoption/devoption/issues/306)).
+
 - Allow short HTTP request bursts to wait up to 250 milliseconds for the single
   guest execution slot, within the existing 16-connection limit. Preserve serial
   execution, bounded overload rejection and guest resource limits
