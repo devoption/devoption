@@ -146,9 +146,18 @@ fn inspect_expected(
     let mut direct = BTreeMap::new();
     if let Some(dependencies) = manifest.get("dependencies") {
         for (name, value) in table(Some(dependencies))? {
-            let pin = string(Some(value))?
-                .strip_prefix('=')
-                .ok_or(Error::Unsupported)?;
+            let requirement = match value {
+                Value::String(pin) => pin.as_str(),
+                Value::Table(dependency) => {
+                    keys(dependency, &["version", "default-features"])?;
+                    if dependency.get("default-features").and_then(Value::as_bool) != Some(false) {
+                        return Err(Error::Unsupported);
+                    }
+                    string(dependency.get("version"))?
+                }
+                _ => return Err(Error::Unsupported),
+            };
+            let pin = requirement.strip_prefix('=').ok_or(Error::Unsupported)?;
             if !crate::package_name_valid(name) || !crate::exact_version(pin) {
                 return Err(Error::Unsupported);
             }

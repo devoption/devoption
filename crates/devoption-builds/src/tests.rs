@@ -569,6 +569,47 @@ fn static_site_input(name: &str, css: &[u8]) -> (Catalog, PlanInput) {
 }
 
 #[test]
+fn wasm_plan_accepts_disabled_defaults_and_keeps_the_reviewed_manifest_exact() {
+    let (catalog, mut input) = fixture();
+    let manifest = include_str!("../../../examples/web-app/Cargo.toml").replace(
+        "wasip2 = \"=1.0.1\"",
+        "wasip2 = { version = \"=1.0.1\", default-features = false }",
+    );
+    input.source = source_snapshot::tests::ProofFixture::with_files(&[
+        ("Cargo.toml", manifest.as_bytes()),
+        (
+            "Cargo.lock",
+            include_bytes!("../../../examples/web-app/Cargo.lock"),
+        ),
+        (
+            "src/lib.rs",
+            include_bytes!("../../../examples/web-app/src/lib.rs"),
+        ),
+    ])
+    .verify()
+    .unwrap();
+    input.commit = input.source.commit().into();
+    input.dependencies = dependencies(&input.source);
+    input.package = "devoption-web-fixture".into();
+    input.binary = "devoption_web_fixture".into();
+    input.rust_version = "1.99.0".into();
+    let plan = BuildPlan::validate(input, &catalog).unwrap();
+    assert!(plan.is_wasm());
+    assert_eq!(
+        plan.cargo_arguments()[..4],
+        ["build", "--release", "--locked", "--offline"]
+    );
+    let source = plan
+        .details()
+        .source
+        .files()
+        .iter()
+        .find(|f| f.path() == "Cargo.toml")
+        .unwrap();
+    assert_eq!(source.bytes(), manifest.as_bytes());
+}
+
+#[test]
 fn named_wasm_app_binds_library_command_artifact_and_all_asset_bytes() {
     let css = include_bytes!("../../../examples/static-site/assets/site.css");
     let (catalog, input) = static_site_input("sample-site", css);

@@ -206,6 +206,53 @@ fn root_and_direct_dependency_pins_must_match_the_supplied_lockfile() {
 }
 
 #[test]
+fn exact_pin_with_defaults_disabled_is_bound_to_its_exact_manifest() {
+    let changed = text(MANIFEST).replace(
+        "http = \"=1.2.3\"",
+        "http = { version = \"=1.2.3\", default-features = false }",
+    );
+    let request = check(changed.as_bytes(), LOCK).unwrap();
+    let ordinary = check(MANIFEST, LOCK).unwrap();
+    assert!(request.packages() == ordinary.packages());
+    assert!(request.manifest_sha256() != ordinary.manifest_sha256());
+    assert_eq!(
+        validate(
+            RegistryId::new("fixture-registry").unwrap(),
+            changed.as_bytes(),
+            LOCK,
+            hashes(MANIFEST, LOCK)
+        )
+        .err(),
+        Some(Error::HashMismatch)
+    );
+    let mismatch = changed.replace("=1.2.3", "=1.2.4");
+    assert_eq!(
+        check(mismatch.as_bytes(), LOCK).err(),
+        Some(Error::DependencyMismatch)
+    );
+}
+
+#[test]
+fn disabling_defaults_does_not_admit_arbitrary_dependency_semantics() {
+    for table in [
+        "{version='=1.2.3'}",
+        "{version='=1.2.3',default-features=true}",
+        "{version='=1.2.3',default-features='false'}",
+        "{version='1.2.3',default-features=false}",
+        "{version='=1.2.3',default-features=false,features=[]}",
+        "{version='=1.2.3',default-features=false,path='../x'}",
+        "{version='=1.2.3',default-features=false,git='https://example.invalid/x'}",
+        "{version='=1.2.3',default-features=false,package='other'}",
+        "{version='=1.2.3',default-features=false,optional=false}",
+        "{version='=1.2.3',default-features=false,registry='other'}",
+        "{default-features=false}",
+    ] {
+        let changed = text(MANIFEST).replace("\"=1.2.3\"", table);
+        assert!(check(changed.as_bytes(), LOCK).is_err(), "admitted {table}");
+    }
+}
+
+#[test]
 fn unsupported_lockfile_sources_versions_and_fields_are_rejected() {
     for source in [
         "git+https://example.invalid/source#abcdef",

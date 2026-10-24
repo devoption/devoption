@@ -31,6 +31,11 @@ Entries describe implemented changes, not the roadmap.
   preserve existing source, artifact and runtime limits
   ([#295](https://github.com/devoption/devoption/issues/295)).
 
+- Admit exact-pinned Cargo dependency tables only when default features are
+  explicitly disabled. Preserve origin/lock/target constraints and exact
+  manifest review identities; arbitrary feature selection remains unsupported
+  ([#310](https://github.com/devoption/devoption/issues/310)).
+
 - Include the separate version-matched Wasmtime app worker in new schema-3
   bundles, bind its bytes and locked runtime versions into verification/SBOM/
   assembly provenance, and probe it during installation and base upgrades.

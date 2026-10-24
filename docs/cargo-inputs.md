@@ -32,7 +32,12 @@ iterative. These are input-validation bounds, not execution/resource permissions
   This admits the [selected web-app manifest](decisions/0004-first-wasm-web-app.md)
   under [#231](https://github.com/devoption/devoption/issues/231), but does not
   prove a Wasm target, HTTP ABI, source presence or a successful compilation.
-- Direct dependencies are string-valued exact pins, such as `http = "=1.2.3"`.
+- Direct dependencies are string-valued exact pins, such as `http = "=1.2.3"`,
+  or exact pins with defaults explicitly disabled:
+  `http = { version = "=1.2.3", default-features = false }`.
+  The latter accepts only these two keys and literal boolean false; it does not
+  admit arbitrary features or other dependency-table semantics. The exact
+  manifest bytes remain part of review identity.
   Core and prerelease spelling must match the corresponding locked version.
   Build metadata after `+` is ignored only for requirement matching, following
   [Cargo's version metadata rules](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#version-metadata).
@@ -55,7 +60,7 @@ iterative. These are input-validation bounds, not execution/resource permissions
   manifest's direct pins. Dependency-free packages are supported.
 
 Everything outside that subset is rejected rather than ignored: workspaces and
-workspace inheritance, path/Git/private registry dependencies, dependency tables,
+workspace inheritance, path/Git/private registry dependencies, other dependency tables,
 renames, optional dependencies, features, target conditions, dev/build dependencies,
 patches/replacements, profiles, other explicit targets, other manifest metadata/keys,
 source-qualified lock references and other lockfile versions. Even benign metadata
