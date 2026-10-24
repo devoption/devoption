@@ -96,6 +96,14 @@ deadline remain. No pool, retry loop or persistent guest state is introduced.
 These guarantees assume a correctly administered PostgreSQL server and reliable
 storage; they do not prove backups, replication or disaster recovery.
 
+The V1 host also bounds each app/collection to 20 new records per rolling minute
+and 10,000 stored records. An advisory transaction lock serializes the budget
+check with inserts. Budgets come from PostgreSQL rows, so restarting a worker
+does not reset them. Exhaustion returns unavailable without a write or deletion;
+exact replays still succeed. Operators must monitor capacity and configure
+appropriate abuse/retention policy before public use. These fixed first-profile
+limits do not provide per-visitor fairness or replace application abuse controls.
+
 ## Managed broker installation boundary
 
 After separately authorized database/schema/service-identity provisioning, the

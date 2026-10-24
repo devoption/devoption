@@ -13,6 +13,10 @@ pub use devoption::app::records::{WriteError, WriteOutcome};
 
 const MAX_PAYLOAD: usize = 24 * 1024;
 const DB_DEADLINE: Duration = Duration::from_secs(2);
+// Persistent per-namespace bounds survive worker restart. Replays never consume
+// quota; no automatic deletion is used to make space for untrusted submissions.
+const MAX_RECORDS: i64 = 10_000;
+const NEW_PER_MINUTE: i64 = 20;
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -226,6 +230,16 @@ impl Grant {
             let settings = tx.query_one("SELECT current_setting('fsync'), current_setting('full_page_writes'), relpersistence::text FROM pg_catalog.pg_class WHERE oid = 'app_records.entries'::regclass", &[]).await?;
             if settings.get::<_,String>(0) != "on" || settings.get::<_,String>(1) != "on" || settings.get::<_,String>(2) != "p" {
                 return Ok::<_,tokio_postgres::Error>(Err(WriteError::Unavailable));
+            }
+            tx.query_one("SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1::text || ':' || $2::text, 0))", &[&self.app_id,&self.collection]).await?;
+            if let Some(row) = tx.query_opt("SELECT payload FROM app_records.entries WHERE app_id=$1 AND collection=$2 AND id=$3", &[&self.app_id,&self.collection,&id]).await? {
+                if row.get::<_,Value>(0) != payload { return Ok(Err(WriteError::Conflict)); }
+                tx.commit().await?;
+                return Ok(Ok(WriteOutcome::Replayed));
+            }
+            let budget = tx.query_one("SELECT count(*), count(*) FILTER (WHERE created_at >= CURRENT_TIMESTAMP - interval '1 minute') FROM app_records.entries WHERE app_id=$1 AND collection=$2", &[&self.app_id,&self.collection]).await?;
+            if budget.get::<_,i64>(0) >= MAX_RECORDS || budget.get::<_,i64>(1) >= NEW_PER_MINUTE {
+                return Ok(Err(WriteError::Unavailable));
             }
             let inserted = tx.execute("INSERT INTO app_records.entries (app_id, collection, id, payload) VALUES ($1,$2,$3,$4) ON CONFLICT (app_id,collection,id) DO NOTHING", &[&self.app_id,&self.collection,&id,&payload]).await?;
             let outcome = if inserted == 1 { WriteOutcome::Created } else {
