@@ -117,7 +117,9 @@ jobs:
           cargo fetch --manifest-path examples/record-app/Cargo.toml --locked
           cargo build --manifest-path examples/record-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/record-smoke"
           python3 scripts/check_app_records.py --pg-bin "$PG_PROOF_ROOT/installed/bin" --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"
-          python3 scripts/check_managed_records.py --disposable-system-host --pg-bin "$PG_PROOF_ROOT/installed/bin" --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm" --stateless-component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
+          test -x /usr/lib/postgresql/16/bin/postgres
+          python3 scripts/check_app_records.py --pg-bin /usr/lib/postgresql/16/bin --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"
+          python3 scripts/check_managed_records.py --disposable-system-host --pg-bin /usr/lib/postgresql/16/bin --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm" --stateless-component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
       - name: Exercise prior-preview upgrade and full-state recovery on disposable runner
         env:
           UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture

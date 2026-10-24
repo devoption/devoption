@@ -184,7 +184,9 @@ The fixture uses `/append/UUID` and a generic label/note schema. The script prov
 guest-to-row writes, normalization/replay/conflict, host validation, unknown
 import refusal without a grant, a lost HTTP acknowledgement, bounded database
 lock failure, app namespace separation, database outage, refusal with fsync off,
-and persistence after worker restart and PostgreSQL crash-stop/recovery. With
+and persistence after worker restart and PostgreSQL crash-stop/recovery. It also
+checks persistent rate/storage quotas and an exact row/timestamp digest after
+pg_dump/pg_restore into a separate disposable database. With
 the record grant enabled, it also probes denied files/environment/TCP/UDP/DNS
 and outgoing HTTP to loopback, private, metadata and public destinations.
 The explicit worker command is:
@@ -207,3 +209,7 @@ reserved fixture root. It temporarily creates only its own test identities,
 database and files, uses no passwords, and cleans them up after stopping its units.
 See CI for exact built fixture arguments. Never run it on a workstation or live
 installation.
+
+Linux CI runs the generic proof against both checksum-pinned PostgreSQL 18.6 and
+the Ubuntu 24.04 runner's PostgreSQL 16. It runs the managed systemd proof against
+the latter without starting or changing the runner's preinstalled database service.

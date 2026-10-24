@@ -177,6 +177,15 @@ def check(pg_bin, worker, component):
             sql("INSERT INTO app_records.entries(app_id,collection,id,payload,created_at) SELECT repeat('a',32),'notes', '00000000-0000-4000-8000-' || lpad(n::text,12,'0'), '{\"label\":\"quota fixture\",\"note\":null}'::jsonb, CURRENT_TIMESTAMP-interval '2 minutes' FROM generate_series(1,10000) n")
             assert request(fresh, '{"label":"over storage"}') == (503, 'unavailable')
             assert request('/append/00000000-0000-4000-8000-000000000001', '{"label":"quota fixture"}') == (200, 'replayed')
+            # A PostgreSQL-aware backup restores all scoped rows and timestamps;
+            # copying a live data directory is deliberately not used.
+            backup=root/'records.dump'
+            run([pg_bin/'pg_dump','-h',sockets,'-U',user,'-d','records_proof','-Fc','-f',backup])
+            run([pg_bin/'createdb','-h',sockets,'-U',user,'records_restore'])
+            run([pg_bin/'pg_restore','-h',sockets,'-U',user,'-d','records_restore','--no-owner','--no-privileges',backup])
+            digest_sql="SELECT md5(string_agg(app_id || ':' || collection || ':' || id || ':' || payload::text || ':' || created_at::text, E'\\n' ORDER BY app_id,collection,id)) FROM app_records.entries"
+            restored=run([pg_bin/'psql','-X','-At','-h',sockets,'-U',user,'-d','records_restore','-c',digest_sql])
+            assert restored == sql(digest_sql)
             return {'postgres': run([pg_bin/'postgres', '--version']),
                     'guest_to_postgres': True, 'exact_retry': True, 'conflict': True,
                     'host_validation': True, 'ungranted_import_denied': True,
@@ -184,7 +193,7 @@ def check(pg_bin, worker, component):
                     'worker_and_database_crash_restart': True, 'app_isolation': True,
                     'database_failure': True, 'unsafe_durability_refused': True,
                     'lost_http_acknowledgement': True, 'lock_timeout': True,
-                    'persistent_rate_and_storage_limits': True}
+                    'persistent_rate_and_storage_limits': True, 'backup_restore_exact_rows': True}
         finally:
             worker_stop()
             if pg_started:
