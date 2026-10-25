@@ -53,7 +53,10 @@ detection. This includes both sides of moves and avoids API file-count limits.
 
 The expensive release build and installation job is skipped only when every
 changed path is in `docs/`, `crates/devoption-ui/assets/`, or is a root `README.md`,
-`CHANGELOG.md`, `CONTRIBUTING.md`, `AGENTS.md`, or `LICENSE`. Rust source (including
+`CHANGELOG.md`, `CONTRIBUTING.md`, or `AGENTS.md`. Shipped bundle inputs
+(including installation instructions under `docs/` and `LICENSE`) always require
+installation coverage; the routine changelog is the sole bundle-input exception.
+Rust source (including
 UI rendering), manifests/lockfiles, toolchains, scripts, workflows, examples,
 release inputs and all unknown paths require installation coverage. Missing,
 unreadable or empty diffs also require it. The selection job reports its decision

@@ -7,13 +7,19 @@ from pathlib import Path
 import re
 import subprocess
 
+from release_bundle import SOURCE_FILES
 
-SAFE_ROOT_FILES = {'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'AGENTS.md', 'LICENSE'}
+
+SAFE_ROOT_FILES = {'README.md', 'CHANGELOG.md', 'CONTRIBUTING.md', 'AGENTS.md'}
 
 
 def safe_path(path):
     # An allowlist makes new crates, fixtures and release/configuration inputs
     # require installation coverage without maintaining a dependency blacklist.
+    # Shipped instructions and license are release inputs, even under docs/.
+    # CHANGELOG.md is deliberately exempt: every ordinary PR must update it.
+    if path in SOURCE_FILES and path != 'CHANGELOG.md':
+        return False
     return (path in SAFE_ROOT_FILES or path.startswith('docs/')
             or path.startswith('crates/devoption-ui/assets/'))
 

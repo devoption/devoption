@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
+from release_bundle import SOURCE_FILES
 from ci_installation import installation_required, safe_path, validate_results
 
 
@@ -19,6 +20,10 @@ class SelectionTests(unittest.TestCase):
                      'examples/web-app/Cargo.toml', 'crates/devoption-ui/src/lib.rs',
                      'release-candidates/candidate.json', 'new-input', 'docs-other/file'):
             self.assertFalse(safe_path(path), path)
+
+    def test_shipped_bundle_inputs_require_coverage_except_routine_changelog(self):
+        for path in SOURCE_FILES:
+            self.assertEqual(safe_path(path), path == 'CHANGELOG.md', path)
 
     def test_non_pr_and_reusable_calls_require_full_coverage(self):
         for event, force in (('push', ''), ('workflow_dispatch', ''),
