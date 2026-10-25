@@ -40,13 +40,16 @@ idempotent. No terminal outcome can be replaced. A summary does not contain the
 complete plan, so these identity checks cannot replace exact approval-plan binding.
 There is no general public record constructor, state setter or history-to-plan API.
 
-At most ten attempts are retained, including unfinished attempts. Capacity rejects
+At most 100 attempts are retained, including unfinished attempts. Capacity rejects
 new IDs without eviction. This first store has no deletion, seven-day expiry,
 completed-job retention policy; it fails closed at capacity. IDs are guaranteed
 noncolliding only against this store's retained records; random generation makes
 cross-store collisions unlikely but is not a global uniqueness registry. Do not
 reset, roll back or delete history to reuse attempt IDs. Future retention must
-preserve the fresh-attempt invariant.
+preserve the fresh-attempt invariant. Compiler resource limits and single-job
+admission are unchanged. Existing ten-record stores remain readable without
+migration. Older binaries limited to ten records reject larger stores; do not
+reset history to make an older binary accept it.
 
 Allocation does not validate current source/catalog state, consume approval,
 serialize single-job admission, prove process cleanup or perform startup recovery.
@@ -58,7 +61,7 @@ model API and cannot insert caller-chosen IDs into this history store.
 
 `build-history.bin` uses the nine-byte magic/version `DVHISTRY` followed by byte
 `01`, a one-byte count, that many 161-byte records, then SHA-256 of all preceding
-bytes. Maximum size is 1652 bytes. Each record contains, in order:
+bytes. Maximum size is 16,142 bytes. Each record contains, in order:
 
 - Attempt, project and repository IDs: 16 bytes each.
 - Exact commit: 40 lowercase ASCII hex bytes, nonzero.
@@ -119,8 +122,8 @@ Logs use the same retained directory/lock, no-follow bounded reads, metadata/nam
 checks, fixed pending filename, atomic replacement and file/directory sync as
 summaries. Corrupt or unsafe existing logs cannot be overwritten. Failed writes
 poison the shared writer, leaving uncertain files for inspection. No directory
-scan, orphan adoption, deletion or eviction is performed. At ten retained attempts,
-managed log data is bounded to approximately 10 MiB plus one pending snapshot;
+scan, orphan adoption, deletion or eviction is performed. At 100 retained attempts,
+managed log data is bounded to approximately 100 MiB plus one pending snapshot;
 unrelated entries or same-account modifications are outside that bound.
 
 Raw stored logs can contain secrets or private paths. Private filesystem modes

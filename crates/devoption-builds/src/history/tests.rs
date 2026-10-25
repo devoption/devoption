@@ -122,7 +122,32 @@ fn unsafe_files_corruption_and_oversize_are_never_reset() {
     }
 }
 #[test]
-fn ten_attempt_bound_never_evicts_or_overwrites() {
+fn ten_record_store_reopens_and_accepts_an_eleventh_without_losing_history() {
+    let (temp, path, job) = fixture();
+    let mut store = History::open(&path).unwrap();
+    for _ in 0..10 {
+        let mut attempt = store.queue(job.plan().clone()).unwrap();
+        attempt.cancel_queued().unwrap();
+        store.record(&attempt).unwrap();
+    }
+    let original = store.load().unwrap();
+    let encoded = fs::read(temp.path().join(RECORD)).unwrap();
+    assert_eq!(&encoded[..10], b"DVHISTRY\x01\x0a");
+    assert_eq!(encoded.len(), 1652);
+    drop(store);
+
+    let mut store = History::open(&path).unwrap();
+    assert!(store.load().unwrap() == original);
+    let added = store.queue(job.plan().clone()).unwrap();
+    drop(store);
+    let loaded = History::open(&path).unwrap().load().unwrap();
+    assert_eq!(loaded.len(), 11);
+    assert!(loaded[..10] == original);
+    assert_eq!(loaded[10].id(), added.id());
+    assert!(!original.iter().any(|record| record.id() == added.id()));
+}
+#[test]
+fn retained_attempt_bound_never_evicts_or_overwrites() {
     let (temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
     for _ in 0..MAX_JOBS {
