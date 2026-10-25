@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Clarify deployment review with selected/candidate release comparison, exact
+  health and storage expectations, expandable runtime identities and a prominent
+  explicit approval action. Distinguish first deployment, stopped/failed state
+  and cross-project replacement; retain existing runtime controls
+  ([#322](https://github.com/devoption/devoption/issues/322)).
+
 - Make build review easier to scan with a source/output/limits summary, a clear
   approval state and primary action, expandable exact execution inputs, and
   separate release/deployment guidance. Preserve the existing build actions

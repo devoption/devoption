@@ -371,9 +371,14 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
                     field(deployment, "intent")?
                 );
                 view.current = Some(field(deployment, "release")?.into());
+                view.current_state = Some((
+                    field(deployment, "observed")?.into(),
+                    field(deployment, "intent")?.into(),
+                ));
                 view.can_stop = true;
                 view.log = field(&state, "log")?.into();
             } else if !deployment.is_null() {
+                view.replaces_other_app = true;
                 view.status = if view.bound_elsewhere {
                     "Another project owns this node’s app hostname."
                 } else {

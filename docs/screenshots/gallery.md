@@ -32,7 +32,7 @@ for dimensions, states and refresh instructions.
 
 ![Project Releases with a healthy private app](project-releases.jpg)
 
-![Synthetic deployment review showing the app storage grant before approval](deployment-review.jpg)
+![Synthetic deployment review comparing selected/candidate releases and scoped storage access](deployment-review.jpg)
 
 ![App hostname certificate failure with recovery guidance](app-hostname-error.jpg)
 
