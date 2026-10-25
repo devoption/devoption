@@ -26,9 +26,9 @@ for dimensions, states and refresh instructions.
 
 ![Project Builds with the build action and real local attempt history](project-builds.jpg)
 
-![Passed initial source checks, without execution](build-source-checks.jpg)
+![Synthetic source readiness with initial checks passed, without execution](build-source-checks.jpg)
 
-![Source changes requiring attention](build-source-changes.jpg)
+![Synthetic source readiness with a modified entry requiring attention](build-source-changes.jpg)
 
 ![Project Releases with a healthy private app](project-releases.jpg)
 

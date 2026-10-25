@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Make source readiness easier to scan with observed branch/commit, Git changes,
+  initial input checks, inspected files and a configured-runner path to build
+  review. Keep read-only observations distinct from build admission and correct
+  outdated execution guidance
+  ([#324](https://github.com/devoption/devoption/issues/324)).
+
 - Clarify deployment review with selected/candidate release comparison, exact
   health and storage expectations, expandable runtime identities and a prominent
   explicit approval action. Distinguish first deployment, stopped/failed state

@@ -11,17 +11,18 @@ pub struct PreparationView<'a> {
     pub repository_name: &'a str,
     pub headline: &'static str,
     pub commit: Option<&'a str>,
+    pub branch: Option<&'a str>,
+    pub execution_available: bool,
     pub package: Option<(&'a str, &'a str, usize)>,
     pub checks: Vec<PreparationCheck<'a>>,
     pub unavailable: Option<&'a str>,
 }
 
-const LIMITATION: &str =
-    "Build execution is not available yet. Source checks do not approve or run a build.";
+const LIMITATION: &str = "These checks do not approve or run a build.";
 
 pub(super) fn list(project: &ProjectSummary<'_>, available: bool) -> String {
     let mut html = String::from(
-        r#"<section class="build-preparation" aria-labelledby="preparation-title"><h2 id="preparation-title">Prepare a build</h2><p>Check an attached repository's current source before the future build workflow.</p>"#,
+        r#"<section class="build-preparation" aria-labelledby="preparation-title"><h2 id="preparation-title">Prepare a build</h2><p>Inspect an attached repository’s current source. The build runner is not enabled on this server.</p>"#,
     );
     html.push_str(&format!("<p class=\"preparation-note\">{LIMITATION}</p>"));
     if project.repositories.is_empty() {
@@ -58,86 +59,162 @@ pub(super) fn list(project: &ProjectSummary<'_>, available: bool) -> String {
 
 pub(crate) fn content(project: &ProjectSummary<'_>, view: &PreparationView<'_>) -> String {
     let id = identifier(&project.id);
-    let url = format!("/projects/{id}/builds/{}", identifier(&view.repository_id));
+    let repository = identifier(&view.repository_id);
+    let url = format!("/projects/{id}/builds/{repository}");
+    let git_ready = view.unavailable.is_none()
+        && view.commit.is_some()
+        && ["Commit", "Working tree"].iter().all(|label| {
+            view.checks
+                .iter()
+                .any(|c| c.label == *label && c.outcome == "Passed")
+        });
+    let initial_passed =
+        !view.checks.is_empty() && view.checks.iter().all(|c| c.outcome == "Passed");
+    let mut files = String::new();
     let mut html = super::workspace::navigation(project, ProjectSection::Builds);
-    html.push_str(&format!(r#"<section class="build-preparation" aria-labelledby="preparation-title"><a class="text-button" href="/projects/{id}/builds">← Back to Builds</a><h2 id="preparation-title">"#));
+    html.push_str(r#"<section class="source-readiness" aria-labelledby="source-readiness-title"><header class="source-readiness-heading"><h2 id="source-readiness-title">Review your source</h2><p>Inspect the checkout before preparing a build.</p></header><ol class="source-readiness-stages" aria-label="Delivery stages"><li aria-current="step">Source <span>Inspect checkout</span></li><li>Build <span>Review and approve</span></li><li>Release <span>Save a successful build</span></li><li>Deploy <span>Separate approval</span></li></ol><div class="source-readiness-layout"><div class="source-readiness-main"><p class="source-readiness-label">Repository</p><h3>"#);
     escape_into(&mut html, view.repository_name);
-    html.push_str(" · Source checks</h2><p class=\"preparation-result\" role=\"status\">");
+    html.push_str(r#"</h3><dl class="source-identity"><div><dt>Branch</dt><dd>"#);
+    escape_into(
+        &mut html,
+        if view.unavailable.is_some() {
+            "Unavailable"
+        } else {
+            view.branch.unwrap_or("Detached HEAD")
+        },
+    );
+    html.push_str("</dd></div><div><dt>Commit</dt><dd><code>");
+    escape_into(
+        &mut html,
+        &view
+            .commit
+            .map(|value| value.chars().take(12).collect::<String>())
+            .unwrap_or_else(|| {
+                if view.unavailable.is_some() {
+                    "Unavailable"
+                } else {
+                    "No commits yet"
+                }
+                .into()
+            }),
+    );
+    html.push_str(r#"</code></dd></div></dl><p class="source-readiness-status" role="status">"#);
     escape_into(&mut html, view.headline);
-    html.push_str(&format!(
-        "</p><p class=\"preparation-note\">{LIMITATION}</p>"
-    ));
+    html.push_str("</p>");
     if let Some(message) = view.unavailable {
-        html.push_str("<p>");
+        html.push_str("<p class=\"source-readiness-problem\">");
         escape_into(&mut html, message);
         html.push_str("</p>");
     } else {
-        html.push_str(r#"<dl class="preparation-summary"><div><dt>Observed HEAD</dt><dd><code>"#);
-        escape_into(&mut html, view.commit.unwrap_or("No commits yet"));
-        html.push_str("</code></dd></div>");
-        if let Some((package, version, count)) = view.package {
-            html.push_str("<div><dt>Package</dt><dd>");
-            escape_into(&mut html, package);
-            html.push(' ');
-            escape_into(&mut html, version);
-            html.push_str(&format!(
-                "</dd></div><div><dt>Locked registry dependencies</dt><dd>{count}</dd></div>"
-            ));
+        html.push_str(r#"<ul class="source-observations" aria-label="Source observations">"#);
+        for label in ["Commit", "Working tree", "Cargo inputs"] {
+            if let Some(check) = view.checks.iter().find(|check| check.label == label) {
+                let summary = PreparationCheck {
+                    label: check.label,
+                    outcome: check.outcome,
+                    detail: if label == "Cargo inputs" && check.outcome == "Passed" {
+                        "Manifest and lockfile checks passed; dependencies are not verified."
+                    } else {
+                        check.detail
+                    },
+                };
+                check_row(
+                    &mut html,
+                    &summary,
+                    if label == "Cargo inputs" {
+                        "Initial build inputs"
+                    } else {
+                        label
+                    },
+                    None,
+                );
+            }
         }
-        html.push_str(r#"</dl><ol class="preparation-checks" aria-label="Source check results">"#);
+        html.push_str("</ul>");
+        files.push_str(r#"<section class="source-files-panel" aria-labelledby="source-files-title"><h3 id="source-files-title">Inspected files</h3><ul class="source-files" aria-label="Inspected source files">"#);
         for check in &view.checks {
-            html.push_str("<li><div class=\"preparation-check-heading\"><h3>");
-            escape_into(&mut html, check.label);
-            html.push_str("</h3><span>");
-            escape_into(&mut html, check.outcome);
-            html.push_str("</span></div><p>");
-            escape_into(&mut html, check.detail);
-            html.push_str("</p></li>");
+            if matches!(check.label, "Cargo.toml" | "Cargo.lock" | "src/main.rs") {
+                let file_url = format!(
+                    "/projects/{id}/repositories/{repository}/files/{}",
+                    check.label
+                );
+                check_row(
+                    &mut files,
+                    check,
+                    check.label,
+                    (check.outcome == "Passed").then_some(file_url.as_str()),
+                );
+            }
         }
-        html.push_str("</ol><p class=\"preparation-note\">These observations describe current working-tree files, not a verified immutable source snapshot. Refreshing checks the repository again.</p>");
+        files.push_str("</ul></section>");
     }
-    html.push_str(&format!(r#"<div class="preparation-actions"><a class="action-button" href="{url}">Check again</a><a class="text-button" href="/projects/{id}/code">Open Code</a></div><details class="preparation-help"><summary>Supported source format</summary><p>One standalone Rust package with a tracked Cargo.toml, version-4 Cargo.lock and nonempty src/main.rs. The manifest must declare name, version, edition (2021 or 2024) and build = false. Direct dependencies must use exact version pins; workspaces, path and Git dependencies are not supported by this check.</p><p>Each file is limited to 64 KiB. Cargo and the compiler are not run. Complete source verification, toolchain selection, dependency preparation and build approval are still unavailable.</p></details></section>"#));
+    html.push_str(&format!(r#"<div class="source-refresh"><a class="text-button" href="{url}">Refresh source</a><p>Observed on this page load.</p></div></div><aside class="source-next" aria-labelledby="source-next-title">"#));
+    if view.unavailable.is_some() {
+        html.push_str(&format!(r#"<h3 id="source-next-title">Source could not be checked</h3><p>Inspect the checkout attachment in Code, then refresh source. An unavailable read is not a clean result.</p><a class="action-button primary" href="{url}">Retry source checks</a>"#));
+    } else if !git_ready {
+        html.push_str(&format!(r#"<h3 id="source-next-title">Resolve source changes</h3><p>Review the commit and working-tree observations. Update or commit this checkout using your Git tools, then refresh source.</p><a class="action-button primary" href="/projects/{id}/code">Open Code</a>"#));
+    } else if view.execution_available {
+        html.push_str(r#"<h3 id="source-next-title">Next: prepare a build</h3><p>Continue to the web-app build page to capture committed source and review the build settings.</p>"#);
+        if !initial_passed {
+            html.push_str(r#"<p class="source-readiness-problem">The initial file checks need attention. They use a binary-source format; web-app build review validates its supported source layout separately.</p>"#);
+        }
+        html.push_str(&format!(r#"<a class="action-button primary" href="{url}/run">Continue to build review</a><p class="source-next-note">Opening the page does not prepare, approve or run a build.</p>"#));
+    } else {
+        html.push_str(&format!(r#"<h3 id="source-next-title">Build runner not enabled</h3><p>Source inspection is available. An administrator must enable the Linux web-app build runner before a build review can be prepared.</p><a class="text-button" href="/projects/{id}/code">Open Code</a>"#));
+    }
+    html.push_str(r#"<div class="source-git-guidance"><h4>Pushing a change?</h4><p>DevOption reads the attached server checkout. Update and commit it using your Git tools, then refresh source here.</p></div></aside>"#);
+    html.push_str(&files);
+    html.push_str(r#"</div><p class="source-observation-note">These are current working-tree observations, not a verified immutable source snapshot. These checks do not approve or run a build.</p><details class="source-technical-details"><summary>Repository details and initial source format</summary><dl class="build-identities"><div><dt>Observed HEAD</dt><dd><code>"#);
+    escape_into(
+        &mut html,
+        view.commit.unwrap_or(if view.unavailable.is_some() {
+            "Unavailable"
+        } else {
+            "No commits yet"
+        }),
+    );
+    html.push_str("</code></dd></div>");
+    if let Some((package, version, count)) = view.package {
+        html.push_str("<div><dt>Package</dt><dd>");
+        escape_into(&mut html, package);
+        html.push(' ');
+        escape_into(&mut html, version);
+        html.push_str(&format!(
+            "</dd></div><div><dt>Locked registry dependencies</dt><dd>{count}</dd></div>"
+        ));
+    }
+    html.push_str(
+        r#"</dl><ol class="preparation-checks" aria-label="Detailed source check results">"#,
+    );
+    for check in &view.checks {
+        check_row(&mut html, check, check.label, None);
+    }
+    html.push_str(r#"</ol><p>The initial checks inspect a standalone binary package: tracked Cargo.toml, version-4 Cargo.lock and nonempty src/main.rs. Each inspected text file is limited to 64 KiB. These checks do not verify compiler validity, dependency availability or complete committed bytes.</p><p>The opt-in web-app build review checks its supported library source, toolchain and prepared dependencies independently before approval. A passing source report is not build admission.</p><a class="text-button" href="https://github.com/devoption/devoption/blob/main/docs/build-preparation.md" target="_blank" rel="noopener noreferrer">Source inspection limits</a></details>"#);
+    html.push_str(&format!(r#"<footer class="source-readiness-links"><a class="text-button" href="/projects/{id}/builds">Back to Builds</a><a class="text-button" href="/projects/{id}/code">Browse source in Code</a></footer></section>"#));
     html
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn preparation_escapes_dynamic_values_and_keeps_results_separate_from_execution() {
-        let project = ProjectSummary {
-            id: [1; 16],
-            name: "<project>",
-            repositories: vec![],
-        };
-        let view = PreparationView {
-            repository_id: [2; 16],
-            repository_name: "<repo>",
-            headline: "Source checks passed",
-            commit: Some("<commit>"),
-            package: Some(("<package>", "<version>", 2)),
-            checks: vec![PreparationCheck {
-                label: "<label>",
-                outcome: "Passed",
-                detail: "<script>fixture</script>",
-            }],
-            unavailable: None,
-        };
-        let html = crate::render_build_preparation(&project, &view);
-        for escaped in [
-            "&lt;repo&gt;",
-            "&lt;commit&gt;",
-            "&lt;package&gt;",
-            "&lt;label&gt;",
-            "&lt;script&gt;fixture&lt;/script&gt;",
-        ] {
-            assert!(html.contains(escaped));
-        }
-        assert!(!html.contains("<script>fixture"));
-        assert!(html.contains("/builds\" aria-current=\"page\""));
-        assert!(html.contains("not approve or run a build"));
-        assert!(html.contains("Check again</a>"));
-        assert!(!html.contains("<button") || !html.contains(">Run build</button>"));
-        assert!(list(&project, true).contains("No repositories yet"));
+fn check_row(html: &mut String, check: &PreparationCheck<'_>, label: &str, link: Option<&str>) {
+    html.push_str("<li><div class=\"source-check-heading\"><strong>");
+    if let Some(link) = link {
+        html.push_str("<a href=\"");
+        escape_into(html, link);
+        html.push_str("\">");
     }
+    escape_into(html, label);
+    if link.is_some() {
+        html.push_str("</a>");
+    }
+    html.push_str("</strong><span>");
+    escape_into(html, check.outcome);
+    html.push_str("</span></div>");
+    if link.is_none() {
+        html.push_str("<p>");
+        escape_into(html, check.detail);
+        html.push_str("</p>");
+    }
+    html.push_str("</li>");
 }
+
+#[cfg(test)]
+mod tests;

@@ -128,8 +128,11 @@ Source files include line numbers and syntax highlighting; Markdown offers
 **Preview** and **Source** views. Repository details and inspection remain below;
 **Settings** edits the project
 name. **Builds** offers [source preparation checks](build-preparation.md) for an
-attached repository: observed commit, Git changes, tracked Cargo inputs and binary
-source. **Check again** reads current state; no build is run or approved. **Releases**
+attached repository: observed branch/commit, Git changes, tracked Cargo inputs
+and binary source. **Refresh source** reads current state; no build is run or approved.
+When the runner is configured, a clean Git observation offers **Continue to build
+review**; that page separately verifies the supported web-app source before
+approval. **Releases**
 saves successful builds and reviews deployment when the Linux app runtime is explicitly
 enabled; see [deployment setup and recovery](web-app-deployments.md). **Packages**
 retains its unavailable state.

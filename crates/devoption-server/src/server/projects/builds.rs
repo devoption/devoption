@@ -9,6 +9,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         let ids = ids.ok().and_then(|RoutePath((p, r))| Some((project_id(&p)?, RepositoryId::from_bytes(project_id(&r)?.to_bytes()))));
         let Some((project, repository)) = ids else { return missing(); };
         let root = projects.root.clone();
+        let execution_available = projects.execution.is_some();
         let loaded = projects.access(move |directory| {
             let catalog = directory.load()?.unwrap_or_default();
             let record = catalog.projects().iter().find(|p| p.id() == project).ok_or(Error::UnknownProject)?;
@@ -37,6 +38,8 @@ pub(super) fn routes(projects: Projects) -> Router {
             repository_name: repository.name,
             headline: match report.map(|r| r.outcome()) { Some(Outcome::Passed) => "Source checks passed", Some(Outcome::ChangesNeeded) => "Changes needed", _ => "Source checks unavailable" },
             commit: report.and_then(|r| r.status.commit.as_deref()),
+            branch: report.and_then(|r| r.status.branch.as_deref()),
+            execution_available,
             package: report.and_then(|r| r.cargo.as_ref()).map(|c| (c.package(), c.version(), c.dependency_count())),
             checks: report.map(|r| r.checks.iter().map(|c| PreparationCheck { label: c.label, outcome: match c.outcome { Outcome::Passed => "Passed", Outcome::ChangesNeeded => "Needs changes", Outcome::Unavailable => "Unavailable" }, detail: &c.detail }).collect()).unwrap_or_default(),
             unavailable,

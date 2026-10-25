@@ -1,11 +1,15 @@
 # Check source before a build
 
-Open a project’s **Builds** page, then choose **Check source** for an attached
-repository. The report shows its observed HEAD, working-tree changes, fixed source
-file checks, and package/dependency metadata when Cargo input inspection succeeds.
-**Check again** reads the repository again; **Open Code** returns to its files and
-attachment. Links work with keyboard navigation, refresh, history and without
-JavaScript after sign-in.
+Open a project’s **Builds** page. When the runner is enabled, open the repository’s
+**Build app** page and choose **Check source**; otherwise choose **Check source**
+for an attached repository. The readiness screen shows the repository, observed
+branch and shortened commit,
+working-tree changes, initial input checks and the three inspected files.
+**Refresh source** reads the repository again; **Open Code** returns to its files and
+attachment. **Repository details and initial source format** preserves the full
+observed HEAD, every check detail and inspected package/dependency metadata.
+Links work with keyboard navigation, refresh, history and without JavaScript
+after sign-in.
 
 - **Source checks passed** means the initial checks below passed. It does not mean
   a build succeeded, source was compiled, or execution is approved.
@@ -16,9 +20,20 @@ JavaScript after sign-in.
   encoding or inspection limits prevented a check. It never substitutes success
   for a failed read.
 
+The next action follows the commit and working-tree observations. Missing commits
+or Git changes direct you to resolve source changes; failed reads offer a retry.
+A clean Git observation offers **Continue to build review** when the Linux runner
+is configured. This ordinary link opens the existing build page; it captures no
+snapshot and submits no approval. A disabled runner is explained in place.
+Initial file checks use the binary-source format below. A web app can use a
+different supported library layout, so these older input results do not gate its
+separate [build review](web-app-builds.md). The page shows any input warning before
+that link. Build preparation performs its own admission and may reject the source.
+
 Reports are fresh observations of the current working tree, not verified immutable
 source snapshots. No job, durable preparation record, build history or approval is
-created. Build execution remains unavailable. The flow runs no Cargo, compiler,
+created by this report. The separate opt-in [web-app build workflow](web-app-builds.md)
+is available when configured. This inspection runs no Cargo, compiler,
 project code, dependency acquisition, network fetch or VM.
 
 The separate backend [registered snapshot API](source-snapshots.md#capture-from-a-registered-repository)
@@ -82,8 +97,8 @@ semantics and buildability are not checked. Tests deliberately use invalid Rust
 text to establish that this check does not invoke a compiler.
 The Cargo adapter and [immutable snapshot verifier](source-snapshots.md) also
 admit a narrow `cdylib` source shape under #231, but this working-tree report still
-checks `src/main.rs`. Library-target preparation and build controls are not yet
-connected to the project interface.
+checks `src/main.rs`. The separate web-app build review supports its documented
+library target; it does not use this initial binary-file checklist for admission.
 
 ## Bounds and trust
 
@@ -110,15 +125,14 @@ project or foreign repository association returns 404; changed bindings return
 unsupported source inputs returns 200 with its actual result. No credentials or
 source contents enter URLs, logs or the report HTML.
 
-## Remaining build work
+## Relationship to build review
 
-This flow is separate from the pure [BuildPlan](build-plans.md) and
-[job lifecycle](build-jobs.md) models. A runnable workflow still needs a verified
-immutable source/target, prepared and verified dependency archives, selected and
-verified toolchain/executable, owned work directory, execution policy and an
-explicit approval bound to those facts. Job persistence, bounded execution/logs,
-cancellation and restart recovery are also not implemented. No passing report can
-be submitted as an execution capability.
+The [web-app build workflow](web-app-builds.md) separately captures committed source,
+verifies the configured toolchain and dependency inputs, and requires explicit
+owner approval. It records bounded build results and supports cancellation and
+startup recovery. These capabilities do not turn the source report into a verified
+snapshot or an execution capability. This report and `check-source` continue to
+provide the initial observations and limits described above.
 
 Implemented and tested with disposable repositories under
 [#171](https://github.com/devoption/devoption/issues/171) and exposed through the
