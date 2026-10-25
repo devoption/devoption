@@ -126,10 +126,11 @@ for dimensions, states and refresh instructions.
 
 ## Reviewed web-app builds
 
-These captures use the opt-in Linux runner in a disposable local Ubuntu VM.
-The component is compiled, not deployed or serving HTTP.
+The build review capture uses synthetic prepared inputs to show the layout; it
+executes no build. The successful attempt below uses the opt-in Linux runner in a
+disposable local Ubuntu VM. Its component is compiled, not deployed or serving HTTP.
 
-![Exact build review before single-use approval](build-review.jpg)
+![Build review summary and explicit approval using synthetic prepared inputs](build-review.jpg)
 
 ![Successful local compile and saved diagnostics](build-succeeded.jpg)
 
