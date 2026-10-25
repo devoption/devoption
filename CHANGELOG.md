@@ -12,6 +12,11 @@ Entries describe implemented changes, not the roadmap.
   separate release/deployment guidance. Preserve the existing build actions
   ([#316](https://github.com/devoption/devoption/issues/316)).
 
+- Skip expensive installation acceptance on PRs limited to documentation or UI
+  assets; keep conservative coverage for all other changes, full main/reusable
+  release validation, and an explicit required-status skip gate
+  ([#317](https://github.com/devoption/devoption/issues/317)).
+
 - Increase retained build history from ten to 100 attempts without eviction,
   history reset or changes to compiler resource limits. Preserve existing records
   and fresh attempt identities
