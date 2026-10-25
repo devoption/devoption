@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Increase retained build history from ten to 100 attempts without eviction,
+  history reset or changes to compiler resource limits. Preserve existing records
+  and fresh attempt identities
+  ([#312](https://github.com/devoption/devoption/issues/312)).
+
 - Bind optional app record grants to immutable saved releases and deployment
   review, including exact schema/identity digests, a dedicated non-login service
   user and read-only Unix socket/grant mounts. Refuse changed grants on restart

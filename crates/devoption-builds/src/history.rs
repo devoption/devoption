@@ -18,7 +18,7 @@ mod logs;
 const RECORD: &str = "build-history.bin";
 const LOCK: &str = "build-history.lock";
 const PENDING: &str = ".build-history.pending";
-pub const MAX_JOBS: usize = 10;
+pub const MAX_JOBS: usize = 100;
 const DIRECTORY: OFlags = OFlags::RDONLY
     .union(OFlags::DIRECTORY)
     .union(OFlags::NOFOLLOW)
