@@ -88,10 +88,21 @@ runtime is unavailable and offers no mutation controls.
    the same release; existing release bytes are never overwritten.
 3. Expand that saved release. Enter the exact `/healthz` response: `ok A` for the
    example's first revision. Choose **Review deployment**.
-4. Review release identity, expected health, private port, runtime configuration
-   digest and capability/resource policy. **Approve and deploy** consumes the
-   five-minute review once. Changed configuration or deployment state requires a
-   new review. The broker rechecks the immutable manifest and component bytes.
+4. Review the **Current selection** and **New release** side by side. The selected
+   app can be stopped or unhealthy; its observed state is distinct from the saved
+   candidate. A first deployment and replacing another project's app have separate
+   impact messages. **Deployment checks** shows the exact health response, configured
+   app access observation and any scoped storage access. Candidate health is checked
+   after approval; this summary does not verify public reachability.
+   Expand **Runtime limits, release identity & technical details** for full release
+   and commit identities, artifact checksum, private port, runtime configuration
+   digest, storage grant digest and capability/resource policy. Approval is withheld
+   if the candidate's saved metadata is unavailable or the hostname belongs to
+   another project; refresh Releases and resolve the condition before preparing a
+   new review. **Choose another release** moves to the saved release list below.
+   **Approve and deploy** consumes the five-minute review once. Changed configuration
+   or deployment state requires a new review. The broker rechecks the immutable
+   manifest and component bytes.
 5. Refresh health and logs. Healthy means the selected systemd invocation answered
    `/healthz` with status 200 and the exact expected body. The private endpoint is
    on the node, not the computer displaying the browser. Use an SSH tunnel for a

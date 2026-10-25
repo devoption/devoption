@@ -469,6 +469,49 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 #app-deployment label input { display: block; margin-top: .5rem; }
 #app-deployment summary, #app-deployment p { overflow-wrap: anywhere; }
 
+/* Deployment review only: compare selected and candidate releases before approval. */
+.deployment-review { font-size: 1rem; }
+.deployment-review-heading { margin: 1.5rem 0 1.25rem; }
+.deployment-review-heading h2 { font-size: 2rem; margin-bottom: .5rem; }
+.deployment-review-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; list-style: none; padding: 0; margin: 0 0 1rem; }
+.deployment-review-stages li { padding: .5rem 0; border-bottom: 2px solid var(--color-border); font-weight: 600; }
+.deployment-review-stages li[aria-current] { color: var(--color-primary); border-color: var(--color-primary); }
+.deployment-review-stages span { display: block; color: var(--color-muted); font-size: .875rem; font-weight: 400; margin-top: .25rem; }
+.deployment-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+.deployment-comparison > section { min-width: 0; }
+#app-deployment.deployment-review h3 { margin: 0 0 .5rem; font-size: 1.375rem; }
+#app-deployment.deployment-review .deployment-eyebrow { text-transform: uppercase; letter-spacing: .06em; font-size: .75rem; font-weight: 600; margin-bottom: .5rem; }
+.deployment-candidate .deployment-eyebrow { color: var(--color-primary); }
+.deployment-comparison p { margin-top: .25rem; }
+.deployment-current-state { font-weight: 600; }
+#app-deployment .deployment-note { font-size: .875rem; line-height: 1.5; }
+.deployment-checks { margin-top: 1rem; }
+.deployment-checks dl { margin: .75rem 0; }
+.deployment-checks dl > div { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: 1rem; padding: .625rem 0; border-bottom: 1px solid var(--color-border); }
+.deployment-checks dt { font-weight: 600; }
+.deployment-checks dd { margin: 0; overflow-wrap: anywhere; }
+.deployment-checks dd p { margin-top: .25rem; }
+.deployment-health-body { display: inline; white-space: pre-wrap; font-size: 1rem; overflow-wrap: anywhere; margin-top: .125rem; }
+.deployment-runtime-details > summary { cursor: pointer; font-size: .9375rem; padding: .5rem 0; }
+.deployment-runtime-details .build-identities code { white-space: pre-wrap; }
+.deployment-runtime-details p { margin: .75rem 0; max-width: 75ch; }
+.deployment-approval { border-top: 1px solid var(--color-border); padding-top: 1rem; margin-top: .25rem; }
+.deployment-approval > p { max-width: 85ch; font-size: .9375rem; }
+.deployment-review-actions, .deployment-review-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; margin-top: 1rem; }
+.deployment-review-actions .primary { min-width: 15rem; min-height: 3rem; }
+.deployment-review-tools > p { flex-basis: 100%; }
+.deployment-saved-releases { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); }
+#app-deployment .deployment-saved-releases h3 { margin-top: 2rem; }
+#app-deployment .deployment-saved-releases h3:first-child { margin-top: 0; }
+@media (max-width: 600px) {
+  .deployment-review-heading h2 { font-size: 1.75rem; }
+  .deployment-review-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deployment-comparison { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+  .deployment-checks dl > div { grid-template-columns: minmax(0, 1fr); gap: .375rem; }
+  .deployment-review-actions { align-items: stretch; flex-direction: column; }
+  .deployment-review-actions .primary { width: 100%; min-width: 0; }
+}
+
 /* Project overview: repository-first reading order with secondary guidance. */
 .project-overview-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; gap: 3rem; align-items: start; }
 .overview-repositories .section-heading { align-items: start; gap: 1rem; }
