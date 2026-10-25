@@ -45,13 +45,31 @@ pushes to `main`, and through the reusable release check. Marking a draft PR rea
 for review does not restart CI. PR title/body edits run only the separate
 contribution workflow, which validates issue references and change documentation.
 
-CI runs four independent jobs in parallel: Rust formatting/Clippy, workspace tests
-and the debug build (including the explicit trusted offline fixture), the release
-build and installation fixtures, and Python/Node checks. Each of these jobs checks for
-tracked-file changes. The required `Rust and repository checks` status succeeds
-only when all four jobs succeed; failure, cancellation, or skipping cannot pass
-that gate. `Issue and change documentation` remains a separate required status.
-This preserves branch protection without changing repository settings.
+Rust formatting/Clippy, workspace tests and the debug build (including the
+explicit trusted offline fixture), and Python/Node checks run on every PR.
+A separate selection job compares the PR head against its merge base with the
+current PR base, using full Git history and a NUL-delimited diff without rename
+detection. This includes both sides of moves and avoids API file-count limits.
+
+The expensive release build and installation job is skipped only when every
+changed path is in `docs/`, `crates/devoption-ui/assets/`, or is a root `README.md`,
+`CHANGELOG.md`, `CONTRIBUTING.md`, `AGENTS.md`, or `LICENSE`. Rust source (including
+UI rendering), manifests/lockfiles, toolchains, scripts, workflows, examples,
+release inputs and all unknown paths require installation coverage. Missing,
+unreadable or empty diffs also require it. The selection job reports its decision
+in the Actions summary. This is a conservative path policy, not dependency analysis.
+
+Pushes to `main` always run full validation. Reusable workflow calls default to
+`full-validation: true`, preserving full acceptance for release checking,
+planning, provenance and candidate retention, even if called from a PR context.
+No release workflow caller is changed to opt out.
+
+The required `Rust and repository checks` status requires successful selection,
+lint, tests and scripts, plus successful installation when selected. It accepts
+installation's `skipped` result only for an explicit successful skip decision;
+missing decisions, failures, cancellation and other skipped jobs fail the gate.
+Each validation job checks for tracked-file changes. `Issue and change
+documentation` remains a separate required status. Repository settings are unchanged.
 
 The installation job downloads Caddy using the existing exact version/checksum
 pin and explicitly runs the ignored `public_https_proxy` test. It uses loopback
