@@ -159,11 +159,11 @@ async fn show(
         }) && !review.expired()
         {
             view.message =
-                "Review prepared. Check the source, command and limits before approving.".into();
+                "The source snapshot is prepared. Review the details before approving.".into();
             view.token = Some(review.token().into());
             let plan = review.job.plan();
             let context = review.context().details();
-            view.review=vec![("Commit".into(),plan.details().commit.clone()),("Command inside isolated worker".into(),format!("{} {}",plan.details().cargo_executable,plan.cargo_arguments().join(" "))),("Working directory".into(),"/source (read-only owned snapshot)".into()),("Artifact".into(),plan.artifact_path()),("Policy".into(),"WasmBuildV1: 60 seconds; 512 MiB RAM; no swap; one CPU; 64 tasks; 256 MiB job storage (240 MiB scratch; 16 MiB reserved for staged inputs, artifact and logs); 1 MiB logs; 4 MiB component. No network. Target scratch permits dependency build scripts.".into()),("Toolchain SHA-256".into(),hex(context.toolchain_manifest.bytes())),("Dependency bundle SHA-256".into(),hex(context.dependency_bundle.bytes())),("Source SHA-256".into(),hex(plan.details().source.sha256().bytes())),("Configuration SHA-256".into(),hex(context.configuration.bytes())),("Execution UID".into(),context.execution_uid.to_string()),("Environment (all values)".into(),plan.details().environment.iter().map(|e|format!("{}={}",e.name,e.value)).collect::<Vec<_>>().join("\n"))];
+            view.review=vec![("Build limits".into(),"1 CPU · 512 MiB memory · 60-second limit".into()),("Network access".into(),"Off".into()),("Commit".into(),plan.details().commit.clone()),("Command inside isolated worker".into(),format!("{} {}",plan.details().cargo_executable,plan.cargo_arguments().join(" "))),("Working directory".into(),"/source (read-only owned snapshot)".into()),("Artifact".into(),plan.artifact_path()),("Policy".into(),"WasmBuildV1: 60 seconds; 512 MiB RAM; no swap; one CPU; 64 tasks; 256 MiB job storage (240 MiB scratch; 16 MiB reserved for staged inputs, artifact and logs); 1 MiB logs; 4 MiB component. No network. Target scratch permits dependency build scripts.".into()),("Toolchain SHA-256".into(),hex(context.toolchain_manifest.bytes())),("Dependency bundle SHA-256".into(),hex(context.dependency_bundle.bytes())),("Source SHA-256".into(),hex(plan.details().source.sha256().bytes())),("Configuration SHA-256".into(),hex(context.configuration.bytes())),("Execution UID".into(),context.execution_uid.to_string()),("Environment (all values)".into(),plan.details().environment.iter().map(|e|format!("{}={}",e.name,e.value)).collect::<Vec<_>>().join("\n"))];
         }
     }
     (

@@ -155,9 +155,13 @@ fallback that runs Cargo directly on the host.
 
 Create a project, open **Code → Attach repository**, and select the trusted app.
 Open **Builds → app · Build app → Prepare build review**. Preparation captures
-committed source and verifies inputs; it does not run Cargo. Review the exact
-commit, command, target, policy, hashes and complete environment (expand **Input
-identities and environment**). Select **Approve and build** once.
+committed source and verifies inputs; it does not run Cargo. The review shows the
+repository, a shortened commit, output, resource limits and network access before
+the approval action. Expand **Build command, inputs &
+technical details** to inspect the full commit, exact command, target, policy,
+hashes and complete environment. Select **Approve and build** once.
+The next-step guidance keeps saving a release and approving deployment separate
+from this build. Build history and logs remain available through the page link.
 
 Approval expires after five minutes and cannot survive service restart or be
 replayed. Changed source, staging, toolchain, dependency bundle or installed

@@ -18,7 +18,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths and README preview; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend highlighted source with expanded src folder; 1280 × 900 | `repository-file.jpg` |
 | Project builds | `/projects/{id}/builds` | Real local Wasm fixture attempts and enabled build action; 1280 × 1200 | `project-builds.jpg` |
-| Build review | `/projects/{id}/builds/{repository}/run` | Real prepared fixture, input identities collapsed; 1280 × 1200 | `build-review.jpg` |
+| Build review | `/projects/{id}/builds/{repository}/run` | Synthetic prepared review, technical details collapsed; 1280 × 1200 | `build-review.jpg` |
 | Successful build | `/projects/{id}/builds/attempts/{id}` | Real local Wasm compile with saved diagnostics; 1280 × 1200 | `build-succeeded.jpg` |
 | Build attempt | `/projects/{id}/builds/attempts/{id}` | Interrupted synthetic record, saved streams, source details collapsed; 1280 × 1200 | `build-attempt.jpg` |
 | Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
@@ -148,10 +148,25 @@ in the captures, but verify expansion and exact identifiers separately. Confirm
 truncated script/control/bidi text remains inert and no horizontal overflow at
 320, 375, 768, 800 and 1280 pixels. Source checks retain their existing captures.
 
+For the build-review layout capture, generate the explicit synthetic renderer
+fixture into an existing temporary directory:
+
+```sh
+DEVOPTION_BUILD_REVIEW_CAPTURE_DIR=ABSOLUTE_TEMPORARY_DIRECTORY cargo test -p devoption-ui manual_build_review_fixture --locked --offline -- --ignored --nocapture
+```
+
+Serve only that directory on loopback and open `index.html` for `build-review.jpg`
+at **1280 × 1200**, with technical details collapsed. The fixture also writes
+`prepare.html`, `running.html` and `unavailable.html` for checking state-specific
+controls. Verify keyboard disclosure, exact values and command wrapping at the
+widths above. These pages use synthetic review data and execute no build; they
+provide UI evidence only. Their session/action requests cannot succeed on a static
+server. The successful-build and runtime captures remain real execution evidence.
+
 For the real runner captures, follow [web-app build setup](../web-app-builds.md)
 in a disposable local Ubuntu VM. Use the public fixture and a disposable owner.
-Capture the prepared review before approval, then a real successful attempt with
-saved compiler output. Existing interrupted/truncated screenshots remain synthetic
+Inspect the prepared review before approval, then capture a real successful attempt
+with saved compiler output. Existing interrupted/truncated screenshots remain synthetic
 display tests. Never substitute seeded success for real build evidence.
 
 For deployment captures, follow [private app deployment](../web-app-deployments.md)

@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Make build review easier to scan with a source/output/limits summary, a clear
+  approval state and primary action, expandable exact execution inputs, and
+  separate release/deployment guidance. Preserve the existing build actions
+  ([#316](https://github.com/devoption/devoption/issues/316)).
+
 - Increase retained build history from ten to 100 attempts without eviction,
   history reset or changes to compiler resource limits. Preserve existing records
   and fresh attempt identities

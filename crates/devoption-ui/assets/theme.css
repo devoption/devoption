@@ -409,8 +409,59 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 .build-source-details { margin: 1.5rem 0; }
 .build-source-details summary { cursor: pointer; font-weight: 500; }
 
+/* Build review only: summary first, exact execution inputs on demand. */
+.build-review { font-size: 1rem; }
+.build-review-heading { margin: 2rem 0 1.5rem; }
+.build-review-heading h2 { font-size: 2rem; margin-bottom: .5rem; }
+.build-review-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.build-review-stages li { color: var(--color-muted); padding: .625rem 0; border-bottom: 2px solid var(--color-border); font-weight: 600; }
+.build-review-stages li[aria-current] { color: var(--color-primary); border-color: var(--color-primary); }
+.build-review-stages span { display: block; font-size: .875rem; font-weight: 400; color: var(--color-muted); margin-top: .25rem; }
+.build-review-layout { display: grid; grid-template-columns: minmax(0, 1fr) 18rem; gap: 2rem; }
+.build-review-main { min-width: 0; }
+.build-review-state { font-size: 1.5rem; margin-bottom: .5rem; }
+.build-review #build-action-status { max-width: 65ch; margin-bottom: 1.5rem; }
+.build-review-summary { margin: 0 0 1.5rem; }
+.build-review-summary > div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: 1rem; padding: .75rem 0; border-bottom: 1px solid var(--color-border); }
+.build-review-summary dt { font-weight: 600; }
+.build-review-summary dd { margin: 0; overflow-wrap: anywhere; }
+.build-review-details summary { cursor: pointer; padding: .75rem 0; font-weight: 600; }
+.build-review-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.6; margin: 0; }
+.build-review-next { padding-left: 1.75rem; border-left: 1px solid var(--color-border); }
+.build-review-next h3 { font-size: 1.25rem; }
+.build-review-next ol { padding-left: 1.25rem; margin: 1.5rem 0 0; }
+.build-review-next li { padding-left: .5rem; margin-bottom: 1.5rem; }
+.build-review-next p { font-size: .9375rem; margin-top: .5rem; }
+.build-review-approval { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem 2rem; background: var(--color-surface); padding: 1.5rem; margin-top: 1.75rem; }
+.build-review-approval > div:first-child { flex: 1 1 21rem; }
+.build-review-approval p { font-size: .875rem; margin-top: .5rem; max-width: 65ch; }
+.build-review-actions { display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: center; }
+.build-review-actions .primary { min-width: 13rem; min-height: 3rem; }
+.build-review-links { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: 1.5rem; }
+@media (max-width: 1100px) {
+  .build-review { display: flex; flex-direction: column; }
+  .build-review-layout { display: contents; }
+  .build-review-approval { order: 1; }
+  .build-review-next { order: 2; border-left: 0; padding-left: 0; margin-top: 2rem; }
+  .build-review-links { order: 3; }
+  .build-review > noscript { order: 4; }
+  .build-review-next ol { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+  .build-review-next li { margin-bottom: 0; }
+}
+@media (max-width: 600px) {
+  .build-review-heading h2 { font-size: 1.75rem; }
+  .build-review-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .build-review-summary > div { grid-template-columns: minmax(0, 1fr); gap: .25rem; }
+  .build-review-next ol { display: block; }
+  .build-review-next li { margin-bottom: 1rem; }
+  .build-review-approval { padding: 1rem; }
+  .build-review-actions { width: 100%; }
+  .build-review-actions button { width: 100%; }
+}
+
+
 #build-execution pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-#build-execution h3 { margin-top: 1.5rem; }
+#build-execution .build-review-state, #build-execution .build-review-next h3 { margin-top: 0; }
 
 #app-deployment pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 28rem; overflow: auto; }
 #app-deployment h3 { margin-top: 2rem; }
