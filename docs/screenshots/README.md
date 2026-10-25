@@ -22,8 +22,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Successful build | `/projects/{id}/builds/attempts/{id}` | Real local Wasm compile with saved diagnostics; 1280 × 1200 | `build-succeeded.jpg` |
 | Build attempt | `/projects/{id}/builds/attempts/{id}` | Interrupted synthetic record, saved streams, source details collapsed; 1280 × 1200 | `build-attempt.jpg` |
 | Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
-| Source checks | `/projects/{id}/builds/{repository}` | backend, clean committed fixture; 1280 × 1400 | `build-source-checks.jpg` |
-| Source changes | `/projects/{id}/builds/{repository}` | backend, one modified source file; 1280 × 1400 | `build-source-changes.jpg` |
+| Source checks | `/projects/{id}/builds/{repository}` | Synthetic clean source observations, runner configured, details collapsed; 1280 × 1400 | `build-source-checks.jpg` |
+| Source changes | `/projects/{id}/builds/{repository}` | Synthetic source observations with one modified entry, details collapsed; 1280 × 1400 | `build-source-changes.jpg` |
 | App hostname error | `/projects/{id}/releases` | Deliberately untrusted rehearsal certificate, with actionable status; 1280 × 1200 | `app-hostname-error.jpg` |
 | Deployed app | Separate app HTTPS hostname | Real saved revision A served by the Wasm worker; 1280 × 1200 | `deployed-app.jpg` |
 | Deployment review | `/projects/{id}/releases` | Synthetic selected/candidate comparison, scoped storage access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
@@ -114,13 +114,29 @@ printed ephemeral origin. Do not create an owner for that capture.
 9. Inspect the images, text, active navigation and gallery entries before
    committing. Restore browser preferences and clear temporary overrides.
 
-For the Builds captures, start a separate fixture with
+For the source-readiness captures, generate the explicit renderer fixture in an
+existing temporary directory:
+
+```sh
+DEVOPTION_SOURCE_CAPTURE_DIR=ABSOLUTE_TEMPORARY_DIRECTORY cargo test -p devoption-ui manual_source_readiness_fixture --locked --offline -- --ignored --nocapture
+```
+
+Serve only that directory on loopback. Capture `index.html` as
+`build-source-checks.jpg` and `changes.html` as `build-source-changes.jpg`, each at
+**1280 × 1400**, scroll at the top, with repository details collapsed. The fixture
+also writes no-commit, detached, runner-unconfigured, library-layout and read-failure
+variants, plus a synthetic build-page destination for the continuation link.
+These are synthetic observations and configuration; the fixture performs no Git
+inspection, snapshot preparation or build execution. Verify keyboard disclosure,
+corrective actions and wrapping at 320, 375, 768, 800 and 1280 pixels.
+
+For live source-inspection verification, start a separate fixture with
 `DEVOPTION_BROWSER_PREPARATION=1` using the same Cargo command above. This adds
 three committed backend files with fixed public fixture author/date metadata,
-without running their Rust source. Open Example application → Builds, capture the
-repository choices, then **Check source for backend**. Capture **Source checks
-passed**, append a comment to the temporary backend `src/main.rs`, and use **Check
-again** to capture **Changes needed** with one modified entry. Restore the temporary
+without running their Rust source. Open Example application → Builds, inspect the
+repository choices, then **Check source for backend**. Verify **Source checks
+passed**, append a comment to the temporary backend `src/main.rs`, and use **Refresh
+source** to verify **Changes needed** with one modified entry. Restore the temporary
 file afterward. The fixture’s printed root identifies these disposable files;
 do not change a real checkout or the persistent preview’s repository root.
 The three browser flags can also be combined to capture the full set in one

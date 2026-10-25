@@ -108,6 +108,8 @@ fn preparation_uses_real_fresh_source_and_never_creates_a_job_or_modifies_storag
     let html = check(&response, 200);
     assert!(html.contains("Source checks passed") && html.contains("fixture-app 0.1.0"));
     assert!(html.contains("not approve or run a build") && html.contains("Observed HEAD"));
+    assert!(html.contains("Build runner not enabled"));
+    assert!(!html.contains("Continue to build review"));
     assert!(!html.contains("never compile this fixture"));
     assert_eq!(check(&read(address, "HEAD", &url, Some(&issued)), 200), "");
     for path in [

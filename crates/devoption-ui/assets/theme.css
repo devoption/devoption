@@ -390,6 +390,61 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 .preparation-help summary { cursor: pointer; font-weight: 500; }
 .preparation-help p { margin: 1rem 0; }
 
+/* Read-only source readiness: observations and the next action, scoped to this page. */
+.source-readiness { font-size: 1rem; }
+.source-readiness-heading { margin: 1.75rem 0 1.25rem; }
+.source-readiness-heading h2 { font-size: 2rem; margin-bottom: .5rem; }
+.source-readiness-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; list-style: none; padding: 0; margin: 0 0 1.5rem; }
+.source-readiness-stages li { padding: .5rem 0; border-bottom: 2px solid var(--color-border); font-weight: 600; }
+.source-readiness-stages li[aria-current] { color: var(--color-primary); border-color: var(--color-primary); }
+.source-readiness-stages span { display: block; color: var(--color-muted); font-size: .875rem; font-weight: 400; margin-top: .25rem; }
+.source-readiness-layout { display: grid; grid-template-columns: minmax(0, 1fr) 20rem; gap: 1.5rem 2rem; }
+.source-readiness-main { grid-column: 1; grid-row: 1; min-width: 0; }
+.source-readiness-main h3 { font-size: 1.5rem; margin: .25rem 0 .75rem; }
+.source-readiness-label { font-size: .875rem; }
+.source-identity { display: flex; flex-wrap: wrap; gap: .75rem 2rem; margin: 0 0 1.25rem; }
+.source-identity > div { min-width: 0; }
+.source-identity dt { color: var(--color-muted); font-size: .875rem; }
+.source-identity dd { margin: .25rem 0 0; overflow-wrap: anywhere; }
+.source-readiness-status { font-weight: 600; font-size: 1.125rem; margin-bottom: .5rem; }
+.source-observations, .source-files { list-style: none; padding: 0; margin: 0; }
+.source-observations li, .source-files li { padding: .75rem 0; border-bottom: 1px solid var(--color-border); }
+.source-check-heading { display: flex; justify-content: space-between; gap: .75rem; align-items: baseline; }
+.source-check-heading > strong { min-width: 0; overflow-wrap: anywhere; }
+.source-check-heading span { flex-shrink: 0; color: var(--color-muted); font-size: .875rem; }
+.source-observations p, .source-files p { max-width: 65ch; margin-top: .375rem; font-size: .875rem; }
+.source-files-panel { grid-column: 1; grid-row: 2; min-width: 0; }
+.source-files-panel h3 { font-size: 1.25rem; margin-bottom: .5rem; }
+.source-files a { text-decoration: underline; text-underline-offset: .2em; }
+.source-refresh { display: flex; gap: .5rem 1.5rem; flex-wrap: wrap; align-items: center; margin-top: .75rem; }
+.source-refresh p { font-size: .875rem; }
+.source-next { grid-column: 2; grid-row: 1 / span 2; border-left: 1px solid var(--color-border); padding-left: 1.75rem; min-width: 0; }
+.source-next h3 { font-size: 1.5rem; }
+.source-next p { margin: .75rem 0 1rem; }
+.source-next .primary { width: 100%; min-height: 3rem; }
+.source-next .source-next-note { font-size: .875rem; }
+.source-git-guidance { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--color-border); }
+.source-git-guidance h4 { margin: 0; font-size: 1rem; }
+.source-git-guidance p, .source-observation-note { font-size: .875rem; }
+.source-observation-note { max-width: 85ch; margin: 1.5rem 0 .75rem; }
+.source-readiness-problem { font-weight: 500; }
+.source-technical-details summary { cursor: pointer; font-weight: 600; padding: .75rem 0; }
+.source-technical-details p { max-width: 80ch; margin: .75rem 0; font-size: .9375rem; }
+.source-technical-details .source-check-heading { font-size: 1rem; }
+.source-readiness-links { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: 1rem; }
+@media (max-width: 1000px) {
+  .source-readiness-layout { grid-template-columns: minmax(0, 1fr); }
+  .source-readiness-main, .source-next, .source-files-panel { grid-column: 1; grid-row: auto; }
+  .source-next { border-left: 0; padding: 1.25rem 0 0; border-top: 1px solid var(--color-border); }
+  .source-next .primary { width: auto; }
+}
+@media (max-width: 600px) {
+  .source-readiness-heading h2 { font-size: 1.75rem; }
+  .source-readiness-stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .source-check-heading { flex-wrap: wrap; }
+  .source-next .primary { width: 100%; }
+}
+
 /* Saved build history: scoped styles, no shared layout changes. */
 .build-history { max-width: 60rem; margin-bottom: 3rem; }
 .build-history h2 { margin-top: 1.25rem; }
