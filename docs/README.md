@@ -37,6 +37,7 @@ accounts and production hosting acceptance remain planned.
 
 ## Implementation references
 
+- [Native application account and RBAC library (no HTTP activation)](app-identity.md)
 - [Experimental app-scoped append-only PostgreSQL records](app-records.md)
 
 - [Local mutation and execution trust contract](execution-trust.md)

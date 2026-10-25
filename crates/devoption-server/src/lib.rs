@@ -8,6 +8,9 @@
 
 mod server;
 
+#[cfg(unix)]
+pub mod app_identity;
+
 pub use server::{
     PublicOrigin, run, run_with_build_history, run_with_deployments, run_with_execution,
     run_with_managed_repository_root, run_with_public_origin, run_with_repository_root,

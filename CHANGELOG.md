@@ -5,6 +5,15 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Add an isolated host-side native application account/RBAC library with private
+  atomic account snapshots, bounded password hashing/sign-in attempts, expiring
+  sessions and CSRF validation, and separate application/organization roles.
+  Password and authorization changes revoke sessions. HTTP transport and managed
+  activation remain unimplemented
+  ([#320](https://github.com/devoption/devoption/issues/320)).
+
 ### Changed
 
 - Increase retained build history from ten to 100 attempts without eviction,
