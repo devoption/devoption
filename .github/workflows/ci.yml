@@ -6,6 +6,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_call:
+    inputs:
+      full-validation:
+        description: 'Require installation acceptance for reusable release checks'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -15,6 +20,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  selection:
+    name: Select installation coverage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      installation: ${{ steps.select.outputs.installation }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Select conservative PR coverage
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_FULL: ${{ inputs.full-validation }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 scripts/ci_installation.py select
+
   lint:
     name: Rust formatting and Clippy
     runs-on: ubuntu-24.04
@@ -48,6 +73,8 @@ jobs:
       - run: git diff --exit-code
 
   installation:
+    needs: selection
+    if: needs.selection.outputs.installation == 'true'
     name: Release build and installation checks
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -164,21 +191,17 @@ jobs:
       - run: git diff --exit-code
 
   checks:
-    # Preserve the required status; skipped or failed dependencies must fail it.
+    # Accept installation skipping only after a successful explicit safe-change decision.
     name: Rust and repository checks
-    needs: [lint, tests, installation, scripts]
+    needs: [selection, lint, tests, installation, scripts]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require every validation job to pass
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require every selected validation job to pass
         env:
-          RESULTS: ${{ toJSON(needs.*.result) }}
-        run: |
-          python3 - <<'PYTHON'
-          import json
-          import os
-          results = json.loads(os.environ["RESULTS"])
-          if len(results) != 4 or any(result != "success" for result in results):
-              raise SystemExit(f"Validation jobs did not all pass: {results}")
-          PYTHON
+          NEEDS: ${{ toJSON(needs) }}
+        run: python3 scripts/ci_installation.py gate
