@@ -1,5 +1,7 @@
 //! WASIp2 HTTP host for the separately supervised private app worker.
-//! No owner store, inherited environment, filesystem preopens or outbound grants.
+//! No owner store, inherited environment or filesystem preopens. Optional HTTPS
+//! authorization stays in the host and requires an explicit deployment grant.
+mod https;
 mod records;
 
 use http_body_util::{BodyExt, Full, Limited};
@@ -53,36 +55,12 @@ async fn admit(admission: &Semaphore) -> Option<tokio::sync::SemaphorePermit<'_>
         .ok()
 }
 
-struct DenyNetwork;
-impl WasiHttpHooks for DenyNetwork {
-    fn send_request(
-        &mut self,
-        _: Request<WasiBody>,
-        _: Option<RequestOptions>,
-        _: Box<dyn Future<Output = Result<(), Error>> + Send>,
-    ) -> Box<
-        dyn Future<
-                Output = Result<
-                    (
-                        Response<WasiBody>,
-                        Box<dyn Future<Output = Result<(), Error>> + Send>,
-                    ),
-                    Error,
-                >,
-            > + Send,
-    > {
-        Box::new(async { Err(Error::HttpRequestDenied) })
-    }
-    fn p2_outgoing_body_chunk_size(&mut self) -> usize {
-        16 * 1024
-    }
-}
 struct State {
     wasi: WasiCtx,
     http: WasiHttpCtx,
     table: ResourceTable,
     limits: StoreLimits,
-    hooks: DenyNetwork,
+    hooks: https::Hooks,
     records: Option<Arc<records::Grant>>,
     record_call_used: bool,
 }
@@ -136,6 +114,7 @@ async fn invoke(
     pre: &ProxyPre<State>,
     request: Request<Full<Bytes>>,
     records: Option<Arc<records::Grant>>,
+    https: Option<Arc<https::Grant>>,
 ) -> wasmtime::Result<Response<Bytes>> {
     let stdout = MemoryOutputPipe::new(32 * 1024);
     let stderr = MemoryOutputPipe::new(32 * 1024);
@@ -153,7 +132,7 @@ async fn invoke(
             wasi: wasi.build(),
             http,
             table: ResourceTable::new(),
-            hooks: DenyNetwork,
+            hooks: https::Hooks::new(https),
             records,
             record_call_used: false,
             limits: StoreLimitsBuilder::new()
@@ -298,6 +277,7 @@ async fn connection(
     pre: ProxyPre<State>,
     admission: Arc<Semaphore>,
     records: Option<Arc<records::Grant>>,
+    https: Option<Arc<https::Grant>>,
 ) {
     let response = match tokio::time::timeout(DEADLINE, receive(&mut stream)).await {
         Err(_) => failure(408),
@@ -305,7 +285,7 @@ async fn connection(
         Ok(Ok(request)) => match admit(&admission).await {
             None => failure(503),
             Some(_permit) => {
-                match tokio::time::timeout(DEADLINE, invoke(&pre, request, records)).await {
+                match tokio::time::timeout(DEADLINE, invoke(&pre, request, records, https)).await {
                     Err(_) => failure(504),
                     Ok(Err(error))
                         if matches!(
@@ -359,10 +339,10 @@ async fn connection(
 
 /// Invoked only in the separately supervised worker. Listener is loopback-only.
 pub fn run(path: &std::path::Path, port: u16, validate_only: bool) -> wasmtime::Result<()> {
-    run_inner(path, port, validate_only, None)
+    run_inner(path, port, validate_only, None, None)
 }
 
-/// Experimental local proof entry point, intentionally absent from the broker.
+/// Compatibility entry point for explicitly granted record workers.
 pub fn run_with_records(
     path: &std::path::Path,
     port: u16,
@@ -370,7 +350,24 @@ pub fn run_with_records(
     grant: &std::path::Path,
 ) -> wasmtime::Result<()> {
     let records = Arc::new(records::Grant::load(grant)?);
-    run_inner(path, port, validate_only, Some(records))
+    run_inner(path, port, validate_only, Some(records), None)
+}
+
+/// Operator-supervised capability worker. No credential path is passed to the guest.
+pub fn run_with_capabilities(
+    path: &std::path::Path,
+    port: u16,
+    validate_only: bool,
+    records: Option<&std::path::Path>,
+    https: Option<&std::path::Path>,
+) -> wasmtime::Result<()> {
+    let records = records.map(records::Grant::load).transpose()?.map(Arc::new);
+    let https = if validate_only {
+        None
+    } else {
+        https.map(https::Grant::load).transpose()?.map(Arc::new)
+    };
+    run_inner(path, port, validate_only, records, https)
 }
 
 fn run_inner(
@@ -378,6 +375,7 @@ fn run_inner(
     port: u16,
     validate_only: bool,
     records: Option<Arc<records::Grant>>,
+    https: Option<Arc<https::Grant>>,
 ) -> wasmtime::Result<()> {
     use std::io::Read;
     let file = std::fs::File::open(path)?;
@@ -415,9 +413,10 @@ fn run_inner(
                     let pre = pre.clone();
                     let admission = admission.clone();
                     let records = records.clone();
+                    let https = https.clone();
                     tokio::spawn(async move {
                         let _permit = permit;
-                        connection(stream, pre, admission, records).await;
+                        connection(stream, pre, admission, records, https).await;
                     });
                 }
             }

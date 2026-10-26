@@ -195,6 +195,24 @@ impl Store {
         }
         Ok(())
     }
+    /// Runtime delivery only: never expose this through an HTTP read response.
+    pub(crate) fn resolve(
+        &self,
+        project: ProjectId,
+        env: Environment,
+        name: &str,
+        revision: u64,
+    ) -> Result<Zeroizing<String>, Error> {
+        if !valid_name(name) || revision == 0 {
+            return Err(Error::Invalid);
+        }
+        self.load(project, env)?
+            .entries
+            .into_iter()
+            .find(|e| e.name == name && e.revision == revision)
+            .map(|e| e.value)
+            .ok_or(Error::Conflict)
+    }
     fn filename(project: ProjectId, env: Environment) -> String {
         format!(
             "project-secrets-{}-{}.bin",

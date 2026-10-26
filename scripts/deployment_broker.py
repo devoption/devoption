@@ -21,6 +21,9 @@ import subprocess
 import sys
 import time
 import tomllib
+import select
+import tempfile
+import urllib.parse
 
 CONFIG = Path('/etc/devoption/deployment.toml')
 BROKER = Path('/usr/local/libexec/devoption-deployment-broker')
@@ -127,7 +130,7 @@ def configuration():
     protected(BROKER)
     raw = read_regular(CONFIG, 16384, 0)
     config = tomllib.loads(raw.decode())
-    if set(config) - {'ingress', 'records'} != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
+    if set(config) - {'ingress', 'records', 'https'} != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
         raise ValueError('unexpected configuration')
     if type(config['uid']) is not int or config['uid'] <= 0 or int(os.environ.get('SUDO_UID', '-1')) != config['uid']:
         raise ValueError('caller not configured owner')
@@ -172,8 +175,99 @@ def configuration():
         config['records'] = {'grant_file': grant_path, 'bytes': record_bytes,
                              'grant': grant, 'identity': identity}
         record_bytes += canonical(identity)
+    if 'https' in config:
+        validate_https_policy(config['https'])
+        if config.get('ingress') and config['https']['project'] != config['ingress']['project']:
+            raise ValueError('HTTPS project must match hostname binding')
     config['fingerprint'] = digest(raw + trust + record_bytes + read_regular(BROKER, 65536, 0) + read_regular(config['worker'], 256*1024*1024, 0))
     return config
+
+
+def validate_https_policy(policy):
+    if not isinstance(policy, dict) or set(policy) != {'project', 'environment', 'secret', 'revision', 'endpoint'}:
+        raise ValueError('invalid HTTPS policy')
+    if not isinstance(policy['project'], str) or not ID.fullmatch(policy['project']) or policy['environment'] not in ('development', 'preview', 'production'):
+        raise ValueError('invalid HTTPS scope')
+    if not isinstance(policy['secret'], str) or not re.fullmatch(r'[A-Z_][A-Z0-9_]{0,63}', policy['secret']) or type(policy['revision']) is not int or not 1 <= policy['revision'] <= 2**64-1:
+        raise ValueError('invalid HTTPS secret binding')
+    endpoint = policy['endpoint']
+    if not isinstance(endpoint, str) or len(endpoint) > 512:
+        raise ValueError('invalid HTTPS endpoint')
+    # Canonical DNS host and a fixed literal path. No IPs, ports, userinfo, query,
+    # fragment, encoded paths or path normalization differences between clients.
+    if not re.fullmatch(r'https://[a-z0-9.-]+/[A-Za-z0-9/_-]*', endpoint):
+        raise ValueError('invalid HTTPS endpoint')
+    url = urllib.parse.urlsplit(endpoint)
+    hostname(url.hostname)
+    if len(url.path) > 256:
+        raise ValueError('invalid HTTPS path')
+    return policy
+
+
+def https_policy(config, project):
+    policy = config.get('https')
+    return dict(policy) if policy and policy['project'] == project else None
+
+
+def check_https_release(config, manifest):
+    if manifest.get('https') and manifest['https'] != https_policy(config, manifest['project']):
+        raise ValueError('HTTPS grant revoked or changed; promote and review a new release')
+
+
+def read_delivery():
+    deadline = time.monotonic()+2
+    data = bytearray()
+    while True:
+        remaining = deadline-time.monotonic()
+        if remaining <= 0 or not select.select([sys.stdin], [], [], remaining)[0]:
+            raise ValueError('credential delivery unavailable')
+        chunk = os.read(sys.stdin.fileno(), 32769-len(data))
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > 32768:
+            raise ValueError('credential delivery too large')
+    if not data:
+        return None
+    try:
+        value = json.loads(data)
+    except (ValueError, UnicodeError):
+        raise ValueError('invalid credential delivery') from None
+    finally:
+        data[:] = b'\0'*len(data)
+    return value
+
+
+def public_addresses(host):
+    # A separate fixed resolver process gives libc DNS a hard deadline. No shell,
+    # credentials, caller paths or environment are inherited by the resolver.
+    source = "import json,socket,sys; a=sorted({v[4][0] for v in socket.getaddrinfo(sys.argv[1],443,socket.AF_INET,socket.SOCK_STREAM)}); print(json.dumps(a[:17]))"
+    try:
+        result = subprocess.run(['/usr/bin/python3', '-I', '-c', source, host], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env={'PATH':'/usr/bin:/bin'}, timeout=3, check=True)
+        return json.loads(result.stdout)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise ValueError('HTTPS endpoint resolution unavailable') from None
+
+
+def resolve_https(config, manifest, delivery):
+    policy = manifest.get('https')
+    if not policy:
+        if delivery is not None:
+            raise ValueError('unexpected credential delivery')
+        return None
+    check_https_release(config, manifest)
+    if not isinstance(delivery, dict) or set(delivery) != {'policy', 'value'} or delivery['policy'] != policy:
+        raise ValueError('HTTPS credential binding changed')
+    validate_https_policy(delivery['policy'])
+    value = delivery['value']
+    if not isinstance(value, str) or not re.fullmatch(r'[\x21-\x7e]{1,8192}', value):
+        raise ValueError('HTTPS credential is not a bounded bearer token')
+    # DNS is resolved once by the broker, before the running app is disturbed.
+    # The worker pins only these addresses; the guest never receives DNS access.
+    addresses = public_addresses(urllib.parse.urlsplit(policy['endpoint']).hostname)
+    if not 1 <= len(addresses) <= 16 or any(not ipaddress.IPv4Address(ip).is_global or ipaddress.IPv4Address(ip).is_multicast or ipaddress.IPv4Address(ip) in ipaddress.IPv4Network('192.88.99.0/24') for ip in addresses):
+        raise ValueError('HTTPS endpoint did not resolve exclusively to public IPv4 addresses')
+    return {'policy': policy, 'addresses': addresses, 'value': value}
 
 
 def record_identity(grant, owner_uid):
@@ -263,6 +357,10 @@ def load_release(config, release):
         grant = read_regular(directory/'records.json', 32768, 0)
         if digest(grant) != policy['grant_sha256']:
             raise ValueError('saved record grant changed')
+    if 'https' in manifest:
+        validate_https_policy(manifest['https'])
+        if manifest['https']['project'] != manifest['project']:
+            raise ValueError('saved HTTPS project changed')
     return manifest
 
 
@@ -331,6 +429,9 @@ def promote(config, job, expected, provenance):
     records = record_policy(config, receipt['project'])
     if records:
         manifest['records'] = records
+    https = https_policy(config, receipt['project'])
+    if https:
+        manifest['https'] = https
     encoded = canonical(manifest)
     release = digest(encoded)
     destination = config['state'] / release
@@ -362,9 +463,10 @@ def promote(config, job, expected, provenance):
     return release
 
 
-def launch(config, release, validate=False):
+def launch(config, release, validate=False, delivery=None):
     manifest = load_release(config, release)
     check_record_release(config, manifest)
+    check_https_release(config, manifest)
     unit = VALIDATE_UNIT if validate else UNIT
     stop_unit(unit)
     mounts = [f'{config["state"] / release / "component.wasm"}:/component.wasm']
@@ -391,14 +493,33 @@ def launch(config, release, validate=False):
         mounts.append(f'{config["state"] / release / "records.json"}:/records-grant.json')
         if not validate:
             mounts.append(config['records']['grant']['socket_dir'])
+    if manifest.get('https') and not validate:
+        if delivery is None:
+            raise ValueError('HTTPS credential delivery missing')
+        properties += ['IPAddressAllow='+ip+'/32' for ip in delivery['addresses']]
     properties.append('BindReadOnlyPaths='+' '.join(mounts))
     args = ['/usr/bin/systemd-run', '--quiet', '--collect', '--unit='+unit]
     if validate: args += ['--wait']
     for prop in properties: args += ['--property='+prop]
-    args += [str(config['worker']), 'records-worker' if manifest.get('records') else 'app-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve']
-    if manifest.get('records'):
-        args.append('/records-grant.json')
-    command(args, 37 if validate else 5)
+    credential = None
+    try:
+        if manifest.get('https'):
+            if not validate:
+                # Root-private volatile source; systemd copies into its read-only
+                # per-unit credential mount. Never persist a value in releases.
+                credential = tempfile.NamedTemporaryFile(prefix='devoption-https-', dir='/run', delete=False)
+                os.fchmod(credential.fileno(), 0o600)
+                credential.write(canonical(delivery)); credential.flush(); credential.close()
+                args += ['--property=LoadCredential=https.json:'+credential.name]
+            args += [str(config['worker']), 'capability-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve', '/records-grant.json' if manifest.get('records') else '-', '-' if validate else '%d/https.json']
+        else:
+            args += [str(config['worker']), 'records-worker' if manifest.get('records') else 'app-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve']
+            if manifest.get('records'):
+                args.append('/records-grant.json')
+        command(args, 37 if validate else 5)
+    finally:
+        if credential is not None:
+            Path(credential.name).unlink(missing_ok=True)
 
 
 def health(config, expected, invocation):
@@ -425,7 +546,7 @@ def save(config, value):
     atomic(config['state'] / 'desired.json', value)
 
 
-def start(config, release, expected, fingerprint, generation=None):
+def start(config, release, expected, fingerprint, generation=None, delivery=None):
     if fingerprint != config['fingerprint']:
         raise ValueError('runtime configuration changed; review again')
     if not re.fullmatch(r'[\x20-\x7e]{1,128}', expected):
@@ -435,6 +556,7 @@ def start(config, release, expected, fingerprint, generation=None):
     manifest = load_release(config, release)
     if config.get('ingress') and manifest['project'] != config['ingress']['project']:
         raise ValueError('hostname is bound to another project; operator reconfiguration required')
+    resolved = resolve_https(config, manifest, delivery)
     # Validate candidate before disturbing a running release. Compilation is bounded
     # by the validation unit, but never instantiates application code here.
     try:
@@ -452,7 +574,7 @@ def start(config, release, expected, fingerprint, generation=None):
     save(config, record)
     try:
         until = time.monotonic() + 30
-        launch(config, release)
+        launch(config, release, delivery=resolved)
         while time.monotonic() < until:
             state = unit_state()
             if state.get('ActiveState') == 'active' and health(config, expected, state.get('InvocationID')):
@@ -502,7 +624,7 @@ def dispatch(config, args):
         case ['promote', job, checksum, project, repository, commit, source, size]:
             return {'release': promote(config, job, checksum, (project, repository, commit, source, size))}
         case ['start', release, expected, fingerprint, generation]:
-            start(config, release, expected, fingerprint, generation)
+            start(config, release, expected, fingerprint, generation, read_delivery())
         case ['stop']:
             record = desired(config)
             if record:
@@ -516,7 +638,7 @@ def dispatch(config, args):
             stop_unit(VALIDATE_UNIT)
             if record and record['intent'] == 'running':
                 try:
-                    start(config, record['release'], record['health'], record['fingerprint'])
+                    start(config, record['release'], record['health'], record['fingerprint'], delivery=read_delivery())
                     resumed = desired(config)
                     resumed['previous'] = record.get('previous')
                     save(config, resumed)

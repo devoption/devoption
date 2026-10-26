@@ -356,7 +356,7 @@ mod tests {
             http: wasmtime_wasi_http::WasiHttpCtx::new(),
             table: wasmtime::component::ResourceTable::new(),
             limits: wasmtime::StoreLimitsBuilder::new().build(),
-            hooks: super::super::DenyNetwork,
+            hooks: super::super::https::Hooks::default(),
             records: Some(std::sync::Arc::new(grant())),
             record_call_used: false,
         };
