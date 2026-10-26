@@ -500,18 +500,21 @@ def launch(config, release, validate=False, delivery=None):
     properties.append('BindReadOnlyPaths='+' '.join(mounts))
     args = ['/usr/bin/systemd-run', '--quiet', '--collect', '--unit='+unit]
     if validate: args += ['--wait']
+    if manifest.get('https'): args += ['--service-type=exec']
     for prop in properties: args += ['--property='+prop]
     credential = None
     try:
         if manifest.get('https'):
             if not validate:
                 # Root-private volatile source; systemd copies into its read-only
-                # per-unit credential mount. Never persist a value in releases.
+                # per-unit credential mount. Type=exec waits for credential setup
+                # before systemd-run returns and the source can be removed.
+                # Never persist a value in releases.
                 credential = tempfile.NamedTemporaryFile(prefix='devoption-https-', dir='/run', delete=False)
                 os.fchmod(credential.fileno(), 0o600)
                 credential.write(canonical(delivery)); credential.flush(); credential.close()
                 args += ['--property=LoadCredential=https.json:'+credential.name]
-            args += [str(config['worker']), 'capability-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve', '/records-grant.json' if manifest.get('records') else '-', '-' if validate else '%d/https.json']
+            args += [str(config['worker']), 'capability-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve', '/records-grant.json' if manifest.get('records') else '-', '-' if validate else f'/run/credentials/{unit}/https.json']
         else:
             args += [str(config['worker']), 'records-worker' if manifest.get('records') else 'app-worker', '/component.wasm', str(config['port']), 'validate' if validate else 'serve']
             if manifest.get('records'):

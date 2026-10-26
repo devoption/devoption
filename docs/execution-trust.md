@@ -5,8 +5,9 @@ Merging this contract accepts requirements for dependent work; it does not enabl
 execution or authorize a workload. The HTTP controls below exist today. The opt-in [Linux web-app build integration](web-app-builds.md) now connects
 owner approval, private staging, bounded compilation and saved artifacts for the
 selected trusted target. The [approval lifecycle](build-approvals.md) remains an
-in-memory model; its metadata alone cannot grant execution. Runtime/deployment
-remain separate work.
+in-memory model; its metadata alone cannot grant execution. The separately
+opted-in [app runtime/deployment](web-app-deployments.md) and
+[scoped HTTPS delivery](app-https.md) define their own enforced runtime boundaries.
 
 ## Trust and authority
 
@@ -20,11 +21,14 @@ account are inside the trust boundary. Do not put credentials in job inputs.
 
 The control listener remains loopback-only. The explicit
 [HTTPS proxy mode](public-linux-install.md) under #230 adds a configured public
-origin for platform access without changing that bind address. Any future application runtime
-listener must also remain loopback-only until a separately reviewed exposure
-policy supersedes this contract. There is no application runtime listener today. Multi-user login, repository
-secrets and general shell execution remain outside this contract. The linked
-#230 mode defines platform HTTPS exposure only. Registration, inspection and source capture never run repository
+origin for platform access without changing that bind address. The opted-in app
+runtime listener also remains loopback-only; the separate
+[app hostname policy](app-hostnames.md) governs its explicit HTTPS exposure.
+Multi-user login and general shell execution remain outside this contract.
+[Project secrets](project-secrets.md) grant no build or raw guest secret access;
+only an explicitly configured, release-bound [HTTPS capability](app-https.md)
+can use a selected exact revision inside the trusted host transport.
+Registration, inspection and source capture never run repository
 code, hooks, dependency installation or builds. Selecting a root grants only the
 explicit documented filesystem operations, never execution permission.
 
