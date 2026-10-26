@@ -250,6 +250,13 @@ mod tests {
                 )
                 .unwrap();
             };
+            let review = view.review.take();
+            write("release.html", &view);
+            let ingress = view.ingress.take();
+            view.ingress = Some(("https://app.example.test".into(), "Certificate verification failed. Ask the operator to inspect the hostname and trust configuration. Synthetic presentation fixture.".into()));
+            write("hostname.html", &view);
+            view.ingress = ingress;
+            view.review = review;
             view.review_records = None;
             view.review.as_mut().unwrap().2 = "ok sample-site".into();
             view.status =

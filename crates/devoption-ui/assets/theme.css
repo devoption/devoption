@@ -24,7 +24,7 @@
   --text-heading: 1.375rem;
   --text-small: 0.875rem;
   --line-height: 1.5;
-  --sidebar-width: 14.125rem;
+  --sidebar-width: 16.25rem;
   --header-height: 4rem;
   --content-gutter: clamp(1.25rem, 3.125vw, 2.5rem);
   --control-height: 2.875rem;
@@ -710,3 +710,48 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 @media (max-width: 800px) { .secrets-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; } }
 
 .secrets-reload { margin-left: .5rem; }
+
+/* A quiet shell around the scrollable work canvas. Auth keeps its own layout. */
+body:not(.auth-page) { background: var(--color-sidebar); font-size: .9375rem; }
+:root:is(:not([data-theme]), [data-theme="nord"]):not([data-appearance="light"]) body:not(.auth-page) { --color-sidebar: #242933; --color-surface: #343c4a; }
+.workspace { height: 100dvh; display: flex; flex-direction: column; padding: 0 .75rem .75rem 0; }
+.workspace-header { flex-shrink: 0; min-height: var(--header-height); padding: 0 var(--content-gutter); }
+.workspace-header .breadcrumbs { min-height: var(--header-height); margin: 0; font-size: .8125rem; }
+.workspace > main { flex: 1; min-height: 0; width: 100%; max-width: none; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; background: var(--color-background); border-radius: 1.375rem; padding: 2rem var(--content-gutter) 3rem; }
+.workspace h1 { font-size: clamp(1.75rem, 2.5vw, 2.25rem); letter-spacing: -.035em; }
+.workspace h2 { font-size: 1.25rem; }
+.workspace .page-heading { margin-bottom: 1.75rem; align-items: center; }
+.workspace #page-message { margin-top: .5rem; font-size: .9375rem; max-width: 65ch; }
+.workspace .action-button { min-height: 2.625rem; font-size: .8125rem; }
+.workspace .project-navigation { display: flex; margin-bottom: 1.5rem; gap: .25rem 1.5rem; }
+.workspace .project-navigation a { min-height: 2.75rem; font-size: .875rem; }
+.workspace main > section, .workspace main > .appearance, .overview-repositories, .overview-guide { padding: 1.5rem; border-radius: .375rem; background: var(--color-surface); }
+.workspace main > .empty-state { max-width: none; }
+.workspace .project-overview-layout { gap: 1.25rem; }
+.workspace .overview-guide { padding: 1.5rem; }
+.workspace .overview-list-heading { background: var(--color-background); }
+.workspace .overview-repository-list li { padding-inline: 0; }
+.workspace .project-symbol { width: 2.75rem; height: 2.75rem; }
+.workspace .project-row { min-height: 6rem; padding: 1.25rem 0; }
+.workspace .project-copy h3 { font-size: 1rem; }
+.workspace .project-list > li:last-child .project-row { padding-bottom: .25rem; }
+.workspace .section-heading { margin-bottom: 1rem; }
+.workspace .source-readiness-heading h2, .workspace .deployment-review-heading h2, .workspace .environment-secrets h2 { font-size: 1.75rem; }
+.workspace .secret-add { background: var(--color-background); border-radius: .375rem; }
+.workspace .file-tree, .workspace .file-viewer { border-radius: .375rem; }
+.workspace .build-preparation, .workspace .environment-secrets { max-width: none; }
+.workspace .environment-secrets { margin-top: 0; }
+.workspace .platform-update { margin-top: 1.25rem; }
+@media (max-width: 64rem) {
+  .workspace .page-heading { align-items: flex-start; }
+}
+@media (max-width: 48rem) {
+  body:not(.auth-page) { min-height: 100dvh; }
+  .workspace { height: auto; min-height: 0; padding: 0 .5rem .5rem; }
+  .workspace-header { min-height: 3rem; padding-inline: var(--content-gutter); }
+  .workspace-header .breadcrumbs { min-height: 3rem; padding-block: .625rem; }
+  .workspace > main { flex: none; overflow: visible; min-height: 60vh; border-radius: 1rem; padding: 1.5rem var(--content-gutter) 2rem; }
+  .workspace main > section, .workspace main > .appearance, .overview-repositories, .workspace .overview-guide { padding: 1.125rem; }
+  .workspace .project-navigation { gap: .25rem 1rem; }
+  .workspace .page-heading { gap: 1rem; }
+}

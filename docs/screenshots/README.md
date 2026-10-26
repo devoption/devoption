@@ -17,17 +17,17 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Project code | `/projects/{id}/code` | Frontend tree and default README preview; managed creation enabled; status read below viewer; 1280 × 900 | `project-code.jpg` |
 | Repository files | `/projects/{id}/repositories/{id}/files` | frontend; three staged paths and README preview; 1280 × 900 | `repository-files.jpg` |
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend highlighted source with expanded src folder; 1280 × 900 | `repository-file.jpg` |
-| Project builds | `/projects/{id}/builds` | Real local Wasm fixture attempts and enabled build action; 1280 × 1200 | `project-builds.jpg` |
+| Project builds | `/projects/{id}/builds` | Synthetic saved attempt states; runner unconfigured; 1280 × 1200 | `project-builds.jpg` |
 | Build review | `/projects/{id}/builds/{repository}/run` | Synthetic prepared review, technical details collapsed; 1280 × 1200 | `build-review.jpg` |
-| Successful build | `/projects/{id}/builds/attempts/{id}` | Real local Wasm compile with saved diagnostics; 1280 × 1200 | `build-succeeded.jpg` |
+| Successful build | `/projects/{id}/builds/attempts/{id}` | Synthetic saved success record; no output checkpoint or executed build; 1280 × 1200 | `build-succeeded.jpg` |
 | Build attempt | `/projects/{id}/builds/attempts/{id}` | Interrupted synthetic record, saved streams, source details collapsed; 1280 × 1200 | `build-attempt.jpg` |
 | Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
 | Source checks | `/projects/{id}/builds/{repository}` | Synthetic clean source observations, runner configured, details collapsed; 1280 × 1400 | `build-source-checks.jpg` |
 | Source changes | `/projects/{id}/builds/{repository}` | Synthetic source observations with one modified entry, details collapsed; 1280 × 1400 | `build-source-changes.jpg` |
-| App hostname error | `/projects/{id}/releases` | Deliberately untrusted rehearsal certificate, with actionable status; 1280 × 1200 | `app-hostname-error.jpg` |
+| App hostname error | `/projects/{id}/releases` | Synthetic certificate error presentation; no hostname request; 1280 × 1200 | `app-hostname-error.jpg` |
 | Deployed app | Separate app HTTPS hostname | Real saved revision A served by the Wasm worker; 1280 × 1200 | `deployed-app.jpg` |
 | Deployment review | `/projects/{id}/releases` | Synthetic selected/candidate comparison, scoped storage access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
-| Project releases | `/projects/{id}/releases` | Real saved Wasm releases, healthy deployment and locally verified HTTPS hostname; 1280 × 1200 | `project-releases.jpg` |
+| Project releases | `/projects/{id}/releases` | Synthetic saved release and health presentation; no deployment or hostname request; 1280 × 1200 | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit; environment-secrets entry point | `project-settings.jpg` |
 | Project environment secrets | `/projects/{id}/environments/preview` | Real encrypted disposable store; two sample names, blank masked inputs, controls collapsed; 1280 × 1100 | `project-environments.jpg` |
@@ -226,3 +226,18 @@ binary has no such override. Other supported fixture values are `healthy`, `fail
 and `restored`; do not describe these captures as real upgrade evidence. Capture
 `home.jpg` without this flag, at the default dimensions. Verify both disclosures
 and the SSH guidance at narrow widths; no browser action executes the updater.
+
+The content-layout refresh uses synthetic saved history for `project-builds.jpg`
+and `build-succeeded.jpg`, including the explicit absence of a saved output
+checkpoint. These captures do not prove a successful build. `project-releases.jpg`
+and `app-hostname-error.jpg` now use the deployment renderer's `release.html`
+and `hostname.html` variants, generated alongside the review fixture. Their
+health/certificate states are presentation inputs, not network observations.
+The separate unchanged `deployed-app.jpg` remains the earlier real application
+response. Linux build/runtime acceptance is verified separately by the documented
+checks; screenshots do not replace that evidence.
+
+The shared work canvas scrolls independently on desktop; scroll the
+main canvas to its top before captures. Mobile retains normal document
+scrolling. Check the skip link reaches the main landmark and dialog close returns
+focus to its trigger at desktop and narrow widths.
