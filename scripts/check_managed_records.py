@@ -148,6 +148,9 @@ def check(pg_bin, worker, component, stateless_component, https_component=None):
                 configure(base+records_text+https_text)
                 with_https=promote();assert with_https != release
                 current=broker('status')
+                def credential_sources():
+                    return set(run('sudo','-n','find','/run','-maxdepth','1','-type','f','-name','devoption-https-*','-print').splitlines())
+                sources_before=credential_sources()
                 broker('start',with_https,'ok records',current['fingerprint'],current['generation'],delivery=packet)
                 assert broker('status')['deployment']['observed']=='healthy'
                 assert request(key,'{"label":"managed proof"}')==(200,'replayed')
@@ -159,8 +162,7 @@ def check(pg_bin, worker, component, stateless_component, https_component=None):
                 assert copied['policy']==policy and copied['value']==packet['value'] and copied['addresses']
                 # Credential source is gone, so a raw systemctl restart cannot
                 # recover it; the controller must resolve the exact revision.
-                source_path=run('sudo','-n','systemctl','show','devoption-app.service','-p','LoadCredential','--value').split(':',1)[1].strip()
-                assert run('sudo','-n','test','!','-e',source_path)==''
+                assert credential_sources()==sources_before
                 broker('reconcile',delivery=packet)
                 assert broker('status')['deployment']['observed']=='healthy'
                 broker('reconcile')
