@@ -202,6 +202,95 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse((self.config['state']/release/'records.json').exists())
 
 
+    def test_stateless_dispatch_and_recovery_never_wait_for_credential_input(self):
+        release=self.promote()
+        with patch.object(broker,'read_delivery',side_effect=AssertionError('unexpected stdin read')) as read, patch.object(broker,'start') as start:
+            broker.dispatch(self.config,['start',release,'ok',self.config['fingerprint'],'generation'])
+            start.assert_called_once();read.assert_not_called()
+        broker.save(self.config,{'release':release,'intent':'running','health':'ok','fingerprint':self.config['fingerprint']})
+        with patch.object(broker,'read_delivery',side_effect=AssertionError('unexpected stdin read')) as read, patch.object(broker,'start'),patch.object(broker,'stop_unit'):
+            broker.dispatch(self.config,['reconcile'])
+            read.assert_not_called()
+
+    def https_binding(self):
+        self.config['https'] = {'project':self.receipt['project'], 'environment':'preview', 'secret':'SERVICE_API_KEY', 'revision':1, 'endpoint':'https://api.example.test/events'}
+        for key in ('owner_data','history','repositories'):
+            self.config[key] = Path(self.temp.name)/key
+        self.config['worker'] = Path('/usr/local/libexec/devoption-app-worker')
+        return {'policy':dict(self.config['https']),'value':'synthetic-broker-proof-token'}
+
+    def test_https_policy_is_exact_and_release_contains_no_value(self):
+        ordinary=self.promote()
+        packet=self.https_binding()
+        broker.validate_https_policy(packet['policy'])
+        release=self.promote()
+        self.assertNotEqual(ordinary,release)
+        manifest=broker.load_release(self.config,release)
+        self.assertEqual(manifest['https'],packet['policy'])
+        self.assertNotIn(packet['value'],(self.config['state']/release/'manifest.json').read_text())
+        for update in [{'environment':'other'},{'revision':True},{'revision':0},{'secret':'lower'},{'project':'x'*32},{'extra':'field'},*({'endpoint':url} for url in ['http://api.example.test/events','https://127.0.0.1/events','https://api.example.test:443/events','https://user@api.example.test/events','https://api.example.test/events?q=x','https://api.example.test/a/../events','https://api.example.test/%2f'])]:
+            with self.subTest(update=update), self.assertRaises(ValueError):
+                broker.validate_https_policy(packet['policy'] | update)
+        self.config['https']['revision']=2
+        with self.assertRaisesRegex(ValueError,'revoked or changed'):
+            broker.check_https_release(self.config,manifest)
+        self.assertNotEqual(self.promote(),release)
+        self.assertNotIn('https',broker.load_release(self.config,ordinary))
+
+    def test_https_mismatch_private_dns_and_missing_delivery_preserve_current_app(self):
+        packet=self.https_binding();release=self.promote()
+        for delivery in [None, {'policy':packet['policy'],'value':'bad\nvalue'}, {'policy':packet['policy'] | {'revision':2},'value':packet['value']}]:
+            with patch.object(broker,'launch') as launch, patch.object(broker,'stop_unit') as stop:
+                with self.assertRaises(ValueError): broker.start(self.config,release,'ok',self.config['fingerprint'],delivery=delivery)
+                launch.assert_not_called();stop.assert_not_called()
+        for addresses in [[],['127.0.0.1'],['10.0.0.1'],['169.254.169.254'],['100.64.0.1'],['224.0.0.1'],['192.88.99.1'],['1.1.1.1','192.168.1.1'],['1.1.1.1']*17]:
+            with patch.object(broker,'public_addresses',return_value=addresses), patch.object(broker,'launch') as launch,patch.object(broker,'stop_unit') as stop:
+                with self.assertRaises(ValueError): broker.start(self.config,release,'ok',self.config['fingerprint'],delivery=packet)
+                launch.assert_not_called();stop.assert_not_called()
+
+    def test_https_delivery_uses_volatile_systemd_credential_and_pinned_ip_only(self):
+        packet=self.https_binding();release=self.promote()
+        manifest=broker.load_release(self.config,release)
+        with patch.object(broker,'public_addresses',return_value=['1.1.1.1']):
+            resolved=broker.resolve_https(self.config,manifest,packet)
+        original=tempfile.NamedTemporaryFile
+        sources=[]
+        def temporary(**kwargs):
+            kwargs['dir']=self.temp.name
+            file=original(**kwargs);sources.append(Path(file.name));return file
+        def command(args,*unused):
+            self.assertNotIn(packet['value'],str(args))
+            source=next(a.split('=https.json:',1)[1] for a in args if a.startswith('--property=LoadCredential='))
+            self.assertEqual(json.loads(Path(source).read_text()),resolved)
+            self.assertEqual(stat.S_IMODE(Path(source).stat().st_mode),0o600)
+            self.assertIn('--property=IPAddressDeny=any',args)
+            self.assertIn('--property=IPAddressAllow=1.1.1.1/32',args)
+            self.assertIn('/run/credentials/devoption-app.service/https.json',args)
+            self.assertIn('--service-type=exec',args)
+            self.assertNotIn('--property=PrivateNetwork=yes',args)
+        with patch.object(broker,'stop_unit'),patch.object(broker.tempfile,'NamedTemporaryFile',side_effect=temporary),patch.object(broker,'command',side_effect=command):
+            broker.launch(self.config,release,delivery=resolved)
+        self.assertTrue(sources)
+        self.assertTrue(all(not p.exists() for p in sources))
+        with patch.object(broker,'stop_unit'),patch.object(broker.tempfile,'NamedTemporaryFile',side_effect=temporary),patch.object(broker,'command',side_effect=ValueError('unit startup refused')):
+            with self.assertRaises(ValueError): broker.launch(self.config,release,delivery=resolved)
+        self.assertTrue(all(not p.exists() for p in sources))
+        self.assertFalse(any(packet['value'].encode() in p.read_bytes() for p in self.config['state'].rglob('*') if p.is_file()))
+        with patch.object(broker,'stop_unit'),patch.object(broker,'command') as command:
+            broker.launch(self.config,release,validate=True)
+        self.assertIn('--property=PrivateNetwork=yes',command.call_args.args[0])
+        self.assertNotIn('/run/credentials/devoption-app.service/https.json',command.call_args.args[0])
+
+    def test_https_recovery_without_the_exact_secret_stops_and_never_substitutes(self):
+        packet=self.https_binding();release=self.promote()
+        broker.save(self.config,{'release':release,'intent':'running','observed':'healthy','health':'ok','fingerprint':self.config['fingerprint']})
+        with patch.object(broker,'read_delivery',return_value=None),patch.object(broker,'stop_unit'),patch.object(broker,'launch') as launch:
+            broker.dispatch(self.config,['reconcile'])
+            launch.assert_not_called()
+        self.assertEqual(broker.desired(self.config)['observed'],'recovery failed')
+        self.assertEqual(broker.desired(self.config)['intent'],'stopped')
+
+
 class IdentityTests(unittest.TestCase):
     def test_record_identity_rejects_login_privilege_groups_and_writable_socket_ancestors(self):
         with tempfile.TemporaryDirectory() as temp:

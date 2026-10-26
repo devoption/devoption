@@ -98,6 +98,11 @@ reinstall. No system accounts, host units or services are changed. Signature
 failure/acceptance policy is tested separately; real privileged installer and
 reboot acceptance remain subject to the [installer's validation limits](bundle-installation.md#validation-scope).
 
+The installation job also runs the [scoped HTTPS proof](app-https.md#disposable-proof-and-limits)
+with a real WASIp2 guest, disposable CA and synthetic bearer token. Managed Linux
+acceptance covers systemd credentials and exact recovery with both worker identities.
+Neither checker contacts a real integration provider.
+
 The installation job additionally runs `check_named_web_app.py` with explicit
 `--disposable-system-host`. It refuses existing build helpers/configuration,
 prepares and verifies the public static site's offline dependencies, temporarily

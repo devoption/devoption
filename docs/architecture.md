@@ -17,7 +17,7 @@ The Rust workspace has seven crates. The running service uses
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
-| `devoption-runtime` | Separate Wasmtime WASIp2 HTTP worker; private listener, fresh bounded Store per request, denied filesystem/environment/network grants |
+| `devoption-runtime` | Separate Wasmtime WASIp2 HTTP worker; private listener, fresh bounded Store per request, denied filesystem/environment/socket/DNS grants and opt-in [host-mediated HTTPS](app-https.md) |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
 | `devoption-ui` | HTML rendering and browser assets |
 
@@ -83,7 +83,9 @@ Use focused references for details rather than loading every subsystem:
    starts the bounded Wasmtime worker under a separate dynamic identity. The
    interface supplies health/log/stop controls and explicit saved-release recovery.
    Previously approved healthy running intent can recover after restart; stopped
-   intent remains stopped.
+   intent remains stopped. Optional [HTTPS bindings](app-https.md) retain exact
+   environment secret revisions in review and deliver only selected values through
+   systemd credentials to the host transport; guests never receive raw secrets.
 6. [App hostname configuration](app-hostnames.md) binds one project to a second
    explicit Caddy HTTPS site on the same IP. The control service verifies its
    canonical origin; the broker checks local TLS/health for that binding.

@@ -11,6 +11,13 @@ Entries describe implemented changes, not the roadmap.
   consistent flat sections while preserving appearance choices and existing
   controls ([#330](https://github.com/devoption/devoption/issues/330)).
 
+- Bind optional HTTPS integration policies and exact environment secret revisions
+  to saved releases and owner deployment review. Deliver selected bearer tokens
+  privately to the host via systemd credentials, with pinned public IPv4 endpoints,
+  bounded JSON POST, verified TLS, no redirects/proxies/retries and guest secret
+  isolation. Add disposable TLS/WASIp2 and managed Linux custody/recovery checks
+  ([#329](https://github.com/devoption/devoption/issues/329)).
+
 - Make source readiness easier to scan with observed branch/commit, Git changes,
   initial input checks, inspected files and a configured-runner path to build
   review. Keep read-only observations distinct from build admission and correct

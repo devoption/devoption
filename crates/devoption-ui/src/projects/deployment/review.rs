@@ -56,6 +56,13 @@ pub(super) fn content(view: &DeploymentView) -> String {
     } else {
         html.push_str("No database access requested.");
     }
+    html.push_str("</dd></div><div><dt>HTTPS integration</dt><dd>");
+    if let Some(binding) = &view.review_https {
+        html.push_str(&escaped(binding));
+        html.push_str("<p class=\"deployment-note\">POST JSON only. The host adds this secret as bearer authorization; the app cannot read its value. One call per app request, three seconds, no redirects. Approval includes this access.</p>");
+    } else {
+        html.push_str("No outbound HTTPS access requested.");
+    }
     html.push_str(r#"</dd></div></dl></section><details class="deployment-runtime-details"><summary>Runtime limits, release identity &amp; technical details</summary><dl class="build-identities">"#);
     if let Some(current) = &view.current {
         identity(&mut html, "Selected release", current);
@@ -85,7 +92,7 @@ pub(super) fn content(view: &DeploymentView) -> String {
     if let Some(grant) = &view.review_records {
         identity(&mut html, "App storage grant SHA-256", grant);
     }
-    html.push_str("</dl><p>WasiHttpV1: Wasmtime 49.0.3. No guest files, environment or outbound network. One request at a time, 64 MiB guest memory, 10 million fuel units and five seconds per request. Worker: one CPU, 512 MiB RAM, no swap, 64 tasks. Startup health must pass in 30 seconds.</p><p>A healthy approved app resumes after platform restart; a stopped app stays stopped.</p></details><section class=\"deployment-approval\" aria-labelledby=\"deployment-impact-title\"><h3 id=\"deployment-impact-title\">");
+    html.push_str("</dl><p>WasiHttpV1: Wasmtime 49.0.3. No guest files, environment, sockets or DNS. HTTPS is denied unless the integration above is explicitly bound. One request at a time, 64 MiB guest memory, 10 million fuel units and five seconds per request. Worker: one CPU, 512 MiB RAM, no swap, 64 tasks. Startup health must pass in 30 seconds.</p><p>A healthy approved app resumes after platform restart only when its bound grants and exact secret revision remain available; a stopped app stays stopped.</p></details><section class=\"deployment-approval\" aria-labelledby=\"deployment-impact-title\"><h3 id=\"deployment-impact-title\">");
     if view.replaces_other_app {
         html.push_str("This will replace another project’s app.");
     } else if view.current.is_some() {

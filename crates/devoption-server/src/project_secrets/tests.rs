@@ -289,3 +289,45 @@ fn post_publication_sync_failure_is_uncertain_and_reload_reads_authenticated_sta
     assert_eq!(s.list(PROJECT, ENV).unwrap().entries[0].revision, 3);
     assert_eq!(fs::read(pending).unwrap(), b"encrypted incomplete fixture");
 }
+
+#[test]
+fn runtime_resolution_requires_exact_project_environment_name_and_revision() {
+    let f = Fixture::new();
+    let store = f.store();
+    store.set(PROJECT, ENV, "SERVICE_KEY", value(), 0).unwrap();
+    assert_eq!(
+        store
+            .resolve(PROJECT, ENV, "SERVICE_KEY", 1)
+            .unwrap()
+            .as_str(),
+        VALUE
+    );
+    for (project, env, name, revision) in [
+        (ProjectId::from_bytes([9; 16]), ENV, "SERVICE_KEY", 1),
+        (PROJECT, Environment::Preview, "SERVICE_KEY", 1),
+        (PROJECT, ENV, "OTHER_KEY", 1),
+        (PROJECT, ENV, "SERVICE_KEY", 2),
+        (PROJECT, ENV, "SERVICE_KEY", 0),
+    ] {
+        assert!(store.resolve(project, env, name, revision).is_err());
+    }
+    store
+        .set(
+            PROJECT,
+            ENV,
+            "SERVICE_KEY",
+            Zeroizing::new("replacement".into()),
+            1,
+        )
+        .unwrap();
+    assert!(store.resolve(PROJECT, ENV, "SERVICE_KEY", 1).is_err());
+    assert_eq!(
+        store
+            .resolve(PROJECT, ENV, "SERVICE_KEY", 2)
+            .unwrap()
+            .as_str(),
+        "replacement"
+    );
+    store.remove(PROJECT, ENV, "SERVICE_KEY", 2).unwrap();
+    assert!(store.resolve(PROJECT, ENV, "SERVICE_KEY", 2).is_err());
+}

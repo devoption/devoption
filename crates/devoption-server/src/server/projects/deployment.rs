@@ -4,7 +4,7 @@ use devoption_builds::jobs::State;
 use serde_json::Value;
 use std::{
     fs,
-    io::Read,
+    io::{Read, Write},
     os::unix::fs::MetadataExt,
     process::{Command, Stdio},
     time::{Duration, Instant},
@@ -32,6 +32,7 @@ impl Engine {
         catalog: &Catalog,
         public_origin: Option<&str>,
         port: u16,
+        secrets: Option<&Arc<Mutex<crate::project_secrets::Store>>>,
     ) -> io::Result<Self> {
         for name in [CONFIG, BROKER] {
             for path in Path::new(name).ancestors() {
@@ -96,18 +97,44 @@ impl Engine {
                 broker(&["stop"])?;
             }
         }
-        broker(&["reconcile"])?;
+        let delivery = state["deployment"]["release"]
+            .as_str()
+            .and_then(|release| {
+                state["releases"]
+                    .as_array()?
+                    .iter()
+                    .find(|r| r["release"] == release)
+            })
+            .and_then(|manifest| {
+                let store = secrets.and_then(|s| s.try_lock().ok());
+                delivery(manifest, store.as_deref()).ok().flatten()
+            });
+        // Missing/rotated credentials cause broker recovery to stop the app; the
+        // controller remains available so an owner can prepare a fresh release.
+        broker_input(&["reconcile"], delivery.as_deref().map(Vec::as_slice))?;
         Ok(Self { pending: None })
     }
 }
 fn broker(args: &[&str]) -> io::Result<Value> {
+    broker_input(args, None)
+}
+fn broker_input(args: &[&str], input: Option<&[u8]>) -> io::Result<Value> {
     let mut child = Command::new("/usr/bin/sudo")
         .args(["-n", BROKER])
         .args(args)
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
+    let writer = input.map(|bytes| {
+        let mut stdin = child.stdin.take().expect("piped stdin");
+        let bytes = zeroize::Zeroizing::new(bytes.to_vec());
+        std::thread::spawn(move || stdin.write_all(&bytes))
+    });
     let output = child.stdout.take().expect("piped stdout");
     let errors = child.stderr.take().expect("piped stderr");
     let output = std::thread::spawn(move || {
@@ -135,6 +162,12 @@ fn broker(args: &[&str]) -> io::Result<Value> {
         }
         std::thread::sleep(Duration::from_millis(25));
     };
+    if let Some(writer) = writer {
+        writer
+            .join()
+            .map_err(|_| io::Error::other("credential delivery unavailable"))?
+            .map_err(|_| io::Error::other("credential delivery unavailable"))?;
+    }
     let bytes = output
         .join()
         .map_err(|_| io::Error::other("broker output unavailable"))??;
@@ -146,6 +179,41 @@ fn broker(args: &[&str]) -> io::Result<Value> {
         return Err(io::Error::other("deployment operation unavailable"));
     }
     serde_json::from_slice(&bytes).map_err(io::Error::other)
+}
+/// Serialize a selected revision directly into a zeroizing transport buffer.
+fn delivery(
+    manifest: &Value,
+    store: Option<&crate::project_secrets::Store>,
+) -> io::Result<Option<zeroize::Zeroizing<Vec<u8>>>> {
+    let policy = &manifest["https"];
+    if policy.is_null() {
+        return Ok(None);
+    }
+    let project = project_id(field(policy, "project")?)
+        .ok_or_else(|| io::Error::other("invalid secret project"))?;
+    if manifest["project"] != policy["project"] {
+        return Err(io::Error::other("secret project changed"));
+    }
+    let environment = crate::project_secrets::Environment::parse(field(policy, "environment")?)
+        .ok_or_else(|| io::Error::other("invalid secret environment"))?;
+    let revision = policy["revision"]
+        .as_u64()
+        .ok_or_else(|| io::Error::other("invalid secret revision"))?;
+    let value = store
+        .ok_or_else(|| io::Error::other("secret storage unavailable"))?
+        .resolve(project, environment, field(policy, "secret")?, revision)
+        .map_err(|_| io::Error::other("bound secret unavailable or changed"))?;
+    #[derive(serde::Serialize)]
+    struct Delivery<'a> {
+        policy: &'a Value,
+        value: &'a str,
+    }
+    serde_json::to_vec(&Delivery {
+        policy,
+        value: &value,
+    })
+    .map(|bytes| Some(zeroize::Zeroizing::new(bytes)))
+    .map_err(|_| io::Error::other("secret delivery unavailable"))
 }
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
@@ -190,6 +258,10 @@ async fn mutate(
         return error();
     };
     let history = history.lock_owned().await;
+    let secrets = match projects.secrets.clone() {
+        Some(s) => Some(s.lock_owned().await),
+        None => None,
+    };
     let gate = projects.gate.clone().lock_owned().await;
     let result = tokio::task::spawn_blocking(move || -> io::Result<()> {
         let _gate = gate;
@@ -263,6 +335,9 @@ async fn mutate(
                 {
                     return Err(io::Error::other("release association changed"));
                 }
+                // Validate the exact binding now and again at approval, while the
+                // secret lock prevents a replacement racing the actual start.
+                let _ = delivery(manifest, secrets.as_deref())?;
                 let mut bytes = [0; 16];
                 getrandom::fill(&mut bytes).map_err(io::Error::other)?;
                 engine.pending = Some(Review {
@@ -301,13 +376,17 @@ async fn mutate(
                 }
                 // Root-owned release is rehashed by broker, and installed fingerprint
                 // must still equal the exact reviewed configuration and worker bytes.
-                broker(&[
-                    "start",
-                    &review.release,
-                    &review.health,
-                    &review.fingerprint,
-                    &review.generation,
-                ])?;
+                let input = delivery(manifest, secrets.as_deref())?;
+                broker_input(
+                    &[
+                        "start",
+                        &review.release,
+                        &review.health,
+                        &review.fingerprint,
+                        &review.generation,
+                    ],
+                    input.as_deref().map(Vec::as_slice),
+                )?;
             }
             "stop" if body.is_empty() => {
                 let state = broker(&["status"])?;
@@ -420,6 +499,22 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
                         .and_then(|r| r["records"]["grant_sha256"].as_str())
                         .map(str::to_owned)
                 });
+                if let Some(policy) = state["releases"]
+                    .as_array()
+                    .and_then(|releases| releases.iter().find(|r| r["release"] == review.release))
+                    .map(|r| &r["https"])
+                    .filter(|p| !p.is_null())
+                {
+                    view.review_https = Some(format!(
+                        "{} · {} revision {} → POST {}",
+                        field(policy, "environment")?,
+                        field(policy, "secret")?,
+                        policy["revision"]
+                            .as_u64()
+                            .ok_or_else(|| io::Error::other("invalid secret revision"))?,
+                        field(policy, "endpoint")?
+                    ));
+                }
                 view.review = Some((
                     review.token.clone(),
                     review.release.clone(),

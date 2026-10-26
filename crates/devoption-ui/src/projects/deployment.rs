@@ -17,6 +17,7 @@ pub struct DeploymentView {
     pub builds: Vec<(String, String)>,
     pub review: Option<(String, String, String, String)>,
     pub review_records: Option<String>,
+    pub review_https: Option<String>,
 }
 pub struct ReleaseView {
     pub provenance: String,
@@ -233,6 +234,10 @@ mod tests {
                 "12".repeat(32),
             )),
             review_records: Some("34".repeat(32)),
+            review_https: Some(
+                "preview · SERVICE_API_KEY revision 1 → POST https://api.example.test/events"
+                    .into(),
+            ),
             ..Default::default()
         };
         view.releases = vec![
@@ -258,6 +263,7 @@ mod tests {
             view.ingress = ingress;
             view.review = review;
             view.review_records = None;
+            view.review_https = None;
             view.review.as_mut().unwrap().2 = "ok sample-site".into();
             view.status =
                 "Healthy on this server. Review the saved candidate before approval.".into();

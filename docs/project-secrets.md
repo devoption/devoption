@@ -27,13 +27,11 @@ response. The client never retries a mutation automatically. No values enter URL
 parameters, HTML, browser storage, audit entries or error messages. JavaScript is
 required for mutations; navigation and metadata reads use ordinary links.
 
-**Saving is not runtime delivery.** These environment labels are configuration
-scopes; this change does not create separate running environments, select one for
-a deployment, inject values into builds, or grant a guest access to secrets.
-The runtime still receives an empty environment and denies outbound networking.
-Deployment bindings and a narrowly scoped delivery capability need separate review;
-service access [#293](https://github.com/devoption/devoption/issues/293) and outbound
-integrations [#296](https://github.com/devoption/devoption/issues/296) remain related work.
+**Saving does not itself grant runtime access.** An operator can bind an exact
+project/environment/name/revision to a [scoped HTTPS integration](app-https.md),
+then the owner separately reviews and approves its deployment. Values stay in the
+host; the guest receives no raw-secret read API, environment variables or build
+injection. Environment labels do not create separate running environments.
 
 ## Explicit operator enablement
 

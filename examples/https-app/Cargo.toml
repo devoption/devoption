@@ -1,0 +1,11 @@
+[package]
+name = "devoption-https-fixture"
+version = "0.1.0"
+edition = "2021"
+build = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasip2 = "=1.0.1"
