@@ -265,17 +265,21 @@ class DeploymentTests(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(Path(source).stat().st_mode),0o600)
             self.assertIn('--property=IPAddressDeny=any',args)
             self.assertIn('--property=IPAddressAllow=1.1.1.1/32',args)
-            self.assertIn('%d/https.json',args)
+            self.assertIn('/run/credentials/devoption-app.service/https.json',args)
+            self.assertIn('--service-type=exec',args)
             self.assertNotIn('--property=PrivateNetwork=yes',args)
         with patch.object(broker,'stop_unit'),patch.object(broker.tempfile,'NamedTemporaryFile',side_effect=temporary),patch.object(broker,'command',side_effect=command):
             broker.launch(self.config,release,delivery=resolved)
         self.assertTrue(sources)
         self.assertTrue(all(not p.exists() for p in sources))
+        with patch.object(broker,'stop_unit'),patch.object(broker.tempfile,'NamedTemporaryFile',side_effect=temporary),patch.object(broker,'command',side_effect=ValueError('unit startup refused')):
+            with self.assertRaises(ValueError): broker.launch(self.config,release,delivery=resolved)
+        self.assertTrue(all(not p.exists() for p in sources))
         self.assertFalse(any(packet['value'].encode() in p.read_bytes() for p in self.config['state'].rglob('*') if p.is_file()))
         with patch.object(broker,'stop_unit'),patch.object(broker,'command') as command:
             broker.launch(self.config,release,validate=True)
         self.assertIn('--property=PrivateNetwork=yes',command.call_args.args[0])
-        self.assertNotIn('%d/https.json',command.call_args.args[0])
+        self.assertNotIn('/run/credentials/devoption-app.service/https.json',command.call_args.args[0])
 
     def test_https_recovery_without_the_exact_secret_stops_and_never_substitutes(self):
         packet=self.https_binding();release=self.promote()
