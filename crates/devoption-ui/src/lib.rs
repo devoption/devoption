@@ -322,8 +322,6 @@ fn render_page_with_updates(
         format!(
             r#"<p class="breadcrumbs"><a href="/projects">Projects</a><span aria-hidden="true">/</span><span>{title}</span></p>"#
         )
-    } else if matches!(page, Page::Appearance | Page::Profile) {
-        String::new()
     } else {
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
@@ -427,8 +425,8 @@ fn render_page_with_updates(
     </div>
   </aside>
   <div class=\"workspace\">
+    <header class=\"workspace-header\">{breadcrumb}</header>
     <main id=\"main-content\" tabindex=\"-1\" aria-labelledby=\"page-title\"{main_class}>
-      {breadcrumb}
       <div class=\"page-heading\"><div><h1 id=\"page-title\" tabindex=\"-1\">{title}</h1>
       <p id=\"page-message\">{message}</p></div><div class=\"page-actions\">{actions}</div></div>
       {content}

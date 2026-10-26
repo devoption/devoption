@@ -24,17 +24,17 @@ for dimensions, states and refresh instructions.
 
 ![Highlighted source with line numbers and an expanded folder tree](repository-file.jpg)
 
-![Project Builds with the build action and real local attempt history](project-builds.jpg)
+![Project Builds with synthetic saved attempt history and an unconfigured runner](project-builds.jpg)
 
 ![Synthetic source readiness with initial checks passed, without execution](build-source-checks.jpg)
 
 ![Synthetic source readiness with a modified entry requiring attention](build-source-changes.jpg)
 
-![Project Releases with a healthy private app](project-releases.jpg)
+![Synthetic saved release and health presentation; no deployment](project-releases.jpg)
 
 ![Synthetic deployment review comparing selected/candidate releases and scoped storage access](deployment-review.jpg)
 
-![App hostname certificate failure with recovery guidance](app-hostname-error.jpg)
+![Synthetic app hostname certificate failure with recovery guidance](app-hostname-error.jpg)
 
 ![Revision A served at the separate app HTTPS hostname](deployed-app.jpg)
 
@@ -127,12 +127,12 @@ for dimensions, states and refresh instructions.
 ## Reviewed web-app builds
 
 The build review capture uses synthetic prepared inputs to show the layout; it
-executes no build. The successful attempt below uses the opt-in Linux runner in a
-disposable local Ubuntu VM. Its component is compiled, not deployed or serving HTTP.
+executes no build. The saved success below is also a synthetic history record,
+with no output checkpoint. Real build and runtime acceptance is checked separately.
 
 ![Build review summary and explicit approval using synthetic prepared inputs](build-review.jpg)
 
-![Successful local compile and saved diagnostics](build-succeeded.jpg)
+![Synthetic saved success record without an output checkpoint](build-succeeded.jpg)
 
 ## Public cloud acceptance
 

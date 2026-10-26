@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Refresh content areas with a rounded work canvas, compact page hierarchy and
+  consistent flat sections while preserving appearance choices and existing
+  controls ([#330](https://github.com/devoption/devoption/issues/330)).
+
 - Make source readiness easier to scan with observed branch/commit, Git changes,
   initial input checks, inspected files and a configured-runner path to build
   review. Keep read-only observations distinct from build admission and correct
