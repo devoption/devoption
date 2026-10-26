@@ -202,6 +202,16 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse((self.config['state']/release/'records.json').exists())
 
 
+    def test_stateless_dispatch_and_recovery_never_wait_for_credential_input(self):
+        release=self.promote()
+        with patch.object(broker,'read_delivery',side_effect=AssertionError('unexpected stdin read')) as read, patch.object(broker,'start') as start:
+            broker.dispatch(self.config,['start',release,'ok',self.config['fingerprint'],'generation'])
+            start.assert_called_once();read.assert_not_called()
+        broker.save(self.config,{'release':release,'intent':'running','health':'ok','fingerprint':self.config['fingerprint']})
+        with patch.object(broker,'read_delivery',side_effect=AssertionError('unexpected stdin read')) as read, patch.object(broker,'start'),patch.object(broker,'stop_unit'):
+            broker.dispatch(self.config,['reconcile'])
+            read.assert_not_called()
+
     def https_binding(self):
         self.config['https'] = {'project':self.receipt['project'], 'environment':'preview', 'secret':'SERVICE_API_KEY', 'revision':1, 'endpoint':'https://api.example.test/events'}
         for key in ('owner_data','history','repositories'):
