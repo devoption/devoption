@@ -14,6 +14,10 @@ and copied inventories, and rechecks unit state. It cannot discover an unrelated
 foreground process or prevent a trusted administrator from changing files. Stop
 those writers too. Do not use it for hostile concurrent writers or network filesystems.
 
+The optional [project secret store](project-secrets.md) is included as encrypted
+owner-directory records. Its external installation key is not copied; retain a
+separately protected matching key backup and original owner identity.
+
 ## Create and verify
 
 Cancel any active build in the interface and wait for a terminal result. Use
@@ -46,7 +50,7 @@ destination for retry instead of deleting working data.
 
 The private snapshot contains `payload/{owner,history,jobs,releases}` and a
 manifest recording SHA-256, sizes, numeric ownership/modes, original paths and
-source revision. It excludes the four writer locks; it rejects links, special
+source revision. It excludes the four original writer locks and the optional `.project-secrets.lock`; it rejects links, special
 files, special permission bits and pending temporary state. Storage roots must
 retain their private installed ownership/mode; ordinary child modes are preserved. Missing optional records remain absent. No browser session or approval is
 restored. Treat the snapshot and manifest as private: owner hashes, source, build

@@ -9,8 +9,9 @@
 mod server;
 
 pub use server::{
-    PublicOrigin, run, run_with_build_history, run_with_deployments, run_with_execution,
-    run_with_managed_repository_root, run_with_public_origin, run_with_repository_root,
+    ProjectSecretsOptions, PublicOrigin, run, run_with_build_history, run_with_deployments,
+    run_with_execution, run_with_managed_repository_root, run_with_project_secrets,
+    run_with_public_origin, run_with_repository_root,
 };
 
 #[cfg(unix)]
@@ -26,4 +27,6 @@ pub mod password_form;
 pub mod preauth_csrf;
 #[cfg(unix)]
 mod profile;
+#[cfg(unix)]
+mod project_secrets;
 pub mod session;

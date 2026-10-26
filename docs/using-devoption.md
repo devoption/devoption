@@ -274,3 +274,12 @@ reloads the saved status; it does not check a remote release feed or start an
 upgrade. A stale or unavailable observation needs an administrator check. See
 [platform upgrades](platform-upgrades.md#owner-notification-and-operator-action)
 for support limits, full command arguments and recovery/data-loss guidance.
+
+## Project environment secrets
+
+Project **Settings → Manage environment secrets** provides separate Development,
+Preview and Production scopes when an operator explicitly enables encrypted
+storage. You can add, replace and remove values; the page lists metadata only.
+Stored secrets are not yet delivered to builds or running applications.
+See [project secrets](project-secrets.md) for configuration, limits, key custody,
+backup/recovery and the remaining runtime boundary.

@@ -325,6 +325,35 @@ fn manual_cookie_browser_fixture() {
     } else {
         projects::Projects::open_with_root(&store, enabled.then_some(root.as_path())).unwrap()
     };
+    let secret_keys = tempfile::tempdir().unwrap();
+    if std::env::var_os("DEVOPTION_BROWSER_SECRETS").is_some() {
+        let key = secret_keys
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("fixture.key");
+        std::fs::write(&key, [0xa5; 32]).unwrap();
+        std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let secrets = crate::project_secrets::Store::open(
+            store.duplicate_directory().unwrap(),
+            &key,
+            identity.to_bytes(),
+            &[&root],
+        )
+        .unwrap();
+        for name in ["SERVICE_API_KEY", "DATABASE_PASSWORD"] {
+            secrets
+                .set(
+                    project,
+                    crate::project_secrets::Environment::Preview,
+                    name,
+                    zeroize::Zeroizing::new("disposable browser fixture only".into()),
+                    0,
+                )
+                .unwrap();
+        }
+        projects.enable_secrets(secrets).unwrap();
+    }
     if std::env::var_os("DEVOPTION_BROWSER_HISTORY").is_some() {
         let catalog = devoption_projects::read_catalog(&data).unwrap().unwrap();
         let repo = catalog

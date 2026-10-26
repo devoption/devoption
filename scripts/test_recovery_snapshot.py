@@ -97,6 +97,22 @@ class RecoveryTests(unittest.TestCase):
             with self.assertRaises(BlockingIOError): self.create()
         self.assertFalse(self.snapshot.exists())
 
+    def test_secret_writer_is_locked_and_encrypted_snapshots_are_retained(self):
+        lock = self.roots['owner']/'.project-secrets.lock'
+        lock.write_bytes(b''); lock.chmod(0o600)
+        encrypted = self.roots['owner']/('project-secrets-' + 'a'*32 + '-preview.bin')
+        encrypted.write_bytes(b'encrypted fixture bytes'); encrypted.chmod(0o600)
+        with lock.open('rb') as stream:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError): self.create()
+        self.assertFalse(self.snapshot.exists())
+        self.create()
+        recovery.verify(self.snapshot)
+        destination = self.root/'restored-secrets'
+        recovery.stage(self.snapshot, destination)
+        self.assertEqual((destination/'owner'/encrypted.name).read_bytes(), encrypted.read_bytes())
+        self.assertFalse((destination/'owner'/lock.name).exists())
+
     def test_source_change_leaves_unverifiable_incomplete_snapshot(self):
         original = recovery.copy_records
         def changing(*args):

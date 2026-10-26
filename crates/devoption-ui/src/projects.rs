@@ -1,3 +1,6 @@
+mod secrets;
+pub(super) use secrets::content as secrets_content;
+pub use secrets::{EnvironmentSecretsView, SecretEventView, SecretMetadataView};
 mod deployment;
 pub(super) use deployment::content as deployment_content;
 pub use deployment::{DeploymentView, ReleaseView};

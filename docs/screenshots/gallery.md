@@ -149,3 +149,11 @@ Synthetic reviewed-candidate notice in the disposable browser fixture. This is
 interface evidence, not a signed candidate or executed upgrade.
 
 ![Owner platform update observation](platform-update.jpg)
+
+## Project environment secrets
+
+The authenticated disposable browser fixture uses an actual encrypted store and
+a test-only installation key. Preview shows two sample names and blank inputs;
+secret values are never rendered. Runtime delivery remains separate.
+
+![Environment-specific encrypted secret management](project-environments.jpg)

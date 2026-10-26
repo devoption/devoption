@@ -55,7 +55,7 @@ pub fn run_with_repository_root(
         false,
         None,
         None,
-        ExecutionMode::Disabled,
+        ExecutionMode::Disabled.into(),
     )
 }
 
@@ -73,7 +73,7 @@ pub fn run_with_managed_repository_root(
         true,
         None,
         None,
-        ExecutionMode::Disabled,
+        ExecutionMode::Disabled.into(),
     )
 }
 
@@ -96,7 +96,7 @@ pub fn run_with_build_history(
         managed,
         Some(history_directory),
         None,
-        ExecutionMode::Disabled,
+        ExecutionMode::Disabled.into(),
     )
 }
 
@@ -120,7 +120,7 @@ pub fn run_with_public_origin(
         managed,
         history_directory,
         Some(origin),
-        ExecutionMode::Disabled,
+        ExecutionMode::Disabled.into(),
     )
 }
 
@@ -139,7 +139,7 @@ pub fn run_with_execution(
         managed,
         Some(history_directory),
         public_origin,
-        ExecutionMode::Builds,
+        ExecutionMode::Builds.into(),
     )
 }
 
@@ -165,8 +165,67 @@ pub fn run_with_deployments(
         managed,
         Some(history_directory),
         public_origin,
-        ExecutionMode::Deployments,
+        ExecutionMode::Deployments.into(),
     )
+}
+
+/// Explicit installation-key opt-in; no credentials are created by startup.
+pub struct ProjectSecretsOptions<'a> {
+    pub key_file: &'a Path,
+    pub build_execution: bool,
+    pub app_deployment: bool,
+}
+
+/// Enable encrypted management alongside the existing optional workloads.
+pub fn run_with_project_secrets(
+    port: u16,
+    data: &Path,
+    repositories: Option<&Path>,
+    managed: bool,
+    history: Option<&Path>,
+    origin: Option<PublicOrigin>,
+    secrets: ProjectSecretsOptions<'_>,
+) -> io::Result<()> {
+    if (managed && repositories.is_none())
+        || (secrets.app_deployment && !secrets.build_execution)
+        || (secrets.build_execution && (repositories.is_none() || history.is_none()))
+    {
+        return Err(io::Error::other(
+            "invalid project secrets startup capabilities",
+        ));
+    }
+    let execution = if secrets.app_deployment {
+        ExecutionMode::Deployments
+    } else if secrets.build_execution {
+        ExecutionMode::Builds
+    } else {
+        ExecutionMode::Disabled
+    };
+    run_with_roots(
+        port,
+        Some(data),
+        repositories,
+        managed,
+        history,
+        origin,
+        Capabilities {
+            execution,
+            key: Some(secrets.key_file),
+        },
+    )
+}
+
+struct Capabilities<'a> {
+    execution: ExecutionMode,
+    key: Option<&'a Path>,
+}
+impl From<ExecutionMode> for Capabilities<'_> {
+    fn from(execution: ExecutionMode) -> Self {
+        Self {
+            execution,
+            key: None,
+        }
+    }
 }
 
 fn run_with_roots(
@@ -176,8 +235,9 @@ fn run_with_roots(
     managed: bool,
     history_directory: Option<&Path>,
     public_origin: Option<PublicOrigin>,
-    execution: ExecutionMode,
+    capabilities: Capabilities<'_>,
 ) -> io::Result<()> {
+    let Capabilities { execution, key } = capabilities;
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
     // no enrollment permission; only an already-present owner can sign in.
@@ -212,6 +272,7 @@ fn run_with_roots(
         || repository_root.is_some()
         || history_directory.is_some()
         || public_origin.is_some()
+        || key.is_some()
     {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -242,6 +303,29 @@ fn run_with_roots(
         }
         None
     };
+    #[cfg(unix)]
+    if let Some(key) = key {
+        let owner = owner_store
+            .as_ref()
+            .ok_or_else(|| io::Error::other("project secrets require owner storage"))?;
+        let identity = owner_identity
+            .ok_or_else(|| io::Error::other("project secrets require an existing owner"))?;
+        let forbidden: Vec<&Path> = [repository_root, history_directory]
+            .into_iter()
+            .flatten()
+            .collect();
+        let store = crate::project_secrets::Store::open(
+            owner.duplicate_directory()?,
+            key,
+            identity.to_bytes(),
+            &forbidden,
+        )
+        .map_err(|_| io::Error::other("project secrets key or storage is unavailable"))?;
+        projects
+            .as_mut()
+            .expect("configured projects")
+            .enable_secrets(store)?;
+    }
     #[cfg(unix)]
     let profile = owner_identity
         .map(|identity| {
