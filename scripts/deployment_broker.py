@@ -624,7 +624,8 @@ def dispatch(config, args):
         case ['promote', job, checksum, project, repository, commit, source, size]:
             return {'release': promote(config, job, checksum, (project, repository, commit, source, size))}
         case ['start', release, expected, fingerprint, generation]:
-            start(config, release, expected, fingerprint, generation, read_delivery())
+            delivery = read_delivery() if load_release(config, release).get('https') else None
+            start(config, release, expected, fingerprint, generation, delivery)
         case ['stop']:
             record = desired(config)
             if record:
@@ -638,7 +639,8 @@ def dispatch(config, args):
             stop_unit(VALIDATE_UNIT)
             if record and record['intent'] == 'running':
                 try:
-                    start(config, record['release'], record['health'], record['fingerprint'], delivery=read_delivery())
+                    delivery = read_delivery() if load_release(config, record['release']).get('https') else None
+                    start(config, record['release'], record['health'], record['fingerprint'], delivery=delivery)
                     resumed = desired(config)
                     resumed['previous'] = record.get('previous')
                     save(config, resumed)
