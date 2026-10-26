@@ -17,8 +17,9 @@ pub use platform_updates::{PlatformUpdates, UpgradeNotice};
 mod projects;
 pub use projects::{
     BuildAttemptView, BuildExecutionView, BuildHistoryView, BuildLogView, DeploymentView,
-    FileEntry, FilePreview, HistoryAvailability, PreparationCheck, PreparationView, ProjectSection,
-    ProjectSummary, ReleaseView, RepositoryFilesView, RepositorySummary,
+    EnvironmentSecretsView, FileEntry, FilePreview, HistoryAvailability, PreparationCheck,
+    PreparationView, ProjectSection, ProjectSummary, ReleaseView, RepositoryFilesView,
+    RepositorySummary, SecretEventView, SecretMetadataView,
 };
 
 const HOME: &str = r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your source code, builds and app releases.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#;
@@ -26,6 +27,7 @@ const HOME: &str = r#"<section class="empty-state"><h2>Start with a project</h2>
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const REPOSITORY_CREATE: &str = include_str!("../assets/repository-create.js");
+const PROJECT_SECRETS: &str = include_str!("../assets/project-secrets.js");
 const PROFILE: &str = include_str!("../assets/profile.js");
 const BUILD_EXECUTION: &str = concat!(
     include_str!("../assets/build-execution.js"),
@@ -192,7 +194,19 @@ pub fn render_build_history(project: &ProjectSummary<'_>, view: &BuildHistoryVie
     )
 }
 
+pub fn render_project_secrets(
+    project: &ProjectSummary<'_>,
+    view: &EnvironmentSecretsView,
+) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Secrets(project, view)),
+    )
+}
+
 enum ProjectView<'a> {
+    Secrets(&'a ProjectSummary<'a>, &'a EnvironmentSecretsView),
     Deployment(&'a ProjectSummary<'a>, &'a DeploymentView),
     Execution(&'a ProjectSummary<'a>, &'a BuildExecutionView),
     History(&'a ProjectSummary<'a>, &'a BuildHistoryView),
@@ -234,6 +248,7 @@ fn render_page_with_updates(
                     | ProjectView::Preparation(..)
                     | ProjectView::History(..)
                     | ProjectView::Deployment(..)
+                    | ProjectView::Secrets(..)
                     | ProjectView::Execution(..),
                 ) => "",
                 None => "Project management is not available yet.",
@@ -267,6 +282,7 @@ fn render_page_with_updates(
         | ProjectView::Preparation(project, _)
         | ProjectView::History(project, _)
         | ProjectView::Deployment(project, _)
+        | ProjectView::Secrets(project, _)
         | ProjectView::Execution(project, _),
     ) = &projects
     {
@@ -286,6 +302,7 @@ fn render_page_with_updates(
             | ProjectView::Preparation(..)
             | ProjectView::History(..)
             | ProjectView::Deployment(..)
+            | ProjectView::Secrets(..)
             | ProjectView::Execution(..),
         ) => "",
         None => "",
@@ -298,6 +315,7 @@ fn render_page_with_updates(
                 | ProjectView::Preparation(..)
                 | ProjectView::History(..)
                 | ProjectView::Deployment(..)
+                | ProjectView::Secrets(..)
                 | ProjectView::Execution(..)
         )
     ) {
@@ -310,6 +328,7 @@ fn render_page_with_updates(
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
     let document_title = match &projects {
+        Some(ProjectView::Secrets(..)) => format!("{title} · Environments"),
         Some(ProjectView::Deployment(..)) => format!("{title} · Releases"),
         Some(ProjectView::Files(..)) => format!("{title} · Files"),
         Some(
@@ -323,6 +342,7 @@ fn render_page_with_updates(
         _ => title.clone(),
     };
     let project_content = projects.map(|view| match view {
+        ProjectView::Secrets(project, view) => projects::secrets_content(project, view),
         ProjectView::Files(project, files) => projects::files_content(project, files),
         ProjectView::History(project, view) => projects::history_content(project, view),
         ProjectView::Deployment(project, view) => projects::deployment_content(project, view),
@@ -431,6 +451,7 @@ fn document(title: &str, body: &str) -> String {
   <script>{APPEARANCE}</script>
   <script>{AUTH}</script>
 <script>{BUILD_EXECUTION}</script>
+<script>{PROJECT_SECRETS}</script>
   <script>{PROFILE}</script>
   <script>{REPOSITORY_CREATE}</script>
   <script>{REPOSITORY_STATUS}</script>

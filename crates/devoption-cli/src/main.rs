@@ -10,7 +10,7 @@ mod source_check;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--app-deployment enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--project-secrets-key-file ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--app-deployment enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
        devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
@@ -23,6 +23,7 @@ Usage: devoption [--help | --version]
   recover-repositories  Review changed device bindings; explicit approval required to apply (Unix)
   --port PORT   Override the port (0 chooses a free port)
   --public-origin  Serve one canonical https://DNS_NAME through a local TLS proxy; requires an existing owner
+  --project-secrets-key-file  Enable encrypted project secret management using an existing protected 32-byte key (Unix)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
   --app-deployment     Explicitly enable installed Linux app runtime (value: enabled)
   --build-execution    Explicitly enable installed Linux build runner (value: enabled)
@@ -121,9 +122,26 @@ fn main() -> ExitCode {
         public_origin,
         execution_enabled,
         deployment_enabled,
+        project_secrets_key_file,
     }) = options
     {
-        let result = if deployment_enabled {
+        let result = if let Some(key_file) = project_secrets_key_file {
+            devoption_server::run_with_project_secrets(
+                port,
+                data_directory.as_deref().expect("validated owner"),
+                managed_repository_root
+                    .as_deref()
+                    .or(repository_root.as_deref()),
+                managed_repository_root.is_some(),
+                build_history_directory.as_deref(),
+                public_origin,
+                devoption_server::ProjectSecretsOptions {
+                    key_file: &key_file,
+                    build_execution: execution_enabled,
+                    app_deployment: deployment_enabled,
+                },
+            )
+        } else if deployment_enabled {
             devoption_server::run_with_deployments(
                 port,
                 data_directory.as_deref().expect("validated owner"),
@@ -200,6 +218,7 @@ fn main() -> ExitCode {
 }
 
 struct ServeOptions {
+    project_secrets_key_file: Option<PathBuf>,
     port: u16,
     data_directory: Option<PathBuf>,
     repository_root: Option<PathBuf>,
@@ -211,6 +230,7 @@ struct ServeOptions {
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
+    let mut project_secrets_key_file = None;
     let mut public_origin = None;
     let mut execution_enabled = false;
     let mut deployment_enabled = false;
@@ -244,6 +264,12 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
                 return Err("data directory requires an absolute path");
             }
             data_directory = Some(path);
+        } else if flag == "--project-secrets-key-file" && project_secrets_key_file.is_none() {
+            let path = PathBuf::from(value);
+            if !path.is_absolute() {
+                return Err("project secrets key requires an absolute path");
+            }
+            project_secrets_key_file = Some(path);
         } else if flag == "--build-history-dir" && build_history_directory.is_none() {
             let path = PathBuf::from(value);
             if !path.is_absolute() {
@@ -275,6 +301,9 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     if build_history_directory.is_some() && data_directory.is_none() {
         return Err("build history requires --data-dir with an existing configured owner");
     }
+    if project_secrets_key_file.is_some() && data_directory.is_none() {
+        return Err("project secrets require --data-dir with an existing configured owner");
+    }
     if public_origin.is_some() && data_directory.is_none() {
         return Err("public origin requires --data-dir with an existing configured owner");
     }
@@ -289,6 +318,7 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
         return Err("build execution requires owner, repository and history directories");
     }
     Ok(ServeOptions {
+        project_secrets_key_file,
         deployment_enabled,
         execution_enabled,
         public_origin,
@@ -334,5 +364,49 @@ mod deployment_options_tests {
         let mut duplicate = selected.to_vec();
         duplicate.extend(["--app-deployment", "enabled"]);
         assert!(parse(&duplicate).is_err());
+    }
+}
+
+#[cfg(test)]
+mod project_secrets_options_tests {
+    use super::*;
+    fn options(values: &[&str]) -> Vec<OsString> {
+        values.iter().map(OsString::from).collect()
+    }
+    #[test]
+    fn secret_key_is_explicit_absolute_and_requires_owner_storage() {
+        assert!(
+            serve_options(&[])
+                .unwrap()
+                .project_secrets_key_file
+                .is_none()
+        );
+        for values in [
+            vec!["--project-secrets-key-file", "relative"],
+            vec!["--project-secrets-key-file", "/private/key"],
+            vec![
+                "--data-dir",
+                "/private/data",
+                "--project-secrets-key-file",
+                "/private/key",
+                "--project-secrets-key-file",
+                "/other/key",
+            ],
+        ] {
+            assert!(serve_options(&options(&values)).is_err());
+        }
+        let selected = serve_options(&options(&[
+            "--data-dir",
+            "/private/data",
+            "--project-secrets-key-file",
+            "/private/key",
+        ]))
+        .unwrap();
+        assert_eq!(
+            selected.project_secrets_key_file,
+            Some(PathBuf::from("/private/key"))
+        );
+        assert!(!selected.execution_enabled);
+        assert!(!selected.deployment_enabled);
     }
 }

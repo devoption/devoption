@@ -14,6 +14,7 @@ import tomllib
 
 LIMIT = 256 * 1024 * 1024
 ENTRIES = 20000
+EXTRA_LOCKS = {'owner': ('.project-secrets.lock',)}
 LOCKS = {'owner': '.projects.lock', 'history': 'build-history.lock', 'jobs': 'execution.lock', 'releases': 'broker.lock'}
 
 
@@ -70,7 +71,7 @@ def inventory(roots, limit, skip_locks=True):
         records[name] = record
         if record['kind'] == 'directory':
             for child in sorted(path.iterdir()):
-                if skip_locks and name in LOCKS and child.name == LOCKS[name]:
+                if skip_locks and name in LOCKS and child.name in (LOCKS[name], *EXTRA_LOCKS.get(name, ())):
                     metadata(child)
                     continue
                 visit(child, name + '/' + child.name)
@@ -185,12 +186,13 @@ def create(build_path, deployment_path, binary, output, unit, revision, limit):
     assert_stopped(unit)
     with ExitStack() as stack:
         for name, root in roots.items():
-            lock = root / LOCKS[name]
-            if lock.exists() or lock.is_symlink():
-                if metadata(lock)['kind'] != 'file':
-                    raise ValueError('invalid writer lock')
-                stream = stack.enter_context(lock.open('rb'))
-                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            for filename in (LOCKS[name], *EXTRA_LOCKS.get(name, ())):
+                lock = root / filename
+                if lock.exists() or lock.is_symlink():
+                    if metadata(lock)['kind'] != 'file':
+                        raise ValueError('invalid writer lock')
+                    stream = stack.enter_context(lock.open('rb'))
+                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if not (roots['owner'] / 'owner.bin').is_file():
             raise ValueError('existing owner required')
         intent = roots['releases'] / 'desired.json'

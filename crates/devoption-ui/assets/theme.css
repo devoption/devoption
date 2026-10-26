@@ -678,3 +678,35 @@ body.auth-page { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); }
 .platform-update li { margin-top: .75rem; }
 .platform-update dt { margin-top: .75rem; color: var(--color-muted); }
 .platform-update dd { margin-left: 0; }
+
+/* Project environment configuration; flat surfaces and scoped layout. */
+.project-environment-settings { margin-top: 2rem; }
+.environment-secrets { margin: 2rem 0; max-width: 76rem; }
+.environment-secrets h2 { font-size: 2rem; margin: 1.5rem 0 .5rem; }
+.environment-tabs { display: flex; flex-direction: row; flex-wrap: wrap; gap: 1.5rem; margin: 1.75rem 0; }
+.environment-tabs a { padding: .5rem 0; color: var(--color-muted); border-radius: 0; }
+.environment-tabs a[aria-current] { background: transparent; }
+.environment-tabs a[aria-current]::before { display: none; }
+.environment-tabs [aria-current] { color: var(--color-primary); border-bottom: 2px solid currentColor; }
+.environment-secrets h3 { font-size: 1.5rem; }
+.secrets-scope-note { color: var(--color-muted); max-width: 70ch; margin: .75rem 0 1.5rem; }
+.secrets-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem); gap: 3rem; }
+.secret-add { padding: 1.5rem; background: var(--color-surface); }
+.environment-secrets h4 { font-size: 1.125rem; margin-bottom: 1rem; }
+.environment-secrets fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.environment-secrets label { display: block; margin: .75rem 0 .375rem; }
+.environment-secrets input:not([type="checkbox"]) { width: 100%; min-width: 0; }
+.environment-secrets form p { color: var(--color-muted); font-size: .875rem; margin: .75rem 0 1rem; }
+.secret-list { overflow-wrap: anywhere; list-style: none; margin: 0; padding: 0; }
+.secret-list > li { padding: 1.25rem 0; border-bottom: 1px solid var(--color-border); }
+.secret-metadata { overflow-wrap: anywhere; }
+.secret-metadata p { color: var(--color-muted); font-size: .875rem; margin: .375rem 0; }
+.secret-list details { margin-top: .75rem; }
+.secret-list summary, .secret-activity summary { cursor: pointer; }
+.secret-list form { max-width: 32rem; margin: 1rem 0; }
+.secret-activity { margin-top: 2rem; overflow-wrap: anywhere; }
+.secret-activity li { margin: .75rem 0; }
+#secrets-status { margin: 1rem 0; max-width: 70ch; }
+@media (max-width: 800px) { .secrets-layout { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; } }
+
+.secrets-reload { margin-left: .5rem; }

@@ -29,7 +29,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Deployment review | `/projects/{id}/releases` | Synthetic selected/candidate comparison, scoped storage access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
 | Project releases | `/projects/{id}/releases` | Real saved Wasm releases, healthy deployment and locally verified HTTPS hostname; 1280 × 1200 | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
-| Project settings | `/projects/{id}/settings` | Saved fixture name, no edit | `project-settings.jpg` |
+| Project settings | `/projects/{id}/settings` | Saved fixture name, no edit; environment-secrets entry point | `project-settings.jpg` |
+| Project environment secrets | `/projects/{id}/environments/preview` | Real encrypted disposable store; two sample names, blank masked inputs, controls collapsed; 1280 × 1100 | `project-environments.jpg` |
 | Create repository | `/projects/{id}/code` | New repository dialog; sample-service entered, not submitted | `repository-create.jpg` |
 | Created repository | `/projects/{id}/repositories/{id}/files` | sample-service created; No tracked files; main, No commits yet, Clean; 1280 × 900 | `repository-created.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; dialogs closed | `project-empty.jpg` |
@@ -59,6 +60,17 @@ owner, catalog, Git metadata trees, three staged frontend files (`README.md`,
 `Cargo.toml`, `src/main.rs`) and an untracked note; it stops after ten minutes.
 No real owner or repository is needed.
 The fixture password is `browser transport fixture only`.
+
+For the project settings/environment captures, also set
+`DEVOPTION_BROWSER_SECRETS=1` on the browser fixture command. This enables a real
+encrypted store using a disposable test key outside its owner/repository roots,
+with sample `SERVICE_API_KEY` and `DATABASE_PASSWORD` values in Preview. Navigate
+from Example application's Settings to environment secrets and select Preview.
+Capture Settings at **1280 × 800** and Preview at **1280 × 1100**, top of page,
+all disclosures collapsed and all inputs empty. These are actual storage/UI
+fixtures, not configured production credentials, runtime injection or deployments.
+Verify add/replace/remove using only disposable values in Development; check
+scope isolation, conflict/input clearing, reload and no-JavaScript behavior.
 
 The storage-enabled `deployment-review.jpg` uses the UI renderer's explicit
 synthetic fixture instead. Generate its HTML into a dedicated temporary review

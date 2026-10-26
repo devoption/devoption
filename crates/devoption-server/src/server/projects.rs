@@ -21,6 +21,7 @@ mod files;
 mod history;
 mod managed;
 mod pages;
+mod secrets;
 
 #[cfg(test)]
 mod startup_tests;
@@ -28,6 +29,7 @@ mod startup_tests;
 #[derive(Clone)]
 pub(super) struct Projects {
     directory: Arc<CatalogDirectory>,
+    secrets: Option<Arc<Mutex<crate::project_secrets::Store>>>,
     pub(super) deployment: Option<Arc<Mutex<deployment::Engine>>>,
     execution: Option<Arc<Mutex<execution::Engine>>>,
     history: Option<Arc<Mutex<devoption_builds::history::History>>>,
@@ -37,6 +39,32 @@ pub(super) struct Projects {
 }
 
 impl Projects {
+    pub(super) fn enable_secrets(
+        &mut self,
+        store: crate::project_secrets::Store,
+    ) -> io::Result<()> {
+        let catalog = self
+            .directory
+            .load()
+            .map_err(|_| io::Error::other("project catalog unavailable"))?
+            .unwrap_or_default();
+        for project in catalog.projects() {
+            for segment in ["development", "preview", "production"] {
+                store
+                    .list(
+                        project.id(),
+                        crate::project_secrets::Environment::parse(segment)
+                            .expect("fixed environment"),
+                    )
+                    .map_err(|_| {
+                        io::Error::other("project secrets key or stored data is unavailable")
+                    })?;
+            }
+        }
+        self.secrets = Some(Arc::new(Mutex::new(store)));
+        Ok(())
+    }
+
     pub(super) fn enable_deployment(
         &mut self,
         owner: &Path,
@@ -93,6 +121,7 @@ impl Projects {
         }
         Ok(Self {
             directory: Arc::new(directory),
+            secrets: None,
             history: None,
             execution: None,
             deployment: None,
@@ -171,6 +200,7 @@ pub(super) fn routes(projects: Projects) -> Router {
     let renamer = projects.clone();
     Router::new()
         .merge(pages::routes(projects.clone()))
+        .merge(secrets::routes(projects.clone()))
         .merge(files::routes(projects.clone()))
         .merge(builds::routes(projects.clone()))
         .merge(execution::routes(projects.clone()))

@@ -94,6 +94,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add opt-in encrypted project secrets scoped to Development, Preview and
+  Production, with write-only settings forms, revision-checked replacements and
+  removals, bounded value-free change history and protected external key handling.
+  Preserve the existing denied runtime environment/network boundary; runtime
+  delivery is not yet implemented
+  ([#326](https://github.com/devoption/devoption/issues/326)).
+
 - Add optional verified-client-certificate and exact-leaf access control for the
   administrative HTTPS proxy, with explicit protected/public generation choices,
   operator revocation/recovery instructions and real pinned-proxy rejection tests.

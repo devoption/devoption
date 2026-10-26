@@ -116,7 +116,7 @@ pub(crate) fn content_with_creation(
         ProjectSection::Settings => {
             html.push_str(r#"<section class="project-settings" aria-labelledby="project-settings-title"><h2 id="project-settings-title">Project details</h2>"#);
             html.push_str(&project_form(Some(project)));
-            html.push_str("<noscript>JavaScript is required to rename a project.</noscript></section>");
+            html.push_str(&format!(r#"<noscript>JavaScript is required to rename a project.</noscript></section><section class="project-environment-settings"><h2>Environments</h2><p>Manage separate secret values for development, preview and production.</p><a class="action-button" href="/projects/{id}/environments/development">Manage environment secrets</a></section>"#));
         }
         ProjectSection::Builds => html.push_str(&super::builds::list(project, attachment_available)),
         ProjectSection::Releases => html.push_str(r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and deployment are not implemented for this project.</p></section>"#),
