@@ -32,7 +32,7 @@ for dimensions, states and refresh instructions.
 
 ![Synthetic saved release and health presentation; no deployment](project-releases.jpg)
 
-![Synthetic deployment review comparing selected/candidate releases and scoped storage access](deployment-review.jpg)
+![Synthetic deployment review comparing selected/candidate releases and scoped storage/HTTPS access](deployment-review.jpg)
 
 ![Synthetic app hostname certificate failure with recovery guidance](app-hostname-error.jpg)
 

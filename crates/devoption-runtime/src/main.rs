@@ -11,6 +11,29 @@ fn main() -> std::process::ExitCode {
         }
         _ => {}
     }
+    if let [command, path, port, mode, records, https] = args.as_slice()
+        && command == "capability-worker"
+        && ["serve", "validate"].contains(&mode.as_str())
+    {
+        let Ok(port) = port.parse::<u16>() else {
+            return std::process::ExitCode::from(2);
+        };
+        let record_path = (records != "-").then(|| std::path::Path::new(records));
+        let https_path = (https != "-").then(|| std::path::Path::new(https));
+        return match devoption_runtime::run_with_capabilities(
+            std::path::Path::new(path),
+            port,
+            mode == "validate",
+            record_path,
+            https_path,
+        ) {
+            Ok(()) => std::process::ExitCode::SUCCESS,
+            Err(_) => {
+                eprintln!("Capability worker failed");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
     if let [command, path, port, mode, grant] = args.as_slice()
         && command == "records-worker"
         && ["serve", "validate"].contains(&mode.as_str())

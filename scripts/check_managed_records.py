@@ -30,7 +30,7 @@ def run(*args, check=True, **kw):
                           text=True, timeout=60, **kw).stdout.strip()
 
 
-def check(pg_bin, worker, component, stateless_component):
+def check(pg_bin, worker, component, stateless_component, https_component=None):
     if sys.platform != 'linux' or os.geteuid() == 0:
         raise ValueError('Requires unprivileged user on a fresh disposable Linux systemd runner')
     if any(p.exists() or p.is_symlink() for p in (CONFIG, BROKER, WORKER, FIXTURE)):
@@ -102,8 +102,8 @@ def check(pg_bin, worker, component, stateless_component):
             run('sudo','-n','install','-d','-m755',CONFIG.parent,BROKER.parent)
             for src,dest,mode in ((ROOT/'scripts/deployment_broker.py',BROKER,'755'),(worker,WORKER,'755'),(config_source,CONFIG,'644')):
                 run('sudo','-n','install','-m'+mode,src,dest);installed.append(dest)
-            def broker(*args):
-                return json.loads(run('sudo','-n','env','SUDO_UID='+str(os.geteuid()),BROKER,*args))
+            def broker(*args, delivery=None):
+                return json.loads(run('sudo','-n','env','SUDO_UID='+str(os.geteuid()),BROKER,*args,input=json.dumps(delivery) if delivery is not None else None))
             def promote():
                 return broker('promote',job,receipt['artifact_sha256'],receipt['project'],receipt['repository'],
                               receipt['commit'],receipt['source_sha256'],str(receipt['artifact_bytes']))['release']
@@ -138,6 +138,46 @@ def check(pg_bin, worker, component, stateless_component):
             assert request(key,'{"label":"managed proof"}')==(200,'replayed')
             assert sql('SELECT count(*) FROM app_records.entries')=='1'
             assert sql(f"SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='{APP_USER}' AND privilege_type IN ('UPDATE','DELETE')")=='0'
+            if https_component is not None:
+                policy={'project':receipt['project'],'environment':'preview','secret':'SERVICE_API_KEY','revision':1,'endpoint':'https://example.com/events'}
+                packet={'policy':policy,'value':'synthetic-managed-https-proof-token'}
+                https_text='\n[https]\n'+''.join(f'{k}={json.dumps(v)}\n' for k,v in policy.items())
+                records_text='\n[records]\ngrant_file='+json.dumps(str(grant_target))+'\n'
+                def configure(text):
+                    config_source.write_text(text);run('sudo','-n','install','-m644',config_source,CONFIG)
+                configure(base+records_text+https_text)
+                with_https=promote();assert with_https != release
+                current=broker('status')
+                broker('start',with_https,'ok records',current['fingerprint'],current['generation'],delivery=packet)
+                assert broker('status')['deployment']['observed']=='healthy'
+                assert request(key,'{"label":"managed proof"}')==(200,'replayed')
+                assert packet['value'] not in json.dumps(broker('status'))
+                argv=run('sudo','-n','systemctl','show','devoption-app.service','-p','ExecStart')
+                assert 'capability-worker' in argv and packet['value'] not in argv
+                credential=Path('/run/credentials/devoption-app.service/https.json')
+                copied=json.loads(run('sudo','-n','cat',credential))
+                assert copied['policy']==policy and copied['value']==packet['value'] and copied['addresses']
+                # Credential source is gone, so a raw systemctl restart cannot
+                # recover it; the controller must resolve the exact revision.
+                source_path=run('sudo','-n','systemctl','show','devoption-app.service','-p','LoadCredential','--value').split(':',1)[1].strip()
+                assert run('sudo','-n','test','!','-e',source_path)==''
+                broker('reconcile',delivery=packet)
+                assert broker('status')['deployment']['observed']=='healthy'
+                broker('reconcile')
+                assert broker('status')['deployment']['observed']=='recovery failed'
+                configure(base+https_text)
+                stage(https_component)
+                https_only=promote();current=broker('status')
+                broker('start',https_only,'ok https',current['fingerprint'],current['generation'],delivery=packet)
+                assert request('/isolation')==(200,'guest isolated')
+                # The fixture requests a different test hostname, so no request
+                # reaches example.com. DNS resolution above is the sole external IO.
+                assert request('/wrong-host')==(200,'denied')
+                assert packet['value'] not in run('sudo','-n','systemctl','show','devoption-app.service','-p','ExecStart')
+                configure(base+records_text)
+                stage(component)
+                current=broker('status')
+                broker('start',release,'ok records',current['fingerprint'],current['generation'])
             broker('reconcile')
             assert broker('status')['deployment']['observed']=='healthy'
             assert request(key,'{"label":"managed proof"}')==(200,'replayed')
@@ -160,7 +200,7 @@ def check(pg_bin, worker, component, stateless_component):
             assert request('/healthz')==(200,'ok A')
             return {'managed_peer_postgres_write':True,'exact_retry':True,'sandbox_denials':True,
                     'worker_recovery':True,'grant_digest_revocation':True,'stateless_import_denied':True,
-                    'return_to_saved_stateless':True,
+                    'return_to_saved_stateless':True,'managed_https_credentials':https_component is not None,
                     'database_row_retained':sql('SELECT count(*) FROM app_records.entries')=='1'}
         finally:
             for unit in ('devoption-app.service','devoption-app-validate.service',DB_UNIT):
@@ -179,5 +219,6 @@ if __name__=='__main__':
     parser.add_argument('--worker',type=Path,required=True)
     parser.add_argument('--component',type=Path,required=True)
     parser.add_argument('--stateless-component',type=Path,required=True)
+    parser.add_argument('--https-component',type=Path)
     args=parser.parse_args()
-    print(json.dumps(check(args.pg_bin.resolve(),args.worker.resolve(),args.component.resolve(),args.stateless_component.resolve()),indent=2))
+    print(json.dumps(check(args.pg_bin.resolve(),args.worker.resolve(),args.component.resolve(),args.stateless_component.resolve(),args.https_component.resolve() if args.https_component else None),indent=2))

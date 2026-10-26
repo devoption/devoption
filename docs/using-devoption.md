@@ -280,6 +280,8 @@ for support limits, full command arguments and recovery/data-loss guidance.
 Project **Settings → Manage environment secrets** provides separate Development,
 Preview and Production scopes when an operator explicitly enables encrypted
 storage. You can add, replace and remove values; the page lists metadata only.
-Stored secrets are not yet delivered to builds or running applications.
+Saving alone grants no runtime access. An operator can configure an exact-revision
+[HTTPS binding](app-https.md), then the owner reviews and approves deployment.
+Builds and guest environment variables never receive values.
 See [project secrets](project-secrets.md) for configuration, limits, key custody,
 backup/recovery and the remaining runtime boundary.

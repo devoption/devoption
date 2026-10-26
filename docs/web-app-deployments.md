@@ -148,13 +148,16 @@ checks to the selected systemd invocation. Guest response headers cannot replace
 
 ## Enforced runtime policy
 
-The worker receives only the selected read-only component. WASI contexts inherit
+The worker receives the selected read-only component and any explicitly bound
+host grants; it receives no owner store or master key. WASI contexts inherit
 no arguments, environment, stdin or preopened directories. Standard WASI interfaces
 needed by Rust's WASIp2 standard library are linked with these empty/denied grants;
-unknown imports fail validation. TCP, UDP, DNS and outbound HTTP are denied,
-including loopback, private addresses and metadata endpoints. The outbound HTTP
-implementation is compiled without the default send-request feature and explicitly
-returns request-denied.
+unknown imports fail validation. TCP, UDP and DNS are denied. Outbound HTTP is
+denied unless an exact [HTTPS integration binding](app-https.md) was explicitly
+configured and approved with the release. Ordinary denials include
+loopback, private addresses and metadata endpoints. The outbound HTTP implementation
+is compiled without the default send-request feature; its host hook defaults to
+request-denied and narrowly mediates an explicitly bound HTTPS endpoint.
 
 The default profile does not link the [optional record host capability](app-records.md).
 An explicit root-owned app grant enables it only for newly promoted releases

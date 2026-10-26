@@ -44,7 +44,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &EnvironmentSecretsVie
     html.push_str("</nav><h3>");
     escape_into(&mut html, &view.label);
     html.push_str(" secrets</h3>");
-    html.push_str(r#"<p class="secrets-scope-note">Values are encrypted and cannot be viewed after saving. Stored secrets are not yet connected to running apps or builds.</p>"#);
+    html.push_str(r#"<p class="secrets-scope-note">Values are encrypted and cannot be viewed after saving. Runtime access requires an operator-configured HTTPS binding and a reviewed deployment. Builds never receive these values.</p>"#);
     if !view.configured {
         html.push_str(r#"<p role="status">Secret storage is not enabled on this installation. An operator must configure a protected installation key before you can save values.</p></section>"#);
         return html;
@@ -114,6 +114,6 @@ mod tests {
         assert!(html.contains("&lt;script&gt;bad&lt;/script&gt;"));
         assert!(html.contains("type=\"password\""));
         assert!(!html.contains("value=\""));
-        assert!(html.contains("Stored secrets are not yet connected"));
+        assert!(html.contains("Runtime access requires an operator-configured HTTPS binding"));
     }
 }

@@ -78,8 +78,15 @@ impl Projects {
             .load()
             .map_err(io::Error::other)?
             .unwrap_or_default();
-        let engine =
-            deployment::Engine::open(owner, repositories, history, &catalog, public_origin, port)?;
+        let engine = deployment::Engine::open(
+            owner,
+            repositories,
+            history,
+            &catalog,
+            public_origin,
+            port,
+            self.secrets.as_ref(),
+        )?;
         self.deployment = Some(Arc::new(Mutex::new(engine)));
         Ok(())
     }
