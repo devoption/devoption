@@ -35,12 +35,7 @@ def guest(directory):
         if any(path.exists() for path in (STATE, CONFIG, BROKER)):
             raise ValueError('Guest installation is not empty')
         run('tar', '-C', '/', '-xf', directory/'snapshot.tar')
-        root = Path(metadata['root']); root.mkdir(mode=0o700)
-        for name in ('data', 'repositories', 'history', 'jobs'):
-            (root/name).mkdir(mode=0o700)
-        for value_path in metadata['policy'].values():
-            shutil.copyfile(directory/Path(value_path).name, value_path)
-        (root/'Caddyfile').write_text(metadata['proxy'])
+        root = Path(metadata['root'])
         unit = Path('/etc/systemd/system')/PROXY_UNIT
         unit.write_text(f'''[Unit]
 After=network.target
@@ -51,7 +46,18 @@ ExecStart={directory}/caddy run --config {root}/Caddyfile --adapter caddyfile
 [Install]
 WantedBy=multi-user.target
 ''')
-        run('systemctl', 'daemon-reload'); run('systemctl', 'enable', '--now', PROXY_UNIT)
+        run('systemctl', 'daemon-reload'); run('systemctl', 'enable', PROXY_UNIT)
+
+    # These are empty placeholders, not an owner/catalog backup. The host's
+    # temporary input paths can be cleared on reboot; reconstruct only fixture
+    # directories and public client-verification files before starting Caddy.
+    root = Path(metadata['root']); root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for name in ('data', 'repositories', 'history', 'jobs'):
+        (root/name).mkdir(mode=0o700, exist_ok=True)
+    for value_path in metadata['policy'].values():
+        shutil.copyfile(directory/Path(value_path).name, value_path)
+    (root/'Caddyfile').write_text(metadata['proxy'])
+    run('systemctl', 'restart', PROXY_UNIT)
 
     def broker(project, *args):
         return json.loads(run('env', 'SUDO_UID='+str(metadata['uid']), BROKER, 'project', project, *args))
@@ -143,7 +149,7 @@ runcmd:
                     child.wait(timeout=max(1, deadline-time.monotonic()))
                     if child.returncode: raise ValueError('QEMU process failed')
                 except BaseException:
-                    print((root/'serial.log').read_text(errors='replace')[-8192:])
+                    print((root/'serial.log').read_text(errors='replace')[-16384:])
                     raise
                 finally:
                     if child.poll() is None:
@@ -155,7 +161,8 @@ runcmd:
                 result = json.loads(report.read_text())
                 if (boot != 2 or result.get('success') is not True or len(set(result.get('boots', []))) != 3
                         or result.get('phases') != ['both-running', 'both-recovered', 'stopped-and-running']):
-                    print((root/'serial.log').read_text(errors='replace')[-8192:])
+                    print((root/'serial.log').read_text(errors='replace')[-16384:])
+                    print(json.dumps(result, indent=2))
                     raise ValueError('Incomplete multi-app reboot evidence')
                 output.write_text(json.dumps(result, indent=2)+'\n')
                 print('Independent running/stopped app recovery passed across three kernel boots.')
@@ -176,7 +183,7 @@ if __name__ == '__main__':
         except BaseException:
             import traceback
             traceback.print_exc()
-            Path('/output/report.json').write_text('{"success":false}')
+            Path('/output/report.json').write_text(json.dumps({'success': False, 'error': traceback.format_exc()[-8192:]}))
             subprocess.run(['systemctl', 'poweroff'], timeout=30, check=False)
             raise
     elif args.fixture and args.report and not args.guest:

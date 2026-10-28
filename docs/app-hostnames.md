@@ -12,7 +12,7 @@ Start with the installed deployment configuration and the project's 32-character
 ID from its URL. Choose two distinct lowercase ASCII DNS names. The app name must
 belong to this operator; this configuration check does not prove public DNS ownership.
 This command stages one legacy app binding. To configure separate project slots,
-use [independent app hostnames and deployments](multiple-apps.md). IPs, wildcards, paths, ports,
+use [independent app hostnames and deployments](https://github.com/devoption/devoption/blob/main/docs/multiple-apps.md). IPs, wildcards, paths, ports,
 duplicate platform/app names and arbitrary proxy directives are rejected.
 
 ```sh

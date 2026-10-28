@@ -150,7 +150,9 @@ Its explicit temporary export feeds `scripts/check_multi_app_reboot.py`, which
 boots an isolated Ubuntu guest three times, checks both running deployments,
 recovery and independent stopped/running intent with local verified HTTPS.
 The guest reconciles the exported approved intent through the production broker;
-it does not rebuild apps or repeat the controller workflow. The export contains
+it does not rebuild apps or repeat the controller workflow. Empty placeholders for
+the original temporary input directories and public proxy verification files are
+recreated on each boot; only the exported deployment and proxy state are recovered. The export contains
 only disposable runtime/proxy state and test-CA material, never the owner store,
 source, compiler inputs or production credentials. CI does not upload it.
 Reports require three distinct kernel boot IDs and all phases; failed/missing

@@ -53,9 +53,13 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_generated_proxy_preserves_protected_platform_and_every_app_boundary(self):
         config = configuration()
+        # An app hostname may be a suffix of the platform hostname. Selecting
+        # its site must match the whole line, never a substring of that origin.
+        config['apps'][1]['ingress']['app_hostname'] = 'example.test'
         policy = dict(client_ca_file='/ca.pem', allowed_clients_file='/allowed.pem')
         proxy = render_apps(config, policy)
         self.assertEqual(proxy.count('mode require_and_verify'), 1)
+        self.assertEqual(proxy.count('reverse_proxy 127.0.0.1:3000'), 1)
         for app in config['apps']:
             self.assertIn(app['ingress']['app_hostname']+' {', proxy)
             self.assertIn(f"reverse_proxy 127.0.0.1:{app['port']}", proxy)

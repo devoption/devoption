@@ -149,7 +149,7 @@ def render_apps(config, platform_access=None):
     for slot in slots[1:]:
         # Reuse the exact cookie/header/control-path boundary for every app.
         site = render(slot['ingress'], slot['port'], platform_access)
-        proxy += '\n' + site[site.index(slot['ingress']['app_hostname'] + ' {'):]
+        proxy += '\n' + site[site.index('\n' + slot['ingress']['app_hostname'] + ' {')+1:]
     return proxy
 
 

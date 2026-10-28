@@ -6,7 +6,7 @@ behind a private loopback HTTP listener. Use the separate [app hostname flow](ap
 Deployment does not itself change DNS, certificates, a registry or a DevOption product release.
 
 The configuration below retains the single-app path. For separate project
-hostnames, listeners and lifecycle state, use [independent app slots](multiple-apps.md).
+hostnames, listeners and lifecycle state, use [independent app slots](https://github.com/devoption/devoption/blob/main/docs/multiple-apps.md).
 
 ## Operator installation
 
