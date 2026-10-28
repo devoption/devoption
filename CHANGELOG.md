@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Make the build-output identity corruption test deterministic, including the
+  previously unchanged identity byte, while preserving valid snapshot round trips
+  and existing corruption checks
+  ([#328](https://github.com/devoption/devoption/issues/328)).
+
 - Refresh content areas with a rounded work canvas, compact page hierarchy and
   consistent flat sections while preserving appearance choices and existing
   controls ([#330](https://github.com/devoption/devoption/issues/330)).
