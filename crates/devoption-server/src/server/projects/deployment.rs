@@ -530,7 +530,11 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
             if let Some(review) = engine
                 .pending
                 .get(&project)
-                .filter(|r| r.project == project && Instant::now() < r.expires)
+                .filter(|r| {
+                    r.project == project && Instant::now() < r.expires
+                        && state["fingerprint"] == r.fingerprint
+                        && state["generation"] == r.generation
+                })
             {
                 view.review_records = state["releases"].as_array().and_then(|releases| {
                     releases

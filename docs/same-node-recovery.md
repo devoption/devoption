@@ -9,7 +9,8 @@ restore or starts an app.
 
 Use it before operator maintenance on a trusted single-node installation. All
 writers must remain stopped throughout creation; the tool checks the named system
-unit and three fixed worker units, holds existing writer locks, compares source
+unit, legacy workers and every configured project-slot worker/validation unit,
+holds existing writer locks, compares source
 and copied inventories, and rechecks unit state. It cannot discover an unrelated
 foreground process or prevent a trusted administrator from changing files. Stop
 those writers too. Do not use it for hostile concurrent writers or network filesystems.
@@ -21,7 +22,7 @@ separately protected matching key backup and original owner identity.
 ## Create and verify
 
 Cancel any active build in the interface and wait for a terminal result. Use
-**Stop app** and confirm it stopped. Stop the platform's actual system unit.
+**Stop app** for every configured app and confirm each stopped. Stop the platform's actual system unit.
 Do not merely kill the worker: saved running intent deliberately blocks backup.
 The command does not stop services for you.
 

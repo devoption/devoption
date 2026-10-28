@@ -193,12 +193,15 @@ def check(binary, runtime, caddy, reboot_fixture=None):
             def snapshot(project):
                 return json.loads(run('sudo', '-n', BROKER, 'project', project, 'status'))
 
-            def deploy(project, release, health):
+            def review(project, release, health):
                 mutate(f'/projects/{project}/releases/prepare', release+'\n'+health)
                 page = request('GET', f'/projects/{project}/releases')[2]
                 assert b'Project destination' in page and b'independent' in page
                 token = re.search(rb'data-deploy-action="approve" data-value="([0-9a-f]+)"', page)[1].decode()
-                mutate(f'/projects/{project}/releases/approve', token)
+                return token
+
+            def deploy(project, release, health):
+                mutate(f'/projects/{project}/releases/approve', review(project, release, health))
 
             def build(project):
                 old_jobs = {r['job'] for r in snapshot(project)['releases']}
@@ -219,9 +222,15 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                     time.sleep(.25)
                 raise TimeoutError('authenticated build completion: '+(root/'controller.log').read_text()[-4096:])
 
-            releases = []
+            releases, reviews = [], []
             for i, project in enumerate(projects):
-                releases.append(build(project)); deploy(project, releases[-1], 'ok '+str(i))
+                releases.append(build(project))
+                reviews.append(review(project, releases[-1], 'ok '+str(i)))
+            # Preparing B must not discard A's pending approval. Cross-project
+            # release input must not bind A's component to B's destination.
+            mutate(f'/projects/{projects[1]}/releases/prepare', releases[0]+'\nok 0', 409)
+            for i, project in enumerate(projects):
+                mutate(f'/projects/{project}/releases/approve', reviews[i])
                 assert snapshot(project)['deployment']['observed'] == 'healthy'
                 assert snapshot(project)['ingress']['status'].startswith('Local HTTPS route verified')
             anonymous = ssl.create_default_context(cafile=str(root/'ca.pem'))
