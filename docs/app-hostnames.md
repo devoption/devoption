@@ -2,7 +2,7 @@
 
 This extends the [platform HTTPS installation](public-linux-install.md) and
 [private app deployment](web-app-deployments.md). One Caddy 2.11.7 installation
-serves the platform and one stateless Wasm app on the same IP and ports 80/443.
+serves the platform and explicitly configured Wasm apps on the same IP and ports 80/443.
 The operator manages the hostname binding; the project Releases page displays
 its app URL and checks the local HTTPS route and certificate on refresh.
 
@@ -11,7 +11,8 @@ its app URL and checks the local HTTPS route and certificate on refresh.
 Start with the installed deployment configuration and the project's 32-character
 ID from its URL. Choose two distinct lowercase ASCII DNS names. The app name must
 belong to this operator; this configuration check does not prove public DNS ownership.
-Only one app hostname/project binding is supported. IPs, wildcards, paths, ports,
+This command stages one legacy app binding. To configure separate project slots,
+use [independent app hostnames and deployments](https://github.com/devoption/devoption/blob/main/docs/multiple-apps.md). IPs, wildcards, paths, ports,
 duplicate platform/app names and arbitrary proxy directives are rejected.
 
 ```sh

@@ -12,7 +12,8 @@ can build trusted standalone Wasm HTTP apps with embedded assets through review
 and approval in the interface.
 The opt-in [private app runtime](docs/web-app-deployments.md) adds saved releases,
 reviewed deployment, health/log/stop controls and restart recovery on the same node.
-[App hostnames](docs/app-hostnames.md) add a separate HTTPS route and visible local TLS status. Authentication
+[Independent app slots](docs/multiple-apps.md) give configured projects separate
+HTTPS hostnames, runtime state and lifecycle controls. Authentication
 currently supports one owner; team accounts are planned, not implemented.
 There is no published release. An explicit [HTTPS proxy setup](docs/public-linux-install.md)
 has [fresh cloud installation, public DNS/ACME and lifecycle evidence](docs/public-cloud-acceptance.md)

@@ -4,6 +4,7 @@ use super::{ProjectSection, ProjectSummary, escape_into, identifier};
 #[derive(Default)]
 pub struct DeploymentView {
     pub enabled: bool,
+    pub independent: bool,
     pub ingress: Option<(String, String)>,
     pub bound_elsewhere: bool,
     pub status: String,
@@ -37,14 +38,14 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
     let reviewing = view.enabled && view.review.is_some();
     if reviewing {
         html.push_str(&format!(r#"<section class="deployment-review" id="app-deployment" data-base="{base}" aria-labelledby="deployment-review-title">"#));
-        html.push_str(&review::content(view));
+        html.push_str(&review::content(project, view));
     } else {
         html.push_str(&format!(r#"<section class="build-preparation" id="app-deployment" data-base="{base}"><h2>Run your web app</h2><p id="deployment-action-status" role="status">{}</p>"#, escaped(&view.status)));
     }
     if view.enabled {
         if !reviewing {
             if view.bound_elsewhere {
-                html.push_str("<p>This node's app hostname belongs to another project. An operator must reconfigure the binding before deploying this project.</p>");
+                html.push_str("<p>No app destination is assigned to this project. An operator must configure its hostname and private listener before deployment.</p>");
             }
             if let Some((url, status)) = &view.ingress {
                 html.push_str(&format!(r#"<h3>App hostname</h3><p><a href="{}" target="_blank" rel="noopener noreferrer">Open app: {}</a></p><p>{}</p><p>Hostname changes are operator-managed. <a href="https://github.com/devoption/devoption/blob/main/docs/app-hostnames.md" target="_blank" rel="noopener noreferrer">App hostname setup</a>.</p>"#,escaped(url),escaped(url),escaped(status)));
@@ -52,7 +53,8 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
             if let Some(current) = &view.current {
                 html.push_str(&format!("<dl class=\"build-identities\"><div><dt>Selected release</dt><dd><code>{}</code></dd></div><div><dt>Private app endpoint on this node</dt><dd><code>http://127.0.0.1:{}</code></dd></div></dl>",escaped(current),view.port));
             }
-            html.push_str(r#"<p>One app runs on this node. Updates can have downtime.</p><a class="text-button" href="">Refresh health and logs</a> "#);
+            html.push_str(if view.independent { "<p>This project has an independent app deployment. Updates can have downtime for this app.</p>" } else { "<p>One app runs on this node. Updates can have downtime.</p>" });
+            html.push_str(r#"<a class="text-button" href="">Refresh health and logs</a> "#);
             if view.can_stop {
                 html.push_str(
                     r#"<button class="text-button" data-deploy-action="stop">Stop app</button>"#,
@@ -219,6 +221,7 @@ mod tests {
         let mut view = DeploymentView {
             enabled: true,
             port: 15000,
+            independent: true,
             status: "Healthy saved app; reviewing a storage-enabled candidate.".into(),
             ingress: Some((
                 "https://app.example.test".into(),

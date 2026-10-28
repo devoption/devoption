@@ -1,6 +1,6 @@
 use super::{DeploymentView, ReleaseView, escaped};
 
-pub(super) fn content(view: &DeploymentView) -> String {
+pub(super) fn content(project: &super::ProjectSummary<'_>, view: &DeploymentView) -> String {
     let (token, candidate, health, fingerprint) = view.review.as_ref().expect("review selected");
     let mut html = String::from(
         r#"<header class="deployment-review-heading"><h2 id="deployment-review-title">Review deployment</h2><p id="deployment-action-status" role="status" aria-live="polite">"#,
@@ -31,7 +31,9 @@ pub(super) fn content(view: &DeploymentView) -> String {
     } else if view.replaces_other_app {
         html.push_str("Another project’s app</h3><p>Deployment will replace the app currently selected on this node.</p>");
     } else {
-        html.push_str("No app deployed</h3><p>This will be the first deployment on this node.</p>");
+        html.push_str(
+            "No app deployed</h3><p>This will be the first deployment in this app slot.</p>",
+        );
     }
     html.push_str(r#"</section><section class="deployment-candidate" aria-labelledby="deployment-candidate-title"><p class="deployment-eyebrow">Ready for review</p><h3 id="deployment-candidate-title">New release</h3>"#);
     release_summary(&mut html, view, candidate);
@@ -49,6 +51,11 @@ pub(super) fn content(view: &DeploymentView) -> String {
         html.push_str(&format!(r#"<a href="{}" target="_blank" rel="noopener noreferrer">{}</a><p class="deployment-note">{}</p>"#, escaped(url), escaped(url), escaped(status)));
     } else {
         html.push_str("No app hostname configured.<p class=\"deployment-note\">The private endpoint is on this server. See runtime details for its address.</p>");
+    }
+    html.push_str("</dd></div><div><dt>Project destination</dt><dd>");
+    html.push_str(&escaped(project.name));
+    if view.independent {
+        html.push_str("<p class=\"deployment-note\">This project has its own listener and runtime state. This action does not replace another project’s app.</p>");
     }
     html.push_str("</dd></div><div><dt>Storage access</dt><dd>");
     if view.review_records.is_some() {

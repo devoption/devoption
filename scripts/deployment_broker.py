@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Fixed privileged adapter for the opt-in single-app Linux runtime.
+"""Fixed privileged adapter for the opt-in project-scoped Linux runtime.
 
 No caller-selected commands, units, ports or filesystem paths. Installation owns
 configuration, immutable release copies and durable intent. UI approvals remain
@@ -125,13 +125,76 @@ def ingress_status(config, record):
         return report('Local HTTPS ingress unavailable. Check Caddy on port 443, its TLS configuration and service logs.')
 
 
+def deployment_slots(config):
+    """Validate the operator schema without provisioning paths or reading grants."""
+    common = {'uid', 'build_work', 'state', 'worker', 'owner_data', 'history', 'repositories'}
+    if 'apps' not in config:
+        if set(config) - {'ingress', 'records', 'https'} != common | {'port'}:
+            raise ValueError('unexpected configuration')
+        return [dict(config)]
+    if set(config) != common | {'apps'} or not isinstance(config['apps'], list) or not 1 <= len(config['apps']) <= 8:
+        raise ValueError('expected one to eight explicit app slots')
+    slots, projects, ports, hosts = [], set(), set(), set()
+    origin = None
+    for app in config['apps']:
+        if not isinstance(app, dict) or set(app) - {'records', 'https'} != {'project', 'port', 'ingress'}:
+            raise ValueError('each app requires project, port and ingress')
+        project, port = app['project'], app['port']
+        if not isinstance(project, str) or not ID.fullmatch(project) or project in projects:
+            raise ValueError('duplicate or invalid app project')
+        if type(port) is not int or not 1024 <= port <= 65535 or port in ports:
+            raise ValueError('duplicate or invalid app listener')
+        validate_ingress(app['ingress'], port)
+        binding = app['ingress']
+        pair = (binding['platform_hostname'], binding['platform_port'])
+        if binding['project'] != project or binding['app_hostname'] in hosts or (origin is not None and pair != origin):
+            raise ValueError('ambiguous project or hostname binding')
+        origin = pair
+        projects.add(project); ports.add(port); hosts.add(binding['app_hostname'])
+        slot = {key: config[key] for key in common}
+        slot.update({key: value for key, value in app.items() if key != 'project'})
+        slot['state'] = str(Path(config['state']) / project)
+        slots.append(slot)
+    if origin[1] in ports or origin[0] in hosts:
+        raise ValueError('platform and apps require distinct listeners and names')
+    return slots
+
+
 def configuration():
     protected(CONFIG)
     protected(BROKER)
-    raw = read_regular(CONFIG, 16384, 0)
+    raw = read_regular(CONFIG, 65536, 0)
     config = tomllib.loads(raw.decode())
-    if set(config) - {'ingress', 'records', 'https'} != {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}:
-        raise ValueError('unexpected configuration')
+    slots = deployment_slots(config)
+    if 'apps' not in config:
+        return slot_configuration(slots[0], raw)
+    root = Path(config['state'])
+    protected(root)
+    if not root.is_dir() or root.stat().st_mode & 0o777 != 0o700:
+        raise ValueError('slot root must be root private')
+    for key in ('build_work', 'owner_data', 'history', 'repositories', 'worker'):
+        other = Path(config[key])
+        if root == other or root in other.parents or other in root.parents:
+            raise ValueError('slot root must be separate from platform storage and worker')
+    # Refuse silently abandoning an existing single-app installation. Operators
+    # must stop and explicitly migrate its records first; no automatic authority.
+    if any((root / name).exists() for name in ('desired.json', 'last-action.json')) or any(HEX.fullmatch(p.name) for p in root.iterdir()):
+        raise ValueError('legacy deployment state requires explicit migration')
+    configured = []
+    for app, slot in zip(config['apps'], slots):
+        selected = slot_configuration(slot, canonical(slot))
+        project = app['project']
+        selected.update(project=project, unit='devoption-app-'+project+'.service',
+                        validate_unit='devoption-app-'+project+'-validate.service',
+                        runtime_directory='devoption-app-'+project)
+        configured.append(selected)
+    identities = [slot['records']['identity']['uid'] for slot in configured if slot.get('records')]
+    if len(identities) != len(set(identities)):
+        raise ValueError('apps require separate record service identities')
+    return {'state': root, 'apps': configured}
+
+
+def slot_configuration(config, raw):
     if type(config['uid']) is not int or config['uid'] <= 0 or int(os.environ.get('SUDO_UID', '-1')) != config['uid']:
         raise ValueError('caller not configured owner')
     if type(config['port']) is not int or not 1024 <= config['port'] <= 65535:
@@ -179,7 +242,7 @@ def configuration():
         validate_https_policy(config['https'])
         if config.get('ingress') and config['https']['project'] != config['ingress']['project']:
             raise ValueError('HTTPS project must match hostname binding')
-    config['fingerprint'] = digest(raw + trust + record_bytes + read_regular(BROKER, 65536, 0) + read_regular(config['worker'], 256*1024*1024, 0))
+    config['fingerprint'] = digest(raw + trust + record_bytes + read_regular(BROKER, 131072, 0) + read_regular(config['worker'], 256*1024*1024, 0))
     return config
 
 
@@ -347,6 +410,8 @@ def load_release(config, release):
     if digest(manifest_bytes) != release:
         raise ValueError('release manifest changed')
     manifest = json.loads(manifest_bytes)
+    if config.get('project') and manifest['project'] != config['project']:
+        raise ValueError('release belongs to another project')
     component = read_regular(directory / 'component.wasm', MAX_COMPONENT, 0)
     if digest(component) != manifest['artifact_sha256'] or len(component) != manifest['artifact_bytes']:
         raise ValueError('release artifact changed')
@@ -406,6 +471,8 @@ def read_build(base, uid, job):
 def promote(config, job, expected, provenance):
     if not ID.fullmatch(job) or not HEX.fullmatch(expected):
         raise ValueError('invalid build identity')
+    if config.get('project') and provenance[0] != config['project']:
+        raise ValueError('build belongs to another project')
     base = config['build_work']
     receipt, component = read_build(base, config['uid'], job)
     if tuple(str(receipt.get(key)) for key in ['project', 'repository', 'commit', 'source_sha256', 'artifact_bytes']) != provenance:
@@ -467,7 +534,7 @@ def launch(config, release, validate=False, delivery=None):
     manifest = load_release(config, release)
     check_record_release(config, manifest)
     check_https_release(config, manifest)
-    unit = VALIDATE_UNIT if validate else UNIT
+    unit = config.get('validate_unit', VALIDATE_UNIT) if validate else config.get('unit', UNIT)
     stop_unit(unit)
     mounts = [f'{config["state"] / release / "component.wasm"}:/component.wasm']
     properties = [
@@ -480,7 +547,7 @@ def launch(config, release, validate=False, delivery=None):
         'RestrictAddressFamilies=AF_INET', 'IPAddressDeny=any', 'IPAddressAllow=localhost',
         'SocketBindDeny=any', f'SocketBindAllow=ipv4:tcp:{config["port"]}',
         'InaccessiblePaths=' + ' '.join('-'+str(config[k]) for k in ['state', 'owner_data', 'history', 'repositories', 'build_work']),
-        'RuntimeDirectory=devoption-app-validate' if validate else 'RuntimeDirectory=devoption-app',
+        'RuntimeDirectory='+config.get('runtime_directory', 'devoption-app')+('-validate' if validate else ''),
         'RuntimeDirectoryPreserve=yes', 'StandardOutput=null', 'StandardError=null',
     ]
     if validate: properties += ['RuntimeMaxSec=30', 'PrivateNetwork=yes']
@@ -534,7 +601,7 @@ def health(config, expected, invocation):
         connection.request('GET', '/healthz', headers={'Connection': 'close'})
         response = connection.getresponse()
         body = response.read(257)
-        return response.status == 200 and body == expected.encode() and response.getheader('X-DevOption-Invocation') == invocation and unit_state().get('InvocationID') == invocation
+        return response.status == 200 and body == expected.encode() and response.getheader('X-DevOption-Invocation') == invocation and unit_state(config.get('unit', UNIT)).get('InvocationID') == invocation
     except (OSError, http.client.HTTPException):
         return False
     finally: connection.close()
@@ -557,6 +624,8 @@ def start(config, release, expected, fingerprint, generation=None, delivery=None
     if generation is not None and generation != digest(canonical(desired(config))):
         raise ValueError('deployment changed; review again')
     manifest = load_release(config, release)
+    if config.get('project') and manifest['project'] != config['project']:
+        raise ValueError('release belongs to another project')
     if config.get('ingress') and manifest['project'] != config['ingress']['project']:
         raise ValueError('hostname is bound to another project; operator reconfiguration required')
     resolved = resolve_https(config, manifest, delivery)
@@ -568,7 +637,7 @@ def start(config, release, expected, fingerprint, generation=None, delivery=None
         atomic(config['state'] / 'last-action.json', {'project': manifest['project'], 'release': release, 'message': 'Candidate compatibility validation failed; current app was preserved.'})
         raise
     previous = desired(config)
-    stop_unit()
+    stop_unit(config.get('unit', UNIT))
     record = {'release': release, 'project': manifest['project'], 'health': expected,
               'fingerprint': fingerprint, 'intent': 'stopped', 'observed': 'starting',
               'previous': (previous.get('last_healthy') or previous.get('previous') or previous.get('release')) if previous else None,
@@ -579,7 +648,7 @@ def start(config, release, expected, fingerprint, generation=None, delivery=None
         until = time.monotonic() + 30
         launch(config, release, delivery=resolved)
         while time.monotonic() < until:
-            state = unit_state()
+            state = unit_state(config.get('unit', UNIT))
             if state.get('ActiveState') == 'active' and health(config, expected, state.get('InvocationID')):
                 record.update(intent='running', observed='healthy', invocation=state.get('InvocationID'), last_healthy=release)
                 save(config, record)
@@ -590,16 +659,16 @@ def start(config, release, expected, fingerprint, generation=None, delivery=None
             time.sleep(.2)
         raise ValueError('candidate health check failed')
     except Exception:
-        stop_unit()
+        stop_unit(config.get('unit', UNIT))
         record.update(intent='stopped', observed='failed')
         save(config, record)
         atomic(config['state'] / 'last-action.json', {'project': manifest['project'], 'release': release, 'message': 'Candidate startup or health failed; candidate was stopped. Review a saved release to recover.'})
         raise
 
 
-def status(config):
+def status(config, include_log=True):
     record = desired(config)
-    state = unit_state()
+    state = unit_state(config.get('unit', UNIT))
     if record and record['intent'] == 'running':
         try: load_release(config, record['release'])
         except (ValueError, OSError): record['observed'] = 'integrity failed'
@@ -611,16 +680,39 @@ def status(config):
             except (ValueError, OSError): continue
             releases.append({'release': directory.name, **manifest})
     log = ''
-    path = Path('/run/devoption-app/worker.log')
-    if path.exists():
+    path = Path('/run') / config.get('runtime_directory', 'devoption-app') / 'worker.log'
+    if include_log and path.exists():
         try: log = read_regular(path, 1024*1024).decode(errors='replace')[-65536:]
         except (ValueError, OSError): log = '[Log changed during inspection; refresh to read again.]'
     last_path = config['state'] / 'last-action.json'
     last = json.loads(read_regular(last_path, 16384, 0)) if last_path.exists() else None
-    return {'ingress': ingress_status(config, record), 'last_action': last, 'generation': digest(canonical(desired(config))), 'fingerprint': config['fingerprint'], 'port': config['port'], 'deployment': record, 'releases': releases, 'log': log}
+    return {'project': config.get('project'), 'ingress': ingress_status(config, record), 'last_action': last, 'generation': digest(canonical(desired(config))), 'fingerprint': config['fingerprint'], 'port': config['port'], 'deployment': record, 'releases': releases, 'log': log}
 
 
 def dispatch(config, args):
+    if args[:1] == ['project']:
+        if len(args) < 3 or not ID.fullmatch(args[1]):
+            raise ValueError('invalid project operation')
+        project, args = args[1], args[2:]
+        if 'apps' in config:
+            selected = next((slot for slot in config['apps'] if slot['project'] == project), None)
+            if selected is None:
+                if args == ['status']:
+                    return {'unconfigured': True, 'releases': []}
+                raise ValueError('project has no configured deployment slot')
+            config = selected
+        else:
+            if args[:1] == ['start'] and load_release(config, args[1])['project'] != project:
+                raise ValueError('release belongs to another project')
+            if args[:1] == ['promote'] and (len(args) != 8 or args[3] != project):
+                raise ValueError('build belongs to another project')
+            if args[:1] in (['stop'], ['reconcile']) and desired(config) and desired(config)['project'] != project:
+                raise ValueError('deployment belongs to another project')
+    elif 'apps' in config:
+        if args == ['status']:
+            # Startup needs intent/provenance, not eight concatenated log tails.
+            return {'apps': [status(slot, include_log=False) for slot in config['apps']]}
+        raise ValueError('multi-app operations require an exact project')
     match args:
         case ['status']:
             return status(config)
@@ -633,13 +725,13 @@ def dispatch(config, args):
             record = desired(config)
             if record:
                 record.update(intent='stopped', observed='stopping'); save(config, record)
-            stop_unit()
+            stop_unit(config.get('unit', UNIT))
             if record:
                 record['observed'] = 'stopped'; save(config, record)
         case ['reconcile']:
             record = desired(config)
-            stop_unit()
-            stop_unit(VALIDATE_UNIT)
+            stop_unit(config.get('unit', UNIT))
+            stop_unit(config.get('validate_unit', VALIDATE_UNIT))
             if record and record['intent'] == 'running':
                 try:
                     delivery = read_delivery() if load_release(config, record['release']).get('https') else None
@@ -648,7 +740,7 @@ def dispatch(config, args):
                     resumed['previous'] = record.get('previous')
                     save(config, resumed)
                 except Exception:
-                    stop_unit()
+                    stop_unit(config.get('unit', UNIT))
                     record.update(intent='stopped', observed='recovery failed')
                     save(config, record)
         case _:

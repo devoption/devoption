@@ -24,11 +24,15 @@ use wasmtime_wasi_http::{
 
 fn log(message: &str) {
     use std::io::Write;
-    let path = std::path::Path::new("/run/devoption-app/worker.log");
+    // systemd supplies this host-only path; WASI contexts inherit no environment.
+    let directory = std::env::var_os("RUNTIME_DIRECTORY")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| "/run/devoption-app".into());
+    let path = directory.join("worker.log");
     let mut options = std::fs::OpenOptions::new();
     options.create(true).write(true);
     let rotate =
-        std::fs::metadata(path).is_ok_and(|m| m.len() + message.len() as u64 + 1 > 1024 * 1024);
+        std::fs::metadata(&path).is_ok_and(|m| m.len() + message.len() as u64 + 1 > 1024 * 1024);
     if rotate {
         options.truncate(true);
     } else {

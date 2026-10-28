@@ -11,6 +11,7 @@ import re
 import stat
 import subprocess
 import tomllib
+from deployment_broker import deployment_slots
 
 LIMIT = 256 * 1024 * 1024
 ENTRIES = 20000
@@ -92,8 +93,13 @@ def stopped(unit):
         raise ValueError('stop platform and all workers before snapshot: ' + unit)
 
 
-def assert_stopped(unit):
-    for name in (unit, 'devoption-build.service', 'devoption-app.service', 'devoption-app-validate.service'):
+def assert_stopped(unit, deployment=None):
+    names = [unit, 'devoption-build.service', 'devoption-app.service', 'devoption-app-validate.service']
+    if deployment and 'apps' in deployment:
+        deployment_slots(deployment)
+        for app in deployment['apps']:
+            names.extend('devoption-app-'+app['project']+suffix+'.service' for suffix in ('', '-validate'))
+    for name in names:
         stopped(name)
 
 
@@ -183,7 +189,11 @@ def create(build_path, deployment_path, binary, output, unit, revision, limit):
                     deployment_broker='/usr/local/libexec/devoption-deployment-broker')
     if 'ca_file' in deployment.get('ingress', {}):
         external['rehearsal_ca'] = deployment['ingress']['ca_file']
-    assert_stopped(unit)
+    slots = deployment_slots(deployment) if 'apps' in deployment else [deployment]
+    for slot in slots:
+        if 'apps' in deployment and 'ca_file' in slot['ingress']:
+            external['rehearsal_ca_'+slot['ingress']['project']] = slot['ingress']['ca_file']
+    assert_stopped(unit, deployment)
     with ExitStack() as stack:
         for name, root in roots.items():
             for filename in (LOCKS[name], *EXTRA_LOCKS.get(name, ())):
@@ -195,11 +205,12 @@ def create(build_path, deployment_path, binary, output, unit, revision, limit):
                     fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if not (roots['owner'] / 'owner.bin').is_file():
             raise ValueError('existing owner required')
-        intent = roots['releases'] / 'desired.json'
-        if intent.exists() or intent.is_symlink():
-            metadata(intent); digest(intent, 16384)
-        if intent.exists() and json.loads(intent.read_text()).get('intent') != 'stopped':
-            raise ValueError('use Stop app before snapshot; running intent is not backed up')
+        for slot in slots:
+            intent = Path(slot['state']) / 'desired.json'
+            if intent.exists() or intent.is_symlink():
+                metadata(intent); digest(intent, 16384)
+            if intent.exists() and json.loads(intent.read_text()).get('intent') != 'stopped':
+                raise ValueError('use Stop app before snapshot; running intent is not backed up')
         before = inventory(roots, limit)
         refs = references(external)
         if any(output == Path(ref['path']) or Path(ref['path']) in output.parents for ref in refs.values()):
@@ -209,7 +220,7 @@ def create(build_path, deployment_path, binary, output, unit, revision, limit):
         copy_records(roots, payload, before)
         if inventory(roots, limit) != before or inventory({k: payload/k for k in roots}, limit) != before or references(external) != refs:
             raise ValueError('state changed or copy verification failed; retain incomplete snapshot for inspection')
-        assert_stopped(unit)
+        assert_stopped(unit, deployment)
         manifest = dict(version=1, revision=revision, limit=limit, roots={k: str(v) for k,v in roots.items()}, references=refs, records=before)
         for directory in [p for p in payload.rglob('*') if p.is_dir()] + [payload]:
             sync_directory(directory)

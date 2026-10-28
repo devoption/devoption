@@ -9,7 +9,7 @@ class PlatformServiceTests(unittest.TestCase):
     def setUp(self):
         self.build = dict(uid=1000, owner_data='/var/lib/devoption/data', repositories='/var/lib/devoption/repositories', history='/var/lib/devoption/history', work='/var/lib/devoption/jobs', toolchain='/opt/inputs/rust', vendor='/opt/inputs/vendor')
         self.deployment = {key: self.build[key] for key in ('uid', 'owner_data', 'repositories', 'history')}
-        self.deployment.update(build_work=self.build['work'], port=15000, state='/var/lib/devoption-app')
+        self.deployment.update(build_work=self.build['work'], port=15000, state='/var/lib/devoption-app', worker='/opt/devoption/devoption-runtime')
         self.options = dict(binary='/opt/devoption/devoption', account='devoption', hostname='platform.example.com', port=3000)
 
     def test_enabled_capabilities_and_writable_paths_follow_installed_config(self):

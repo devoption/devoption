@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Support explicit project deployment slots with separate hostnames, listeners,
+  releases, intent, units and logs. Scope owner review and recovery per project,
+  retain the legacy single-app schema and protected administrative ingress, and
+  add disposable two-app lifecycle and kernel-reboot acceptance
+  ([#336](https://github.com/devoption/devoption/issues/336)).
+
 - Make the build-output identity corruption test deterministic, including the
   previously unchanged identity byte, while preserving valid snapshot round trips
   and existing corruption checks

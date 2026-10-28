@@ -22,7 +22,7 @@ struct Review {
     expires: Instant,
 }
 pub(in crate::server) struct Engine {
-    pending: Option<Review>,
+    pending: std::collections::HashMap<ProjectId, Review>,
 }
 impl Engine {
     pub(in crate::server) fn open(
@@ -58,7 +58,11 @@ impl Engine {
                 ));
             }
         }
-        if let Some(binding) = config.get("ingress") {
+        let bindings: Vec<_> = match config.get("apps").and_then(toml::Value::as_array) {
+            Some(apps) => apps.iter().filter_map(|app| app.get("ingress")).collect(),
+            None => config.get("ingress").into_iter().collect(),
+        };
+        for binding in bindings {
             let expected = binding
                 .get("platform_hostname")
                 .and_then(toml::Value::as_str)
@@ -80,40 +84,65 @@ impl Engine {
                 ));
             }
         }
-        let state = broker(&["status"])?;
-        if let Some(release) = state["deployment"]["release"].as_str() {
-            let manifest = state["releases"]
-                .as_array()
-                .and_then(|releases| releases.iter().find(|r| r["release"] == release));
-            let associated = manifest.is_some_and(|m| {
-                catalog.projects().iter().any(|p| {
-                    m["project"] == hex(&p.id().to_bytes())
-                        && p.repositories()
-                            .iter()
-                            .any(|r| m["repository"] == hex(&r.to_bytes()))
-                })
-            });
-            if !associated {
-                broker(&["stop"])?;
+        let all = broker(&["status"])?;
+        let states = all["apps"].as_array().cloned().unwrap_or_else(|| vec![all]);
+        for state in states {
+            let project = state["project"].as_str();
+            if let Some(release) = state["deployment"]["release"].as_str() {
+                let manifest = state["releases"]
+                    .as_array()
+                    .and_then(|releases| releases.iter().find(|r| r["release"] == release));
+                let associated = manifest.is_some_and(|m| {
+                    catalog.projects().iter().any(|p| {
+                        m["project"] == hex(&p.id().to_bytes())
+                            && p.repositories()
+                                .iter()
+                                .any(|r| m["repository"] == hex(&r.to_bytes()))
+                    })
+                });
+                if !associated {
+                    selected_broker(project, &["stop"], None)?;
+                }
             }
+            let delivery = state["deployment"]["release"]
+                .as_str()
+                .and_then(|release| {
+                    state["releases"]
+                        .as_array()?
+                        .iter()
+                        .find(|r| r["release"] == release)
+                })
+                .and_then(|manifest| {
+                    let store = secrets.and_then(|s| s.try_lock().ok());
+                    delivery(manifest, store.as_deref()).ok().flatten()
+                });
+            // Missing/rotated credentials cause broker recovery to stop the app; the
+            // controller remains available so an owner can prepare a fresh release.
+            selected_broker(
+                project,
+                &["reconcile"],
+                delivery.as_deref().map(Vec::as_slice),
+            )?;
         }
-        let delivery = state["deployment"]["release"]
-            .as_str()
-            .and_then(|release| {
-                state["releases"]
-                    .as_array()?
-                    .iter()
-                    .find(|r| r["release"] == release)
-            })
-            .and_then(|manifest| {
-                let store = secrets.and_then(|s| s.try_lock().ok());
-                delivery(manifest, store.as_deref()).ok().flatten()
-            });
-        // Missing/rotated credentials cause broker recovery to stop the app; the
-        // controller remains available so an owner can prepare a fresh release.
-        broker_input(&["reconcile"], delivery.as_deref().map(Vec::as_slice))?;
-        Ok(Self { pending: None })
+        Ok(Self {
+            pending: Default::default(),
+        })
     }
+}
+fn selected_broker(
+    project: Option<&str>,
+    args: &[&str],
+    input: Option<&[u8]>,
+) -> io::Result<Value> {
+    let mut scoped = Vec::new();
+    if let Some(project) = project {
+        scoped.extend(["project", project]);
+    }
+    scoped.extend_from_slice(args);
+    broker_input(&scoped, input)
+}
+fn project_broker(project: ProjectId, args: &[&str]) -> io::Result<Value> {
+    selected_broker(Some(&hex(&project.to_bytes())), args, None)
 }
 fn broker(args: &[&str]) -> io::Result<Value> {
     broker_input(args, None)
@@ -292,16 +321,19 @@ async fn mutate(
                 let State::Succeeded(artifact) = record.state() else {
                     return Err(io::Error::other("build did not succeed"));
                 };
-                broker(&[
-                    "promote",
-                    &body,
-                    &hex(artifact.sha256().bytes()),
-                    &hex(&record.project()),
-                    &hex(&record.repository()),
-                    record.commit(),
-                    &hex(record.source_sha256()),
-                    &artifact.bytes().to_string(),
-                ])?;
+                project_broker(
+                    project,
+                    &[
+                        "promote",
+                        &body,
+                        &hex(artifact.sha256().bytes()),
+                        &hex(&record.project()),
+                        &hex(&record.repository()),
+                        record.commit(),
+                        &hex(record.source_sha256()),
+                        &artifact.bytes().to_string(),
+                    ],
+                )?;
             }
             "prepare" => {
                 let (release, health) = body
@@ -314,7 +346,7 @@ async fn mutate(
                 {
                     return Err(io::Error::other("invalid review"));
                 }
-                let state = broker(&["status"])?;
+                let state = project_broker(project, &["status"])?;
                 if !state["ingress"].is_null()
                     && state["ingress"]["project"] != hex(&project.to_bytes())
                 {
@@ -340,20 +372,23 @@ async fn mutate(
                 let _ = delivery(manifest, secrets.as_deref())?;
                 let mut bytes = [0; 16];
                 getrandom::fill(&mut bytes).map_err(io::Error::other)?;
-                engine.pending = Some(Review {
+                engine.pending.insert(
                     project,
-                    token: hex(&bytes),
-                    release: release.into(),
-                    health: health.into(),
-                    fingerprint: field(&state, "fingerprint")?.into(),
-                    generation: field(&state, "generation")?.into(),
-                    expires: Instant::now() + Duration::from_secs(300),
-                });
+                    Review {
+                        project,
+                        token: hex(&bytes),
+                        release: release.into(),
+                        health: health.into(),
+                        fingerprint: field(&state, "fingerprint")?.into(),
+                        generation: field(&state, "generation")?.into(),
+                        expires: Instant::now() + Duration::from_secs(300),
+                    },
+                );
             }
             "approve" => {
                 let review = engine
                     .pending
-                    .take()
+                    .remove(&project)
                     .ok_or_else(|| io::Error::other("review missing"))?;
                 if review.project != project
                     || review.token != body
@@ -361,7 +396,7 @@ async fn mutate(
                 {
                     return Err(io::Error::other("review expired"));
                 }
-                let state = broker(&["status"])?;
+                let state = project_broker(project, &["status"])?;
                 let manifest = state["releases"]
                     .as_array()
                     .and_then(|releases| releases.iter().find(|r| r["release"] == review.release))
@@ -377,7 +412,8 @@ async fn mutate(
                 // Root-owned release is rehashed by broker, and installed fingerprint
                 // must still equal the exact reviewed configuration and worker bytes.
                 let input = delivery(manifest, secrets.as_deref())?;
-                broker_input(
+                selected_broker(
+                    Some(&hex(&project.to_bytes())),
                     &[
                         "start",
                         &review.release,
@@ -389,12 +425,12 @@ async fn mutate(
                 )?;
             }
             "stop" if body.is_empty() => {
-                let state = broker(&["status"])?;
+                let state = project_broker(project, &["status"])?;
                 if state["deployment"]["project"] != hex(&project.to_bytes()) {
                     return Err(io::Error::other("different active project"));
                 }
-                engine.pending = None;
-                broker(&["stop"])?;
+                engine.pending.remove(&project);
+                project_broker(project, &["stop"])?;
             }
             _ => return Err(io::Error::other("unsupported action")),
         }
@@ -432,8 +468,9 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
         let mut view = devoption_ui::DeploymentView::default();
         if let Some(engine) = engine {
             view.enabled = true;
-            let state = broker(&["status"])?;
-            view.bound_elsewhere = !state["ingress"].is_null()
+            let state = project_broker(project, &["status"])?;
+            view.independent = state["project"].is_string();
+            view.bound_elsewhere = state["unconfigured"] == true || !state["ingress"].is_null()
                 && state["ingress"]["project"] != hex(&project.to_bytes());
             if state["ingress"]["project"] == hex(&project.to_bytes()) {
                 view.ingress = Some((
@@ -467,6 +504,9 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
             } else {
                 view.status = "No app deployed yet.".into();
             }
+            if state["unconfigured"] == true {
+                view.status = "No deployment slot configured for this project. Ask the operator to assign a hostname and private listener.".into();
+            }
             if state["last_action"]["project"] == hex(&project.to_bytes()) {
                 view.status.push_str(" Last deployment attempt: ");
                 view.status
@@ -489,8 +529,12 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
             }
             if let Some(review) = engine
                 .pending
-                .as_ref()
-                .filter(|r| r.project == project && Instant::now() < r.expires)
+                .get(&project)
+                .filter(|r| {
+                    r.project == project && Instant::now() < r.expires
+                        && state["fingerprint"] == r.fingerprint
+                        && state["generation"] == r.generation
+                })
             {
                 view.review_records = state["releases"].as_array().and_then(|releases| {
                     releases

@@ -97,6 +97,30 @@ class RecoveryTests(unittest.TestCase):
             with self.assertRaises(BlockingIOError): self.create()
         self.assertFalse(self.snapshot.exists())
 
+    def test_multi_app_snapshot_requires_all_stopped_intents_and_preserves_each_store(self):
+        (self.roots['releases']/'desired.json').unlink()
+        self.deployment['apps'] = []
+        for i, project in enumerate(('a'*32, 'b'*32)):
+            directory = self.roots['releases']/project; directory.mkdir(mode=0o700)
+            (directory/'desired.json').write_text('{"intent":"stopped"}')
+            self.deployment['apps'].append(dict(project=project, port=15000+i,
+                ingress=dict(project=project, app_hostname=f'app{i}.example.com',
+                             platform_hostname='platform.example.com', platform_port=3000)))
+        raw = ''.join(f'{k} = {json.dumps(v)}\n' for k,v in self.deployment.items() if k != 'apps')
+        for app in self.deployment['apps']:
+            raw += f'\n[[apps]]\nproject="{app["project"]}"\nport={app["port"]}\n[apps.ingress]\n'
+            raw += ''.join(f'{k}={json.dumps(v)}\n' for k,v in app['ingress'].items())
+        self.deploy_path.write_text(raw)
+        intent = self.roots['releases']/('b'*32)/'desired.json'
+        intent.write_text('{"intent":"running"}')
+        with self.assertRaisesRegex(ValueError, 'Stop app'): self.create()
+        self.assertFalse(self.snapshot.exists())
+        intent.write_text('{"intent":"stopped"}')
+        self.create(); recovery.verify(self.snapshot)
+        for project in ('a'*32, 'b'*32):
+            self.assertEqual((self.snapshot/'payload/releases'/project/'desired.json').read_bytes(),
+                             (self.roots['releases']/project/'desired.json').read_bytes())
+
     def test_secret_writer_is_locked_and_encrypted_snapshots_are_retained(self):
         lock = self.roots['owner']/'.project-secrets.lock'
         lock.write_bytes(b''); lock.chmod(0o600)
