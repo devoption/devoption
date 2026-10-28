@@ -172,6 +172,10 @@ def configuration():
     protected(root)
     if not root.is_dir() or root.stat().st_mode & 0o777 != 0o700:
         raise ValueError('slot root must be root private')
+    for key in ('build_work', 'owner_data', 'history', 'repositories', 'worker'):
+        other = Path(config[key])
+        if root == other or root in other.parents or other in root.parents:
+            raise ValueError('slot root must be separate from platform storage and worker')
     # Refuse silently abandoning an existing single-app installation. Operators
     # must stop and explicitly migrate its records first; no automatic authority.
     if any((root / name).exists() for name in ('desired.json', 'last-action.json')) or any(HEX.fullmatch(p.name) for p in root.iterdir()):
@@ -662,7 +666,7 @@ def start(config, release, expected, fingerprint, generation=None, delivery=None
         raise
 
 
-def status(config):
+def status(config, include_log=True):
     record = desired(config)
     state = unit_state(config.get('unit', UNIT))
     if record and record['intent'] == 'running':
@@ -677,7 +681,7 @@ def status(config):
             releases.append({'release': directory.name, **manifest})
     log = ''
     path = Path('/run') / config.get('runtime_directory', 'devoption-app') / 'worker.log'
-    if path.exists():
+    if include_log and path.exists():
         try: log = read_regular(path, 1024*1024).decode(errors='replace')[-65536:]
         except (ValueError, OSError): log = '[Log changed during inspection; refresh to read again.]'
     last_path = config['state'] / 'last-action.json'
@@ -706,7 +710,8 @@ def dispatch(config, args):
                 raise ValueError('deployment belongs to another project')
     elif 'apps' in config:
         if args == ['status']:
-            return {'apps': [status(slot) for slot in config['apps']]}
+            # Startup needs intent/provenance, not eight concatenated log tails.
+            return {'apps': [status(slot, include_log=False) for slot in config['apps']]}
         raise ValueError('multi-app operations require an exact project')
     match args:
         case ['status']:

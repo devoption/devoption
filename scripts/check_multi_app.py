@@ -98,12 +98,12 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                         stream.settimeout(95)
                         stream.sendall((f'{method} {path} HTTP/1.1\r\n'+''.join(f'{k}: {v}\r\n' for k, v in fields.items())+'\r\n'+body).encode())
                         response = http.client.HTTPResponse(stream); response.begin()
-                        return response.status, dict(response.getheaders()), response.read(1024*1024)
+                        return response.status, {k.lower(): v for k, v in response.getheaders()}, response.read(1024*1024)
                 connection = http.client.HTTPConnection('127.0.0.1', 15336, timeout=95)
                 try:
                     connection.request(method, path, body, fields)
                     response = connection.getresponse()
-                    return response.status, dict(response.getheaders()), response.read(1024*1024)
+                    return response.status, {k.lower(): v for k, v in response.getheaders()}, response.read(1024*1024)
                 finally: connection.close()
 
             def login():
@@ -111,17 +111,17 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                 cookie, csrf = '', ''
                 code, headers, _ = request('POST', '/auth/challenge')
                 assert code == 204
-                cookie, csrf = headers['Set-Cookie'].split(';', 1)[0], headers['X-Csrf-Token']
+                cookie, csrf = headers['set-cookie'].split(';', 1)[0], headers['x-csrf-token']
                 code, headers, _ = request('POST', '/auth/sign-in', 'password=disposable-installer-fixture-only',
                                            content_type='application/x-www-form-urlencoded')
                 assert code == 204
-                cookie, csrf = headers['Set-Cookie'].split(';', 1)[0], headers['X-Csrf-Token']
+                cookie, csrf = headers['set-cookie'].split(';', 1)[0], headers['x-csrf-token']
 
             def mutate(path, body='', expected=204):
                 nonlocal csrf
                 code, headers, _ = request('POST', '/auth/session')
                 assert code == 204
-                csrf = headers['X-Csrf-Token']
+                csrf = headers['x-csrf-token']
                 result = request('POST', path, body)
                 if result[0] != expected:
                     raise ValueError(f'Action {path} returned {result[0]}: '+(root/'controller.log').read_text()[-4096:])
@@ -270,6 +270,7 @@ def check(binary, runtime, caddy, reboot_fixture=None):
             if reboot_fixture is not None:
                 # Export only this disposable fixture's owned files. No owner
                 # store, source, compiler cache or real credentials are exported.
+                run('sudo', '-n', 'systemctl', 'stop', PROXY_UNIT)
                 reboot_fixture.mkdir(mode=0o700)
                 (reboot_fixture/'snapshot.tar').write_bytes(run('sudo', '-n', 'tar', '-C', '/', '-cf', '-',
                     str(STATE).lstrip('/'), str(CONFIG).lstrip('/'), str(BROKER).lstrip('/'), str(WORKER).lstrip('/')))

@@ -23,7 +23,7 @@ def configuration():
 
 
 class ConfigurationTests(unittest.TestCase):
-    def test_duplicate_names_ports_projects_and_cross_project_grants_fail_closed(self):
+    def test_duplicate_names_ports_projects_and_ambiguous_bindings_fail_closed(self):
         for field in ('port', 'project', 'app_hostname', 'platform_hostname', 'platform_port'):
             config = configuration()
             if field in ('port', 'project'):
@@ -116,6 +116,9 @@ class IsolationTests(unittest.TestCase):
             after = broker.configuration()['apps']
             self.assertEqual(before[0]['fingerprint'], after[0]['fingerprint'])
             self.assertNotEqual(before[1]['fingerprint'], after[1]['fingerprint'])
+            config['worker'] = str(root/'worker'); write_config()
+            with self.assertRaisesRegex(ValueError, 'separate from platform'): broker.configuration()
+            config['worker'] = str(worker); write_config()
             # A legacy record cannot be silently abandoned when changing modes.
             (root/'desired.json').write_text('{}')
             with self.assertRaisesRegex(ValueError, 'explicit migration'): broker.configuration()
