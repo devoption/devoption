@@ -109,12 +109,19 @@ fn identity_limit_and_terminal_checks_preserve_bytes() {
 }
 #[test]
 fn codec_rejects_identity_corruption_and_invalid_structure() {
-    let (_temp, _path, _store, job, mut output) = fixture();
+    let (_temp, _path, _store, _job, mut output) = fixture();
+    // Reproduce the identity byte that made the old fixed-value mutation a no-op.
+    let id = JobId::from_bytes([42; 16]);
     output.append(Stream::Stdout, b"test");
-    let original = output.snapshot(job.id());
+    let original = output.snapshot(id);
+    assert_eq!(original[9], 42);
+    assert_eq!(
+        BuildOutput::restore(&original, id).unwrap().snapshot(id),
+        original
+    );
     for (offset, value) in [
         (0, 0),
-        (9, 42),
+        (9, original[9] ^ 1),
         (25, 255),
         (29, 255),
         (33, 255),
@@ -124,17 +131,17 @@ fn codec_rejects_identity_corruption_and_invalid_structure() {
         let mut bytes = original.clone();
         bytes[offset] = value;
         resign(&mut bytes);
-        assert!(BuildOutput::restore(&bytes, job.id()).is_err());
+        assert!(BuildOutput::restore(&bytes, id).is_err());
     }
     let mut corrupt = original.clone();
     corrupt[38] ^= 1;
-    assert!(BuildOutput::restore(&corrupt, job.id()).is_err());
+    assert!(BuildOutput::restore(&corrupt, id).is_err());
     for n in 0..original.len() {
-        assert!(BuildOutput::restore(&original[..n], job.id()).is_err());
+        assert!(BuildOutput::restore(&original[..n], id).is_err());
     }
     let mut extra = original;
     extra.push(0);
-    assert!(BuildOutput::restore(&extra, job.id()).is_err());
+    assert!(BuildOutput::restore(&extra, id).is_err());
 }
 #[test]
 fn unsafe_log_files_are_rejected_and_preserved() {
