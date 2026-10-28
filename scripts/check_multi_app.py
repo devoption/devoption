@@ -144,7 +144,7 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                 run('git', '-C', checkout, 'init', '-q')
                 run('git', '-C', checkout, 'add', '.')
                 run('git', '-C', checkout, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture source')
-                mutate(f'/projects/{project}/repositories', str(checkout))
+                mutate(f'/projects/{project}/repositories', checkout.name)
             controller.terminate(); controller.wait(timeout=15); controller = None
             source = root/'repositories/app0'
             run('cargo', 'vendor', '--locked', '--manifest-path', source/'Cargo.toml', root/'vendor')
