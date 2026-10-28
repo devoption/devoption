@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 import re
 import tomllib
-from deployment_broker import hostname as validate_hostname, validate_ingress
+from deployment_broker import hostname as validate_hostname, validate_ingress, deployment_slots
 
 
 def safe_path(value):
@@ -31,9 +31,16 @@ def render(build, deployment, binary, account, hostname, port):
     if type(port) is not int or not 1024 <= port <= 65535:
         raise ValueError('use an unprivileged private platform port')
     if deployment is not None:
-        app_port = deployment['port']
-        if type(app_port) is not int or not 1024 <= app_port <= 65535 or app_port == port:
-            raise ValueError('platform and app require distinct private ports')
+        slots = deployment_slots(deployment)
+        for slot in slots:
+            app_port = slot['port']
+            if type(app_port) is not int or not 1024 <= app_port <= 65535 or app_port == port:
+                raise ValueError('platform and app require distinct private ports')
+            if 'ingress' in slot:
+                binding = slot['ingress']
+                validate_ingress(binding, app_port)
+                if binding['platform_hostname'] != hostname or binding['platform_port'] != port:
+                    raise ValueError('service origin/port disagree with ingress')
         state = Path(safe_path(deployment['state']))
         if Path(binary) == state or state in Path(binary).parents:
             raise ValueError('binary must be outside release storage')
@@ -44,10 +51,6 @@ def render(build, deployment, binary, account, hostname, port):
                 raise ValueError('build and deployment configurations disagree: ' + key)
         if deployment.get('build_work') != paths['work']:
             raise ValueError('build and deployment work paths disagree')
-        if 'ingress' in deployment:
-            validate_ingress(deployment['ingress'], deployment['port'])
-            if deployment['ingress']['platform_hostname'] != hostname or deployment['ingress']['platform_port'] != port:
-                raise ValueError('service origin/port disagree with ingress')
     command = (f'{binary} serve --port {port} --data-dir {paths["owner_data"]}'
                f' --repository-root {paths["repositories"]} --build-history-dir {paths["history"]}'
                f' --public-origin https://{hostname} --build-execution enabled')

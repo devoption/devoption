@@ -23,6 +23,7 @@ accounts and production hosting acceptance remain planned.
 - [Public-origin HTTPS installation and validation limits](public-linux-install.md)
 - [Verified Ubuntu bundle installer, safe retries and validation limits](bundle-installation.md)
 - [Project environment secrets and key custody](project-secrets.md)
+- [Independent project app deployments and hostnames](multiple-apps.md)
 - [Deployment-bound secrets and scoped HTTPS integrations](app-https.md)
 - [Same-schema preview upgrades and full-state recovery](platform-upgrades.md)
 - [Signed preview upgrade, interruption and reboot acceptance](bundle-upgrade-acceptance.md)

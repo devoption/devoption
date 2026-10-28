@@ -26,7 +26,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Source changes | `/projects/{id}/builds/{repository}` | Synthetic source observations with one modified entry, details collapsed; 1280 × 1400 | `build-source-changes.jpg` |
 | App hostname error | `/projects/{id}/releases` | Synthetic certificate error presentation; no hostname request; 1280 × 1200 | `app-hostname-error.jpg` |
 | Deployed app | Separate app HTTPS hostname | Real saved revision A served by the Wasm worker; 1280 × 1200 | `deployed-app.jpg` |
-| Deployment review | `/projects/{id}/releases` | Synthetic selected/candidate comparison, scoped storage/HTTPS access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
+| Deployment review | `/projects/{id}/releases` | Synthetic independent-project destination and selected/candidate comparison, scoped storage/HTTPS access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
 | Project releases | `/projects/{id}/releases` | Synthetic saved release and health presentation; no deployment or hostname request; 1280 × 1200 | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit; environment-secrets entry point | `project-settings.jpg` |

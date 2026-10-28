@@ -32,6 +32,8 @@ The development preview supports:
 - [Immutable saved releases and same-node deployment](docs/web-app-deployments.md)
   through the interface, with a private Wasmtime worker, health/log/stop controls,
   updates, explicit return to a saved release and approved restart recovery.
+- [Independent project app slots](docs/multiple-apps.md), each with a reviewed
+  hostname/listener and separate deployment/recovery state.
 - [Two-host HTTPS configuration](docs/app-hostnames.md), local routing/certificate
   status, and [bounded same-node snapshots and staged restore](docs/same-node-recovery.md).
 
@@ -48,10 +50,10 @@ steps, including accelerated certificate renewal, updates, reboot, same-node
 restore and data-preserving reinstall. Its single-node/trusted-app limits apply;
 product release approval remains separate.
 
-The supported profile is one active trusted stateless Rust/WASIp2 app on Ubuntu
+The supported profile is trusted Rust/WASIp2 apps in explicit project slots on Ubuntu
 24.04 x86_64, with explicit operator-installed build and deployment support.
 [Standalone app identities and embedded assets](docs/web-app-builds.md#application-identity-and-assets)
-are supported; other target profiles, stateful apps, concurrent app hosting, hostile
+are supported; other target profiles, general stateful apps, hostile
 multi-tenant hosting, MCP and team accounts remain unimplemented. There is no published product release. The older native
 [build contracts](docs/build-plans.md) remain separate from this selected
 [Wasm implementation contract](docs/decisions/0004-first-wasm-web-app.md).

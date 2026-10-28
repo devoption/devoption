@@ -1,9 +1,12 @@
 # Deploy a web app on the same node
 
 This opt-in Linux workflow follows [building through the interface](web-app-builds.md).
-It promotes successful Wasm builds into local releases and runs one approved app
+It promotes successful Wasm builds into local releases and runs approved apps
 behind a private loopback HTTP listener. Use the separate [app hostname flow](app-hostnames.md) to configure HTTPS ingress.
 Deployment does not itself change DNS, certificates, a registry or a DevOption product release.
+
+The configuration below retains the single-app path. For separate project
+hostnames, listeners and lifecycle state, use [independent app slots](multiple-apps.md).
 
 ## Operator installation
 

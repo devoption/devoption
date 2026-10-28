@@ -86,8 +86,9 @@ Use focused references for details rather than loading every subsystem:
    intent remains stopped. Optional [HTTPS bindings](app-https.md) retain exact
    environment secret revisions in review and deliver only selected values through
    systemd credentials to the host transport; guests never receive raw secrets.
-6. [App hostname configuration](app-hostnames.md) binds one project to a second
-   explicit Caddy HTTPS site on the same IP. The control service verifies its
+6. [App hostname configuration](app-hostnames.md) binds each explicitly configured project slot to
+   its own Caddy HTTPS site, listener, units and runtime state on the same IP;
+   see [independent app slots](multiple-apps.md). The control service verifies its
    canonical origin; the broker checks local TLS/health for that binding.
    [Same-node recovery](same-node-recovery.md) snapshots records/artifacts offline
    and stages verified copies without overwriting the installation.

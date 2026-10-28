@@ -5,7 +5,7 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 import tomllib
-from deployment_broker import hostname, validate_ingress
+from deployment_broker import hostname, validate_ingress, deployment_slots, validate_https_policy
 
 
 def validate_policy(policy):
@@ -121,7 +121,7 @@ def generate(source, output, binding, platform_access=None):
     raw = source.read_text()
     config = tomllib.loads(raw)
     required = {'uid', 'build_work', 'state', 'worker', 'port', 'owner_data', 'history', 'repositories'}
-    if set(config) - {'ingress', 'records'} != required:
+    if set(config) - {'ingress', 'records', 'https'} != required:
         raise ValueError('expected the existing deployment configuration')
     if type(config['port']) is not int or not 1024 <= config['port'] <= 65535:
         raise ValueError('invalid private app port')
@@ -133,9 +133,42 @@ def generate(source, output, binding, platform_access=None):
         if not isinstance(config['records'], dict) or set(config['records']) != {'grant_file'} or not isinstance(config['records']['grant_file'], str) or not re.fullmatch(r'/[A-Za-z0-9_./-]+', config['records']['grant_file']):
             raise ValueError('invalid existing record grant binding')
         text += '\n[records]\ngrant_file = ' + json.dumps(config['records']['grant_file']) + '\n'
+    if 'https' in config:
+        validate_https_policy(config['https'])
+        text += '\n[https]\n' + ''.join(f'{key} = {json.dumps(value)}\n' for key, value in config['https'].items())
     text += '\n[ingress]\n' + ''.join(f'{key} = {json.dumps(value)}\n' for key, value in binding.items())
     output.mkdir(mode=0o700)
     (output/'deployment.toml').write_text(text)
+    (output/'Caddyfile').write_text(proxy)
+
+
+def render_apps(config, platform_access=None):
+    slots = deployment_slots(config)
+    first = slots[0]['ingress']
+    proxy = render(first, slots[0]['port'], platform_access)
+    for slot in slots[1:]:
+        # Reuse the exact cookie/header/control-path boundary for every app.
+        site = render(slot['ingress'], slot['port'], platform_access)
+        proxy += '\n' + site[site.index(slot['ingress']['app_hostname'] + ' {'):]
+    return proxy
+
+
+def generate_apps(source, output, platform_host, platform_port, platform_access=None):
+    raw = source.read_text()
+    config = tomllib.loads(raw)
+    if 'apps' not in config:
+        raise ValueError('--all-apps requires explicit app slots')
+    slots = deployment_slots(config)
+    for slot in slots:
+        if (slot['ingress']['platform_hostname'], slot['ingress']['platform_port']) != (platform_host, platform_port):
+            raise ValueError('platform origin disagrees with configured app slots')
+        if 'https' in slot:
+            validate_https_policy(slot['https'])
+            if slot['https']['project'] != slot['ingress']['project']:
+                raise ValueError('HTTPS binding belongs to another project')
+    proxy = render_apps(config, platform_access)
+    output.mkdir(mode=0o700)
+    (output/'deployment.toml').write_text(raw)
     (output/'Caddyfile').write_text(proxy)
 
 
@@ -148,19 +181,25 @@ if __name__ == '__main__':
     parser.add_argument('--platform-port', type=int, default=3000)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--platform-only', action='store_true')
+    parser.add_argument('--all-apps', action='store_true')
     access = parser.add_mutually_exclusive_group(required=True)
     access.add_argument('--platform-access-policy', type=Path)
     access.add_argument('--public-platform', action='store_true')
     args = parser.parse_args()
     if args.platform_only:
-        if not args.platform_access_policy or any((args.deployment_config, args.app_hostname, args.project)):
+        if not args.platform_access_policy or any((args.deployment_config, args.app_hostname, args.project, args.all_apps)):
             parser.error('--platform-only requires an access policy and no app/deployment arguments')
+    elif args.all_apps:
+        if not args.deployment_config or args.app_hostname or args.project:
+            parser.error('--all-apps requires --deployment-config and no single-app binding')
     elif not all((args.deployment_config, args.app_hostname, args.project)):
         parser.error('app routing requires --deployment-config, --app-hostname and --project')
     try:
         policy = load_policy(args.platform_access_policy) if args.platform_access_policy else None
         if args.platform_only:
             generate_platform(args.platform_hostname, args.platform_port, policy, args.output)
+        elif args.all_apps:
+            generate_apps(args.deployment_config, args.output, args.platform_hostname, args.platform_port, policy)
         else:
             generate(args.deployment_config, args.output, dict(platform_hostname=args.platform_hostname,
                      app_hostname=args.app_hostname, project=args.project, platform_port=args.platform_port), policy)
