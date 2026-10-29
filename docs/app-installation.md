@@ -12,7 +12,10 @@ procedures.
 
 Keep the [public installation prerequisites](public-linux-install.md#supported-shape-and-prerequisites):
 systemd/cgroup v2, administrator access, Python 3.11+, Git, sudo including `visudo`,
-and the standard account/systemd tools. Ports 80, 443, 3000 and private app port
+Ubuntu `build-essential` (including `cc` and native development libraries), and the
+standard account/systemd tools. Cargo's native build-time dependencies need the
+C linker even when the final app targets Wasm; plan refuses a missing `cc` before
+installation changes. Ports 80, 443, 3000 and private app port
 15000 must be free. Arrange platform DNS and firewall access separately. At least
 1 GiB plus twice the installed payload size must be free on `/opt`, `/var/lib`
 and `/etc`; prepared toolchain inputs and app builds need additional space.
@@ -169,7 +172,7 @@ crate cache available. It vendors the public static-site fixture and copies a
 bounded toolchain and reviewed binaries into a new directory. Host mode requires
 QEMU/qemu-img and xorriso (or macOS hdiutil), downloads the existing pinned Ubuntu
 image and boots a fresh private disk. An optional `--base-image` accepts only the
-same pinned image hash. The guest installs Git/sudo from Ubuntu archives; package
+same pinned image hash. The guest installs Git/sudo/build-essential from Ubuntu archives; package
 acquisition needs network access. No host root, SSH credentials, forwarded ports
 or host trust changes are needed. The VM and its copied state are removed afterward.
 

@@ -55,7 +55,9 @@ validation is still required before deployment.
 
 Use the existing unprivileged platform account and existing owner. Do not run the
 platform as root. Ubuntu needs systemd, cgroup v2, sudo, Python 3.11+ and the pinned
-Rust/Cargo 1.99.0 toolchain including the `wasm32-wasip2` standard library.
+Rust/Cargo 1.99.0 toolchain including the `wasm32-wasip2` standard library. Install
+Ubuntu `build-essential` for native build-time dependencies and their C linker,
+even though the resulting app targets Wasm.
 Dependency acquisition is an operator setup action, separate from approving a
 build. No build downloads packages or accepts shell commands.
 

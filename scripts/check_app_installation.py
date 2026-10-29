@@ -239,7 +239,12 @@ IPAddressAllow=localhost
         if jobs:
             break
         if time.monotonic() > deadline:
-            raise ValueError('Installed offline build did not succeed.')
+            history = request(f'/projects/{project}/builds', cookie=cookie)[1]
+            for attempt in set(re.findall(rb'/projects/[0-9a-f]{32}/builds/attempts/[0-9a-f]{32}', history)):
+                details = request(attempt.decode(), cookie=cookie)[1]
+                import html
+                print(html.unescape(re.sub('<[^>]+>', ' ', details.decode(errors='replace')))[-8192:], flush=True)
+            raise ValueError('Installed offline build did not succeed; saved attempt output is above.')
         time.sleep(.25)
     mutate(f'/projects/{project}/releases/promote', jobs[0].decode())
     status = lambda: json.loads(host.run('runuser', '-u', 'devoption', '--', '/usr/bin/sudo', '-n',
@@ -347,7 +352,7 @@ runcmd:
   - [mount, -t, 9p, -o, 'trans=virtio,version=9p2000.L', inputs, /inputs]
   - [cp, -r, /inputs/., /srv/devoption-install-proof/]
   - [mount, -t, 9p, -o, 'trans=virtio,version=9p2000.L', output, /output]
-  - [sh, -c, 'apt-get update && apt-get install -y --no-install-recommends git sudo']
+  - [sh, -c, 'apt-get update && apt-get install -y --no-install-recommends git sudo build-essential']
   - [touch, /run/devoption-app-install-guest]
   - [systemctl, daemon-reload]
   - [systemctl, start, --no-block, devoption-install-acceptance.service]

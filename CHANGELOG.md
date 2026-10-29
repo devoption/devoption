@@ -9,7 +9,9 @@ Entries describe implemented changes, not the roadmap.
 
 - Add fresh private Ubuntu VM acceptance of the unified app installer's real
   plan/apply/enroll/start commands, test-CA HTTPS sign-in, approved build/deploy,
-  retry preservation, conflict refusal and running/stopped restart recovery
+  retry preservation, conflict refusal and running/stopped restart recovery.
+  Check the native C linker prerequisite before installation and document the
+  Ubuntu build tools needed by Cargo's native build-time dependencies
   ([#343](https://github.com/devoption/devoption/issues/343)).
 
 - Add a single-configuration fresh-host app-capable source installer with

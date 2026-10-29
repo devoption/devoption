@@ -11,7 +11,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from install_app import AppInstaller, SUDOERS, input_tree, load_config, sha256
+from install_app import AppHost, AppInstaller, SUDOERS, input_tree, load_config, sha256
 from install_bundle import STATE
 from test_install_bundle import FixtureHost
 
@@ -269,6 +269,17 @@ class AppInstallTests(unittest.TestCase):
         (root / 'link').symlink_to(root / 'renamed')
         with self.assertRaisesRegex(ValueError, 'links'):
             input_tree(root, os.getuid())
+
+    def test_missing_native_linker_stops_host_preflight_before_service_inspection(self):
+        calls = []
+        def command(tool, *arguments):
+            calls.append(tool)
+            if tool == 'cc':
+                raise ValueError('Required host command is unavailable: cc')
+        with patch.object(AppHost, 'run', side_effect=command):
+            with self.assertRaisesRegex(ValueError, 'unavailable: cc'):
+                AppHost().app_preflight(False)
+        self.assertNotIn('systemctl', calls)
 
     @unittest.skipUnless(os.environ.get('DEVOPTION_TEST_BINARY'), 'explicit compiled platform needed for Rust/Python input identity check')
     def test_prepared_input_identity_matches_the_real_rust_reader(self):
