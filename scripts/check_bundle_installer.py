@@ -25,18 +25,23 @@ from test_install_bundle import FixtureHost
 
 
 def enroll(binary, data):
+    enroll_command([str(binary), 'setup', '--data-dir', str(data)])
+
+
+def enroll_command(arguments, password=b'disposable-installer-fixture-only', timeout=30):
+    """Exercise hidden terminal prompts through a selected trusted fixture command."""
     pid, terminal = pty.fork()
     if pid == 0:
-        os.execv(str(binary), [str(binary), 'setup', '--data-dir', str(data)])
+        os.execvp(arguments[0], arguments)
     try:
         prompts = [b'New owner password (15+ characters): ', b'Confirm owner password: ']
         output = b''
-        deadline = time.monotonic() + 30
+        deadline = time.monotonic() + timeout
         while prompts and time.monotonic() < deadline:
             if select.select([terminal],[],[],1)[0]:
                 output += os.read(terminal,8192)
                 if prompts[0] in output:
-                    os.write(terminal,b'disposable-installer-fixture-only\n')
+                    os.write(terminal,password+b'\n')
                     prompts.pop(0)
         if prompts:
             raise ValueError('Disposable PTY setup did not request both passwords.')

@@ -153,7 +153,37 @@ hashes, missing target inputs and occupied ports. Linux CI additionally exercise
 real systemd/sudo parsers and compares tree identity with the actual Rust reader.
 The existing bundle tests continue to cover the shared no-replacement engine.
 
-Account/service actions are modeled. These checks are not a fresh-host installation,
-public HTTPS or end-to-end browser build/deploy acceptance run of this entry point.
-Existing [first-app evidence](first-web-app.md#recovery-boundary-and-acceptance-record)
-applies to underlying workflows, not automatically to this new installer.
+Those unit tests model account/service actions. A separate fresh-VM acceptance
+harness now exercises real installation commands and authenticated HTTP actions:
+
+```sh
+python3 scripts/check_app_installation.py --prepare /absolute/new-inputs \
+  --binary target/release/devoption --runtime target/release/devoption-runtime \
+  --caddy-archive /absolute/pinned-caddy.tar.gz
+python3 scripts/check_app_installation.py --inputs /absolute/new-inputs \
+  --report /absolute/new-report.json
+```
+
+Prepare as an unprivileged Linux user with the pinned toolchain/target and original
+crate cache available. It vendors the public static-site fixture and copies a
+bounded toolchain and reviewed binaries into a new directory. Host mode requires
+QEMU/qemu-img and xorriso (or macOS hdiutil), downloads the existing pinned Ubuntu
+image and boots a fresh private disk. An optional `--base-image` accepts only the
+same pinned image hash. The guest installs Git/sudo from Ubuntu archives; package
+acquisition needs network access. No host root, SSH credentials, forwarded ports
+or host trust changes are needed. The VM and its copied state are removed afterward.
+
+Acceptance uses the real `plan`, `apply`, `enroll`, `start` and `status` commands,
+synthetic terminal enrollment, test-CA HTTPS sign-in, a managed repository, approved
+offline build, saved release/deployment, identical retry preservation, operator-edit
+and changed-input refusal, and running/stopped app recovery after service restart.
+The proxy has a guest-only drop-in for loopback/test-CA TLS; the installed production
+Caddyfile stays unchanged. Private owner/application state stays inside the VM.
+The report contains only exact source/binary/image identities and completed cases.
+Missing cases, failed checks, stale output and mismatched identities cannot pass.
+Linux installation CI runs this harness and requires the complete report.
+
+This is single-node local HTTPS acceptance, not public DNS, ACME, a kernel reboot
+test, arbitrary-framework support or a release approval. Existing
+[first-app public evidence](first-web-app.md#recovery-boundary-and-acceptance-record)
+retains its own scope; it is not automatically acceptance of this entry point.
