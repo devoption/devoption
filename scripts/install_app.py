@@ -58,6 +58,8 @@ def input_tree(root, administrator=0):
             raise ValueError('Prepared inputs exceed depth limit.')
         for path in directory.iterdir():
             info = path.lstat()
+            if not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
+                raise ValueError('Prepared inputs cannot contain links or special files.')
             if info.st_uid != administrator or info.st_mode & 0o022:
                 raise ValueError('Prepared inputs must be administrator-controlled.')
             if stat.S_ISDIR(info.st_mode):
@@ -70,8 +72,6 @@ def input_tree(root, administrator=0):
                 if len(files) >= 16384:
                     raise ValueError('Prepared inputs exceed file limit.')
                 files.append(path)
-            else:
-                raise ValueError('Prepared inputs cannot contain links or special files.')
     collect(root, 0)
     manifest = bytearray()
     for path in sorted(files):
