@@ -90,6 +90,10 @@ jobs:
           cargo build --workspace --release --locked --offline
           cargo test -p devoption-cli --test server --release --locked --offline installation
           python3 scripts/check_systemd_unit.py target/release/devoption
+      - name: Verify unified app installer identity and generated Linux configuration
+        env:
+          DEVOPTION_TEST_BINARY: ${{ github.workspace }}/target/release/devoption
+        run: python3 -m unittest discover -s scripts -p 'test_install_app.py'
       - name: Verify ordinary and protected HTTPS access through the pinned proxy
         env:
           DEVOPTION_TEST_CADDY: ${{ runner.temp }}/devoption-proxy-test/caddy

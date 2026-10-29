@@ -13,6 +13,13 @@ records the source-built, public DNS/ACME and lifecycle run under
 
 ## 1. Install and sign in
 
+For a fresh supported host with reviewed Linux binaries and prepared build inputs,
+use the [unified app-capable installer](app-installation.md). It installs the
+build/deployment support and service together. After enrollment/start, continue
+at step 3 below; supply committed application source before attaching it.
+Existing installations must keep their maintenance procedures. The manual path
+below remains available, and the new entry point has its own validation limits.
+
 Follow [platform installation](public-linux-install.md) using a reviewed commit,
 the existing documented account/owner setup, pinned toolchain and Caddy. Build
 with `cargo build --workspace --release --locked --offline` after dependency

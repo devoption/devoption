@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a single-configuration fresh-host app-capable source installer with
+  plan/apply, generated build/deployment/service configuration, installed helpers,
+  explicit enrollment/start, input verification and preservation-safe retries.
+  Refuse existing installations and changed state; add disposable fault and
+  Linux parser/input-identity checks
+  ([#340](https://github.com/devoption/devoption/issues/340)).
+
 - Support explicit project deployment slots with separate hostnames, listeners,
   releases, intent, units and logs. Scope owner review and recovery per project,
   retain the legacy single-app schema and protected administrative ingress, and

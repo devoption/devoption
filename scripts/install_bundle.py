@@ -197,6 +197,7 @@ class Installer:
         return True
 
     def preflight(self):
+        self.prepare_output()
         self.host.preflight(self.root, MIN_FREE + sum(len(data) for data, _ in self.output.values()) * 2)
         resumed = self.receipt()
         if not resumed:
@@ -276,6 +277,7 @@ class Installer:
             self.write(STATE + "/installation.json", canonical(self.identity), 0o600)
         for who, home in (("devoption", PLATFORM), ("caddy", PROXY)):
             self.host.create_account(who, home)
+        self.prepare_output()
         for name, (mode, who) in sorted(self.dirs.items(), key=lambda item: len(Path(item[0]).parts)):
             path = self.path(name)
             if not path.exists():
@@ -290,6 +292,9 @@ class Installer:
         self.runtime_probe()
         self.host.reload()
         return self.preflight()
+
+    def prepare_output(self):
+        """Optional configuration rendering after service identities are known."""
 
     def ready(self):
         plan = self.preflight()
