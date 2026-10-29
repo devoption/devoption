@@ -260,7 +260,7 @@ IPAddressAllow=localhost
                  for unit in ('devoption-public.service', 'caddy-devoption.service', 'devoption-app.service')}
     before = persistent_snapshot()
     assert invoke('apply')['missing_files'] == []
-    enroll_command(commands('enroll'), password=PASSWORD, timeout=300)
+    assert invoke('enroll')['owner_enrolled']
     assert persistent_snapshot() == before and Path(PLATFORM + '/data/owner.bin').read_bytes() == owner
     for unit, identity in processes.items():
         assert identity.strip() and host.run('systemctl', 'show', unit, '-p', 'InvocationID', '--value').stdout == identity
