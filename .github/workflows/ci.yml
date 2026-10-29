@@ -141,7 +141,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
           if [ -e /dev/kvm ]; then sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
       - name: Exercise unified installation and approved app deployment in a fresh private VM
-        run: python3 scripts/check_app_installation.py --inputs "$RUNNER_TEMP/app-install-inputs" --report "$RUNNER_TEMP/app-install-report.json"
+        run: |
+          python3 scripts/check_app_installation.py --inputs "$RUNNER_TEMP/app-install-inputs" --report "$RUNNER_TEMP/app-install-report.json"
+          cat "$RUNNER_TEMP/app-install-report.json"
       - name: Verify authenticated independent app deployments on the disposable runner
         run: python3 scripts/check_multi_app.py --disposable-system-host --binary target/release/devoption --runtime target/release/devoption-runtime --caddy "$RUNNER_TEMP/devoption-proxy-test/caddy" --reboot-fixture "$RUNNER_TEMP/multi-app-reboot"
       - name: Prove scoped record writes with disposable Unix-only PostgreSQL
