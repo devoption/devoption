@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Update the pinned Wasmtime core, WASI and WASI-HTTP crates together to 49.0.4,
+  including the upstream HTTP content-length correction. Keep current release
+  provenance and deployment guidance aligned while preserving earlier saved
+  release bytes and historical candidate identities
+  ([#345](https://github.com/devoption/devoption/issues/345)).
+
 - Add fresh private Ubuntu VM acceptance of the unified app installer's real
   plan/apply/enroll/start commands, test-CA HTTPS sign-in, approved build/deploy,
   retry preservation, conflict refusal and running/stopped restart recovery.

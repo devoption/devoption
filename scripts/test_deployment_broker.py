@@ -57,6 +57,23 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(broker.load_release(self.config, release)['artifact_sha256'], broker.digest(self.component))
         self.assertEqual((self.config['state']/release/'component.wasm').read_bytes(), self.component)
 
+    def test_runtime_patch_records_new_identity_without_rewriting_legacy_releases(self):
+        legacy = {**self.receipt, 'policy': broker.POLICY, 'runtime': 'wasmtime-49.0.3'}
+        encoded = broker.canonical(legacy)
+        old_id = broker.digest(encoded)
+        old = self.config['state'] / old_id
+        old.mkdir(mode=0o700)
+        (old / 'manifest.json').write_bytes(encoded)
+        (old / 'component.wasm').write_bytes(self.component)
+        (old / 'manifest.json').chmod(0o400)
+        (old / 'component.wasm').chmod(0o444)
+        original = {p.name: (p.stat().st_ino, p.stat().st_mode, p.read_bytes()) for p in old.iterdir()}
+        current = self.promote()
+        self.assertNotEqual(current, old_id)
+        self.assertEqual(broker.load_release(self.config, current)['runtime'], 'wasmtime-49.0.4')
+        self.assertEqual(broker.load_release(self.config, old_id), legacy)
+        self.assertEqual({p.name: (p.stat().st_ino, p.stat().st_mode, p.read_bytes()) for p in old.iterdir()}, original)
+
     def test_old_receipt_and_mismatched_history_provenance_are_rejected(self):
         self.receipt['version'] = 1; self.write_receipt()
         with self.assertRaises(ValueError): self.promote()
@@ -104,7 +121,7 @@ class DeploymentTests(unittest.TestCase):
 
     def test_invalid_ids_and_interrupted_promotion_do_not_overwrite(self):
         with self.assertRaises(ValueError): broker.promote(self.config, '../bad', '0'*64, ())
-        release = broker.digest(broker.canonical({**self.receipt, 'policy':broker.POLICY,'runtime':'wasmtime-49.0.3'}))
+        release = broker.digest(broker.canonical({**self.receipt, 'policy':broker.POLICY,'runtime':'wasmtime-49.0.4'}))
         pending = self.config['state']/(release+'.pending'); pending.mkdir(mode=0o700)
         (pending/'operator-note').write_text('preserve')
         with self.assertRaises(FileExistsError): self.promote()

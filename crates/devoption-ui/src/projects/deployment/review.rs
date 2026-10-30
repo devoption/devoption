@@ -99,7 +99,7 @@ pub(super) fn content(project: &super::ProjectSummary<'_>, view: &DeploymentView
     if let Some(grant) = &view.review_records {
         identity(&mut html, "App storage grant SHA-256", grant);
     }
-    html.push_str("</dl><p>WasiHttpV1: Wasmtime 49.0.3. No guest files, environment, sockets or DNS. HTTPS is denied unless the integration above is explicitly bound. One request at a time, 64 MiB guest memory, 10 million fuel units and five seconds per request. Worker: one CPU, 512 MiB RAM, no swap, 64 tasks. Startup health must pass in 30 seconds.</p><p>A healthy approved app resumes after platform restart only when its bound grants and exact secret revision remain available; a stopped app stays stopped.</p></details><section class=\"deployment-approval\" aria-labelledby=\"deployment-impact-title\"><h3 id=\"deployment-impact-title\">");
+    html.push_str("</dl><p>WasiHttpV1: Wasmtime 49.0.4. No guest files, environment, sockets or DNS. HTTPS is denied unless the integration above is explicitly bound. One request at a time, 64 MiB guest memory, 10 million fuel units and five seconds per request. Worker: one CPU, 512 MiB RAM, no swap, 64 tasks. Startup health must pass in 30 seconds.</p><p>A healthy approved app resumes after platform restart only when its bound grants and exact secret revision remain available; a stopped app stays stopped.</p></details><section class=\"deployment-approval\" aria-labelledby=\"deployment-impact-title\"><h3 id=\"deployment-impact-title\">");
     if view.replaces_other_app {
         html.push_str("This will replace another project’s app.");
     } else if view.current.is_some() {
