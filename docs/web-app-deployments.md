@@ -17,7 +17,7 @@ root remain as described in that guide. Deployment uses a separate systemd
 
 Build the workspace with the pinned toolchain and locked dependencies. In addition
 to `devoption`, it produces `devoption-runtime`. The runtime embeds Wasmtime,
-`wasmtime-wasi` and `wasmtime-wasi-http` 49.0.3. Compilation of the platform/runtime
+`wasmtime-wasi` and `wasmtime-wasi-http` 49.0.4. Compilation of the platform/runtime
 is operator installation, not an application build job.
 
 After checking that `devoption-app.service` and `devoption-app-validate.service`

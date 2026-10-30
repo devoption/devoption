@@ -8,6 +8,7 @@ import os
 import re
 from pathlib import Path
 import tarfile
+import tomllib
 from unittest.mock import patch
 
 from check_release_bundle import check
@@ -19,6 +20,17 @@ from test_release_plan import Fixture, ROOT
 
 
 class BundleTests(Fixture):
+    def test_runtime_family_direct_pins_and_locked_versions_stay_aligned(self):
+        dependencies = tomllib.loads((ROOT / 'crates/devoption-runtime/Cargo.toml').read_text())['dependencies']
+        locked = tomllib.loads((ROOT / 'Cargo.lock').read_text())['package']
+        versions = []
+        for name in ('wasmtime', 'wasmtime-wasi', 'wasmtime-wasi-http'):
+            selected = [p['version'] for p in locked if p['name'] == name]
+            self.assertEqual(len(selected), 1)
+            self.assertEqual(dependencies[name]['version'], '=' + selected[0])
+            versions.extend(selected)
+        self.assertEqual(len(set(versions)), 1, 'Update the embedded runtime family together.')
+
     def setUp(self):
         super().setUp()
         self.version = "0.2.1-preview.1"

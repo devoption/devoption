@@ -492,7 +492,7 @@ def promote(config, job, expected, provenance):
     for key in ['source_sha256', 'review_sha256', 'toolchain_sha256', 'dependency_sha256', 'configuration_sha256']:
         if not HEX.fullmatch(receipt[key]): raise ValueError('invalid provenance')
     if not re.fullmatch(r'[0-9a-f]{40}', receipt['commit']): raise ValueError('invalid commit')
-    manifest = {**receipt, 'policy': POLICY, 'runtime': 'wasmtime-49.0.3'}
+    manifest = {**receipt, 'policy': POLICY, 'runtime': 'wasmtime-49.0.4'}
     records = record_policy(config, receipt['project'])
     if records:
         manifest['records'] = records

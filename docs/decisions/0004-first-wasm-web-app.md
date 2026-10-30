@@ -23,6 +23,13 @@ and archive identities remain mandatory. Recheck supported patches and upstream
 advisories when introducing dependencies; changes require a reviewed pin update.
 No dependency or crate is added by this decision.
 
+The initial 49.0.3 pins above record the original decision. The current worker
+uses Wasmtime, WASI and WASI-HTTP **49.0.4** under
+[#345](https://github.com/devoption/devoption/issues/345), including the upstream
+[WASI-HTTP content-length fix](https://github.com/bytecodealliance/wasmtime/security/advisories/GHSA-r8xh-cgf7-392j).
+The P2 features and WASI 0.2.4 app contract are unchanged. Earlier acceptance
+records and retained signed candidates keep their original runtime identities.
+
 Choose the embedded API to enforce request admission, output bounds and denied
 outbound HTTP in the host. Do not embed guest execution in the authenticated
 control-server process. Reuse the existing CLI as the worker entry point where
