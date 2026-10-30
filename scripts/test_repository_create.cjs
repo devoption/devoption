@@ -7,9 +7,10 @@ const script = readFileSync(join(__dirname,"../crates/devoption-ui/assets/reposi
 const project = "01".repeat(16), repository = "02".repeat(16), destination = `/projects/${project}/repositories/${repository}/files`;
 const response = (status, location, token = "ab".repeat(32)) => ({status, headers: new Map([["location",location],["x-csrf-token",token]])});
 const tick = () => new Promise(resolve=>setImmediate(resolve));
-function page(id = project) {
+function page(id = project, starter = false) {
   const nodes=new Map(), events=new Map(), windows=new Map(), queue=[], calls=[], navigation=[];
   for(const key of ["repository-create-form","repository-create-name","repository-create-submit","repository-create-status","repository-create-reload","repository-create-signin"]){const listeners=new Map(),attributes=new Map();nodes.set(key,{value:"",textContent:"",disabled:true,hidden:true,dataset:{project:id},addEventListener:(key,fn)=>listeners.set(key,fn),emit:(key,event={})=>listeners.get(key)?.(event),setAttribute:(key,value)=>attributes.set(key,value),getAttribute:key=>attributes.get(key),focus(){this.focused=true}})}
+  if(starter) {const node={...nodes.get("repository-create-name"),checked:true};nodes.set("repository-create-starter",node);}
   runInNewContext(script,{document:{getElementById:id=>nodes.get(id),addEventListener:(key,fn)=>events.set(key,fn)},window:{addEventListener:(key,fn)=>windows.set(key,fn),history:{replaceState:(_state,_title,url)=>navigation.push(url)},location:{reload:()=>navigation.push("reload")}},fetch:async(url,options)=>{calls.push({url,...options});assert.equal(options.method,"POST");assert.equal(options.credentials,"same-origin");assert.equal(options.cache,"no-store");assert.equal(options.redirect,"error");assert.equal(options.referrerPolicy,"no-referrer");assert.ok(queue.length);const result=await queue.shift();if(result instanceof Error)throw result;return result;}});
   events.get("DOMContentLoaded")();
   return{nodes,queue,calls,navigation,session:detail=>events.get("devoption-session")?.({detail}),hide:()=>windows.get("pagehide")(),submit:value=>{nodes.get("repository-create-name").value=value;return nodes.get("repository-create-form").emit("submit",{preventDefault(){}})},status:()=>nodes.get("repository-create-status").textContent};
@@ -38,4 +39,22 @@ test("pagehide and changed session discard late success and retain uncertainty o
 test("server validation permits editing, while malformed project data stays disabled",async()=>{
  const p=page();p.session("signed-in");p.queue.push(response(204),response(400));await p.submit("rejected");assert.match(p.status(),/name was rejected/);assert.equal(p.nodes.get("repository-create-submit").disabled,false);assert.equal(p.nodes.get("repository-create-name").value,"rejected");
  const malformed=page("../escape");malformed.session("signed-in");await malformed.submit("sample");assert.equal(malformed.calls.length,0);assert.equal(malformed.nodes.get("repository-create-submit").disabled,true);
+});
+
+test("starter creation uses fresh CSRF, locks the choice and opens source checks without running a build",async()=>{
+ const p=page(project,true);p.session("signed-in");let finish;
+ p.queue.push(response(204),new Promise(resolve=>finish=resolve));const pending=p.submit("web");await tick();
+ assert.equal(p.nodes.get("repository-create-starter").disabled,true);
+ assert.equal(p.calls[1].url,`/projects/${project}/repositories/starter`);
+ assert.equal(p.calls[1].headers["x-csrf-token"],"ab".repeat(32));
+ finish(response(204,`/projects/${project}/builds/${repository}`));await pending;
+ assert.deepEqual(p.navigation,[`/projects/${project}/builds/${repository}`,"reload"]);
+ assert.equal(p.calls.length,2);
+});
+test("starter refuses an empty-repository destination and permits an explicit empty choice",async()=>{
+ const p=page(project,true);p.session("signed-in");p.queue.push(response(204),response(204,destination));await p.submit("web");
+ assert.deepEqual(p.navigation,[]);assert.equal(p.nodes.get("repository-create-submit").disabled,true);
+ const empty=page(project,true);empty.session("signed-in");empty.nodes.get("repository-create-starter").checked=false;
+ empty.queue.push(response(204),response(204,destination));await empty.submit("empty");
+ assert.equal(empty.calls[1].url,`/projects/${project}/repositories/create`);assert.deepEqual(empty.navigation,[destination,"reload"]);
 });

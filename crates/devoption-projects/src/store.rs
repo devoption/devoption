@@ -207,6 +207,27 @@ impl CatalogStore {
         root: &crate::worktree::ManagedRoot,
         name: &str,
     ) -> Result<crate::RepositoryId, Error> {
+        self.create_repository(project, root, name, false)
+    }
+
+    /// Initialize the embedded web app and first commit only for an empty project.
+    /// Failed creation retains unpublished files for explicit inspection.
+    pub fn create_starter_repository(
+        &mut self,
+        project: crate::ProjectId,
+        root: &crate::worktree::ManagedRoot,
+        name: &str,
+    ) -> Result<crate::RepositoryId, Error> {
+        self.create_repository(project, root, name, true)
+    }
+
+    fn create_repository(
+        &mut self,
+        project: crate::ProjectId,
+        root: &crate::worktree::ManagedRoot,
+        name: &str,
+        starter: bool,
+    ) -> Result<crate::RepositoryId, Error> {
         crate::worktree::ManagedRoot::validate_name(name)?;
         if !root.permitted().disjoint_directory(&self.directory)? {
             return Err(Error::RootMismatch);
@@ -217,6 +238,9 @@ impl CatalogStore {
             .iter()
             .find(|candidate| candidate.id() == project)
             .ok_or(Error::UnknownProject)?;
+        if starter && !selected.repositories().is_empty() {
+            return Err(Error::RepositoryExists);
+        }
         // Include legacy/attached records so a new storage layout cannot create
         // a second same-named repository in this project. Existing data is unchanged.
         if catalog.repositories().iter().any(|repository| {
@@ -234,7 +258,12 @@ impl CatalogStore {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        let path = root.initialize(&format!("{project_key}--{name}"))?;
+        let storage = format!("{project_key}--{name}");
+        let path = if starter {
+            root.initialize_starter(&storage)?
+        } else {
+            root.initialize(&storage)?
+        };
         // Initialization has already published filesystem state. Even a capacity
         // failure during catalog encoding now requires inspection before retry.
         let repository = catalog

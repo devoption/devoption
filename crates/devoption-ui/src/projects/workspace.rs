@@ -205,11 +205,17 @@ pub(super) fn repositories(
     }
     html.push_str("</section>");
     if creation_available {
+        let starter = if project.repositories.is_empty() {
+            r#"<label class="repository-starter-choice"><input id="repository-create-starter" type="checkbox" checked disabled aria-describedby="repository-starter-hint">Start with a working web app</label><p id="repository-starter-hint">Create the supported Rust web app, its HTML/CSS/JavaScript assets and a first local commit by DevOption. Nothing is built or deployed until you review and approve it.</p>"#
+        } else {
+            ""
+        };
         html.push_str(&super::dialog("repository-create-dialog", "New repository", &format!(r#"
 <form id="repository-create-form" class="project-form" data-project="{id}" aria-labelledby="repository-create-dialog-title">
 <label for="repository-create-name">Repository name</label>
-<p id="repository-create-hint">Create an empty Git repository on this server. Names are unique within this project. Use 1–64 letters, numbers, hyphens or underscores, starting with a letter or number.</p>
+<p id="repository-create-hint">Create a local Git repository on this server. Names are unique within this project. Use 1–64 letters, numbers, hyphens or underscores, starting with a letter or number.</p>
 <input id="repository-create-name" name="name" type="text" required maxlength="64" pattern="[A-Za-z0-9][A-Za-z0-9_\-]*" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="repository-create-hint repository-create-status" disabled>
+{starter}
 <p id="repository-create-status" role="status" aria-live="polite">Checking your session…</p>
 <a id="repository-create-reload" href="/projects/{id}/code" hidden>Reload Code</a>
 <a id="repository-create-signin" href="/sign-in" hidden>Check account</a>

@@ -127,14 +127,14 @@ impl Snapshot {
 }
 
 impl PermittedRoot {
-    /// Inspect only three fixed tracked source inputs and reject detected changes
-    /// across the read. No Cargo invocation or project code execution.
+    /// Inspect fixed tracked manifest, lockfile and binary/library source inputs.
+    /// Reject detected changes across the read; never invoke Cargo or project code.
     pub fn source_inputs(&self, candidate: &Path) -> Result<SourceInputs> {
         let before = self.status_snapshot(candidate)?;
         let status = self.git_status(candidate)?;
         let tracked = files::entries(&before)?;
         let mut files = Vec::new();
-        for path in ["Cargo.toml", "Cargo.lock", "src/main.rs"] {
+        for path in ["Cargo.toml", "Cargo.lock", "src/main.rs", "src/lib.rs"] {
             let content = match tracked.iter().find(|entry| entry.path == path) {
                 None => None,
                 Some(entry) if !entry.regular => Some(FileContent::Unsupported),
@@ -347,7 +347,7 @@ impl Drop for Running {
     }
 }
 
-fn run(command: &mut Command, duration: Duration) -> Result<Vec<u8>> {
+pub(super) fn run(command: &mut Command, duration: Duration) -> Result<Vec<u8>> {
     run_bounded(command, duration, MAX_OUTPUT, Stdio::null())
 }
 

@@ -52,6 +52,100 @@ impl Fixture {
         fs::read(self.data.join("projects.bin")).unwrap()
     }
 }
+
+#[test]
+fn starter_has_embedded_source_one_clean_commit_and_no_build_side_effects() {
+    let f = Fixture::new();
+    let root = f.managed();
+    let mut store = CatalogStore::open_absolute(&f.data).unwrap();
+    let id = store
+        .create_starter_repository(f.project, &root, "web")
+        .unwrap();
+    let saved = store.load().unwrap().unwrap();
+    assert_eq!(saved.projects()[0].repositories(), &[id]);
+    let path = f.path("web");
+    let status = root.permitted().git_status(&path).unwrap();
+    assert_eq!(status.branch.as_deref(), Some("main"));
+    assert!(status.commit.is_some());
+    assert_eq!(status.changes, crate::worktree::ChangeCounts::default());
+    assert_eq!(
+        fs::read(f.root.join(&path).join("Cargo.lock")).unwrap(),
+        include_bytes!("../../../../examples/static-site/Cargo.lock")
+    );
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(f.root.join(&path))
+        .args(["log", "--format=%an <%ae>|%s"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        "DevOption <devoption@localhost>|feat: initialize starter web app\n"
+    );
+    assert!(!f.root.join(&path).join("target").exists());
+    let before = f.bytes();
+    assert!(matches!(
+        store.create_starter_repository(f.project, &root, "second"),
+        Err(Error::RepositoryExists)
+    ));
+    assert_eq!(f.bytes(), before);
+    assert!(!f.root.join(f.path("second")).exists());
+}
+
+#[test]
+fn starter_collision_and_unknown_project_preserve_files_and_catalog() {
+    let f = Fixture::new();
+    let root = f.managed();
+    let mut store = CatalogStore::open_absolute(&f.data).unwrap();
+    let before = f.bytes();
+    fs::create_dir(f.root.join(f.path("existing"))).unwrap();
+    fs::write(
+        f.root.join(f.path("existing")).join("sentinel"),
+        b"preserve",
+    )
+    .unwrap();
+    assert!(matches!(
+        store.create_starter_repository(f.project, &root, "existing"),
+        Err(Error::RepositoryExists)
+    ));
+    assert!(matches!(
+        store.create_starter_repository(ProjectId::from_bytes([0; 16]), &root, "unknown"),
+        Err(Error::UnknownProject)
+    ));
+    assert_eq!(f.bytes(), before);
+    assert_eq!(
+        fs::read(f.root.join(f.path("existing")).join("sentinel")).unwrap(),
+        b"preserve"
+    );
+    assert_eq!(fs::read_dir(&f.root).unwrap().count(), 1);
+}
+
+#[test]
+fn failed_starter_publication_preserves_committed_source_for_explicit_recovery() {
+    let f = Fixture::new();
+    let root = f.managed();
+    let mut store = CatalogStore::open_absolute(&f.data).unwrap();
+    let before = f.bytes();
+    fs::set_permissions(&f.data, fs::Permissions::from_mode(0o500)).unwrap();
+    assert!(matches!(
+        store.create_starter_repository(f.project, &root, "interrupted"),
+        Err(Error::CreationUncertain)
+    ));
+    fs::set_permissions(&f.data, fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(f.bytes(), before);
+    assert!(
+        root.permitted()
+            .git_status(&f.path("interrupted"))
+            .unwrap()
+            .commit
+            .is_some()
+    );
+    assert!(matches!(
+        store.create_starter_repository(f.project, &root, "interrupted"),
+        Err(Error::RepositoryExists)
+    ));
+}
 #[test]
 fn created_repository_has_private_valid_git_metadata_and_persisted_independent_identity() {
     let f = Fixture::new();

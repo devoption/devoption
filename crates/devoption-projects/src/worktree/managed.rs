@@ -1,4 +1,4 @@
-//! Explicit authority to create new empty repositories, separate from inspection.
+//! Explicit authority to create new repositories, separate from inspection.
 use super::{InspectionError, PermittedRoot};
 use crate::Error;
 use rustix::{
@@ -13,12 +13,19 @@ use std::{
     sync::Arc,
 };
 
+mod starter;
+
 /// Selected only by trusted local startup configuration, never browser input.
 /// Existing entries are never overwritten, repaired or removed.
 pub struct ManagedRoot {
     root: Arc<PermittedRoot>,
 }
 impl ManagedRoot {
+    pub(crate) fn initialize_starter(&self, name: &str) -> Result<PathBuf, Error> {
+        let path = self.initialize(name)?;
+        starter::populate(self, &path).map_err(|_| Error::CreationUncertain)?;
+        Ok(path)
+    }
     pub fn open_absolute(path: &Path) -> Result<Self, Error> {
         Self::from_permitted(Arc::new(PermittedRoot::open_absolute(path)?))
     }

@@ -109,8 +109,10 @@ Development checks create owners only in [temporary fixture stores](browser-sess
 
 Create repositories through **New repository** on a project's Code page after an
 administrator selects [managed storage](managed-repositories.md). DevOption creates
-and registers each empty Git checkout on the server. Existing-checkout attachment
-is an optional inspection/import path. Source editing, initial commits and Git hosting remain unavailable. The selected
+and registers each Git checkout on the server. An empty project can choose the
+supported starter web app with its first local commit, then open source checks.
+Existing-checkout attachment is an optional inspection/import path. Source editing,
+arbitrary commits and Git hosting remain unavailable. The selected
 web app has an opt-in [Linux build workflow](web-app-builds.md) and
 [private same-node deployment](web-app-deployments.md).
 

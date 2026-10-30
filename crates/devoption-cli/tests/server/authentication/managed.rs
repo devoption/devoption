@@ -262,6 +262,14 @@ fn inspection_configuration_does_not_implicitly_grant_creation() {
         ),
         503,
     );
+    check(
+        &request(
+            address,
+            &creation(address, &issued, project, "must-not-exist")
+                .replace("/repositories/create", "/repositories/starter"),
+        ),
+        503,
+    );
     assert!(
         !root
             .join(format!("{}--must-not-exist", hex(project)))
@@ -483,5 +491,85 @@ fn cli_managed_projects_can_each_create_ui_and_browse_independent_files_after_re
     let foreign = locations[1].replace(&hex(second), &hex(first));
     check(&read(address, "GET", &foreign, Some(&issued)), 404);
     assert_eq!(read_catalog(&data).unwrap().unwrap(), saved);
+    assert_eq!(fs::read(root.join("main/.git/config")).unwrap(), existing);
+}
+
+#[test]
+fn starter_requires_managed_owner_action_and_preserves_committed_source_across_restart() {
+    let (_data, data) = configured();
+    let (_root, root) = repositories::root_fixture();
+    let (project, _) = repositories::seed(&data);
+    let owner = fs::read(data.join("owner.bin")).unwrap();
+    let existing = fs::read(root.join("main/.git/config")).unwrap();
+    let hooks = root.join("ambient-hooks");
+    fs::create_dir(&hooks).unwrap();
+    let hook = hooks.join("post-commit");
+    fs::write(&hook, "#!/bin/sh\ntouch ../ambient-hook-ran\n").unwrap();
+    fs::set_permissions(&hook, fs::Permissions::from_mode(0o700)).unwrap();
+    let (server, address) = start_command(
+        Command::new(env!("CARGO_BIN_EXE_devoption"))
+            .args(["serve", "--port", "0", "--data-dir"])
+            .arg(&data)
+            .arg("--managed-repository-root")
+            .arg(&root)
+            .env("GIT_CONFIG_COUNT", "2")
+            .env("GIT_CONFIG_KEY_0", "core.hooksPath")
+            .env("GIT_CONFIG_VALUE_0", &hooks)
+            .env("GIT_CONFIG_KEY_1", "commit.gpgSign")
+            .env("GIT_CONFIG_VALUE_1", "true")
+            .env("GIT_AUTHOR_NAME", "Untrusted ambient identity"),
+    );
+    let issued = sign_in(address);
+    let raw = creation(address, &issued, project, "web")
+        .replace("/repositories/create", "/repositories/starter");
+    let before = fs::read(data.join("projects.bin")).unwrap();
+    for header in ["Cookie:", "X-CSRF-Token:"] {
+        let denied = raw
+            .split("\r\n")
+            .filter(|line| !line.starts_with(header))
+            .collect::<Vec<_>>()
+            .join("\r\n");
+        check(&request(address, &denied), 401);
+    }
+    check(
+        &request(
+            address,
+            &raw.replace(
+                &format!("Origin: http://{address}"),
+                "Origin: https://attacker.invalid",
+            ),
+        ),
+        403,
+    );
+    assert_eq!(fs::read(data.join("projects.bin")).unwrap(), before);
+    let result = request(address, &raw);
+    check(&result, 204);
+    let location = result
+        .split("\r\n")
+        .find_map(|line| line.strip_prefix("location: "))
+        .unwrap()
+        .to_owned();
+    assert!(location.starts_with(&format!("/projects/{}/builds/", hex(project))));
+    let saved = read_catalog(&data).unwrap().unwrap();
+    let checkout = root.join(saved.default_checkouts()[0].relative_path());
+    let source = fs::read(checkout.join("src/lib.rs")).unwrap();
+    assert!(!checkout.join("target").exists());
+    assert!(!root.join("ambient-hook-ran").exists());
+    check(&request(address, &raw), 409);
+    let other = creation(address, &issued, project, "another")
+        .replace("/repositories/create", "/repositories/starter");
+    check(&request(address, &other), 409);
+    assert!(!root.join(format!("{}--another", hex(project))).exists());
+    drop(server);
+    let (_server, address) = start_managed(&data, &root);
+    let issued = sign_in(address);
+    let page = read(address, "GET", &location, Some(&issued));
+    let html = check(&page, 200);
+    assert!(html.contains("Cargo.toml"));
+    assert!(html.contains("Source checks passed"));
+    assert!(html.contains("src/lib.rs"));
+    assert_eq!(read_catalog(&data).unwrap().unwrap(), saved);
+    assert_eq!(fs::read(checkout.join("src/lib.rs")).unwrap(), source);
+    assert_eq!(fs::read(data.join("owner.bin")).unwrap(), owner);
     assert_eq!(fs::read(root.join("main/.git/config")).unwrap(), existing);
 }
