@@ -110,6 +110,7 @@ jobs:
               raise ValueError('Proxy fixture checksum mismatch.')
           binary = Path(os.environ['DEVOPTION_TEST_CADDY'])
           binary.parent.mkdir(mode=0o700)
+          (binary.parent/'caddy.tar.gz').write_bytes(raw)
           with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
               binary.write_bytes(archive.extractfile('caddy').read())
           binary.chmod(0o700)
@@ -132,6 +133,17 @@ jobs:
           python3 scripts/check_bundle_runtime.py "$BUNDLE_OUTPUT" --binary target/release/devoption --runtime target/release/devoption-runtime --component "$RUNNER_TEMP/worker-smoke/wasm32-wasip2/release/devoption_web_fixture.wasm"
       - name: Build and serve a named app with embedded assets on the disposable runner
         run: python3 scripts/check_named_web_app.py --disposable-system-host --runtime target/release/devoption-runtime
+      - name: Prepare unified installer acceptance inputs from the selected source build
+        run: python3 scripts/check_app_installation.py --prepare "$RUNNER_TEMP/app-install-inputs" --binary target/release/devoption --runtime target/release/devoption-runtime --caddy-archive "$RUNNER_TEMP/devoption-proxy-test/caddy.tar.gz"
+      - name: Install private VM acceptance tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+          if [ -e /dev/kvm ]; then sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
+      - name: Exercise unified installation and approved app deployment in a fresh private VM
+        run: |
+          python3 scripts/check_app_installation.py --inputs "$RUNNER_TEMP/app-install-inputs" --report "$RUNNER_TEMP/app-install-report.json"
+          cat "$RUNNER_TEMP/app-install-report.json"
       - name: Verify authenticated independent app deployments on the disposable runner
         run: python3 scripts/check_multi_app.py --disposable-system-host --binary target/release/devoption --runtime target/release/devoption-runtime --caddy "$RUNNER_TEMP/devoption-proxy-test/caddy" --reboot-fixture "$RUNNER_TEMP/multi-app-reboot"
       - name: Prove scoped record writes with disposable Unix-only PostgreSQL
@@ -167,9 +179,6 @@ jobs:
           UPGRADE_FIXTURE: ${{ runner.temp }}/devoption-upgrade-fixture
           REBOOT_REPORT: ${{ runner.temp }}/devoption-upgrade-reboot.json
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
-          if [ -e /dev/kvm ]; then sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
           python3 scripts/check_upgrade_reboot.py --fixtures "$UPGRADE_FIXTURE" --report "$REBOOT_REPORT"
       - name: Reboot independently approved apps in a private QEMU guest
         run: |
