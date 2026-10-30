@@ -122,7 +122,7 @@ def load_config(path):
 
 class AppHost(Host):
     def app_preflight(self, resumed):
-        for tool in ('visudo', 'systemd-run'):
+        for tool in ('visudo', 'systemd-run', 'cc'):
             self.run(tool, '--version')
         if not resumed:
             for unit in ('devoption-build.service', 'devoption-app.service', 'devoption-app-validate.service'):
