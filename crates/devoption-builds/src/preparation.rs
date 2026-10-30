@@ -76,55 +76,15 @@ pub fn inspect(
             format!("{} staged · {} modified · {} untracked · {} conflicted. Review and commit or resolve these changes with Git, then check again.", changes.staged, changes.modified, changes.untracked, changes.conflicted)
         },
     });
-    let mut text = Vec::new();
-    for (path, content) in &source.files {
-        let (outcome, detail, value) = match content {
-            Some(FileContent::Text(value)) if !value.trim().is_empty() => (
-                Outcome::Passed,
-                "Tracked text file is readable.",
-                Some(value.as_bytes()),
-            ),
-            Some(FileContent::Text(_)) => (
-                Outcome::ChangesNeeded,
-                "This tracked file is empty. Add its contents and commit with Git.",
-                None,
-            ),
-            None => (
-                Outcome::ChangesNeeded,
-                "This file is not tracked. Add it and commit with Git.",
-                None,
-            ),
-            Some(FileContent::TooLarge) => (
-                Outcome::Unavailable,
-                "This file exceeds the 64 KiB inspection limit.",
-                None,
-            ),
-            Some(FileContent::Binary) => (
-                Outcome::Unavailable,
-                "This file is not supported UTF-8 text.",
-                None,
-            ),
-            Some(FileContent::Unsupported | FileContent::Unavailable) => (
-                Outcome::Unavailable,
-                "This tracked file is missing, changed or unsafe to read. Inspect it with Git.",
-                None,
-            ),
-        };
-        checks.push(Check {
-            label: path,
-            outcome,
-            detail: detail.into(),
-        });
-        text.push(value);
-    }
-    let cargo = match (text[0], text[1]) {
+    let mut cargo_checks = Vec::new();
+    let cargo = match (text(&source.files[0].1), text(&source.files[1].1)) {
         (Some(manifest), Some(lockfile)) => match cargo_inputs::inspect(manifest, lockfile) {
             Ok(cargo) => {
-                checks.push(Check { label: "Cargo inputs", outcome: Outcome::Passed, detail: "The standalone manifest and version-4 lockfile are internally consistent. Dependency archives have not been acquired or verified.".into() });
+                cargo_checks.push(Check { label: "Cargo inputs", outcome: Outcome::Passed, detail: "The standalone manifest and version-4 lockfile are internally consistent. Dependency archives have not been acquired or verified.".into() });
                 Some(cargo)
             }
             Err(error) => {
-                checks.push(Check {
+                cargo_checks.push(Check {
                     label: "Cargo inputs",
                     outcome: Outcome::ChangesNeeded,
                     detail: format!("{} See the supported source format below.", error),
@@ -133,10 +93,50 @@ pub fn inspect(
             }
         },
         _ => {
-            checks.push(Check { label: "Cargo inputs", outcome: Outcome::ChangesNeeded, detail: "Both Cargo.toml and Cargo.lock must be readable before their consistency can be checked.".into() });
+            cargo_checks.push(Check { label: "Cargo inputs", outcome: Outcome::ChangesNeeded, detail: "Both Cargo.toml and Cargo.lock must be readable before their consistency can be checked.".into() });
             None
         }
     };
+    let entry = cargo
+        .as_ref()
+        .map(|inputs| inputs.target().path())
+        .unwrap_or("src/main.rs");
+    for (path, content) in &source.files {
+        if matches!(*path, "src/main.rs" | "src/lib.rs") && *path != entry {
+            continue;
+        }
+        let (outcome, detail) = match content {
+            Some(FileContent::Text(value)) if !value.trim().is_empty() => {
+                (Outcome::Passed, "Tracked text file is readable.")
+            }
+            Some(FileContent::Text(_)) => (
+                Outcome::ChangesNeeded,
+                "This tracked file is empty. Add its contents and commit with Git.",
+            ),
+            None => (
+                Outcome::ChangesNeeded,
+                "This file is not tracked. Add it and commit with Git.",
+            ),
+            Some(FileContent::TooLarge) => (
+                Outcome::Unavailable,
+                "This file exceeds the 64 KiB inspection limit.",
+            ),
+            Some(FileContent::Binary) => (
+                Outcome::Unavailable,
+                "This file is not supported UTF-8 text.",
+            ),
+            Some(FileContent::Unsupported | FileContent::Unavailable) => (
+                Outcome::Unavailable,
+                "This tracked file is missing, changed or unsafe to read. Inspect it with Git.",
+            ),
+        };
+        checks.push(Check {
+            label: path,
+            outcome,
+            detail: detail.into(),
+        });
+    }
+    checks.extend(cargo_checks);
     Ok(Preparation {
         status: source.status,
         checks,
@@ -146,3 +146,10 @@ pub fn inspect(
 
 #[cfg(test)]
 mod tests;
+
+fn text(content: &Option<FileContent>) -> Option<&[u8]> {
+    match content {
+        Some(FileContent::Text(value)) if !value.trim().is_empty() => Some(value.as_bytes()),
+        _ => None,
+    }
+}

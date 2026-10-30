@@ -225,6 +225,8 @@ input::placeholder { color: var(--color-muted); opacity: .8; }
 .project-form label { font-weight: 600; }
 .project-form p { font-size: var(--text-small); }
 .project-form [role="status"]:empty { display: none; }
+.repository-starter-choice { display: flex; align-items: center; gap: .75rem; }
+.repository-starter-choice input[type="checkbox"] { width: 1.125rem; min-height: 1.125rem; height: 1.125rem; padding: 0; flex: 0 0 1.125rem; accent-color: var(--color-primary); }
 .input-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .75rem; }
 .form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
 .profile-area { margin-top: auto; padding-top: 2rem; }

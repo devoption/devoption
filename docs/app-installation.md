@@ -118,8 +118,9 @@ Enrollment never replaces an owner. Start requires a complete matching installat
 and owner, validates configuration, enables/starts services and checks the private
 sign-in redirect. It does not prove public DNS/ACME. Verify HTTPS sign-in externally.
 
-Create a project and supply/attach committed source, then use the existing
-[browser build/release workflow](first-web-app.md#3-build-and-deploy-from-the-interface).
+Create a project, open **Code → New repository**, and choose the starter web app
+to create committed source without SSH. You can also attach existing committed
+source. Then use the existing [browser build/release workflow](first-web-app.md#3-build-and-deploy-from-the-interface).
 The initial runtime has one private app listener on port 15000. No project IDs or
 app hostnames are invented. Configure the [app hostname](app-hostnames.md) after
 project creation, or follow [multi-app configuration](multiple-apps.md). Those

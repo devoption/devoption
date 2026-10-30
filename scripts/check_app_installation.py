@@ -207,23 +207,20 @@ IPAddressAllow=localhost
     mutate('/projects', 'Unified installer fixture')
     project, = set(re.findall(rb'href="/projects/([0-9a-f]{32})"', request('/projects', cookie=cookie)[1]))
     project = project.decode()
-    mutate(f'/projects/{project}/repositories/create', 'app')
+    mutate(f'/projects/{project}/repositories/starter', 'app')
     repositories = Path(PLATFORM + '/repositories')
     checkouts = list(repositories.glob('*/.git'))
     assert len(checkouts) == 1
     checkout = checkouts[0].parent
-    source = GUEST / 'repository/examples/static-site'
-    for path in source.rglob('*'):
-        if path.is_file():
-            target = checkout / path.relative_to(source)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(path, target)
-    uid, gid = host.account('devoption')
-    for path in checkout.rglob('*'):
-        os.chown(path, uid, gid, follow_symlinks=False)
-    host.run('runuser', '-u', 'devoption', '--', 'git', '-C', str(checkout), 'add', '.')
-    host.run('runuser', '-u', 'devoption', '--', 'git', '-C', str(checkout), '-c', 'user.name=Fixture',
-             '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture app')
+    assert (checkout / 'Cargo.lock').read_bytes() == (GUEST / 'repository/examples/static-site/Cargo.lock').read_bytes()
+    assert not (checkout / 'target').exists()
+    assert (checkout / 'assets/index.html').is_file()
+    uid, _ = host.account('devoption')
+    assert checkout.stat().st_uid == uid
+    clean = host.run('runuser', '-u', 'devoption', '--', 'git', '-C', str(checkout), 'status', '--porcelain').stdout
+    assert not clean.strip()
+    identity = host.run('runuser', '-u', 'devoption', '--', 'git', '-C', str(checkout), 'log', '-1', '--format=%an <%ae>').stdout
+    assert identity.strip() == b'DevOption <devoption@localhost>'
     passed('managed-repository')
     page = request(f'/projects/{project}/builds', cookie=cookie)[1]
     repository = re.search(rb'/builds/([0-9a-f]{32})', page)[1].decode()

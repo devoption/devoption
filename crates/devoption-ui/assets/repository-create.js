@@ -5,6 +5,7 @@
     const form = byId("repository-create-form");
     if (!form) return;
     const name = byId("repository-create-name");
+    const starter = byId("repository-create-starter");
     const submit = byId("repository-create-submit");
     const status = byId("repository-create-status");
     const reload = byId("repository-create-reload");
@@ -15,12 +16,14 @@
     const message = text => { status.textContent = text; };
     const controls = () => {
       name.disabled = submit.disabled = !verified || pending || blocked;
-      submit.textContent = pending ? "Creating…" : "Create repository";
+      if (starter) starter.disabled = !verified || pending || blocked;
+      submit.textContent = pending ? "Creating…" : starter?.checked ? "Create starter app" : "Create repository";
       form.setAttribute("aria-busy", String(pending));
       signin.hidden = verified;
       reload.hidden = !(blocked || inspectNeeded);
     };
     const request = (url, options = {}) => fetch(url, {method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error", referrerPolicy: "no-referrer", ...options});
+    if (starter) starter.addEventListener("change", controls);
     document.addEventListener("devoption-session", event => {
       ++version;
       if (pending) blocked = true;
@@ -38,7 +41,8 @@
         name.focus(); return;
       }
       const current = ++version;
-      pending = true; inspectNeeded = false; message("Creating your repository…"); controls();
+      const initialize = Boolean(starter?.checked);
+      pending = true; inspectNeeded = false; message(initialize ? "Creating app files and the first commit…" : "Creating your repository…"); controls();
       try {
         const session = await request("/auth/session");
         if (current !== version) return;
@@ -46,15 +50,16 @@
         if (session.status !== 204 || !/^[a-f0-9]{64}$/i.test(csrf || "")) {
           verified = false; message("Your session could not be confirmed. Check your account to continue."); return;
         }
-        const response = await request(`/projects/${project}/repositories/create`, {headers: {"content-type": "text/plain;charset=UTF-8", "x-csrf-token": csrf}, body: value});
+        const response = await request(`/projects/${project}/repositories/${initialize ? "starter" : "create"}`, {headers: {"content-type": "text/plain;charset=UTF-8", "x-csrf-token": csrf}, body: value});
         if (current !== version) return;
         const destination = response.headers.get("location") || "";
-        if (response.status === 204 && new RegExp(`^/projects/${project}/repositories/[a-f0-9]{32}/files$`, "i").test(destination)) {
-          blocked = true; message("Repository created. Opening Code…"); window.history.replaceState(null, "", destination); window.location.reload();
+        const expected = initialize ? `^/projects/${project}/builds/[a-f0-9]{32}$` : `^/projects/${project}/repositories/[a-f0-9]{32}/files$`;
+        if (response.status === 204 && new RegExp(expected, "i").test(destination)) {
+          blocked = true; message(initialize ? "Starter app committed. Opening source checks…" : "Repository created. Opening Code…"); window.history.replaceState(null, "", destination); window.location.reload();
         } else if (response.status === 400 || response.status === 413) {
           message("The repository name was rejected. Check the name and try again.");
         } else if (response.status === 409) {
-          message("That repository name is already used in this project, its storage path already exists, or the catalog is full. Existing files were not changed. Choose another name or reload Code to inspect saved state.");
+          message("The project already has a repository, that name or storage path already exists, or the catalog is full. Existing files were not changed. Choose another name or reload Code to inspect saved state.");
           inspectNeeded = true;
         } else if (response.status === 401) {
           verified = false; message("Your session ended. Check your account to continue.");

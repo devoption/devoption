@@ -15,7 +15,8 @@ after sign-in.
   a build succeeded, source was compiled, or execution is approved.
 - **Changes needed** identifies missing commits/files, Git changes or unsupported
   Cargo inputs. Resolve them using Git or your editor outside DevOption and check
-  again. DevOption does not edit, stage, commit or discard source.
+  again. The starter action can create its initial commit; subsequent editing and
+  commits still use external tools. DevOption does not discard source.
 - **Source checks unavailable** means storage, a changed attachment, file safety,
   encoding or inspection limits prevented a check. It never substitutes success
   for a failed read.
@@ -25,10 +26,11 @@ or Git changes direct you to resolve source changes; failed reads offer a retry.
 A clean Git observation offers **Continue to build review** when the Linux runner
 is configured. This ordinary link opens the existing build page; it captures no
 snapshot and submits no approval. A disabled runner is explained in place.
-Initial file checks use the binary-source format below. A web app can use a
-different supported library layout, so these older input results do not gate its
-separate [build review](web-app-builds.md). The page shows any input warning before
-that link. Build preparation performs its own admission and may reject the source.
+Initial file checks inspect the entry point selected by the validated Cargo inputs:
+`src/main.rs` for a binary, or `src/lib.rs` for the supported `cdylib` web app.
+Missing or invalid Cargo inputs retain the binary default and report the input
+error. The separate [build review](web-app-builds.md) performs its own admission
+and may reject the source.
 
 Reports are fresh observations of the current working tree, not verified immutable
 source snapshots. No job, durable preparation record, build history or approval is
@@ -82,7 +84,7 @@ also apply to CLI results.
 The association must have a saved default checkout under the configured inspection
 or managed root. A passing report requires an observed HEAD commit, no Git-reported
 staged/modified/untracked/conflicted entries, and readable, nonempty tracked text in
-these three fixed paths: `Cargo.toml`, `Cargo.lock`, and `src/main.rs`.
+`Cargo.toml`, `Cargo.lock`, and the validated target’s `src/main.rs` or `src/lib.rs`.
 
 The [existing Cargo adapter](cargo-inputs.md) checks the manifest and lockfile for
 internal consistency: one standalone package, required name/version/edition and
@@ -92,24 +94,23 @@ path/Git dependencies and unsupported manifest keys fail this check. The report
 shows the actual inspected package name/version and locked registry dependency
 count. It does not select a registry or manufacture materialization metadata.
 
-`src/main.rs` is checked for tracked text presence only. Its Rust syntax, target
-semantics and buildability are not checked. Tests deliberately use invalid Rust
-text to establish that this check does not invoke a compiler.
-The Cargo adapter and [immutable snapshot verifier](source-snapshots.md) also
-admit a narrow `cdylib` source shape under #231, but this working-tree report still
-checks `src/main.rs`. The separate web-app build review supports its documented
-library target; it does not use this initial binary-file checklist for admission.
+The selected entry point is checked for tracked text presence only. Its Rust
+syntax, target semantics and buildability are not checked. Tests deliberately use
+invalid Rust text to establish that this check does not invoke a compiler. The
+separate web-app build review independently checks its supported library target.
 
 ## Bounds and trust
 
 The existing [file browsing bounds](repository-files.md) apply: up to 256 tracked
 paths, paths of at most 1024 UTF-8 bytes/16 components, an index of at most 1 MiB,
 and each selected text file at most **64 KiB**. This runtime lockfile bound is
-narrower than the pure Cargo adapter’s 512 KiB limit. Only the three fixed tracked files supply text to the Cargo input/source checks.
+narrower than the pure Cargo adapter’s 512 KiB limit. Only the fixed manifest,
+lockfile and binary/library entry-point paths are read; the selected entry point
+supplies the source check.
 Status retains the existing Git ignore handling. Symlinks, hard links, unsupported entries, binary/unsupported-control text
 and unsafe paths cannot provide source inputs.
 
-The project domain reads status before and after the three file reads and checks
+The project domain reads status before and after the fixed file reads and checks
 Git metadata/index plus root/checkout identity across the operation. It runs two
 controlled `git status` commands and one `git ls-files`, each with a three-second
 deadline and 64 KiB output cap, using private temporary metadata and no source

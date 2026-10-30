@@ -157,3 +157,13 @@ a test-only installation key. Preview shows two sample names and blank inputs;
 secret values are never rendered. Runtime delivery remains separate.
 
 ![Environment-specific encrypted secret management](project-environments.jpg)
+
+## Starter web app
+
+The disposable authenticated browser fixture creates the embedded web app and
+first local commit, then opens source checks. The runner is disabled in this
+fixture; the capture records no build or deployment.
+
+![Starter choice in the new repository dialog](repository-create.jpg)
+
+![Committed starter source checks](starter-created.jpg)

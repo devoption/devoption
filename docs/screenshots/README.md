@@ -31,7 +31,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name, no edit; environment-secrets entry point | `project-settings.jpg` |
 | Project environment secrets | `/projects/{id}/environments/preview` | Real encrypted disposable store; two sample names, blank masked inputs, controls collapsed; 1280 × 1100 | `project-environments.jpg` |
-| Create repository | `/projects/{id}/code` | New repository dialog; sample-service entered, not submitted | `repository-create.jpg` |
+| Create repository | `/projects/{id}/code` | Empty project’s new repository dialog; sample-service and starter selected, not submitted; 1280 × 900 | `repository-create.jpg` |
+| Starter source checks | `/projects/{id}/builds/{id}` | Real embedded starter and first commit; all source checks passed; runner disabled in this fixture; 1280 × 1400 | `starter-created.jpg` |
 | Created repository | `/projects/{id}/repositories/{id}/files` | sample-service created; No tracked files; main, No commits yet, Clean; 1280 × 900 | `repository-created.jpg` |
 | Empty project details | `/projects/{id}` | Create Example new project; dialogs closed | `project-empty.jpg` |
 | Attach repository | `/projects/{id}/code` | Example new project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |

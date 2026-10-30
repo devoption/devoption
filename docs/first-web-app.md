@@ -16,7 +16,11 @@ records the source-built, public DNS/ACME and lifecycle run under
 For a fresh supported host with reviewed Linux binaries and prepared build inputs,
 use the [unified app-capable installer](app-installation.md). It installs the
 build/deployment support and service together. After enrollment/start, continue
-at step 3 below; supply committed application source before attaching it.
+at step 3 below. On **Code → New repository**, keep **Start with a working web
+app** selected, enter a repository name and choose **Create starter app**. This
+creates the supported example and its first local commit, then opens source
+checks. Continue with build review; no build or deployment starts automatically.
+Existing committed source can still be attached instead.
 Existing installations must keep their maintenance procedures. The manual path
 below remains available, and the new entry point has its own validation limits.
 
@@ -92,7 +96,8 @@ omit `--deployment-config`; add it later after runtime installation.
 
 ## 3. Build and deploy from the interface
 
-1. In the project, **Code → Attach repository**, select the prepared app.
+1. If you created the starter app, its repository is already attached. Otherwise,
+   use **Code → Attach repository** and select the prepared app.
 2. **Builds → Build app → Prepare build review**. Verify the committed source,
    inputs and policy, then **Approve and build**. Reload the saved attempt until
    it reaches Succeeded; inspect compiler output on failure.

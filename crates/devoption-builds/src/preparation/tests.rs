@@ -260,3 +260,41 @@ fn unsafe_files_wrong_associations_and_replaced_checkouts_are_rejected() {
         Err(Error::StaleCheckout)
     ));
 }
+
+#[test]
+fn supported_library_starter_uses_its_declared_source_without_requiring_a_binary() {
+    let f = Fixture::new();
+    fs::create_dir(f.app().join("src")).unwrap();
+    fs::write(
+        f.app().join("Cargo.toml"),
+        include_bytes!("../../../../examples/static-site/Cargo.toml"),
+    )
+    .unwrap();
+    fs::write(
+        f.app().join("Cargo.lock"),
+        include_bytes!("../../../../examples/static-site/Cargo.lock"),
+    )
+    .unwrap();
+    fs::write(
+        f.app().join("src/lib.rs"),
+        include_bytes!("../../../../examples/static-site/src/lib.rs"),
+    )
+    .unwrap();
+    f.commit();
+    let report = f.inspect();
+    assert!(report.outcome() == Outcome::Passed);
+    assert!(
+        report
+            .checks
+            .iter()
+            .any(|check| check.label == "src/lib.rs" && check.outcome == Outcome::Passed)
+    );
+    assert!(
+        !report
+            .checks
+            .iter()
+            .any(|check| check.label == "src/main.rs")
+    );
+    fs::write(f.app().join("src/lib.rs"), "").unwrap();
+    assert!(f.inspect().outcome() == Outcome::ChangesNeeded);
+}

@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Create a supported embedded web app and first local Git commit from an empty
+  project's Code page, then open source checks for explicit build review. Keep
+  empty repository creation and existing installations unchanged; retain source
+  on uncertain publication and exercise the starter API in fresh-host acceptance
+  ([#347](https://github.com/devoption/devoption/issues/347)).
+
 - Update the pinned Wasmtime core, WASI and WASI-HTTP crates together to 49.0.4,
   including the upstream HTTP content-length correction. Keep current release
   provenance and deployment guidance aligned while preserving earlier saved

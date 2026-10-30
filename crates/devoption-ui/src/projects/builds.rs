@@ -133,7 +133,10 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &PreparationView<'_>) 
         html.push_str("</ul>");
         files.push_str(r#"<section class="source-files-panel" aria-labelledby="source-files-title"><h3 id="source-files-title">Inspected files</h3><ul class="source-files" aria-label="Inspected source files">"#);
         for check in &view.checks {
-            if matches!(check.label, "Cargo.toml" | "Cargo.lock" | "src/main.rs") {
+            if matches!(
+                check.label,
+                "Cargo.toml" | "Cargo.lock" | "src/main.rs" | "src/lib.rs"
+            ) {
                 let file_url = format!(
                     "/projects/{id}/repositories/{repository}/files/{}",
                     check.label
@@ -189,7 +192,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &PreparationView<'_>) 
     for check in &view.checks {
         check_row(&mut html, check, check.label, None);
     }
-    html.push_str(r#"</ol><p>The initial checks inspect a standalone binary package: tracked Cargo.toml, version-4 Cargo.lock and nonempty src/main.rs. Each inspected text file is limited to 64 KiB. These checks do not verify compiler validity, dependency availability or complete committed bytes.</p><p>The opt-in web-app build review checks its supported library source, toolchain and prepared dependencies independently before approval. A passing source report is not build admission.</p><a class="text-button" href="https://github.com/devoption/devoption/blob/main/docs/build-preparation.md" target="_blank" rel="noopener noreferrer">Source inspection limits</a></details>"#);
+    html.push_str(r#"</ol><p>The initial checks inspect a supported standalone package: tracked Cargo.toml, version-4 Cargo.lock and the declared nonempty src/main.rs or src/lib.rs. Each inspected text file is limited to 64 KiB. These checks do not verify compiler validity, dependency availability or complete committed bytes.</p><p>The opt-in web-app build review checks its supported library source, toolchain and prepared dependencies independently before approval. A passing source report is not build admission.</p><a class="text-button" href="https://github.com/devoption/devoption/blob/main/docs/build-preparation.md" target="_blank" rel="noopener noreferrer">Source inspection limits</a></details>"#);
     html.push_str(&format!(r#"<footer class="source-readiness-links"><a class="text-button" href="/projects/{id}/builds">Back to Builds</a><a class="text-button" href="/projects/{id}/code">Browse source in Code</a></footer></section>"#));
     html
 }

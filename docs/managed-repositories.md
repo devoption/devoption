@@ -2,24 +2,25 @@
 
 Create a project, open **Code**, then choose **New repository**. Enter a name of
 1–64 ASCII letters, numbers, hyphens or underscores, starting with a letter or
-number. **Create repository** creates an empty Git repository on the server and
-opens its file browser. Separate projects can each create a repository named `ui`.
-Names are compared without ASCII case when creating within the same project. **View
-status** shows branch `main`, no commits yet and a clean working tree. Git is
-required for that status read, but creation itself does not run Git or project code.
+number. In a project with no repositories, **Start with a working web app** is
+selected. **Create starter app** writes the supported Rust/WASIp2 example with
+HTML, CSS and JavaScript, makes its first local commit on `main`, and opens
+**Builds** source checks. The commit uses `DevOption <devoption@localhost>`.
+Creation does not download dependencies, build or deploy. Review and approve each
+build and deployment using the existing controls.
+
+Uncheck the starter choice to create an empty checkout and open its file browser.
+Projects with repositories keep this empty-repository flow. **View status** shows
+`main`, no commits yet and a clean working tree for an empty checkout. Empty
+creation does not run Git; starter creation and status reads require Git on PATH.
+Names are compared without ASCII case within the same project. Separate projects
+can each create a repository named `ui`.
 
 Creation requires the administrator to select managed storage once. Users do not
 need to prepare each repository over SSH. **Attach repository** remains available
-as an optional existing-checkout inspection/import path. Projects can still have
-multiple repositories, and explicitly attaching the same repository to another
-project preserves its identity.
-
-This creates a real empty checkout and persistent association. Source editing,
-scaffolding, initial commits, Git push/pull hosting, builds and deployment remain
-unimplemented. It extends the registration model from
-[#16](https://github.com/devoption/devoption/issues/16); a new empty repository has
-no pinned source commit for the future build workflow in
-[#17](https://github.com/devoption/devoption/issues/17).
+for existing checkouts; shared associations retain their identity. Source editing,
+committing arbitrary changes, Git push/pull hosting and other starter templates
+remain unavailable in the interface.
 
 ## Select storage explicitly
 
@@ -58,8 +59,14 @@ a directory named `<32-hex-project-id>--<repository-name>` exclusively, writes
 private Git metadata with an unborn `main` branch, syncs files/directories,
 re-inspects the checkout and publishes its new random repository ID and project
 association using the existing catalog's atomic save. The version 2 catalog format
-is unchanged. Creation runs no hooks, templates, subprocesses, network access or
-credentials.
+is unchanged. Empty creation runs no subprocesses. Starter creation writes only
+the embedded public `examples/static-site` files and an explanatory README into the new
+checkout, using exclusive file creation. It runs bounded Git add/commit commands
+with a cleared environment, fixed author/committer, disabled hooks/global and
+system configuration, signing, automatic maintenance and network protocols. It
+never initializes an existing checkout or accepts a template, command or identity
+from the request. The catalog lock also requires the project still have no
+repositories before starter creation; stale/duplicate choices fail closed.
 
 New storage keys use the stable project ID, so renaming a project does not move its
 repositories. Display names stay unchanged. Existing flat or attached paths,
@@ -96,6 +103,9 @@ a guarantee for network filesystem durability.
 64 bytes with the existing five-second body deadline. The existing current-session
 cookie, explicit CSRF header, Host and same-Origin guards run first. The browser
 cannot supply a root, command, identity or configuration.
+`POST /projects/{id}/repositories/starter` accepts the same name and guards;
+its success Location is `/projects/{project}/builds/{repository}` for source
+checks. A project that already has a repository returns `409` before writes.
 
 Success is an empty, non-cacheable `204` with the new repository's same-project
 `/projects/{project}/repositories/{repository}/files` `Location`. Its empty file
