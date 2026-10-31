@@ -31,7 +31,9 @@ pub(super) fn observation(installed: bool) -> PlatformUpdates {
         let (previous, candidate) = if phase == "healthy" {
             ("0.1.0-preview.1".into(), running.clone())
         } else {
-            (running.clone(), "0.1.0-preview.3".into())
+            let (base, number) = running.rsplit_once('.').expect("numbered preview fixture");
+            let next: u64 = number.parse().expect("preview sequence");
+            (running.clone(), format!("{base}.{}", next + 1))
         };
         return PlatformUpdates {
             running_version: running,

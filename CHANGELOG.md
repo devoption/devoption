@@ -5,6 +5,8 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+## [0.1.0-preview.3] - 2026-10-31
+
 ### Added
 
 - Prepare `0.1.0-preview.3` with fresh-install-only compatibility, covering the
@@ -193,6 +195,25 @@ Entries describe implemented changes, not the roadmap.
   authenticated prior/candidate packets, the production installer/upgrader CLI,
   normal guest TLS trust and exact-identity evidence checks
   ([#263](https://github.com/devoption/devoption/issues/263)).
+
+<!-- devoption-release-metadata:start -->
+### Release compatibility and support
+
+- Preview version: `0.1.0-preview.3`; supported platform: Ubuntu 24.04 amd64.
+- Installation: fresh only. Upgrades from earlier platform versions are unsupported.
+- Data compatibility: Fresh installation only. This preview adds shared workspace accounts and operational telemetry; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state.
+- Configuration compatibility: Dedicated Ubuntu 24.04 amd64 with explicitly reviewed owner, repository, build and app configuration. Existing source, custom, base-bundle and app-capable installations are not approved upgrade sources for this preview; no automatic configuration conversion is provided.
+- Migration: none implemented. No migration runs for a fresh installation. Migration of existing accounts, sessions, catalogs, build history, secrets or deployment state requires a separate reviewed compatibility and recovery contract.
+- Binary rollback: unsupported. No cross-version rollback or upgrade recovery path is declared for preview.3. Preserve the prior installation and its verified packets/backups before a separately approved transition; replacing only executables is not recovery. The earlier preview.1-to-preview.2 base-bundle acceptance does not establish preview.3 compatibility.
+- Support status: development preview.
+- Warning: Trusted single-node Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.
+- Warning: Workspace members share all projects and configured capabilities; project-specific roles and read-only membership are unavailable.
+- Warning: Monitoring covers the DevOption Wasm worker, not separate native backends or external proxy traffic. Active users are per-app anonymous browser estimates; telemetry history resets on worker restart.
+- Warning: Security scanning and MCP access are not implemented. External harnesses are the intended MCP clients; DevOption does not host agents.
+- Warning: Preview.3 signed-packet installation acceptance and the issue #21 release gate remain pending. Source-built CI and earlier retained preview packets do not replace validation of this candidate.
+- Warning: Unattended upgrades, automatic publication, stable promotion and DigitalOcean image distribution remain unavailable. No production-readiness claim is made.
+- Metadata SHA-256: `8e5636cf7628e1df1541afec5eafa9a187725f10d334b0480504fbfdffe735a1` (metadata identity, not artifact provenance).
+<!-- devoption-release-metadata:end -->
 
 ## [0.1.0-preview.2] - 2026-10-19
 
