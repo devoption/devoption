@@ -121,3 +121,43 @@ fn absent_configuration_or_owner_keeps_only_the_intended_public_preview() {
         assert_eq!(fs::read_dir(&empty).unwrap().count(), 0);
     }
 }
+
+#[test]
+fn malformed_or_unknown_project_repository_ids_preserve_http_access_boundaries() {
+    let (_directory, data) = configured();
+    let (_root, root) = data_directory::fixture();
+    let (_server, address) = start_command(
+        Command::new(env!("CARGO_BIN_EXE_devoption"))
+            .args(["serve", "--port", "0", "--data-dir"])
+            .arg(&data)
+            .arg("--repository-root")
+            .arg(&root),
+    );
+    let issued = sign_in(address);
+    for id in [
+        "bad".to_owned(),
+        "+0".repeat(16),
+        "0".repeat(33),
+        "%C3%A9".repeat(16),
+        "00".repeat(16),
+        "aF".repeat(16),
+    ] {
+        let valid = "00".repeat(16);
+        for path in [
+            format!("/projects/{id}/code"),
+            format!("/projects/{id}/repositories/{valid}/status"),
+            format!("/projects/{valid}/repositories/{id}/status"),
+            format!("/projects/{valid}/repositories/{id}/files"),
+            format!("/projects/{valid}/builds/{id}"),
+            format!("/projects/{valid}/builds/{id}/run"),
+        ] {
+            let anonymous = read(address, "GET", &path, "");
+            assert!(anonymous.starts_with("HTTP/1.1 303"), "{path}: {anonymous}");
+            let authenticated = read(address, "GET", &path, &cookie(&issued));
+            assert!(
+                authenticated.starts_with("HTTP/1.1 404"),
+                "{path}: {authenticated}"
+            );
+        }
+    }
+}

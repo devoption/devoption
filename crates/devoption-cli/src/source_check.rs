@@ -89,9 +89,9 @@ fn options(mut args: &[OsString]) -> Result<Options, &'static str> {
         } else if flag == "--repository-root" && root.is_none() {
             root = Some(absolute_path(value)?);
         } else if flag == "--project" && project.is_none() {
-            project = Some(ProjectId::from_bytes(identity(value)?));
+            project = Some(identity(value, ProjectId::from_hex)?);
         } else if flag == "--repository" && repository.is_none() {
-            repository = Some(RepositoryId::from_bytes(identity(value)?));
+            repository = Some(identity(value, RepositoryId::from_hex)?);
         } else {
             return Err("unsupported or duplicate source-check option");
         }
@@ -113,15 +113,7 @@ fn absolute_path(value: &OsString) -> Result<PathBuf, &'static str> {
     Ok(path)
 }
 
-fn identity(value: &OsString) -> Result<[u8; 16], &'static str> {
+fn identity<T>(value: &OsString, parse: impl FnOnce(&str) -> Option<T>) -> Result<T, &'static str> {
     let invalid = "project and repository IDs require exactly 32 hexadecimal characters";
-    let value = value.to_str().ok_or(invalid)?;
-    if value.len() != 32 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err(invalid);
-    }
-    let mut bytes = [0; 16];
-    for (index, byte) in bytes.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).map_err(|_| invalid)?;
-    }
-    Ok(bytes)
+    value.to_str().and_then(parse).ok_or(invalid)
 }

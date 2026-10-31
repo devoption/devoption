@@ -5,6 +5,12 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Changed
+
+- Share strict project/repository ID parsing between HTTP and CLI, preserving
+  case acceptance, leading zeros, adapter errors and access checks
+  ([#207](https://github.com/devoption/devoption/issues/207)).
+
 ### Added
 
 - Reserve the signed `0.1.0-preview.3` validation candidate from reviewed source

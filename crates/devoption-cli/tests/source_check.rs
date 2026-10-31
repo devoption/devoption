@@ -302,9 +302,24 @@ fn missing_duplicate_unknown_relative_and_non_hex_arguments_exit_two() {
         args[index] = value.into();
         invalid.push(args);
     }
-    let mut args = original.clone();
-    args[7] = OsString::from_vec(vec![255; 32]);
-    invalid.push(args);
+    for index in [5, 7] {
+        for value in [
+            OsString::from("é".repeat(16)),
+            OsString::from("0".repeat(33)),
+            OsString::from(format!("-{}", "0".repeat(31))),
+            OsString::from_vec(vec![255; 32]),
+        ] {
+            let mut args = original.clone();
+            args[index] = value;
+            let output = run(&args);
+            assert_eq!(output.status.code(), Some(2));
+            assert!(output.stdout.is_empty());
+            assert_eq!(
+                String::from_utf8(output.stderr).unwrap(),
+                "error: project and repository IDs require exactly 32 hexadecimal characters; use --help\n"
+            );
+        }
+    }
     let mut args = original;
     args.push("extra".into());
     invalid.push(args);
