@@ -35,6 +35,7 @@ pub use projects::{
 
 const HOME: &str = r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your source code, builds and app releases.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#;
 
+const OVERVIEW_STYLES: &str = include_str!("../assets/overview.css");
 const STYLES: &str = include_str!("../assets/theme.css");
 const APPEARANCE: &str = include_str!("../assets/appearance.js");
 const REPOSITORY_CREATE: &str = include_str!("../assets/repository-create.js");
@@ -264,6 +265,12 @@ fn render_page_with_updates(
     if matches!(page, Page::SignIn) {
         return auth::render(account_available);
     }
+    let overview_styles =
+        if overview.is_some() || matches!(&projects, Some(ProjectView::Monitoring(..))) {
+            OVERVIEW_STYLES
+        } else {
+            ""
+        };
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
         Page::Home => (
@@ -457,7 +464,7 @@ fn render_page_with_updates(
     .collect();
     let profile_icon = icon("M20 21v-2a8 8 0 0 0-16 0v2M16 7a4 4 0 1 1-8 0a4 4 0 0 1 8 0");
 
-    document(&document_title, &format!(
+    document_with_styles(&document_title, &format!(
         "<body data-owner-configured=\"{account_available}\">
   <a class=\"skip-link\" href=\"#main-content\">Skip to content</a>
   <aside class=\"sidebar\" aria-label=\"Sidebar\">
@@ -487,10 +494,13 @@ fn render_page_with_updates(
     </main>
   </div>
 </body>"
-    ))
+    ), overview_styles)
 }
 
 fn document(title: &str, body: &str) -> String {
+    document_with_styles(title, body, "")
+}
+fn document_with_styles(title: &str, body: &str, overview_styles: &str) -> String {
     format!(
         "<!doctype html>
 <html lang=\"en\">
@@ -499,7 +509,7 @@ fn document(title: &str, body: &str) -> String {
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
   <meta name=\"referrer\" content=\"no-referrer\">
   <title>{title} · DevOption</title>
-  <style>{STYLES}</style>
+  <style>{STYLES}{overview_styles}</style>
   <script>{APPEARANCE}</script>
   <script>{AUTH}</script>
 <script>{BUILD_EXECUTION}</script>

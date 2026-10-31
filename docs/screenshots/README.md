@@ -10,7 +10,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Page or state | Path | Capture state | File |
 | --- | --- | --- | --- |
 | Overview | `/` | Signed in; real fixture catalog; telemetry, agents and security unavailable | `home.jpg` |
-| Populated monitoring | Static Overview renderer | Synthetic aggregate samples only; 1280 × 1000 | `home-monitoring.jpg` |
+| Populated monitoring | Static Overview renderer | Synthetic aggregate samples only; 1280 × 1200 | `home-monitoring.jpg` |
 | Project monitoring | `/projects/{id}/monitoring` | Authenticated project drilldown; metrics unavailable; 1280 × 900 | `project-monitoring.jpg` |
 | Platform update | `/` | Synthetic reviewed preview notice; maintenance expanded and scrolled into view; 1280 × 1000 | `platform-update.jpg` |
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
@@ -227,7 +227,7 @@ For `home-monitoring.jpg`, generate an explicitly labeled **synthetic telemetry*
 preview using `DEVOPTION_OVERVIEW_CAPTURE=ABSOLUTE_HTML_PATH cargo test -p
 devoption-ui manual_overview_monitoring_fixture -- --ignored`. Load that HTML
 in the authenticated disposable fixture's browser context and capture at
-1280 × 1000, Nord / Dark / Purple. This exercises chart rendering only; it is not
+1280 × 1200, Nord / Dark / Purple. This exercises chart rendering only; it is not
 worker, deployment, active-user, agent, security, or backup evidence. The default
 `home.jpg` uses the real fixture catalog with unavailable metrics. Follow its
 **Monitoring →** link for `project-monitoring.jpg`, at 1280 × 900.

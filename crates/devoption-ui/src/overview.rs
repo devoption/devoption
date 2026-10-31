@@ -81,7 +81,7 @@ pub(super) fn content(view: &Overview) -> String {
     } else {
         "Attention coverage incomplete".into()
     };
-    write!(html, "<section class=\"overview-status\" aria-label=\"Operational summary\"><div><h2>{title}</h2><p>{healthy} of {} projects verified healthy. Security and agents are not connected.</p></div><div><strong>{attention}</strong><p>Agent approvals are not tracked yet.</p></div></section>",view.projects.len()).unwrap();
+    write!(html, "<section class=\"overview-status\" aria-label=\"Operational summary\"><div><h2>{title}</h2><p>{healthy} of {} projects verified healthy. Security scanning is not connected.</p></div><div><strong>{attention}</strong><p>Based on saved builds and runtime checks.</p></div></section>",view.projects.len()).unwrap();
     html.push_str(&monitoring(&view.monitoring, view.range_hours, "/"));
     html.push_str("<div class=\"overview-columns\"><section aria-labelledby=\"overview-projects\"><div class=\"section-heading\"><h2 id=\"overview-projects\">Projects</h2><a href=\"/projects\">View all →</a></div>");
     if !view.catalog_available {
@@ -98,7 +98,7 @@ pub(super) fn content(view: &Overview) -> String {
             "<p>Showing the first 8 projects. Open Projects to see all saved projects.</p>",
         );
     }
-    html.push_str("</section><aside><section class=\"overview-panel\" aria-labelledby=\"overview-agents\"><h2 id=\"overview-agents\">Agent operations</h2><p class=\"overview-number\">Not connected</p><p>Connect an agent execution service to see progress and decisions here.</p></section><section class=\"overview-panel\" aria-labelledby=\"overview-attention\"><h2 id=\"overview-attention\">Needs attention</h2>");
+    html.push_str("</section><aside><section class=\"overview-panel\" aria-labelledby=\"overview-attention\"><h2 id=\"overview-attention\">Needs attention</h2>");
     if !view.history_available {
         html.push_str(
             "<p>Build history unavailable. Failed or interrupted builds cannot be checked.</p>",
@@ -109,7 +109,7 @@ pub(super) fn content(view: &Overview) -> String {
         &view.attention,
         "No issues found in the available build and runtime observations.",
     );
-    html.push_str("</section><section class=\"overview-panel\" aria-labelledby=\"overview-outcomes\"><h2 id=\"overview-outcomes\">Recorded outcomes</h2><p class=\"muted\">Saved build results; not a live agent activity feed.</p>");
+    html.push_str("</section><section class=\"overview-panel\" aria-labelledby=\"overview-outcomes\"><h2 id=\"overview-outcomes\">Recorded outcomes</h2><p class=\"muted\">Latest saved build results.</p>");
     list(&mut html, &view.outcomes, "No saved build outcomes.");
     html.push_str("</section></aside></div><p class=\"overview-footer\">Runtime checks are point-in-time observations. <a href=\"/\">Refresh Overview</a></p></div>");
     html
@@ -137,6 +137,19 @@ fn list(html: &mut String, items: &[OverviewOutcome], empty: &str) {
         );
     }
 }
+fn count(value: u64) -> String {
+    let digits = value.to_string();
+    digits
+        .chars()
+        .enumerate()
+        .fold(String::new(), |mut out, (i, c)| {
+            if i > 0 && (digits.len() - i).is_multiple_of(3) {
+                out.push(',');
+            }
+            out.push(c);
+            out
+        })
+}
 pub(super) fn monitoring(m: &Monitoring, hours: u64, base: &str) -> String {
     let hours = if hours == 1 { 1 } else { 24 };
     let mut html = String::from(
@@ -154,16 +167,12 @@ pub(super) fn monitoring(m: &Monitoring, hours: u64, base: &str) -> String {
         )
         .unwrap();
     }
-    html.push_str("</nav></div><div class=\"overview-charts\">");
-    let active = m
-        .active
-        .map(|v| format!("{}{v}", if m.overflow { "≥" } else { "" }))
-        .unwrap_or_else(|| "—".into());
+    html.push_str("</nav></div><div class=\"overview-observatory\">");
     let values = [
-        active,
-        m.requests
-            .map(|v| v.to_string())
+        m.active
+            .map(|v| format!("{}{}", if m.overflow { "≥" } else { "" }, count(v)))
             .unwrap_or_else(|| "—".into()),
+        m.requests.map(count).unwrap_or_else(|| "—".into()),
         m.p95
             .map(|v| format!("{v} ms"))
             .unwrap_or_else(|| "—".into()),
@@ -171,83 +180,149 @@ pub(super) fn monitoring(m: &Monitoring, hours: u64, base: &str) -> String {
             .map(|v| format!("{v:.2}%"))
             .unwrap_or_else(|| "—".into()),
     ];
-    for (index, (title, note)) in [
-        ("Active users", "Estimated browsers · last 5 min"),
-        ("Requests", "Observed requests in this window"),
-        (
-            "Response time · p95",
-            "Histogram estimate · request handling",
-        ),
-        ("Error rate", "HTTP 5xx · observed requests"),
-    ]
-    .iter()
-    .enumerate()
-    {
-        write!(html,"<article class=\"overview-chart\"><h3>{title}</h3><p class=\"overview-number\">{}</p><p class=\"muted\">{note}</p>",values[index]).unwrap();
-        let series: Vec<_> = m
-            .points
-            .iter()
-            .map(|p| match index {
-                0 => p.active,
-                1 => p.requests,
-                2 => p.p95,
-                _ => p.errors,
-            })
-            .collect();
-        html.push_str(&chart(&series, title, 1.0, hours));
-        html.push_str("</article>");
+    let labels = [
+        "Active users",
+        "Requests",
+        "Response time · p95",
+        "Error rate",
+    ];
+    let notes = [
+        "Estimated browsers · last 5 min",
+        "Requests per 5 minutes",
+        "Handling time · histogram estimate",
+        "HTTP 5xx / observed requests",
+    ];
+    let units = ["browsers", "requests", "ms", "%"];
+    let series: Vec<Vec<Option<f64>>> = (0..4)
+        .map(|i| {
+            m.points
+                .iter()
+                .map(|p| match i {
+                    0 => p.active,
+                    1 => p.requests,
+                    2 => p.p95,
+                    _ => p.errors,
+                })
+                .collect()
+        })
+        .collect();
+    write!(html,"<article class=\"overview-chart overview-traffic\"><div class=\"overview-chart-heading\"><div><h3>Application traffic</h3><p class=\"overview-chart-caption\">{}</p></div><div class=\"overview-total\"><span class=\"overview-number\">{}</span><span>requests · last {hours}h</span></div></div>{}</article><div class=\"overview-metric-stack\">",notes[1],values[1],chart(&series[1],labels[1],units[1],hours,false)).unwrap();
+    for i in [0, 2, 3] {
+        write!(html,"<article class=\"overview-chart overview-metric\"><div class=\"overview-metric-heading\"><h3>{}</h3><span class=\"overview-number\">{}</span></div><p class=\"overview-chart-caption\">{}</p>{}</article>",labels[i],values[i],notes[i],chart(&series[i],labels[i],units[i],hours,true)).unwrap();
     }
-    write!(html,"</div><p class=\"muted\">{} of {} projects reporting. Gaps mean unavailable data, not zero traffic. </p>",m.reporting,m.expected).unwrap();
-    html.push_str("<details class=\"overview-metric-notes\"><summary>About these metrics</summary><p>Five-minute buckets, retained for up to 24 hours. History resets on worker restart. Latency uses histogram upper bounds; errors are HTTP 5xx responses. Health probes are excluded.</p>");
+    write!(html,"</div></div><div class=\"overview-monitoring-footer\"><p>{} of {} projects reporting · Missing intervals remain gaps</p><details><summary>Chart data</summary><p>Five-minute buckets, oldest first. A dash means missing observations.</p>",m.reporting,m.expected).unwrap();
+    for i in [1, 0, 2, 3] {
+        write!(
+            html,
+            "<h4>{} ({})</h4><p class=\"overview-data\">{}</p>",
+            labels[i],
+            units[i],
+            series[i]
+                .iter()
+                .map(|v| v.map(|n| format!("{n:.2}")).unwrap_or_else(|| "—".into()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+        .unwrap();
+    }
+    html.push_str("</details></div><details class=\"overview-metric-notes\"><summary>About these metrics</summary><p>Five-minute buckets, retained for up to 24 hours. History resets on worker restart. Latency uses histogram upper bounds; errors are HTTP 5xx responses. Health probes are excluded.</p>");
     if m.since.is_some() {
-        html.push_str("<p class=\"muted\">Values cover available observations only. Active users are browser estimates summed per app; the same person can count in multiple apps. Cookie rejection can inflate estimates; non-browser clients are not identified.</p>");
+        html.push_str("<p>Values cover available observations only. Active users are browser estimates summed per app; the same person can count in multiple apps. Cookie rejection can inflate estimates; non-browser clients are not identified.</p>");
     }
     html.push_str("</details></section>");
     html
 }
-fn chart(series: &[Option<f64>], label: &str, floor: f64, hours: u64) -> String {
-    let max = series.iter().flatten().copied().fold(floor, f64::max);
-    let mut path = String::new();
+fn axis(value: f64, unit: &str) -> String {
+    if unit == "%" {
+        format!("{value:.1}%")
+    } else if value >= 1000.0 {
+        format!("{:.1}k", value / 1000.0)
+    } else {
+        format!("{value:.0}")
+    }
+}
+fn chart_ceiling(value: f64) -> f64 {
+    let magnitude = 10_f64.powf(value.log10().floor());
+    [1.0, 2.0, 2.5, 5.0, 10.0]
+        .into_iter()
+        .map(|step| step * magnitude)
+        .find(|step| *step >= value)
+        .unwrap_or(10.0 * magnitude)
+}
+fn chart(series: &[Option<f64>], label: &str, unit: &str, hours: u64, compact: bool) -> String {
+    let floor = 1.0;
+    let observed = series.iter().flatten().copied().fold(floor, f64::max);
+    let max = if unit == "%" && observed <= 1.0 {
+        1.0
+    } else {
+        chart_ceiling(observed * 1.15)
+    };
+    let mut line = String::new();
+    let mut area = String::new();
+    let mut dots = String::new();
     let mut open = false;
-    for (i, v) in series.iter().enumerate() {
-        if let Some(v) = v {
-            let x = 30.0 + i as f64 / (series.len().saturating_sub(1).max(1)) as f64 * 260.0;
-            let y = 90.0 - v / max * 70.0;
-            write!(path, "{} {x:.1} {y:.1} ", if open { "L" } else { "M" }).unwrap();
+    let mut last_x = 0.0;
+    for (i, value) in series.iter().enumerate() {
+        if let Some(value) = value {
+            let x = i as f64 / series.len().saturating_sub(1).max(1) as f64 * 1000.0;
+            let y = 200.0 - value / max * 200.0;
+            write!(line, "{} {x:.1} {y:.1} ", if open { "L" } else { "M" }).unwrap();
+            if !open {
+                write!(area, "M {x:.1} 200 L {x:.1} {y:.1} ").unwrap();
+            } else {
+                write!(area, "L {x:.1} {y:.1} ").unwrap();
+            }
+            if (i == 0 || series[i - 1].is_none())
+                && (i + 1 == series.len() || series[i + 1].is_none())
+            {
+                // A short line segment has a stable visible width even when the
+                // responsive plot stretches. Do not bridge missing samples.
+                write!(dots, "M {:.1} {y:.1} L {:.1} {y:.1} ", x - 1.0, x + 1.0).unwrap();
+            }
             open = true;
-        } else {
+            last_x = x;
+        } else if open {
+            write!(area, "L {last_x:.1} 200 Z ").unwrap();
             open = false;
         }
     }
-    let mut dots = String::new();
-    for (i, v) in series.iter().enumerate() {
-        if let Some(v) = v
-            && (i == 0 || series[i - 1].is_none())
-            && (i + 1 == series.len() || series[i + 1].is_none())
-        {
-            let x = 30.0 + i as f64 / series.len().saturating_sub(1).max(1) as f64 * 260.0;
-            let y = 90.0 - v / max * 70.0;
-            write!(
-                dots,
-                "<circle class=\"overview-point\" cx=\"{x:.1}\" cy=\"{y:.1}\" r=\"2.5\"/>"
-            )
-            .unwrap();
-        }
+    if open {
+        write!(area, "L {last_x:.1} 200 Z").unwrap();
     }
-    let empty = if path.is_empty() {
-        "<text x=\"160\" y=\"57\" text-anchor=\"middle\">No observations</text>"
+    let empty = if line.is_empty() {
+        "<span class=\"overview-no-data\">No observations</span>"
     } else {
         ""
     };
-    format!(
-        "<svg viewBox=\"0 0 320 120\" role=\"img\" aria-label=\"{}; last {hours} hours. Missing intervals are gaps.\"><path class=\"overview-grid\" d=\"M30 20H295 M30 55H295 M30 90H295\"/><text x=\"2\" y=\"24\">{max:.0}</text><text x=\"10\" y=\"94\">0</text><path class=\"overview-line\" d=\"{path}\"/>{dots}{empty}<text x=\"30\" y=\"115\">−{hours}h</text><text x=\"270\" y=\"115\">Now</text></svg><details><summary>Chart data</summary><p>Five-minute buckets, oldest first. A dash means missing observations.</p><p class=\"overview-data\">{}</p></details>",
+    let mut html = format!(
+        "<div class=\"overview-plot{}\"><div class=\"overview-y-axis\" aria-hidden=\"true\"><span>{}</span><span>{}</span><span>{}</span></div><div class=\"overview-plot-canvas\"><svg viewBox=\"0 0 1000 200\" preserveAspectRatio=\"none\" role=\"img\" aria-label=\"{}; {}; last {hours} hours. Missing intervals are gaps.\"><path class=\"overview-grid\" d=\"M0 0H1000 M0 100H1000 M0 200H1000\"/><path class=\"overview-area\" d=\"{area}\"/><path class=\"overview-line\" vector-effect=\"non-scaling-stroke\" d=\"{line}{dots}\"/></svg>{empty}</div>",
+        if compact {
+            " overview-plot-compact"
+        } else {
+            ""
+        },
+        if line.is_empty() {
+            String::new()
+        } else {
+            axis(max, unit)
+        },
+        if line.is_empty() {
+            String::new()
+        } else {
+            axis(max / 2.0, unit)
+        },
+        if line.is_empty() {
+            ""
+        } else if unit == "%" {
+            "0%"
+        } else {
+            "0"
+        },
         escaped(label),
-        series
-            .iter()
-            .map(|v| v.map(|n| format!("{n:.2}")).unwrap_or_else(|| "—".into()))
-            .collect::<Vec<_>>()
-            .join(", ")
-    )
+        escaped(unit)
+    );
+    write!(html,"<div class=\"overview-x-axis\" aria-hidden=\"true\"><span>−{hours}h</span><span>−{}h</span><span>Now</span></div></div>",hours as f64/2.0).unwrap();
+    html
 }
 
 #[cfg(test)]
@@ -270,15 +345,32 @@ mod tests {
         assert!(h.contains("&lt;script&gt;"));
         assert!(!h.contains("<script>private"));
         assert!(h.contains("No observations"));
-        assert!(h.contains("Not connected"));
+        assert!(!h.contains("Agent operations"));
         assert!(!h.contains("Everything is healthy"));
         assert!(h.contains("/monitoring"));
     }
     #[test]
+    fn monitoring_keeps_units_and_precision_without_inventing_empty_axis_values() {
+        assert_eq!(count(1234567), "1,234,567");
+        let empty = chart(&[None, None], "Errors", "%", 24, false);
+        assert!(!empty.contains("1.0%"));
+        assert!(empty.contains("No observations"));
+        let observed = chart(&[Some(0.08), Some(0.1)], "Errors", "%", 24, true);
+        assert!(observed.contains("1.0%"));
+        assert!(observed.contains("0.5%"));
+        assert!(observed.contains("vector-effect=\"non-scaling-stroke\""));
+    }
+    #[test]
     fn chart_breaks_lines_for_missing_intervals() {
-        let h = chart(&[Some(0.0), None, Some(2.0)], "Traffic", 1.0, 1);
-        assert!(h.contains("M 30.0 90.0 M 290.0 20.0"));
-        assert!(h.contains("Chart data"));
+        let h = chart(
+            &[Some(0.0), None, Some(2.0)],
+            "Traffic",
+            "requests",
+            1,
+            false,
+        );
+        assert!(h.contains("M 0.0 200.0 M 1000.0"));
+        assert!(h.contains("preserveAspectRatio=\"none\""));
     }
 }
 

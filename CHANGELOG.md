@@ -11,8 +11,10 @@ Entries describe implemented changes, not the roadmap.
   build outcomes and attention items, plus aggregate and per-project monitoring.
   Add bounded Wasm worker telemetry for request volume, histogram p95 latency,
   HTTP 5xx errors, and per-app anonymous active-browser estimates. Preserve the
-  existing appearance and navigation, and show missing security/agent coverage
-  explicitly ([#355](https://github.com/devoption/devoption/issues/355)).
+  existing appearance and navigation, and show missing security coverage
+  explicitly; refine Overview alignment, lighter typography, and an open traffic
+  chart with supporting trends instead of nested cards. Clarify the external-harness
+  MCP boundary and remove hosted-agent status from Overview ([#355](https://github.com/devoption/devoption/issues/355)).
 
 - Support shared workspace members through expiring single-use invitations or
   optional owner-approved registration, with owner-only account management,

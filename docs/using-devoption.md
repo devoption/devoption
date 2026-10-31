@@ -282,7 +282,8 @@ latest saved build results, and items to review. It retains the application's
 existing appearance and navigation. **Platform maintenance** contains the version
 and upgrade guidance. Refresh reloads observations without starting workloads.
 
-Monitoring offers **1h** and **24h** windows for aggregate active-user estimates,
+Monitoring uses an open traffic plot with supporting active-user, latency, and
+error trends, plus **1h** and **24h** windows for aggregate active-user estimates,
 request counts, p95 handling latency, and HTTP 5xx error rates. Open a project's
 **Monitoring** link for that project's statistics at `/projects/{id}/monitoring`.
 Per-app user counts do not appear on Overview project cards.
@@ -314,9 +315,10 @@ clearing, automated HTML clients, and private HTTP access can distort estimates;
 non-browser clients are not identified. This is not a count of registered accounts
 or globally deduplicated people.
 
-Security scans, autonomous agents, stalled-agent detection, and agent approvals
-are not implemented. Overview labels these as not connected rather than reporting
-healthy coverage or zero pending agent decisions. Runtime health is a point-in-time
+Security scans and MCP access are not implemented. Overview reports platform
+observations and missing security coverage; it does not claim to host agents or
+track an external harness's internal runs. See the [product boundary](product.md)
+for the intended MCP, tools, and skills integration. Runtime health is a point-in-time
 broker check, not an uptime guarantee. Saved queued/running build checkpoints are
 not live process status. Failed/interrupted latest saved builds and failed runtime
 checks link to their project details. **Recorded outcomes** reports saved build

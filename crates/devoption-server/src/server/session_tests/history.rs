@@ -404,7 +404,8 @@ fn overview_and_project_monitoring_are_guarded_scoped_and_honest_about_gaps() {
     let (_, html) = read(&f, "/", true);
     assert!(html.contains("&lt;Project&gt;"));
     assert!(html.contains("Other project"));
-    assert!(html.contains("Agent operations"));
+    assert!(html.contains("Needs attention"));
+    assert!(!html.contains("Agent operations"));
     let (_, scoped) = read(
         &f,
         &format!("/projects/{}/monitoring?range=1h", f.project),
