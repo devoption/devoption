@@ -5,6 +5,12 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Support shared workspace members through expiring single-use invitations or
+  optional owner-approved registration, with owner-only account management,
+  member disabling, separate profiles and independent sessions ([#351](https://github.com/devoption/devoption/issues/351)).
+
 ### Changed
 
 - Generate the unified app installer's reviewable schema-1 configuration from

@@ -18,11 +18,11 @@ The Rust workspace has seven crates. The running service uses
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
 | `devoption-runtime` | Separate Wasmtime WASIp2 HTTP worker; private listener, fresh bounded Store per request, denied filesystem/environment/socket/DNS grants and opt-in [host-mediated HTTPS](app-https.md) |
-| `devoption-server` | HTTP/runtime behavior, request guards, authentication, sessions, and owner storage |
+| `devoption-server` | HTTP/runtime behavior, request guards, authentication, independent account sessions, owner storage and durable member approvals/invitations |
 | `devoption-ui` | HTML rendering and browser assets |
 
 Server APIs live under `devoption_server`; the CLI is a binary without a library
-facade. Authentication, owner storage and the opt-in [project environment secret store](project-secrets.md) remain server modules. Executable
+facade. Authentication, [shared workspace users](users.md), owner storage and the opt-in [project environment secret store](project-secrets.md) remain server modules. Executable
 integration tests stay with the CLI; domain logic remains in domain crates.
 
 Use focused references for details rather than loading every subsystem:

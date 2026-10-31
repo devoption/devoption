@@ -9,7 +9,7 @@ use std::{
 const FIRST: [u8; TOKEN_BYTES] = [0x11; TOKEN_BYTES];
 const SECOND: [u8; TOKEN_BYTES] = [0x22; TOKEN_BYTES];
 const FIRST_ID: IdentityId = IdentityId::from_bytes([1; 16]);
-const SECOND_ID: IdentityId = IdentityId::from_bytes([2; 16]);
+const SECOND_ID: IdentityId = FIRST_ID; // Rotation tests use the same account.
 const FIRST_CSRF: [u8; TOKEN_BYTES] = [0x33; TOKEN_BYTES];
 const SECOND_CSRF: [u8; TOKEN_BYTES] = [0x44; TOKEN_BYTES];
 
@@ -317,4 +317,27 @@ fn poisoned_state_rejects_activation_authentication_and_logout() {
         None
     );
     assert!(!slot.logout_browser(Some(&FIRST), Some(&FIRST_CSRF)));
+}
+
+#[test]
+fn different_accounts_keep_independent_sessions_and_csrf_pairs() {
+    let slot = SessionSlot::default();
+    let other = IdentityId::from_bytes([2; 16]);
+    let now = Instant::now();
+    slot.activate(session(FIRST_ID, FIRST, now).with_csrf(FIRST_CSRF), &FIRST)
+        .unwrap();
+    slot.activate(session(other, SECOND, now).with_csrf(SECOND_CSRF), &SECOND)
+        .unwrap();
+    assert_eq!(
+        slot.authenticate_browser(Some(&FIRST), Some(&SECOND_CSRF)),
+        None
+    );
+    assert_eq!(
+        slot.authenticate_browser(Some(&FIRST), Some(&FIRST_CSRF)),
+        Some(FIRST_ID)
+    );
+    assert!(slot.logout_browser(Some(&SECOND), Some(&SECOND_CSRF)));
+    assert_eq!(slot.authenticate(Some(&FIRST)), Some(FIRST_ID));
+    slot.revoke_identity(FIRST_ID);
+    assert_eq!(slot.authenticate(Some(&FIRST)), None);
 }

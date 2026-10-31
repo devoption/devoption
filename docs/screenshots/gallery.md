@@ -167,3 +167,12 @@ fixture; the capture records no build or deployment.
 ![Starter choice in the new repository dialog](repository-create.jpg)
 
 ![Committed starter source checks](starter-created.jpg)
+
+
+**Workspace users (disposable member and pending application)**
+
+![Owner user management](users.jpg)
+
+**Create account (registration open, owner approval required)**
+
+![Create a workspace account](join.jpg)

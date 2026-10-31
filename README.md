@@ -7,14 +7,14 @@ The current preview supports saved projects, project creation and renaming,
 repository creation, attachment, [file browsing in Code](docs/repository-files.md)
 and Git status inspection,
 [source preparation checks](docs/build-preparation.md) in Builds or the CLI,
-owner sign-in, and appearance preferences. An opt-in [Linux build runner](docs/web-app-builds.md)
+owner/member sign-in, and appearance preferences. An opt-in [Linux build runner](docs/web-app-builds.md)
 can build trusted standalone Wasm HTTP apps with embedded assets through review
 and approval in the interface.
 The opt-in [private app runtime](docs/web-app-deployments.md) adds saved releases,
 reviewed deployment, health/log/stop controls and restart recovery on the same node.
 [Independent app slots](docs/multiple-apps.md) give configured projects separate
-HTTPS hostnames, runtime state and lifecycle controls. Authentication
-currently supports one owner; team accounts are planned, not implemented.
+HTTPS hostnames, runtime state and lifecycle controls. Authentication supports an owner and [shared workspace members](docs/users.md)
+through invitations or owner-approved registration.
 There is no published release. An explicit [HTTPS proxy setup](docs/public-linux-install.md)
 has [fresh cloud installation, public DNS/ACME and lifecycle evidence](docs/public-cloud-acceptance.md)
 for the selected trusted app on one Ubuntu node.

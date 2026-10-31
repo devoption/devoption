@@ -1,5 +1,7 @@
 //! Existing-owner HTTP authentication. No enrollment or owner creation routes.
 
+mod accounts;
+
 use super::{SharedSession, protect_origin};
 use crate::{
     browser_session,
@@ -34,6 +36,7 @@ pub(super) fn routes(
     session: SharedSession,
 ) -> Router {
     let app = Router::new()
+        .merge(accounts::routes())
         .route("/auth/session", post(recover_session))
         .route("/auth/challenge", post(challenge))
         .route("/auth/sign-in", post(sign_in))

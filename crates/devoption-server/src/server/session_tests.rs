@@ -15,6 +15,7 @@ use std::{
 };
 use tower::ServiceExt;
 
+mod accounts;
 #[cfg(unix)]
 mod browser;
 #[cfg(unix)]

@@ -2,7 +2,7 @@
 //!
 //! This core neither generates tokens nor authenticates their owner. The owner-auth
 //! service can issue a fresh cryptographically random token after password verification.
-//! The shared [`slot`] retains one active session for the HTTP request guard.
+//! The shared [`slot`] retains one active session per account for the HTTP guard.
 //! Issued sessions also retain a separate synchronizer CSRF token. Browser mutation
 //! validation requires both tokens from the same live session. Cookie transport is
 //! separate; existing-owner HTTP sign-in uses a pre-authentication CSRF adapter,

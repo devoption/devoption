@@ -354,7 +354,10 @@ fn real_sign_in_rotation_and_logout_share_the_production_session_guard() {
     assert_eq!(post(address, "/projects", Some(&second), "").status, 415);
     // Enrollment remains absent even after a valid sign-in.
     assert_eq!(post(address, "/auth/setup", Some(&second), "").status, 404);
-    let (_other_server, other_address) = start_with(&data);
+    // Another installation/process cannot recover this server's in-memory session.
+    // A second writer to the same data directory is now deliberately excluded.
+    let (_other_directory, other_data) = configured();
+    let (_other_server, other_address) = start_with(&other_data);
     assert_eq!(
         post(other_address, "/auth/sign-out", Some(&second), "").status,
         401

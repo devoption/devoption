@@ -128,6 +128,7 @@ impl Error for ServiceError {
 
 struct State {
     store: OwnerStore,
+    users: Option<crate::users::Store>,
     worker: Arc<Semaphore>,
     attempts: Mutex<VecDeque<Instant>>,
 }
@@ -148,10 +149,69 @@ impl OwnerAuthService {
         Self {
             state: Arc::new(State {
                 store,
+                users: None,
                 worker: Arc::new(Semaphore::new(1)),
                 attempts: Mutex::new(VecDeque::with_capacity(MAX_ATTEMPTS)),
             }),
         }
+    }
+
+    pub(crate) fn with_users(store: OwnerStore) -> std::io::Result<Self> {
+        let users = crate::users::Store::new(&store)?;
+        Ok(Self {
+            state: Arc::new(State {
+                store,
+                users: Some(users),
+                worker: Arc::new(Semaphore::new(1)),
+                attempts: Mutex::new(VecDeque::with_capacity(MAX_ATTEMPTS)),
+            }),
+        })
+    }
+
+    /// Serialize durable account operations with authentication and activation.
+    /// Public password work shares the existing global attempt budget.
+    pub(crate) async fn accounts<T: Send + 'static>(
+        &self,
+        limited: bool,
+        operation: impl FnOnce(&OwnerStore, &crate::users::Store) -> std::io::Result<T> + Send + 'static,
+    ) -> Result<T, ServiceError> {
+        let permit = if limited {
+            self.admit_at(Instant::now())?
+        } else {
+            Arc::clone(&self.state.worker)
+                .try_acquire_owned()
+                .map_err(|_| ServiceError::Busy)?
+        };
+        let state = Arc::clone(&self.state);
+        tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            let users = state.users.as_ref().ok_or(ServiceError::Unavailable)?;
+            operation(&state.store, users).map_err(|_| ServiceError::Unavailable)
+        })
+        .await
+        .map_err(|_| ServiceError::Unavailable)?
+    }
+
+    pub(crate) async fn sign_in_user(
+        &self,
+        email: String,
+        password: String,
+        slot: Arc<SessionSlot>,
+    ) -> Result<Option<BrowserCredentials>, ServiceError> {
+        self.accounts(true, move |_, users| {
+            let Some(identity) = users.authenticate(&email, &password)? else {
+                return Ok(None);
+            };
+            let grant = issue(identity, |bytes| {
+                getrandom::fill(bytes).map_err(|_| ServiceError::Unavailable)
+            })
+            .map_err(|_| std::io::Error::other("session unavailable"))?;
+            grant
+                .activate_browser(&slot)
+                .map(Some)
+                .map_err(|_| std::io::Error::other("session unavailable"))
+        })
+        .await
     }
 
     /// Run independently authorized setup off the runtime thread.
@@ -229,12 +289,19 @@ impl OwnerAuthService {
 fn sign_in_with_entropy(
     store: &OwnerStore,
     password: &str,
-    mut fill: impl FnMut(&mut [u8]) -> Result<(), ServiceError>,
+    fill: impl FnMut(&mut [u8]) -> Result<(), ServiceError>,
 ) -> Result<Option<IssuedSession>, ServiceError> {
     let Some(identity) = owner_auth::authenticate(store, password).map_err(ServiceError::Store)?
     else {
         return Ok(None);
     };
+    issue(identity, fill).map(Some)
+}
+
+fn issue(
+    identity: IdentityId,
+    mut fill: impl FnMut(&mut [u8]) -> Result<(), ServiceError>,
+) -> Result<IssuedSession, ServiceError> {
     let mut token = [0; TOKEN_BYTES];
     fill(&mut token)?;
     let mut csrf_token = [0; CSRF_TOKEN_BYTES];
@@ -242,11 +309,11 @@ fn sign_in_with_entropy(
     let session = Session::new(identity, token, MAX_LIFETIME)
         .map_err(|_| ServiceError::Unavailable)?
         .with_csrf(csrf_token);
-    Ok(Some(IssuedSession {
+    Ok(IssuedSession {
         session,
         token,
         csrf_token,
-    }))
+    })
 }
 
 #[cfg(test)]

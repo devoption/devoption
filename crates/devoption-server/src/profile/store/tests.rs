@@ -100,7 +100,14 @@ fn unsafe_or_corrupt_records_fail_closed_and_are_never_replaced() {
 fn identity_and_directory_changes_cannot_redirect_writes() {
     let (directory, _owner, store) = fixture();
     let name = DisplayName::new("Fixture").unwrap();
-    assert!(store.save(IdentityId::from_bytes([2; 16]), &name).is_err());
+    let member = IdentityId::from_bytes([2; 16]);
+    store.save(member, &name).unwrap();
+    assert_eq!(store.load(member).unwrap(), name);
+    assert_eq!(store.load(ID).unwrap().as_str(), "");
+    store
+        .save(ID, &DisplayName::new("Owner fixture").unwrap())
+        .unwrap();
+    assert_eq!(store.load(member).unwrap(), name);
     fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o755)).unwrap();
     assert!(store.save(ID, &name).is_err());
     fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700)).unwrap();

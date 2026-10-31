@@ -1,6 +1,6 @@
-//! One authoritative in-memory session, shared by activation and request validation.
+//! Bounded in-memory sessions, with one independently rotating session per identity.
 //!
-//! Activation replaces the prior session; logout requires its current live token.
+//! Activation replaces only the same identity’s prior session; logout is token-scoped.
 //! Share one slot across all relevant handlers. A new slot/process starts empty.
 //! Rotation and logout affect subsequent validations, not already-authorized work.
 //! No HTTP activation/logout endpoints or credential transport are implemented here.
@@ -28,14 +28,14 @@ impl fmt::Display for ActivationError {
 
 impl Error for ActivationError {}
 
-/// A single session slot. Share with `Arc`; cloning independent state is unsupported.
+/// Shared sessions. Share with `Arc`; cloning independent state is unsupported.
 #[derive(Default)]
 pub struct SessionSlot {
-    active: Mutex<Option<Session>>,
+    active: Mutex<Vec<Session>>,
 }
 
 impl SessionSlot {
-    /// Atomically retain a live session, replacing the previous one without renewal.
+    /// Atomically retain a live session, replacing only this account’s prior session.
     /// The issuer must have authenticated its identity and supplied fresh entropy.
     /// Validating the session/token pair here does not authenticate a password.
     pub fn activate(&self, session: Session, token: &[u8]) -> Result<(), ActivationError> {
@@ -53,14 +53,19 @@ impl SessionSlot {
             .lock()
             .map_err(|_| ActivationError::Unavailable)?;
         // Observe expiry after acquiring the lock, so contention cannot use stale time.
-        if session.authenticate_at(Some(token), now()).is_none() {
+        let now = now();
+        if session.authenticate_at(Some(token), now).is_none() {
             return Err(ActivationError::InvalidSession);
         }
-        *active = Some(session);
+        active.retain(|entry| entry.expires_at > now && entry.identity != session.identity);
+        if active.len() >= 129 {
+            return Err(ActivationError::Unavailable);
+        }
+        active.push(session);
         Ok(())
     }
 
-    /// Validate only the current live session; absent or poisoned state fails closed.
+    /// Validate a live session; absent or poisoned state fails closed.
     /// This does not validate CSRF; browser mutations must use `authenticate_browser`.
     pub fn authenticate(&self, candidate: Option<&[u8]>) -> Option<IdentityId> {
         self.authenticate_with_clock(candidate, Instant::now)
@@ -71,11 +76,11 @@ impl SessionSlot {
         candidate: Option<&[u8]>,
         now: impl FnOnce() -> Instant,
     ) -> Option<IdentityId> {
-        self.active
-            .lock()
-            .ok()?
-            .as_mut()?
-            .authenticate_at(candidate, now())
+        let mut active = self.active.lock().ok()?;
+        let now = now();
+        active
+            .iter_mut()
+            .find_map(|session| session.authenticate_at(candidate, now))
     }
 
     /// Validate both browser credentials against one current session under one lock.
@@ -100,11 +105,11 @@ impl SessionSlot {
         candidate: &[u8],
         now: impl FnOnce() -> Instant,
     ) -> Option<[u8; super::CSRF_TOKEN_BYTES]> {
-        self.active
-            .lock()
-            .ok()?
-            .as_mut()?
-            .recover_csrf_at(candidate, now())
+        let mut active = self.active.lock().ok()?;
+        let now = now();
+        active
+            .iter_mut()
+            .find_map(|session| session.recover_csrf_at(candidate, now))
     }
 
     /// Remove only the live session identified by the matching browser token pair.
@@ -122,13 +127,25 @@ impl SessionSlot {
         now: impl FnOnce() -> Instant,
     ) -> Option<IdentityId> {
         let mut active = self.active.lock().ok()?;
-        let identity = active
-            .as_mut()?
-            .authenticate_browser_at(candidate, csrf, now())?;
+        let now = now();
+        let index = active.iter_mut().position(|session| {
+            session
+                .authenticate_browser_at(candidate, csrf, now)
+                .is_some()
+        })?;
+        let identity = active[index].identity;
         if logout {
-            *active = None;
+            active.remove(index);
         }
         Some(identity)
+    }
+
+    /// Revoke all sessions for an account disabled by its administrator.
+    #[cfg(any(unix, test))]
+    pub(crate) fn revoke_identity(&self, identity: IdentityId) {
+        if let Ok(mut active) = self.active.lock() {
+            active.retain(|entry| entry.identity != identity);
+        }
     }
 
     /// Remove the session only when this request presents its current live token.
@@ -142,14 +159,14 @@ impl SessionSlot {
         let Ok(mut active) = self.active.lock() else {
             return false;
         };
-        let valid = active
-            .as_mut()
-            .and_then(|session| session.authenticate_at(candidate, now()))
-            .is_some();
-        if valid {
-            *active = None;
+        let now = now();
+        let index = active
+            .iter_mut()
+            .position(|session| session.authenticate_at(candidate, now).is_some());
+        if let Some(index) = index {
+            active.remove(index);
         }
-        valid
+        index.is_some()
     }
 }
 

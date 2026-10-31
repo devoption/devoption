@@ -3,10 +3,13 @@
 //! The CLI starts the service through [`run`]; this crate owns HTTP/runtime behavior
 //! and uses devoption-ui for rendering. Existing-owner HTTP sign-in is available
 //! with explicitly configured storage; local/SSH setup is explicit and browser
-//! enrollment routes remain closed. Configured page reads require a session;
+//! owner enrollment routes remain closed. Existing owners can invite members or
+//! enable owner-approved registration; members share the workspace. Configured page reads require a session;
 //! Sign in and the unconfigured preview remain public.
 
 mod server;
+#[cfg(unix)]
+mod users;
 
 pub use server::{
     ProjectSecretsOptions, PublicOrigin, run, run_with_build_history, run_with_deployments,

@@ -1,7 +1,7 @@
 # Using the current preview
 
 DevOption is intended to be a deployable software factory for individuals and teams.
-The current preview supports one owner and a loopback HTTP listener. An explicit
+The current preview supports an owner, [shared workspace members](users.md), and a loopback HTTP listener. An explicit
 [HTTPS proxy mode](public-linux-install.md) supports one public origin; see the
 [fresh cloud acceptance evidence and limits](public-cloud-acceptance.md). Start with the
 [quick start](../README.md#quick-start) or the [private Ubuntu installation guide](private-linux-install.md).
@@ -45,7 +45,7 @@ automatically. A direct visit to `/sign-in` while already signed in shows Accoun
 with **Open workspace** and **Sign out**; the workspace profile menu also offers
 **Sign out**. Reloading or navigating checks the
 current session again; a session lasts at most one hour and ends on server restart
-or another sign-in. JavaScript is required. Without an owner, the Sign in page
+or another sign-in to the same account. JavaScript is required. Without an owner, the Sign in page
 explains that CLI setup is required. See [setup limits](local-enrollment.md).
 
 For private Ubuntu source installation, see the
@@ -56,8 +56,8 @@ and the scope of [CI and disposable Ubuntu VM validation](linux-rehearsal.md).
 For HTTPS administrative access, an optional
 [device-certificate gate](public-linux-install.md#optional-protected-administrative-access)
 can reject unauthorized connections before sign-in content is served. A permitted
-device must still sign in as the owner. This proxy policy does not add app users,
-team roles, browser SSO or agent credentials to the server.
+device must still sign in to a platform account. This proxy policy is separate
+from [workspace membership](users.md), browser SSO or agent credentials.
 
 ## HTTP authentication in the current preview
 
@@ -73,7 +73,7 @@ without a Bearer challenge. Without a configured owner, all
 unsafe requests remain denied. With an owner configured at startup, Overview, Projects, Releases, Infrastructure,
 Appearance and Profile GET/HEAD requests require the current session cookie. Missing,
 invalid or expired sessions receive a non-cacheable redirect to `/sign-in` without
-page content. Sign in stays public; the unconfigured preview stays public. This
+page content. Sign in and `/join` stay public; the unconfigured preview stays public. This
 startup choice cannot be changed by a request or by removing the owner record from
 a running server. Page reads never renew sessions and do not replace the CSRF
 requirement on mutations. TLS is not implemented in the backend. Use only the explicit
@@ -95,15 +95,23 @@ Pre-sessions last five minutes with at most 16 pending pairs. Full capacity retu
 503 with `Retry-After` rounded up to the earliest expiry (1–300 seconds); consuming
 a challenge may free capacity sooner. Each submission needs
 a fresh challenge, including retries after a failed password or invalid form.
-Sign-in is limited to one worker and five admitted attempts per minute. One active
-session is retained in memory for at most an hour; another sign-in replaces it,
-and restarting loses it. Tokens must not enter URLs, logs, or browser-local storage.
+Owner/member sign-in and account registration share one worker and five admitted
+attempts per minute. One active session per account is retained in memory for at
+most an hour; another sign-in replaces only that account’s session, and restarting
+loses every session. Tokens must not enter URLs, logs, or browser-local storage.
 The browser keeps CSRF tokens only in page memory and clears the password field
 on submission. A stale tab's logout is rejected without ending a newer session;
 reload that tab to check its current account. Secure-cookie support has been
 verified in Chrome on loopback, not every browser. If a session check fails, use
 **Check account** to retry recovery without submitting the password again.
 Development checks create owners only in [temporary fixture stores](browser-session-check.md).
+
+## Invite or approve workspace users
+
+The owner can open **Profile → Manage workspace users** to create a single-use
+invitation, enable registration, approve/reject pending applicants, or disable a
+member. Members share all projects; only the owner manages accounts. See
+[workspace users](users.md) for the onboarding, storage and HTTP contract.
 
 ## Projects and repositories
 

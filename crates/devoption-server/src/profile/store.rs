@@ -34,10 +34,23 @@ impl ProfileStore {
         Ok(store)
     }
 
-    fn check(&self, identity: IdentityId) -> Result<(), Error> {
-        if identity != self.identity {
-            return Err(Error::InvalidRecord);
+    fn record(&self, identity: IdentityId) -> String {
+        if identity == self.identity {
+            RECORD.to_owned()
+        } else {
+            format!(
+                "profile-{}.bin",
+                identity
+                    .to_bytes()
+                    .iter()
+                    .map(|v| format!("{v:02x}"))
+                    .collect::<String>()
+            )
         }
+    }
+
+    // The HTTP guard supplies the authenticated account ID for record selection.
+    fn check(&self) -> Result<(), Error> {
         let metadata = self.directory.metadata()?;
         if !metadata.is_dir()
             || metadata.nlink() == 0
@@ -60,10 +73,10 @@ impl ProfileStore {
         mut after_open: impl FnMut(),
     ) -> Result<DisplayName, Error> {
         for attempt in 0..MAX_READ_ATTEMPTS {
-            self.check(identity)?;
+            self.check()?;
             let file = match openat(
                 &self.directory,
-                RECORD,
+                self.record(identity).as_str(),
                 OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
                 Mode::empty(),
             ) {
@@ -138,12 +151,12 @@ impl ProfileStore {
             let mut file = File::from(fd);
             file.write_all(&bytes)?;
             file.sync_all()?;
-            self.check(identity)?;
+            self.check()?;
             renameat(
                 &self.directory,
                 pending.name.as_str(),
                 &self.directory,
-                RECORD,
+                self.record(identity).as_str(),
             )?;
             self.directory.sync_all()?;
             return Ok(());
