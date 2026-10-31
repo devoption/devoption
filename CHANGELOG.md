@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Prepare `0.1.0-preview.3` with fresh-install-only compatibility, covering the
+  operational Overview, runtime monitoring, shared workspace accounts and current
+  app workflows. Preserve earlier candidate identities and the publication stop
+  ([#357](https://github.com/devoption/devoption/issues/357)).
+
 - Replace the Overview starter panel with operational project summaries, recorded
   build outcomes and attention items, plus aggregate and per-project monitoring.
   Add bounded Wasm worker telemetry for request volume, histogram p95 latency,
