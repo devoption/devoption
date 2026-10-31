@@ -282,8 +282,10 @@ latest saved build results, and items to review. It retains the application's
 existing appearance and navigation. **Platform maintenance** contains the version
 and upgrade guidance. Refresh reloads observations without starting workloads.
 
-Monitoring uses an open traffic plot with supporting active-user, latency, and
-error trends, plus **1h** and **24h** windows for aggregate active-user estimates,
+Monitoring uses four aligned metric selectors and a shared full-width trend plot.
+Select Requests, Active users, Response time, or Error rate to switch the chart;
+keyboard users can move between the selectors with arrow keys. **1h** and **24h**
+windows show aggregate active-user estimates,
 request counts, p95 handling latency, and HTTP 5xx error rates. Open a project's
 **Monitoring** link for that project's statistics at `/projects/{id}/monitoring`.
 Per-app user counts do not appear on Overview project cards.

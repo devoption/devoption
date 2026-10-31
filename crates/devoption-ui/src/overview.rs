@@ -206,9 +206,19 @@ pub(super) fn monitoring(m: &Monitoring, hours: u64, base: &str) -> String {
                 .collect()
         })
         .collect();
-    write!(html,"<article class=\"overview-chart overview-traffic\"><div class=\"overview-chart-heading\"><div><h3>Application traffic</h3><p class=\"overview-chart-caption\">{}</p></div><div class=\"overview-total\"><span class=\"overview-number\">{}</span><span>requests · last {hours}h</span></div></div>{}</article><div class=\"overview-metric-stack\">",notes[1],values[1],chart(&series[1],labels[1],units[1],hours,false)).unwrap();
-    for i in [0, 2, 3] {
-        write!(html,"<article class=\"overview-chart overview-metric\"><div class=\"overview-metric-heading\"><h3>{}</h3><span class=\"overview-number\">{}</span></div><p class=\"overview-chart-caption\">{}</p>{}</article>",labels[i],values[i],notes[i],chart(&series[i],labels[i],units[i],hours,true)).unwrap();
+    html.push_str("<fieldset class=\"overview-metrics\"><legend class=\"visually-hidden\">Metric to chart</legend>");
+    let summaries = [
+        "Browsers · last 5 min",
+        "Observed in this window",
+        "Histogram estimate",
+        "HTTP 5xx responses",
+    ];
+    for i in [1, 0, 2, 3] {
+        write!(html,"<label class=\"overview-metric-choice\"><input class=\"visually-hidden\" type=\"radio\" name=\"overview-metric\" value=\"{i}\" {}><span id=\"overview-metric-{i}-label\" class=\"overview-metric-label\">{}</span><span class=\"overview-number\">{}</span><span class=\"overview-chart-caption\">{}</span></label>",if i==1 {"checked"} else {""},labels[i],values[i],summaries[i]).unwrap();
+    }
+    html.push_str("</fieldset><div class=\"overview-trends\">");
+    for i in [1, 0, 2, 3] {
+        write!(html,"<section class=\"overview-chart\" data-metric=\"{i}\" aria-labelledby=\"overview-metric-{i}-label\"><p class=\"overview-chart-caption\">{}</p>{}</section>",notes[i],chart(&series[i],labels[i],units[i],hours,false)).unwrap();
     }
     write!(html,"</div></div><div class=\"overview-monitoring-footer\"><p>{} of {} projects reporting · Missing intervals remain gaps</p><details><summary>Chart data</summary><p>Five-minute buckets, oldest first. A dash means missing observations.</p>",m.reporting,m.expected).unwrap();
     for i in [1, 0, 2, 3] {
@@ -295,7 +305,7 @@ fn chart(series: &[Option<f64>], label: &str, unit: &str, hours: u64, compact: b
         ""
     };
     let mut html = format!(
-        "<div class=\"overview-plot{}\"><div class=\"overview-y-axis\" aria-hidden=\"true\"><span>{}</span><span>{}</span><span>{}</span></div><div class=\"overview-plot-canvas\"><svg viewBox=\"0 0 1000 200\" preserveAspectRatio=\"none\" role=\"img\" aria-label=\"{}; {}; last {hours} hours. Missing intervals are gaps.\"><path class=\"overview-grid\" d=\"M0 0H1000 M0 100H1000 M0 200H1000\"/><path class=\"overview-area\" d=\"{area}\"/><path class=\"overview-line\" vector-effect=\"non-scaling-stroke\" d=\"{line}{dots}\"/></svg>{empty}</div>",
+        "<div class=\"overview-plot{}\"><div class=\"overview-y-axis\" aria-hidden=\"true\"><span>{}</span><span>{}</span><span>{}</span></div><div class=\"overview-plot-canvas\"><svg viewBox=\"0 0 1000 200\" preserveAspectRatio=\"none\" role=\"img\" aria-label=\"{}; {}; last {hours} hours. Missing intervals are gaps.\"><path class=\"overview-grid\" d=\"M0 200H1000\"/><path class=\"overview-area\" d=\"{area}\"/><path class=\"overview-line\" vector-effect=\"non-scaling-stroke\" d=\"{line}{dots}\"/></svg>{empty}</div>",
         if compact {
             " overview-plot-compact"
         } else {
