@@ -1,0 +1,19 @@
+{
+  "artifact": {
+    "id": "13050973236",
+    "transport_sha256": "75441516638c6e7c26d57d16dc9234023612f7d8c6a8b250a20cad90ad3fe055"
+  },
+  "candidate": {
+    "archive": "devoption-0.1.0-preview.3-ubuntu-24.04-amd64.tar.gz",
+    "archive_sha256": "0fcddd6b3e80574f3c59346b380b18fea06cc4af25c847d647940a5fb8d040c1",
+    "artifact_name": "bundle-dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0-41223531548-1",
+    "platform_version": "0.1.0-preview.3",
+    "proof_sha256": "373fd2bba2c1015b832c271970ac64ee069917842e181cc4bd6cb3248fd9c10a",
+    "publication_eligible": false,
+    "run_attempt": "1",
+    "run_id": "41223531548",
+    "schema_version": 1,
+    "source_commit": "dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0"
+  },
+  "schema_version": 1
+}

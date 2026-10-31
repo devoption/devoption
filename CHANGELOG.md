@@ -5,6 +5,14 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Reserve the signed `0.1.0-preview.3` validation candidate from reviewed source
+  `dbe5a5c`, after exact-main checks, signing, independent Actions readback and
+  local ZIP/proof verification. Preserve earlier reservations and false publication
+  eligibility; long-lived draft retention follows this reservation
+  ([#357](https://github.com/devoption/devoption/issues/357)).
+
 ## [0.1.0-preview.3] - 2026-10-31
 
 ### Added
