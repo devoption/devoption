@@ -54,7 +54,8 @@ The supported profile is trusted Rust/WASIp2 apps in explicit project slots on U
 24.04 x86_64, with explicit operator-installed build and deployment support.
 [Standalone app identities and embedded assets](docs/web-app-builds.md#application-identity-and-assets)
 are supported; other target profiles, general stateful apps, hostile
-multi-tenant hosting, MCP and team accounts remain unimplemented. There is no published product release. The older native
+multi-tenant hosting, MCP and project-specific team roles remain unimplemented.
+[Shared workspace membership](docs/users.md) supports invitations and owner-approved registration. There is no published product release. The older native
 [build contracts](docs/build-plans.md) remain separate from this selected
 [Wasm implementation contract](docs/decisions/0004-first-wasm-web-app.md).
 
@@ -160,8 +161,8 @@ Once the single-server path is usable, extend the platform around it:
   publishing and access policies, and keep dependency credentials out of builds.
   Registry hosting, proxy fetching and package publication are intentions, not
   current services.
-- **Teams and access.** Add multiple users, project roles, scoped service access,
-  invitations, revocation and shared audit history. Apply those permissions
+- **Teams and access.** Extend shared workspace membership with project roles,
+  scoped service access and shared audit history. Apply those permissions
   consistently to source, pipelines, packages, deployments and MCP.
 - **Multi-server orchestration.** Build on proven single-server operations to add
   server enrollment, workload placement, coordinated rollouts, health monitoring

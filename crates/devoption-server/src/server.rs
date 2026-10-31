@@ -376,12 +376,19 @@ fn run_with_roots(
         return Err(io::Error::other("build execution requires Linux"));
     }
     #[cfg(unix)]
-    let owner_auth = owner_store.map(|store| {
-        (
-            crate::owner_auth::service::OwnerAuthService::new(store),
-            configured,
-        )
-    });
+    let owner_auth = owner_store
+        .map(|store| {
+            if configured {
+                crate::owner_auth::service::OwnerAuthService::with_users(store)
+                    .map(|auth| (auth, true))
+            } else {
+                Ok((
+                    crate::owner_auth::service::OwnerAuthService::new(store),
+                    false,
+                ))
+            }
+        })
+        .transpose()?;
     Builder::new_current_thread()
         .enable_all()
         .build()?

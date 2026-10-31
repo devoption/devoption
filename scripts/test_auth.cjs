@@ -36,7 +36,7 @@ function page({ configured = true, form = true, profile = true, projects = false
   }
   ["page-title", "page-message"].forEach(node);
   if (profile) ["profile-state", "profile-note", "profile-account", "profile-status"].forEach(node);
-  if (form) ["signin-form", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
+  if (form) ["signin-form", "auth-email", "auth-password", "auth-submit", "auth-signed-in", "auth-recheck", "auth-status"].forEach(node);
   if (projects) ["project-form", "project-name", "project-submit", "project-status"].forEach(node);
   if (rename !== undefined) nodes.get("project-form").dataset.project = rename;
   const repositoryForms = repositories ? [0, 1].map((index) => {
@@ -763,5 +763,23 @@ test("an already authenticated account visit stays available, and an expired ses
   assert.match(current.status.textContent, /session ended/);
   current.queue.push(response(204, csrf), response(204, nextCsrf), response(204, nextCsrf));
   await current.submit();
+  assert.deepEqual(current.navigation, ["replace:/"]);
+});
+
+
+test("member sign-in binds the submitted email and password while waiting for a challenge", async () => {
+  const current = page();
+  await tick();
+  current.nodes.get("auth-email").value = "member@example.test";
+  let release;
+  current.queue.push(new Promise((resolve) => { release = resolve; }), response(204, csrf), response(204, csrf));
+  const submitted = current.submit("public member fixture password");
+  assert.equal(current.nodes.get("auth-email").disabled, true);
+  current.nodes.get("auth-email").value = "changed@example.test";
+  release(response(204, csrf));
+  await submitted;
+  const request = current.calls.find((call) => call.url === "/auth/user-sign-in");
+  assert.equal(request.headers["content-type"], "text/plain;charset=UTF-8");
+  assert.deepEqual(JSON.parse(request.body), { email: "member@example.test", password: "public member fixture password" });
   assert.deepEqual(current.navigation, ["replace:/"]);
 });

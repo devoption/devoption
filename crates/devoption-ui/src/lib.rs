@@ -7,10 +7,19 @@ pub enum Page {
     Infrastructure,
     Appearance,
     Profile,
+    Users,
     SignIn,
 }
 
 mod auth;
+mod users;
+const ACCOUNTS: &str = include_str!("../assets/accounts.js");
+pub fn render_users() -> String {
+    render_with_account(Page::Users, true)
+}
+pub fn render_join() -> String {
+    auth::render_join()
+}
 mod platform_updates;
 mod profile;
 pub use platform_updates::{PlatformUpdates, UpgradeNotice};
@@ -269,6 +278,11 @@ fn render_page_with_updates(
             "/settings/appearance",
             "Choose how DevOption looks in this browser.",
         ),
+        Page::Users => (
+            "Users",
+            "/settings/users",
+            "Manage access to your shared workspace.",
+        ),
         Page::Profile => (
             "Profile",
             "/settings/profile",
@@ -363,6 +377,7 @@ fn render_page_with_updates(
             "",
             match page {
                 Page::Profile => profile::CONTENT,
+                Page::Users => users::CONTENT,
                 Page::Home => HOME,
                 Page::Releases => {
                     r#"<section class="empty-state"><h2>Releases are not available yet</h2><p>Release creation and publishing are not implemented. Your saved projects and repositories are available in Projects.</p><a class="action-button" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#
@@ -451,6 +466,7 @@ fn document(title: &str, body: &str) -> String {
 <script>{BUILD_EXECUTION}</script>
 <script>{PROJECT_SECRETS}</script>
   <script>{PROFILE}</script>
+  <script>{ACCOUNTS}</script>
   <script>{REPOSITORY_CREATE}</script>
   <script>{REPOSITORY_STATUS}</script>
   <script>{PROJECT_FILTER}</script>

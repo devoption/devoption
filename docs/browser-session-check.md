@@ -3,7 +3,10 @@
 The unconfigured preview cannot issue browser sessions. This optional manual check
 uses an ignored Rust test, a temporary private owner store with a fixture password,
 and an ephemeral `127.0.0.1` listener. It changes no real account or preview settings.
-It uses production authentication handlers with only a temporary fixture owner.
+It uses production authentication handlers with a temporary fixture owner and
+shared account storage. [Workspace users](users.md) documents invitations and
+approved registration; the [capture guide](screenshots/README.md) describes
+separate-browser member checks.
 
 Run from the repository root:
 

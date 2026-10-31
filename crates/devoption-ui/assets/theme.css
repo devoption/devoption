@@ -757,3 +757,15 @@ body:not(.auth-page) { background: var(--color-sidebar); font-size: .9375rem; }
   .workspace .project-navigation { gap: .25rem 1rem; }
   .workspace .page-heading { gap: 1rem; }
 }
+
+/* Account management stays within the existing settings canvas. */
+#users-panel { max-width: 48rem; }
+#users-panel form { display: grid; gap: .75rem; margin: 1.5rem 0 2rem; max-width: 34rem; }
+#users-panel h2 { margin-top: 2rem; }
+#users-panel input, #users-panel select, #invitation-code { width: 100%; min-width: 0; }
+#users-panel form button { justify-self: start; }
+#invitation-result { padding: 1rem; background: var(--color-selected); border-radius: var(--control-radius); }
+#invitation-code { margin-top: .75rem; padding: .75rem; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--control-radius); font: inherit; overflow-wrap: anywhere; resize: vertical; }
+.user-row { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; padding: 1rem 0; border-bottom: 1px solid var(--color-border); }
+.user-row strong { min-width: 0; overflow-wrap: anywhere; flex: 1 1 16rem; }
+.user-row span { text-transform: capitalize; }

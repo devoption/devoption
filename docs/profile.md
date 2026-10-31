@@ -1,6 +1,6 @@
 # Profile
 
-A signed-in owner can open **Profile** from the account menu or visit
+A signed-in workspace user can open **Profile** from the account menu or visit
 `/settings/profile`. Enter a display name and choose **Save name**. Leave the field
 blank and save to return to the **Account** fallback. The menu shows initials from
 the first and last word containing letters or numbers; names without them keep the
@@ -22,6 +22,8 @@ JavaScript is required for editing.
 
 On Unix, `profile.bin` is an optional private record in the same startup-selected
 data directory as `owner.bin`, anchored to that directory's open file descriptor.
+[Members](users.md) use separate `profile-<identity>.bin` records with the same
+validation and atomic-write rules. They cannot overwrite the owner profile.
 No record means an unset name. The record contains an eight-byte `DVPROFIL` magic,
 a version byte (`1`), the existing 16-byte account ID and the UTF-8 name. It contains
 no password or session material. Validation bounds it to 153 bytes and requires a
@@ -46,7 +48,7 @@ cookie and CSRF checks, and accepts a single `text/plain;charset=UTF-8` body of 
 most 128 bytes. Empty text clears the name. A validated, durable save returns `204`;
 invalid names return `400`, oversize bodies `413`, unsupported media `415`, stalled
 bodies `408`, and unavailable storage `503`. Server-owned identity extensions bind
-access to the existing owner; client identity or role headers grant no authority.
+access to the authenticated account; client identity or role headers grant no authority.
 
 Keep this optional record with the owner and catalog in the
 [documented offline backup](private-linux-install.md#restart-backup-and-restore). Tests

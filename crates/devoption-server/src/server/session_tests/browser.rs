@@ -199,6 +199,8 @@ fn cookie_credentials_cannot_bypass_host_origin_rotation_or_logout() {
 #[ignore = "manual browser fixture; see docs/browser-session-check.md"]
 fn manual_cookie_browser_fixture() {
     let (directory, auth, identity) = owner();
+    drop(auth);
+    let auth = OwnerAuthService::with_users(OwnerStore::open(directory.path()).unwrap()).unwrap();
     let data = directory.path().canonicalize().unwrap();
     let repositories = tempfile::Builder::new()
         .permissions(std::fs::Permissions::from_mode(0o700))

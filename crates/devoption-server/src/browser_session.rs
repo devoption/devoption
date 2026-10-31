@@ -37,6 +37,10 @@ const MAX_COOKIE_BYTES: usize = 4096;
 /// The caller must authorize/protect sign-in before calling this helper.
 pub fn activate(grant: IssuedSession, slot: &SessionSlot) -> Result<Response, ActivationError> {
     let credentials = grant.activate_browser(slot)?;
+    Ok(activated(credentials))
+}
+
+pub(crate) fn activated(credentials: crate::owner_auth::service::BrowserCredentials) -> Response {
     let mut response = empty(StatusCode::NO_CONTENT);
     response.headers_mut().insert(
         SET_COOKIE,
@@ -48,7 +52,7 @@ pub fn activate(grant: IssuedSession, slot: &SessionSlot) -> Result<Response, Ac
     response
         .headers_mut()
         .insert(CSRF_HEADER, sensitive(encode(credentials.csrf_token())));
-    Ok(response)
+    response
 }
 
 /// Require the cookie and explicit CSRF header from the same live session.

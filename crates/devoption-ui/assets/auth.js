@@ -4,6 +4,7 @@
     const byId = (id) => document.getElementById(id);
     const form = byId("signin-form");
     const password = byId("auth-password");
+    const emailInput = byId("auth-email");
     const submit = byId("auth-submit");
     const signedIn = byId("auth-signed-in");
     const status = byId("auth-status") || byId("profile-status");
@@ -36,6 +37,7 @@
     const message = (value) => { if (status) status.textContent = value; };
     const controls = () => {
       if (password) password.disabled = busy || csrf !== null;
+      if (emailInput) emailInput.disabled = busy || csrf !== null;
       if (submit) {
         submit.disabled = busy || csrf !== null;
         submit.textContent = busy ? operation : "Sign in";
@@ -72,12 +74,12 @@
       if (signedIn) signedIn.hidden = !csrf;
       signouts.forEach((button) => { button.hidden = !csrf; });
       text("profile-state", unchecked ? "Check account" : csrf ? "Account" : "Signed out");
-      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Role: Owner" : "Sign in to your account.");
+      text("profile-note", unchecked ? "Check your current session before signing in again." : csrf ? "Signed in" : "Sign in to your account.");
       text("profile-account", unchecked ? "Check account" : csrf ? "Profile" : "Sign in");
       if (form) {
         const title = unchecked ? "Check account" : csrf ? "Account" : "Sign in";
         byId("page-title").textContent = title;
-        byId("page-message").textContent = unchecked ? "Check your current session before signing in again." : csrf ? "You’re signed in on this server." : "Use the owner password for this server.";
+        byId("page-message").textContent = unchecked ? "Check your current session before signing in again." : csrf ? "You’re signed in on this server." : "Enter your email and password, or leave email blank to sign in as owner.";
         document.title = title + " · DevOption";
       }
       const account = byId("profile-account");
@@ -187,6 +189,7 @@
     if (form) form.addEventListener("submit", async function (event) {
       event.preventDefault();
       if (busy || csrf !== null) return;
+      const email = emailInput?.value || "";
       let value = password.value;
       password.value = "";
       password.removeAttribute("aria-invalid");
@@ -210,8 +213,9 @@
         }
         const body = new URLSearchParams({ password: value });
         value = "";
-        const response = await request("/auth/sign-in", {
-          headers: { "content-type": "application/x-www-form-urlencoded", "x-csrf-token": token(challenge) }, body,
+        const response = await request(email ? "/auth/user-sign-in" : "/auth/sign-in", {
+          headers: { "content-type": email ? "text/plain;charset=UTF-8" : "application/x-www-form-urlencoded", "x-csrf-token": token(challenge) },
+          body: email ? JSON.stringify({ email, password: body.get("password") }) : body,
         });
         if (current !== version) return;
         if (response.status === 204) {

@@ -1,6 +1,7 @@
 pub(super) const CONTENT: &str = r#"
 <section class="profile-settings" aria-label="Your profile">
   <p id="profile-role" class="profile-role" hidden>Role <strong>Owner</strong></p>
+  <p><a id="manage-users" href="/settings/users" hidden>Manage workspace users</a></p>
   <form id="profile-form" aria-describedby="display-name-help profile-save-status">
     <label for="display-name">Display name</label>
     <input id="display-name" name="display-name" type="text" autocomplete="name" maxlength="128" aria-describedby="display-name-help profile-save-status" disabled>

@@ -38,7 +38,9 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Attach repository | `/projects/{id}/code` | Example new project's attachment dialog; tools selected, not submitted | `repository-attach.jpg` |
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
 | Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
-| Profile | `/settings/profile` | Save disposable name Alex Morgan; initials visible | `profile.jpg` |
+| Profile | `/settings/profile` | Save disposable name Alex Morgan; owner user-management link and initials visible | `profile.jpg` |
+| Users | `/settings/users` | Real disposable member/application workflow; 1280 × 1100; no invitation code visible | `users.jpg` |
+| Create account | `/join` | Open registration; 1280 × 1000 | `join.jpg` |
 | Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
@@ -242,3 +244,17 @@ The shared work canvas scrolls independently on desktop; scroll the
 main canvas to its top before captures. Mobile retains normal document
 scrolling. Check the skip link reaches the main landmark and dialog close returns
 focus to its trigger at desktop and narrow widths.
+
+
+For Users and Create account, use the same temporary browser fixture. Sign in as
+owner with the email field blank, open Profile → Manage workspace users, and enable
+registration. Use separate browser contexts to accept an invitation and submit a
+pending application with public `example.test` addresses. Verify owner approval,
+member denial on Users, member profile separation, and disable/session revocation.
+Capture Users with a member and a pending application, after refreshing and
+scrolling the main canvas to its top. Never capture an invitation code. Capture
+Create account with empty fields, open registration and no password entered.
+Check the three account pages at 320, 375, 768 and 1280 pixels. Owner/member login
+and registration share five attempts per minute; wait for the window or start a
+fresh disposable fixture if needed. Existing owner-only captures retain their
+scope and do not prove per-member workload attribution.

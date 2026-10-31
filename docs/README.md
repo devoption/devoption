@@ -1,11 +1,11 @@
 # Documentation
 
 DevOption is a deployable software factory intended for individuals and teams.
-The current implementation is an owner-only development preview with loopback HTTP
+The current implementation is an shared-workspace development preview with loopback HTTP
 access and an explicit [HTTPS proxy mode](public-linux-install.md) with
 [fresh cloud acceptance evidence](public-cloud-acceptance.md). An opt-in [Linux build workflow](web-app-builds.md) compiles the selected trusted
-Wasm app through the interface. An opt-in app runtime supports saved releases and same-node deployment. Team
-accounts and production hosting acceptance remain planned.
+Wasm app through the interface. An opt-in app runtime supports saved releases and same-node deployment. The owner can invite [workspace members](users.md) or approve registration
+applications; project-specific roles remain planned.
 
 ## Use and contribute
 
