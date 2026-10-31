@@ -31,8 +31,10 @@ attempt 1, from reviewed main source
 signing, independent Actions readback, and local original-ZIP/proof/archive checks
 passed; see [preview.3 provenance evidence](bundle-provenance.md#preview3-signing-and-independent-readback).
 This candidate declares fresh installation only. It does not inherit the earlier
-base-upgrade acceptance. Long-lived draft retention is the next operation under
-[#357](https://github.com/devoption/devoption/issues/357); public publication remains
+base-upgrade acceptance. The original ZIP now has
+[verified long-lived draft retention](release-reconciliation.md#preview3-retention),
+including a separate local download and cryptographic verification under
+[#357](https://github.com/devoption/devoption/issues/357). Public publication remains
 gated and the earlier reservations remain unchanged.
 
 ## Reserve and retry

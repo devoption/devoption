@@ -69,8 +69,10 @@ authorization. Remote state can change between requests and after the plan;
 future write logic must serialize work, re-read state and verify returned IDs
 and bytes. Do not execute operations from a saved stale plan.
 
-The reserved packets have real signing/readback evidence and installer/base-upgrade
-acceptance; see [delivery status](releases.md#delivery-status-against-the-six-issues).
+The reserved packets have real signing/readback evidence. Installer/base-upgrade
+acceptance applies only to the earlier packets documented in
+[delivery status](releases.md#delivery-status-against-the-six-issues); preview.3
+does not inherit it.
 The planner's fixtures cover interrupted states, metadata conflicts, draft visibility,
 annotated tags and pagination failures. The [#21 release gate](releases.md) still
 governs publication.
@@ -166,3 +168,33 @@ the original archive/proof/source and signing run. The release remains a draft
 prerelease with no publication timestamp; the packet remains
 `publication_eligible: false`. Tag/draft creation, upload and readback are now live
 workflow evidence, not publication or proof of fully unattended operation.
+
+## Preview.3 retention
+
+The owner selected an unpublished validation candidate under
+[#357](https://github.com/devoption/devoption/issues/357). The
+[retention run 41228408506](https://github.com/devoption/devoption/actions/runs/41228408506),
+attempt 1, passed full exact-main source checks, installation/reboot coverage,
+reserved tag/draft creation, unchanged ZIP upload, and cryptographic readback.
+The reviewed writer commit was `bbbdc3806cac9e0b0ccc96636514fa744da6f6e3`;
+its reservation SHA-256 was
+`b796d23835229b2ac9bc5b690788a9184ec98317124d75a1c31bafd8872032d1`.
+This writer commit is distinct from the packet's original signed source.
+
+- Tag: `v0.1.0-preview.3`, source `dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0`.
+- Unpublished draft ID: `430117138`; asset ID: `696173888`.
+- ZIP: `devoption-0.1.0-preview.3-ubuntu-24.04-amd64.candidate.zip`, 10,581,393 bytes.
+- Transport SHA-256: `75441516638c6e7c26d57d16dc9234023612f7d8c6a8b250a20cad90ad3fe055`.
+
+A separate local download of that exact release asset matched the reserved ZIP
+digest. The pinned GitHub CLI and committed reservation checker verified the
+signed proof/workflow identity, receipt and complete archive without executing
+downloaded platform binaries. The read-only planner also matched the actual tag,
+draft, asset IDs and metadata. The [reservation](../release-candidates/0.1.0-preview.3.json)
+and [original signing evidence](bundle-provenance.md#preview3-signing-and-independent-readback)
+remain unchanged; no packet was rebuilt or re-signed for retention.
+
+The release remains a draft prerelease with no publication timestamp and
+`publication_eligible: false`. Preview.3 declares fresh installation only;
+exact-version signed-packet installer acceptance and public release approval
+remain pending under #21. No production installation changed.

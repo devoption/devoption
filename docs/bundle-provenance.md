@@ -290,7 +290,9 @@ artifact metadata and the successful readback job. The pinned GitHub CLI 2.102.0
 verified the proof/workflow identity, and the reservation checker verified the
 receipt and complete archive without executing downloaded platform binaries.
 The [candidate record](../release-candidates/0.1.0-preview.3.json) fixes this identity;
-previous records are unchanged. Long-lived draft retention follows under #357.
+previous records are unchanged. The original packet now has
+[verified long-lived draft retention](release-reconciliation.md#preview3-retention)
+under #357, including a separate local download and proof/archive verification.
 
 These checks establish candidate authenticity and source-built test evidence,
 not signed-packet installer or cross-version upgrade acceptance. Preview.3 is
