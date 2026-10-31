@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Generate the unified app installer's reviewable schema-1 configuration from
+  prepared inputs, replacing manual hash/path transcription while validating
+  input identities and refusing existing outputs. Preserve manual configuration
+  and installed data; use the generated config in fresh-host acceptance
+  ([#349](https://github.com/devoption/devoption/issues/349)).
+
 - Create a supported embedded web app and first local Git commit from an empty
   project's Code page, then open source checks for explicit build review. Keep
   empty repository creation and existing installations unchanged; retain source

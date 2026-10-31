@@ -40,13 +40,63 @@ traversable by the service account. They remain at these locations; the installe
 does not copy, chmod or delete them. Keep the original binaries/lockfile outside
 installation-owned paths too.
 
-Record tree hashes as an unprivileged administrator using the reviewed platform's
-`build-input-digest /absolute/tree` command. It reads files without executing
-their contents. The installer independently recomputes that path/byte/mode format.
-Existing limits include 16,384 regular files and 2 GiB per tree; avoid unnecessary
-toolchain components. Dependency acquisition remains an operator preparation step.
+## Generate the installation configuration
 
-Create `installation.toml`, replacing all paths, hostname and hash placeholders:
+Keep prepared inputs together in an administrator-owned directory such as
+`/srv/devoption-stage`, with this layout:
+
+```text
+devoption-stage/
+  devoption
+  devoption-runtime
+  caddy.tar.gz
+  toolchain/       # Rust/Cargo 1.99.0, including wasm32-wasip2
+  vendor/
+  Cargo.lock
+  archives/       # Original checksum-matching crates.io archives
+```
+
+The command below replaces manual hash calculation and TOML transcription. It
+checks the canonical paths, ownership/modes, supported toolchain files, vendor
+archives and pinned proxy, then records the executable, lockfile and tree hashes
+in the existing schema. It reads the selected files without executing binaries,
+Cargo or project code, downloading inputs, inspecting installed accounts or
+changing services:
+
+```sh
+sudo python3 scripts/install_app.py configure \
+  --inputs /srv/devoption-stage \
+  --hostname platform.example.com \
+  --source-commit FULL_REVIEWED_40_CHARACTER_SOURCE_COMMIT \
+  --output /srv/devoption-stage/installation.toml
+```
+
+Use the full lowercase source commit explicitly recorded during your reviewed
+build. Review the generated paths, hostname, source identity and hashes before
+planning. Hashing selected bytes records their identity; it does not independently
+prove where those bytes came from or that the executable matches the declared
+source commit. There is no signed-bundle or acquisition-authenticity claim.
+Runtime version checks still run during installation validation.
+
+The output parent must already exist, be canonical and administrator-controlled.
+The new file is private (`0600`) and published atomically without replacement.
+Existing files, directories and symlinks are refused, including partial files from
+earlier attempts. Choose a new output in the staging directory; system
+configuration locations, installed storage and hashed input trees are refused.
+If publication or its final sync fails, inspect any existing output before another
+attempt. A published file is retained; interrupted temporary files are never
+adopted or automatically removed by later runs. No installed state is reset.
+
+The prepared inputs stay at these paths. Keep the generated configuration and
+original inputs for matching retries. Input trees retain the existing bounds of
+16,384 regular files and 2 GiB per tree; avoid unnecessary toolchain components.
+Dependency acquisition remains a separate operator preparation step.
+
+### Manual configuration remains supported
+
+Existing manually reviewed schema-1 configurations remain supported. If inputs
+are kept in separate locations, record their identities using the trusted
+`build-input-digest` command and use the existing format:
 
 ```toml
 schema_version = 1
@@ -77,8 +127,8 @@ original inputs and installer checkout for matching retries.
 From that trusted checkout:
 
 ```sh
-sudo python3 scripts/install_app.py plan --config installation.toml
-sudo python3 scripts/install_app.py apply --config installation.toml
+sudo python3 scripts/install_app.py plan --config /srv/devoption-stage/installation.toml
+sudo python3 scripts/install_app.py apply --config /srv/devoption-stage/installation.toml
 ```
 
 `plan` reports accounts to create, fixed storage roots, missing files and the next
@@ -109,9 +159,9 @@ owner, create projects or execute builds/deployments.
 In an interactive local/SSH terminal, use the existing hidden password prompts:
 
 ```sh
-sudo python3 scripts/install_app.py enroll --config installation.toml
-sudo python3 scripts/install_app.py start --config installation.toml
-sudo python3 scripts/install_app.py status --config installation.toml
+sudo python3 scripts/install_app.py enroll --config /srv/devoption-stage/installation.toml
+sudo python3 scripts/install_app.py start --config /srv/devoption-stage/installation.toml
+sudo python3 scripts/install_app.py status --config /srv/devoption-stage/installation.toml
 ```
 
 Enrollment never replaces an owner. Start requires a complete matching installation
@@ -158,7 +208,9 @@ real systemd/sudo parsers and compares tree identity with the actual Rust reader
 The existing bundle tests continue to cover the shared no-replacement engine.
 
 Those unit tests model account/service actions. A separate fresh-VM acceptance
-harness now exercises real installation commands and authenticated HTTP actions:
+harness now exercises real configure/installation commands and authenticated
+starter, build and deployment actions, including configuration no-replacement
+checks:
 
 ```sh
 python3 scripts/check_app_installation.py --prepare /absolute/new-inputs \

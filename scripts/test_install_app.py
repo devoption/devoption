@@ -11,7 +11,7 @@ import tomllib
 import unittest
 from unittest.mock import patch
 
-from install_app import AppHost, AppInstaller, SUDOERS, input_tree, load_config, sha256
+from install_app import AppHost, AppInstaller, SUDOERS, configure, input_tree, load_config, main, sha256
 from install_bundle import STATE
 from test_install_bundle import FixtureHost
 
@@ -78,6 +78,131 @@ class AppInstallTests(unittest.TestCase):
         return {str(p.relative_to(self.image)): (p.lstat().st_mode, p.lstat().st_ino,
                 p.read_bytes() if p.is_file() and not p.is_symlink() else None)
                 for p in self.image.rglob('*')}
+
+    def staged_layout(self):
+        for source, destination in (('binary', 'devoption'), ('runtime', 'devoption-runtime'),
+                                    ('caddy_archive', 'caddy.tar.gz'), ('lockfile', 'Cargo.lock')):
+            shutil.copyfile(self.inputs / source, self.inputs / destination)
+        return self.inputs / 'installation.toml'
+
+    def configure(self, output, **arguments):
+        return configure(self.inputs, arguments.get('hostname', 'platform.example.com'),
+                         arguments.get('source_commit', 'a' * 40), output, os.getuid())
+
+    def test_generated_config_matches_manual_identity_without_executing_or_installing(self):
+        output = self.staged_layout()
+        before = self.inventory()
+        pending = self.inputs / '.app-config-interrupted'
+        pending.write_bytes(b'preserve earlier interrupted evidence')
+        prior = pending.read_bytes(), pending.stat().st_ino
+        with patch('install_app.subprocess.run', side_effect=AssertionError('No processes allowed')):
+            result = self.configure(output)
+        self.assertEqual((pending.read_bytes(), pending.stat().st_ino), prior)
+        generated = load_config(output)
+        for key in ('binary_sha256', 'runtime_sha256', 'toolchain_sha256', 'vendor_sha256', 'lock_sha256'):
+            self.assertEqual(generated[key], self.config[key])
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        self.assertFalse(result['installed_state_changed'])
+        self.assertFalse(result['inputs_executed'])
+        self.assertEqual(self.inventory(), before)
+        self.assertEqual(self.host.calls, [])
+        self.assertEqual(self.installer(generated).preflight()['next_action'], 'apply')
+
+    def test_configure_refuses_existing_files_directories_and_broken_links_without_replacement(self):
+        output = self.staged_layout()
+        for kind in ('file', 'directory', 'link'):
+            with self.subTest(kind=kind):
+                if kind == 'file':
+                    output.write_bytes(b'preserved partial config')
+                elif kind == 'directory':
+                    output.mkdir()
+                else:
+                    output.symlink_to(self.inputs / 'missing-target')
+                before = output.lstat()
+                with self.assertRaisesRegex(ValueError, 'already exists'):
+                    self.configure(output)
+                self.assertEqual(output.lstat().st_ino, before.st_ino)
+                if kind == 'file':
+                    self.assertEqual(output.read_bytes(), b'preserved partial config')
+                output.rmdir() if kind == 'directory' else output.unlink()
+
+    def test_configure_validates_before_writing_and_retains_input_bytes(self):
+        output = self.staged_layout()
+        for arguments in ({'hostname': 'bad.example/path'}, {'source_commit': 'not-a-commit'}):
+            with self.assertRaises(ValueError):
+                self.configure(output, **arguments)
+            self.assertFalse(output.exists())
+        target = self.inputs / 'devoption'
+        before = target.read_bytes()
+        target.unlink()
+        target.symlink_to(self.inputs / 'binary')
+        with self.assertRaises(ValueError):
+            self.configure(output)
+        self.assertFalse(output.exists())
+        self.assertEqual((self.inputs / 'binary').read_bytes(), before)
+        target.unlink()
+        target.write_bytes(before)
+        with patch('install_app.proxy_binary', side_effect=ValueError('Pinned proxy mismatch')):
+            with self.assertRaisesRegex(ValueError, 'Pinned proxy mismatch'):
+                self.configure(output)
+        self.assertFalse(output.exists())
+        self.assertEqual(list(self.inputs.glob('.app-config-*')), [])
+
+    def test_configure_rejects_system_outputs_hashed_trees_and_unsafe_archives(self):
+        output = self.staged_layout()
+        for selected in (Path('/usr/devoption-config-review.toml'), self.inputs / 'vendor/config.toml'):
+            with self.assertRaisesRegex(ValueError, 'separate'):
+                self.configure(selected)
+        (self.inputs / 'archives/linked.crate').symlink_to(self.inputs / 'binary')
+        with self.assertRaises(ValueError):
+            self.configure(output)
+        self.assertFalse(output.exists())
+        (self.inputs / 'archives/linked.crate').unlink()
+        (self.inputs / 'vendor/unexpected').mkdir()
+        with self.assertRaises((ValueError, OSError)):
+            self.configure(output)
+        self.assertFalse(output.exists())
+
+    def test_configure_never_overwrites_a_racing_output_or_deletes_published_output_on_sync_failure(self):
+        output = self.staged_layout()
+        def race(_temporary, destination, **_options):
+            Path(destination).write_bytes(b'concurrent writer')
+            raise FileExistsError('concurrent publication')
+        with patch('install_app.os.link', side_effect=race):
+            with self.assertRaises(FileExistsError):
+                self.configure(output)
+        self.assertEqual(output.read_bytes(), b'concurrent writer')
+        output.unlink()
+        sync = os.fsync
+        calls = 0
+        def fail_directory(descriptor):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                raise OSError('directory sync failed')
+            sync(descriptor)
+        with patch('install_app.os.fsync', side_effect=fail_directory):
+            with self.assertRaisesRegex(OSError, 'directory sync failed'):
+                self.configure(output)
+        published = output.read_bytes(), output.stat().st_ino
+        self.assertEqual(load_config(output)['hostname'], 'platform.example.com')
+        with self.assertRaises(ValueError):
+            self.configure(output)
+        self.assertEqual((output.read_bytes(), output.stat().st_ino), published)
+
+    def test_configure_cli_requires_its_inputs_and_preserves_legacy_option_order(self):
+        for arguments in (['configure'], ['configure', '--config', 'anything'], ['plan', '--inputs', 'anything']):
+            with patch.object(sys, 'argv', ['install_app.py', *arguments]), patch('install_app.AppHost') as host:
+                with self.assertRaises(SystemExit) as failure:
+                    main()
+                self.assertEqual(failure.exception.code, 2)
+                host.assert_not_called()
+        for arguments in (['plan', '--config', 'existing'], ['--config', 'existing', 'plan']):
+            with patch.object(sys, 'argv', ['install_app.py', *arguments]), patch('install_app.load_config', side_effect=ValueError('existing config reached')) as selected:
+                with self.assertRaises(SystemExit) as failure:
+                    main()
+                self.assertEqual(failure.exception.code, 1)
+                selected.assert_called_once_with(Path('existing'))
 
     def test_one_config_plans_without_writes_then_installs_consistent_app_support(self):
         config = load_config(self.write_config(self.config))

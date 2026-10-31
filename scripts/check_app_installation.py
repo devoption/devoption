@@ -120,11 +120,18 @@ def guest():
     metadata = json.loads((GUEST / 'metadata.json').read_text())
     installer = GUEST / 'repository/scripts/install_app.py'
     selected = GUEST / 'installation.toml'
-    config = dict(schema_version=1, hostname=HOSTNAME, **metadata,
-                  binary=str(GUEST / 'devoption'), runtime=str(GUEST / 'devoption-runtime'),
-                  caddy_archive=str(GUEST / 'caddy.tar.gz'), toolchain=str(GUEST / 'toolchain'),
-                  vendor=str(GUEST / 'vendor'), lockfile=str(GUEST / 'Cargo.lock'), archives=str(GUEST / 'archives'))
-    selected.write_text(''.join(f'{key} = {json.dumps(value)}\n' for key, value in config.items()))
+    configure_command = ['/usr/bin/python3', str(installer), 'configure', '--inputs', str(GUEST),
+                         '--hostname', HOSTNAME, '--source-commit', metadata['source_commit'],
+                         '--output', str(selected)]
+    generated = json.loads(run(*configure_command))
+    assert not generated['installed_state_changed'] and not generated['inputs_executed']
+    import tomllib
+    config = tomllib.loads(selected.read_text())
+    assert all(config[key] == value for key, value in metadata.items())
+    assert selected.stat().st_mode & 0o777 == 0o600
+    before_config = selected.read_bytes(), selected.stat().st_ino
+    run(*configure_command, failure=True)
+    assert (selected.read_bytes(), selected.stat().st_ino) == before_config
     commands = lambda mode: ['/usr/bin/python3', str(installer), mode, '--config', str(selected)]
     invoke = lambda mode: json.loads(run(*commands(mode), timeout=300))
     completed = []
