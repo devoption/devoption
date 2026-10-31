@@ -1,7 +1,8 @@
 """Plan/apply a prepared, source-built app-capable installation on a fresh host.
 
 This is not a signed bundle installer, upgrader or existing-install conversion.
-The administrator independently reviews this checkout and the input SHA-256s.
+The administrator independently reviews this checkout and input provenance;
+configure records selected input identity without executing it.
 """
 
 import argparse
@@ -13,6 +14,7 @@ import re
 import stat
 import subprocess
 import tarfile
+import tempfile
 import tomllib
 
 from deployment_broker import protected
@@ -91,7 +93,10 @@ def input_tree(root, administrator=0):
 
 
 def load_config(path):
-    config = tomllib.loads(snapshot(path, 16384).decode('utf-8'))
+    return validate_config(tomllib.loads(snapshot(path, 16384).decode('utf-8')))
+
+
+def validate_config(config):
     paths = {'binary', 'runtime', 'caddy_archive', 'toolchain', 'vendor', 'lockfile', 'archives'}
     digests = {'binary_sha256', 'runtime_sha256', 'toolchain_sha256', 'vendor_sha256', 'lock_sha256'}
     if set(config) != paths | digests | {'schema_version', 'hostname', 'source_commit'}:
@@ -118,6 +123,22 @@ def load_config(path):
     if any(a == b or a in b.parents or b in a.parents for i, a in enumerate(roots) for b in roots[i+1:]):
         raise ValueError('Prepared toolchain, vendor and archive roots must be disjoint.')
     return config
+
+
+def verify_prepared_inputs(config, administrator=0):
+    for key in ('toolchain', 'vendor'):
+        if input_tree(Path(config[key]), administrator) != config[key + '_sha256']:
+            raise ValueError('Prepared tree differs from reviewed identity: ' + key)
+    lock = Path(config['lockfile'])
+    if sha256(snapshot(lock, 2 * 1024**2)) != config['lock_sha256']:
+        raise ValueError('Dependency lockfile differs from reviewed identity.')
+    verify_vendor(lock, Path(config['vendor']), Path(config['archives']))
+    if not list((Path(config['toolchain']) / 'lib/rustlib/wasm32-wasip2/lib').glob('*.rlib')):
+        raise ValueError('Prepared toolchain requires the wasm32-wasip2 standard library.')
+    for name in ('rustc', 'cargo'):
+        tool = Path(config['toolchain']) / 'bin' / name
+        if not tool.is_file() or tool.stat().st_mode & 0o005 != 0o005:
+            raise ValueError('Prepared toolchain requires readable executable bin/' + name)
 
 
 class AppHost(Host):
@@ -209,19 +230,7 @@ class AppInstaller(Installer):
         self.prepare_output()
 
     def verify_inputs(self):
-        for key in ('toolchain', 'vendor'):
-            if input_tree(Path(self.config[key]), self.host.root_uid) != self.config[key + '_sha256']:
-                raise ValueError('Prepared tree differs from reviewed identity: ' + key)
-        lock = Path(self.config['lockfile'])
-        if sha256(snapshot(lock, 2 * 1024**2)) != self.config['lock_sha256']:
-            raise ValueError('Dependency lockfile differs from reviewed identity.')
-        verify_vendor(lock, Path(self.config['vendor']), Path(self.config['archives']))
-        if not list((Path(self.config['toolchain']) / 'lib/rustlib/wasm32-wasip2/lib').glob('*.rlib')):
-            raise ValueError('Prepared toolchain requires the wasm32-wasip2 standard library.')
-        for name in ('rustc', 'cargo'):
-            tool = Path(self.config['toolchain']) / 'bin' / name
-            if not tool.is_file() or tool.stat().st_mode & 0o005 != 0o005:
-                raise ValueError('Prepared toolchain requires readable executable bin/' + name)
+        verify_prepared_inputs(self.config, self.host.root_uid)
 
     def prepare_output(self):
         account = self.host.account('devoption')
@@ -273,12 +282,84 @@ class AppInstaller(Installer):
         self.host.validate_app(self.binary, self.config['toolchain'], self.config['vendor'])
 
 
+def configure(inputs, hostname, source_commit, output, administrator=0):
+    """Record already reviewed inputs; never execute them or touch installed state."""
+    inputs, output = Path(inputs), Path(output)
+    safe_path(str(inputs))
+    safe_path(str(output))
+    protected(inputs, administrator)
+    protected(output.parent, administrator)
+    if not inputs.is_dir() or output.parent.resolve(strict=True) != output.parent:
+        raise ValueError('Use canonical prepared inputs and an existing output parent.')
+    if output.exists() or output.is_symlink():
+        raise ValueError('Configuration output already exists; preserve it and inspect.')
+    layout = {'binary': 'devoption', 'runtime': 'devoption-runtime',
+              'caddy_archive': 'caddy.tar.gz', 'toolchain': 'toolchain',
+              'vendor': 'vendor', 'lockfile': 'Cargo.lock', 'archives': 'archives'}
+    config = {'schema_version': 1, 'hostname': hostname, 'source_commit': source_commit,
+              **{key: str(inputs / name) for key, name in layout.items()},
+              **{key: '0' * 64 for key in ('binary_sha256', 'runtime_sha256',
+                                          'toolchain_sha256', 'vendor_sha256', 'lock_sha256')}}
+    validate_config(config)
+    # The output must not alter any hashed tree or installation-owned resource.
+    for reserved in ('/opt/devoption', PLATFORM, PROXY, APP_STATE, STATE, '/var/lib', '/etc', '/usr', '/run',
+                     *(config[key] for key in layout)):
+        root = Path(reserved)
+        if output == root or root in output.parents:
+            raise ValueError('Configuration output must be separate from inputs and installed storage.')
+    for key in layout:
+        protected(Path(config[key]), administrator)
+    for key in ('binary', 'runtime'):
+        config[key + '_sha256'] = sha256(snapshot(Path(config[key]), MAX_BINARY))
+    config['lock_sha256'] = sha256(snapshot(Path(config['lockfile']), 2 * 1024**2))
+    for key in ('toolchain', 'vendor'):
+        config[key + '_sha256'] = input_tree(Path(config[key]), administrator)
+    input_tree(Path(config['archives']), administrator)
+    verify_prepared_inputs(config, administrator)
+    proxy_binary(Path(config['caddy_archive']),
+                 {'external_requirements': {'proxy': {'version': CADDY_VERSION, 'sha512': CADDY_SHA512}}})
+    content = ''.join(f'{key} = {json.dumps(value)}\n' for key, value in config.items()).encode()
+    # Match the installer's no-replacement publication: interrupted or existing
+    # output is never adopted or removed. Only this invocation's temp is cleaned.
+    with tempfile.NamedTemporaryFile(dir=output.parent, prefix='.app-config-', delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.link(temporary, output, follow_symlinks=False)
+            descriptor = os.open(output.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        finally:
+            temporary.unlink()
+    return {'config': str(output), 'next_action': 'review-config-then-plan',
+            'installed_state_changed': False, 'inputs_executed': False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('plan', 'apply', 'enroll', 'start', 'status'))
-    parser.add_argument('--config', required=True, type=Path)
+    parser.add_argument('mode', choices=('configure', 'plan', 'apply', 'enroll', 'start', 'status'))
+    parser.add_argument('--config', type=Path, help='Existing reviewed schema-1 configuration')
+    setup = parser.add_argument_group('configure only: validate prepared inputs without execution')
+    setup.add_argument('--inputs', type=Path)
+    setup.add_argument('--hostname')
+    setup.add_argument('--source-commit')
+    setup.add_argument('--output', type=Path)
     args = parser.parse_args()
+    fields = (args.inputs, args.hostname, args.source_commit, args.output)
+    if args.mode == 'configure':
+        if args.config is not None or any(value is None for value in fields):
+            parser.error('configure requires --inputs, --hostname, --source-commit and --output; omit --config')
+    elif args.config is None or any(value is not None for value in fields):
+        parser.error(args.mode + ' requires --config and does not accept configure-only options')
     try:
+        if args.mode == 'configure':
+            print(json.dumps(configure(args.inputs, args.hostname, args.source_commit, args.output), indent=2))
+            return
         config = load_config(args.config)
         host = AppHost()
         host.preflight(Path('/'), MIN_FREE)
