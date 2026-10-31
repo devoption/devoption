@@ -24,6 +24,17 @@ The same original ZIP now has [verified long-lived draft retention](release-reco
 including independent downloaded-byte verification. Preview.1's existing record
 is unchanged.
 
+The [preview.3 record](../release-candidates/0.1.0-preview.3.json) selects
+[run 41223531548](https://github.com/devoption/devoption/actions/runs/41223531548),
+attempt 1, from reviewed main source
+`dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0`. The exact-main release check,
+signing, independent Actions readback, and local original-ZIP/proof/archive checks
+passed; see [preview.3 provenance evidence](bundle-provenance.md#preview3-signing-and-independent-readback).
+This candidate declares fresh installation only. It does not inherit the earlier
+base-upgrade acceptance. Long-lived draft retention is the next operation under
+[#357](https://github.com/devoption/devoption/issues/357); public publication remains
+gated and the earlier reservations remain unchanged.
+
 ## Reserve and retry
 
 Independently review the source commit, version, archive/proof digests, original

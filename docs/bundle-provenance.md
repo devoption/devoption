@@ -268,3 +268,31 @@ checks. Ordinary read-only Ubuntu PR CI separately installs the pinned CLI and
 requires it to reject a forged proof. Those tests alone do not establish positive
 live OIDC issuance, attestation write permissions or signer certificate acceptance;
 the approved live run above supplies that acceptance evidence for its exact commit.
+
+## Preview.3 signing and independent readback
+
+The owner selected another unpublished validation candidate on 2026-10-31.
+[Release check 41223529475](https://github.com/devoption/devoption/actions/runs/41223529475)
+passed for exact main source `dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0` and
+version `0.1.0-preview.3`.
+[Provenance run 41223531548](https://github.com/devoption/devoption/actions/runs/41223531548),
+attempt 1, passed its source checks, build/install/runtime tests, OIDC attestation,
+seven-day artifact retention, and independent downloaded-packet verification.
+
+- Actions artifact ID: `13050973236`, 10,581,393 bytes.
+- Artifact name: `bundle-dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0-41223531548-1`.
+- Transport SHA-256: `75441516638c6e7c26d57d16dc9234023612f7d8c6a8b250a20cad90ad3fe055`.
+- Archive SHA-256: `0fcddd6b3e80574f3c59346b380b18fea06cc4af25c847d647940a5fb8d040c1`.
+- Proof SHA-256: `373fd2bba2c1015b832c271970ac64ee069917842e181cc4bd6cb3248fd9c10a`.
+
+An independent local download matched the transport digest supplied by GitHub's
+artifact metadata and the successful readback job. The pinned GitHub CLI 2.102.0
+verified the proof/workflow identity, and the reservation checker verified the
+receipt and complete archive without executing downloaded platform binaries.
+The [candidate record](../release-candidates/0.1.0-preview.3.json) fixes this identity;
+previous records are unchanged. Long-lived draft retention follows under #357.
+
+These checks establish candidate authenticity and source-built test evidence,
+not signed-packet installer or cross-version upgrade acceptance. Preview.3 is
+fresh-install-only, `publication_eligible` remains false, and #21/public-publication
+policy remains in force. No production installation was changed.

@@ -10,8 +10,9 @@ Preview.1 and preview.2 remain immutable signed validation packets in the
 [candidate catalog](release-candidates.md), with unpublished retained drafts and
 [verified readback](release-reconciliation.md#live-retention-evidence). Their
 [base-upgrade/reboot acceptance](bundle-upgrade-acceptance.md) does not establish
-preview.3 compatibility. Preview.3 still needs exact-version signed packet and
-installer acceptance and the owner release gate under
+preview.3 compatibility. Preview.3 now has [signed-candidate and readback evidence](bundle-provenance.md#preview3-signing-and-independent-readback).
+Long-lived draft retention follows its reservation. Exact-version signed-packet
+installer acceptance and the owner release gate remain under
 [#21](https://github.com/devoption/devoption/issues/21). Preparation and source CI
 are not publication approval; the promotion stop remains enabled.
 

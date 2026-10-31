@@ -7,7 +7,7 @@ create GitHub releases, distribute bundles or upload to a registry. The existing
 [release approval process](releases.md) and #21 remain applicable. There is still
 no published product release; the prepared source version is `0.1.0-preview.3`.
 Its schema-2 metadata declares fresh installation only, without an upgrade source.
-Signed-packet acceptance and the owner publication gate remain pending; see the
+Signed-packet installer acceptance and the owner publication gate remain pending; see the
 [current release status](releases.md). Earlier preview.1-to-preview.2 acceptance
 does not establish this version's compatibility.
 
