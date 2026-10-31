@@ -42,6 +42,7 @@ impl Fixture {
                 Arc::clone(&slot),
                 projects::routes(projects).merge(profile::routes(profile)),
                 false,
+                None,
             ),
             3000,
             Arc::clone(&slot),

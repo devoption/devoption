@@ -10,6 +10,7 @@ import http.client
 import socket
 import time
 import threading
+import re
 
 
 def request(port, path, method='GET', headers=None):
@@ -45,6 +46,24 @@ def check(port, fixture):
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         results = list(executor.map(burst_request, range(7)))
     assert results == [(200, f'ok {fixture}'.encode())] * 7, results
+    # Browser activity is an anonymous host cookie, never a guest credential.
+    connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+    try:
+        connection.request('GET', '/', headers={'Accept':'text/html'})
+        response = connection.getresponse()
+        response.read(1024*1024+1)
+        cookie = response.getheader('Set-Cookie')
+        assert re.fullmatch(r'__Host-devoption-activity=[0-9a-f]{32}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400', cookie or ''), cookie
+    finally:
+        connection.close()
+    connection = http.client.HTTPConnection('127.0.0.1', port, timeout=8)
+    try:
+        connection.request('GET', '/', headers={'Accept':'text/html', 'Cookie':cookie.split(';')[0]})
+        response = connection.getresponse()
+        response.read(1024*1024+1)
+        assert response.getheader('Set-Cookie') is None
+    finally:
+        connection.close()
     if fixture != 'probes':
         assert request(port,'/healthz') == (200, f'ok {fixture}'.encode())
         code,body = request(port,'/')

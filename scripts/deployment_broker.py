@@ -689,7 +689,56 @@ def status(config, include_log=True):
     return {'project': config.get('project'), 'ingress': ingress_status(config, record), 'last_action': last, 'generation': digest(canonical(desired(config))), 'fingerprint': config['fingerprint'], 'port': config['port'], 'deployment': record, 'releases': releases, 'log': log}
 
 
+def telemetry(config, record, state):
+    """Read bounded host telemetry only for the currently running invocation."""
+    if not record or record.get('intent') != 'running' or state.get('ActiveState') != 'active':
+        return None
+    path = Path('/run') / config.get('runtime_directory', 'devoption-app') / 'metrics.json'
+    try:
+        value = json.loads(read_regular(path, 262144))
+        now = int(time.time())
+        if (not isinstance(value, dict) or value.get('version') != 1 or not ID.fullmatch(str(value.get('invocation', '')))
+                or value['invocation'] != record.get('invocation')
+                or value['invocation'] != state.get('InvocationID')
+                or type(value.get('updated')) is not int
+                or not 0 <= now - value['updated'] <= 45):
+            return None
+        return value
+    except (ValueError, OSError, TypeError, KeyError):
+        return None
+
+
+def overview(config):
+    """Read-only summary: omit release manifests, logs and credentials."""
+    slots = config.get('apps', [config])
+    result = []
+    for slot in slots:
+        record = desired(slot)
+        state = unit_state(slot.get('unit', UNIT))
+        observed = None
+        if record:
+            if record['intent'] == 'running':
+                observed = 'failed'
+                try:
+                    load_release(slot, record['release'])
+                    if (record['fingerprint'] == slot['fingerprint']
+                            and state.get('InvocationID') == record.get('invocation')
+                            and state.get('ActiveState') == 'active'
+                            and health(slot, record['health'], record.get('invocation'))):
+                        observed = 'healthy'
+                except (ValueError, OSError):
+                    pass
+            else:
+                observed = 'stopped'
+        result.append({'project': slot.get('project') or (record or {}).get('project'),
+                       'observed': observed,
+                       'telemetry': telemetry(slot, record, state)})
+    return {'apps': result}
+
+
 def dispatch(config, args):
+    if args == ['overview']:
+        return overview(config)
     if args[:1] == ['project']:
         if len(args) < 3 or not ID.fullmatch(args[1]):
             raise ValueError('invalid project operation')

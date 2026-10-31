@@ -144,7 +144,7 @@ fn selected_broker(
 fn project_broker(project: ProjectId, args: &[&str]) -> io::Result<Value> {
     selected_broker(Some(&hex(&project.to_bytes())), args, None)
 }
-fn broker(args: &[&str]) -> io::Result<Value> {
+pub(in crate::server) fn broker(args: &[&str]) -> io::Result<Value> {
     broker_input(args, None)
 }
 fn broker_input(args: &[&str], input: Option<&[u8]>) -> io::Result<Value> {

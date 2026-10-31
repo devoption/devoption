@@ -26,6 +26,8 @@ mod auth;
 #[cfg(unix)]
 mod input;
 #[cfg(unix)]
+mod overview;
+#[cfg(unix)]
 mod platform_updates;
 #[cfg(unix)]
 mod profile;
@@ -426,6 +428,8 @@ fn run_with_roots(
             let configured = false;
             let session = Arc::new(SessionSlot::default());
             #[cfg(unix)]
+            let overview_projects = projects.clone();
+            #[cfg(unix)]
             let project_routes = projects
                 .map(projects::routes)
                 .unwrap_or_default()
@@ -438,7 +442,22 @@ fn run_with_roots(
                 port,
                 public_origin.is_some(),
             );
-            let app = page_routes(configured, Arc::clone(&session), project_routes, installed);
+            let app = page_routes(
+                configured,
+                Arc::clone(&session),
+                project_routes,
+                installed,
+                {
+                    #[cfg(unix)]
+                    {
+                        overview_projects
+                    }
+                    #[cfg(not(unix))]
+                    {
+                        None
+                    }
+                },
+            );
             let origin = public_origin
                 .map(RequestOrigin::Public)
                 .unwrap_or(RequestOrigin::Local(address.port()));
@@ -469,11 +488,17 @@ fn platform_installation(
         && public
 }
 
+#[cfg(unix)]
+type OverviewProjects = projects::Projects;
+#[cfg(not(unix))]
+type OverviewProjects = ();
+
 fn page_routes(
     configured: bool,
     session: SharedSession,
     project_routes: Router,
     _installed: bool,
+    _overview: Option<OverviewProjects>,
 ) -> Router {
     let mut pages = Router::new();
     for (path, page) in [
@@ -486,7 +511,13 @@ fn page_routes(
     ] {
         #[cfg(unix)]
         if configured && matches!(page, Page::Home) {
-            pages = pages.route(path, get(move || platform_updates::home(_installed)));
+            let projects = _overview.clone();
+            pages = pages.route(
+                path,
+                get(move |query: axum::extract::RawQuery| {
+                    overview::home(projects.clone(), _installed, query.0)
+                }),
+            );
             continue;
         }
         if configured && matches!(page, Page::Projects) {

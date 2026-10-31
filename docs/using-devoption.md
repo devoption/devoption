@@ -275,9 +275,56 @@ For a separate app URL on the same server, follow [app hostnames](app-hostnames.
 The project Releases page shows the configured URL and local TLS/routing status;
 public DNS and external reachability still need operator verification.
 
+## Operational Overview
+
+After sign-in, **Overview** summarizes saved projects, their current runtime checks,
+latest saved build results, and items to review. It retains the application's
+existing appearance and navigation. **Platform maintenance** contains the version
+and upgrade guidance. Refresh reloads observations without starting workloads.
+
+Monitoring offers **1h** and **24h** windows for aggregate active-user estimates,
+request counts, p95 handling latency, and HTTP 5xx error rates. Open a project's
+**Monitoring** link for that project's statistics at `/projects/{id}/monitoring`.
+Per-app user counts do not appear on Overview project cards.
+
+Metrics require the updated, explicitly configured DevOption Wasm worker and
+broker. They describe requests handled by that worker, not separate native
+backends or an external proxy. The worker keeps bounded five-minute buckets in
+memory for up to 24 hours and publishes host-only aggregates every 15 seconds.
+The controller caches runtime summaries for up to 15 seconds, rejects metrics
+older than 45 seconds or from a different worker invocation, and reloads data on
+navigation or **Refresh Overview**. There is no background browser polling.
+History resets when a worker restarts. Missing or incomplete intervals are gaps,
+not zero traffic; summaries cover available observations, and coverage is explicit.
+Latency is an upper-bound histogram estimate of handling time including admission
+waiting, excluding response transfer. P95 is computed from combined request
+histograms, not an average of project percentiles. The p95 estimate is unavailable
+if it falls in the overflow bucket above 12.8 seconds. Idle buckets have no latency
+or error-rate sample. `/healthz` probes are excluded.
+
+**Active users** estimates browsers active within the last five minutes. The host
+sets a per-app `__Host-devoption-activity` cookie on HTML navigation, using Secure,
+HttpOnly, SameSite=Lax, a root path, and a 24-hour lifetime. This is an anonymous
+activity identifier, not authentication. Recent identifiers remain only in bounded
+host memory; snapshots contain counts, not identifiers, IPs or URLs. The host strips
+its activity cookie before invoking application code. Activity is capped at 10,000
+recent identifiers per app; saturation is shown as a lower bound. Counts sum per
+app: the same person can count in several apps or browsers. Cookie rejection,
+clearing, automated HTML clients, and private HTTP access can distort estimates;
+non-browser clients are not identified. This is not a count of registered accounts
+or globally deduplicated people.
+
+Security scans, autonomous agents, stalled-agent detection, and agent approvals
+are not implemented. Overview labels these as not connected rather than reporting
+healthy coverage or zero pending agent decisions. Runtime health is a point-in-time
+broker check, not an uptime guarantee. Saved queued/running build checkpoints are
+not live process status. Failed/interrupted latest saved builds and failed runtime
+checks link to their project details. **Recorded outcomes** reports saved build
+results without inventing timestamps, agent activity, deployments, or backup checks.
+
 ## DevOption updates
 
-On a configured server, Overview shows the running DevOption version and any
+On a configured server, Overview → **Platform maintenance** shows the running DevOption version and any
 reviewed upgrade observation selected by the server administrator. Expand
 **Review upgrade and recovery steps** for the operator's SSH actions. Refresh
 reloads the saved status; it does not check a remote release feed or start an

@@ -133,7 +133,11 @@ fn normal_response_reads_fail_on_reset_after_partial_success() {
 fn pages_share_layout_and_have_working_navigation() {
     let (_server, address) = start();
     for (path, title, message) in [
-        ("/", "Overview", "One place for your software projects."),
+        (
+            "/",
+            "Overview",
+            "Application health, ongoing work, and decisions that need you.",
+        ),
         (
             "/projects",
             "Projects",

@@ -161,7 +161,7 @@ pub(super) async fn show(
             .into_response(),
     }
 }
-fn state(state: &State) -> (&'static str, &'static str) {
+pub(in crate::server) fn state(state: &State) -> (&'static str, &'static str) {
     match state {
         State::Queued => (
             "Queued",

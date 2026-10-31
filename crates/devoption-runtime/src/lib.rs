@@ -3,6 +3,7 @@
 //! authorization stays in the host and requires an explicit deployment grant.
 mod https;
 mod records;
+mod telemetry;
 
 use http_body_util::{BodyExt, Full, Limited};
 use hyper::{Request, Response, body::Bytes};
@@ -241,6 +242,12 @@ async fn receive(stream: &mut TcpStream) -> Result<Request<Full<Bytes>>, u16> {
             }
             length = Some(text.parse::<usize>().map_err(|_| 413u16)?);
         }
+        if h.name.eq_ignore_ascii_case("cookie")
+            && let Ok(raw) = std::str::from_utf8(h.value)
+            && let Some(id) = telemetry::cookie_id(raw)
+        {
+            request = request.extension(telemetry::ActivityCookie(id.to_owned()));
+        }
         if ![
             "authorization",
             "cookie",
@@ -282,29 +289,66 @@ async fn connection(
     admission: Arc<Semaphore>,
     records: Option<Arc<records::Grant>>,
     https: Option<Arc<https::Grant>>,
+    telemetry: Arc<std::sync::Mutex<telemetry::Telemetry>>,
 ) {
+    let started = std::time::Instant::now();
+    let mut visitor = None;
+    let mut fresh = false;
+    let mut probe = false;
     let response = match tokio::time::timeout(DEADLINE, receive(&mut stream)).await {
         Err(_) => failure(408),
         Ok(Err(code)) => failure(code),
-        Ok(Ok(request)) => match admit(&admission).await {
-            None => failure(503),
-            Some(_permit) => {
-                match tokio::time::timeout(DEADLINE, invoke(&pre, request, records, https)).await {
-                    Err(_) => failure(504),
-                    Ok(Err(error))
-                        if matches!(
-                            error.downcast_ref::<wasmtime::Trap>(),
-                            Some(wasmtime::Trap::Interrupt)
-                        ) =>
+        Ok(Ok(mut request)) => {
+            probe = request.uri().path() == "/healthz";
+            // Health probes and bots without HTML navigation do not create users.
+            let navigation = request
+                .headers()
+                .get("accept")
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|v| v.contains("text/html"));
+            // receive() strips all control cookies before building guest headers,
+            // retaining only the validated activity identifier in a host extension.
+            let cookie = request
+                .extensions_mut()
+                .remove::<telemetry::ActivityCookie>();
+            if !probe && (navigation || cookie.is_some()) {
+                let (id, new) = telemetry
+                    .lock()
+                    .expect("telemetry lock")
+                    .visitor(cookie.as_ref().map(|c| c.0.as_str()));
+                visitor = Some(id);
+                fresh = new;
+            }
+            match admit(&admission).await {
+                None => failure(503),
+                Some(_permit) => {
+                    match tokio::time::timeout(DEADLINE, invoke(&pre, request, records, https))
+                        .await
                     {
-                        failure(504)
+                        Err(_) => failure(504),
+                        Ok(Err(error))
+                            if matches!(
+                                error.downcast_ref::<wasmtime::Trap>(),
+                                Some(wasmtime::Trap::Interrupt)
+                            ) =>
+                        {
+                            failure(504)
+                        }
+                        Ok(Err(_)) => failure(502),
+                        Ok(Ok(response)) => response,
                     }
-                    Ok(Err(_)) => failure(502),
-                    Ok(Ok(response)) => response,
                 }
             }
-        },
+        }
     };
+    if !probe {
+        telemetry.lock().expect("telemetry lock").record(
+            telemetry::now(),
+            started.elapsed().as_millis().min(u64::MAX as u128) as u64,
+            response.status().is_server_error(),
+            visitor.clone(),
+        );
+    }
     log(&format!("request completed: {}", response.status()));
     let invocation = std::env::var("INVOCATION_ID").unwrap_or_default();
     let invocation = if invocation.len() == 32 && invocation.bytes().all(|b| b.is_ascii_hexdigit())
@@ -335,6 +379,15 @@ async fn connection(
         wire.extend_from_slice(b": ");
         wire.extend_from_slice(value.as_bytes());
         wire.extend_from_slice(b"\r\n");
+    }
+    if fresh && let Some(id) = visitor {
+        wire.extend_from_slice(
+            format!(
+                "Set-Cookie: {}={id}; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=86400\r\n",
+                telemetry::COOKIE
+            )
+            .as_bytes(),
+        );
     }
     wire.extend_from_slice(b"\r\n");
     wire.extend_from_slice(response.body());
@@ -409,6 +462,7 @@ fn run_inner(
         .build()?
         .block_on(async move {
             let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port)).await?;
+            let telemetry = telemetry::start();
             let connections = Arc::new(Semaphore::new(16));
             let admission = Arc::new(Semaphore::new(1));
             loop {
@@ -418,9 +472,10 @@ fn run_inner(
                     let admission = admission.clone();
                     let records = records.clone();
                     let https = https.clone();
+                    let telemetry = telemetry.clone();
                     tokio::spawn(async move {
                         let _permit = permit;
-                        connection(stream, pre, admission, records, https).await;
+                        connection(stream, pre, admission, records, https, telemetry).await;
                     });
                 }
             }
@@ -432,6 +487,31 @@ fn run_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn activity_identifier_survives_ingress_only_as_host_metadata() {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            receive(&mut stream).await.unwrap()
+        });
+        let mut client = TcpStream::connect(address).await.unwrap();
+        client.write_all(b"GET / HTTP/1.1\r\nHost: app\r\nAccept: text/html\r\nCookie: private=secret; __Host-devoption-activity=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\r\nAuthorization: Bearer secret\r\n\r\n").await.unwrap();
+        let request = server.await.unwrap();
+        assert!(request.headers().get("cookie").is_none());
+        assert!(request.headers().get("authorization").is_none());
+        assert_eq!(
+            request
+                .extensions()
+                .get::<telemetry::ActivityCookie>()
+                .unwrap()
+                .0,
+            "a".repeat(32)
+        );
+    }
+
     #[tokio::test]
     async fn short_burst_waits_and_keeps_guest_execution_serial() {
         let admission = Arc::new(Semaphore::new(1));

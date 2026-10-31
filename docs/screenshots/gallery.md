@@ -8,6 +8,14 @@ for dimensions, states and refresh instructions.
 
 ![Overview page](home.jpg)
 
+**Overview monitoring (synthetic renderer inputs; no live apps or agents)**
+
+![Illustrative monitoring series in the existing theme](home-monitoring.jpg)
+
+**Project monitoring (authenticated drilldown; telemetry unavailable)**
+
+![Project monitoring page](project-monitoring.jpg)
+
 **Projects (search and temporary fixture data)**
 
 ![Projects page](projects.jpg)

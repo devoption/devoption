@@ -20,7 +20,9 @@ pub fn render_users() -> String {
 pub fn render_join() -> String {
     auth::render_join()
 }
+mod overview;
 mod platform_updates;
+pub use overview::{MetricPoint, Monitoring, Overview, OverviewOutcome, OverviewProject};
 mod profile;
 pub use platform_updates::{PlatformUpdates, UpgradeNotice};
 mod projects;
@@ -215,6 +217,7 @@ pub fn render_project_secrets(
 }
 
 enum ProjectView<'a> {
+    Monitoring(&'a ProjectSummary<'a>, &'a Monitoring, u64),
     Secrets(&'a ProjectSummary<'a>, &'a EnvironmentSecretsView),
     Deployment(&'a ProjectSummary<'a>, &'a DeploymentView),
     Execution(&'a ProjectSummary<'a>, &'a BuildExecutionView),
@@ -226,11 +229,29 @@ enum ProjectView<'a> {
 }
 
 pub fn render_platform_home(updates: &PlatformUpdates) -> String {
-    render_page_with_updates(Page::Home, true, None, Some(updates))
+    render_overview(&Overview::default(), updates)
+}
+
+/// Render authenticated operational evidence inside the unchanged page shell.
+pub fn render_overview(view: &Overview, updates: &PlatformUpdates) -> String {
+    render_page_with_updates(Page::Home, true, None, Some(updates), Some(view))
+}
+
+/// Per-project traffic details use the existing project workspace shell.
+pub fn render_project_monitoring(
+    project: &ProjectSummary<'_>,
+    monitoring: &Monitoring,
+    hours: u64,
+) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Monitoring(project, monitoring, hours)),
+    )
 }
 
 fn render_page(page: Page, account_available: bool, projects: Option<ProjectView<'_>>) -> String {
-    render_page_with_updates(page, account_available, projects, None)
+    render_page_with_updates(page, account_available, projects, None, None)
 }
 
 fn render_page_with_updates(
@@ -238,13 +259,18 @@ fn render_page_with_updates(
     account_available: bool,
     projects: Option<ProjectView<'_>>,
     updates: Option<&PlatformUpdates>,
+    overview: Option<&Overview>,
 ) -> String {
     if matches!(page, Page::SignIn) {
         return auth::render(account_available);
     }
     // Dynamic project content is escaped by its renderer; other values are static.
     let (title, path, message) = match page {
-        Page::Home => ("Overview", "/", "One place for your software projects."),
+        Page::Home => (
+            "Overview",
+            "/",
+            "Application health, ongoing work, and decisions that need you.",
+        ),
         Page::Projects => (
             "Projects",
             "/projects",
@@ -252,7 +278,8 @@ fn render_page_with_updates(
                 Some(ProjectView::List([], _)) => "No projects yet.",
                 Some(ProjectView::List(..)) => "Your saved projects.",
                 Some(
-                    ProjectView::Detail(..)
+                    ProjectView::Monitoring(..)
+                    | ProjectView::Detail(..)
                     | ProjectView::Files(..)
                     | ProjectView::Preparation(..)
                     | ProjectView::History(..)
@@ -291,7 +318,8 @@ fn render_page_with_updates(
         Page::SignIn => unreachable!("Authentication uses its dedicated layout"),
     };
     let (title, main_class) = if let Some(
-        ProjectView::Detail(project, _, _, _)
+        ProjectView::Monitoring(project, _, _)
+        | ProjectView::Detail(project, _, _, _)
         | ProjectView::Files(project, _)
         | ProjectView::Preparation(project, _)
         | ProjectView::History(project, _)
@@ -311,7 +339,8 @@ fn render_page_with_updates(
             r#"<button class="action-button primary" type="button" data-open-dialog="project-dialog" disabled><span aria-hidden="true">＋</span>New project</button>"#
         }
         Some(
-            ProjectView::Detail(..)
+            ProjectView::Monitoring(..)
+            | ProjectView::Detail(..)
             | ProjectView::Files(..)
             | ProjectView::Preparation(..)
             | ProjectView::History(..)
@@ -324,7 +353,8 @@ fn render_page_with_updates(
     let breadcrumb = if matches!(
         &projects,
         Some(
-            ProjectView::Detail(..)
+            ProjectView::Monitoring(..)
+                | ProjectView::Detail(..)
                 | ProjectView::Files(..)
                 | ProjectView::Preparation(..)
                 | ProjectView::History(..)
@@ -342,6 +372,7 @@ fn render_page_with_updates(
     let document_title = match &projects {
         Some(ProjectView::Secrets(..)) => format!("{title} · Environments"),
         Some(ProjectView::Deployment(..)) => format!("{title} · Releases"),
+        Some(ProjectView::Monitoring(..)) => format!("{title} · Monitoring"),
         Some(ProjectView::Files(..)) => format!("{title} · Files"),
         Some(
             ProjectView::Preparation(..) | ProjectView::History(..) | ProjectView::Execution(..),
@@ -354,6 +385,14 @@ fn render_page_with_updates(
         _ => title.clone(),
     };
     let project_content = projects.map(|view| match view {
+        ProjectView::Monitoring(project, monitoring, hours) => {
+            let base = format!("/projects/{}/monitoring", overview::hex(&project.id));
+            format!(
+                "<p><a href=\"/projects/{}\">← Project overview</a></p>{}",
+                overview::hex(&project.id),
+                overview::monitoring(monitoring, hours, &base)
+            )
+        }
         ProjectView::Secrets(project, view) => projects::secrets_content(project, view),
         ProjectView::Files(project, files) => projects::files_content(project, files),
         ProjectView::History(project, view) => projects::history_content(project, view),
@@ -365,7 +404,7 @@ fn render_page_with_updates(
             projects::detail_with_creation(project, available, creation, section)
         }
     });
-    let update_content = updates.map(|view| format!("{}{}", HOME, platform_updates::content(view)));
+    let update_content = updates.map(|updates| format!("{}<details class=\"overview-maintenance\"><summary>Platform maintenance</summary>{}</details>", overview::content(overview.unwrap_or(&Overview::default())), platform_updates::content(updates)));
     let (appearance_current, content) = if let Some(content) =
         project_content.as_deref().or(update_content.as_deref())
     {

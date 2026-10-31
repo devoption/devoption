@@ -24,7 +24,7 @@ fn app(configured: bool, slot: SharedSession) -> Router {
         Router::new()
     };
     protect(
-        page_routes(configured, Arc::clone(&slot), projects, false),
+        page_routes(configured, Arc::clone(&slot), projects, false, None),
         3000,
         slot,
     )
@@ -53,7 +53,7 @@ fn reply(app: &Router, request: Request) -> (StatusCode, HeaderMap, Vec<u8>) {
         .unwrap()
         .block_on(async {
             let (parts, body) = app.clone().oneshot(request).await.unwrap().into_parts();
-            let body = axum::body::to_bytes(body, 128 * 1024).await.unwrap();
+            let body = axum::body::to_bytes(body, 512 * 1024).await.unwrap();
             (parts.status, parts.headers, body.to_vec())
         })
 }

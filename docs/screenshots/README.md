@@ -9,8 +9,10 @@ Use stable filenames; Git retains earlier captures. All default captures use
 
 | Page or state | Path | Capture state | File |
 | --- | --- | --- | --- |
-| Overview | `/` | Signed in; no installed-host observation | `home.jpg` |
-| Platform update | `/` | Synthetic reviewed preview notice; 1280 × 1000 | `platform-update.jpg` |
+| Overview | `/` | Signed in; real fixture catalog; telemetry, agents and security unavailable | `home.jpg` |
+| Populated monitoring | Static Overview renderer | Synthetic aggregate samples only; 1280 × 1000 | `home-monitoring.jpg` |
+| Project monitoring | `/projects/{id}/monitoring` | Authenticated project drilldown; metrics unavailable; 1280 × 900 | `project-monitoring.jpg` |
+| Platform update | `/` | Synthetic reviewed preview notice; maintenance expanded and scrolled into view; 1280 × 1000 | `platform-update.jpg` |
 | Projects | `/projects` | Two original fixture projects; empty filter; dialogs closed | `projects.jpg` |
 | New project | `/projects` | New project dialog; unsaved name Example new project | `project-create.jpg` |
 | Project overview | `/projects/{id}` | Example application; repository list, checkout locations collapsed; 1280 × 900 | `project-details.jpg` |
@@ -221,13 +223,22 @@ separate protocol checks verify the full chain. No system trust or public DNS
 changes are involved. Restore the valid trust file after capturing the intentional
 certificate failure.
 
+For `home-monitoring.jpg`, generate an explicitly labeled **synthetic telemetry**
+preview using `DEVOPTION_OVERVIEW_CAPTURE=ABSOLUTE_HTML_PATH cargo test -p
+devoption-ui manual_overview_monitoring_fixture -- --ignored`. Load that HTML
+in the authenticated disposable fixture's browser context and capture at
+1280 × 1000, Nord / Dark / Purple. This exercises chart rendering only; it is not
+worker, deployment, active-user, agent, security, or backup evidence. The default
+`home.jpg` uses the real fixture catalog with unavailable metrics. Follow its
+**Monitoring →** link for `project-monitoring.jpg`, at 1280 × 900.
+
 For `platform-update.jpg`, add `DEVOPTION_BROWSER_UPGRADE=not-started` to the
 browser fixture command and use 1280 × 1000. This test-binary-only flag supplies
 a synthetic preview.2-to-preview.3 observation with fixed sample digests and a
 42-second age. It creates no host notice, signed packet or upgrade. The production
 binary has no such override. Other supported fixture values are `healthy`, `failed`
-and `restored`; do not describe these captures as real upgrade evidence. Capture
-`home.jpg` without this flag, at the default dimensions. Verify both disclosures
+and `restored`; do not describe these captures as real upgrade evidence. Expand **Platform maintenance** and scroll that disclosure into view for
+`platform-update.jpg`. Capture `home.jpg` without this flag, at the default dimensions. Verify both disclosures
 and the SSH guidance at narrow widths; no browser action executes the updater.
 
 The content-layout refresh uses synthetic saved history for `project-builds.jpg`

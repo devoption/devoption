@@ -378,3 +378,30 @@ class IdentityTests(unittest.TestCase):
 
 
 if __name__ == '__main__': unittest.main()
+
+class OverviewTelemetryTests(unittest.TestCase):
+    def test_telemetry_is_bounded_fresh_and_bound_to_running_invocation(self):
+        value = {'version': 1, 'invocation': 'a'*32, 'updated': 1000}
+        record = {'intent': 'running', 'invocation': 'a'*32}
+        state = {'ActiveState': 'active', 'InvocationID': 'a'*32}
+        with patch.object(broker, 'read_regular', return_value=json.dumps(value).encode()) as read, patch.object(broker.time, 'time', return_value=1045):
+            self.assertEqual(broker.telemetry({}, record, state), value)
+            self.assertEqual(read.call_args.args[1], 262144)
+        with patch.object(broker, 'read_regular', return_value=json.dumps(value).encode()), patch.object(broker.time, 'time', return_value=1046):
+            self.assertIsNone(broker.telemetry({}, record, state))
+        for malformed in [[], None, {'version':1,'invocation':'a'*32,'updated':True}]:
+            with patch.object(broker, 'read_regular', return_value=json.dumps(malformed).encode()), patch.object(broker.time, 'time', return_value=1000):
+                self.assertIsNone(broker.telemetry({}, record, state))
+        state['InvocationID'] = 'b'*32
+        with patch.object(broker, 'read_regular', return_value=json.dumps(value).encode()), patch.object(broker.time, 'time', return_value=1000):
+            self.assertIsNone(broker.telemetry({}, record, state))
+        with patch.object(broker, 'read_regular', side_effect=ValueError('unsafe file')):
+            self.assertIsNone(broker.telemetry({}, record, state))
+
+    def test_overview_never_exposes_manifests_or_log_tails(self):
+        config = {'project': 'c'*32, 'fingerprint': 'f'*64}
+        record = {'project': 'c'*32, 'intent': 'running', 'release': 'r', 'fingerprint': 'f'*64, 'invocation': 'a'*32, 'health': 'ok'}
+        with patch.object(broker, 'desired', return_value=record), patch.object(broker, 'unit_state', return_value={'ActiveState':'active','InvocationID':'a'*32}), patch.object(broker, 'load_release', return_value={'secret':'not displayed'}), patch.object(broker, 'health', return_value=True), patch.object(broker, 'telemetry', return_value=None):
+            value = broker.dispatch({'apps':[config]}, ['overview'])
+        self.assertEqual(value['apps'][0]['observed'], 'healthy')
+        self.assertEqual(set(value['apps'][0]), {'project','observed','telemetry'})

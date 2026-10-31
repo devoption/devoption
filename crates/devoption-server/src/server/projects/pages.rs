@@ -21,7 +21,14 @@ pub(super) fn routes(projects: Projects) -> Router {
         .route(
             "/projects/{project}/{section}",
             get(
-                move |path: Result<RoutePath<(String, String)>, PathRejection>| async move {
+                move |path: Result<RoutePath<(String, String)>, PathRejection>,
+                      query: axum::extract::RawQuery| async move {
+                    if let Ok(RoutePath((project, section))) = &path
+                        && section == "monitoring"
+                        && let Some(id) = project_id(project)
+                    {
+                        return super::super::overview::project(projects, id, query.0).await;
+                    }
                     let (project, section) = path
                         .ok()
                         .map(|RoutePath((project, section))| {

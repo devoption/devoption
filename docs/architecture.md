@@ -99,6 +99,13 @@ runtime guides specify enforced limits and remaining trust assumptions. The
 fixture/rehearsal results do not establish public DNS/ACME acceptance or general
 production readiness.
 
+The authenticated [operational Overview](using-devoption.md#operational-overview)
+combines fresh catalog associations, saved build history, and read-only broker
+runtime summaries. The Wasm worker publishes bounded aggregate telemetry in its
+existing host runtime directory; invocation binding and freshness checks prevent
+old workers from supplying current coverage. No observation grants workload or
+approval authority. Agent operations and security scans remain unimplemented.
+
 ## Planned flow and unresolved boundaries
 
 The [roadmap](../ROADMAP.md) owns remaining public-host acceptance and broader
