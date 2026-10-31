@@ -231,7 +231,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         .route(
             "/projects/{project}/repositories/{repository}/status",
             get(move |ids: Result<RoutePath<(String, String)>, PathRejection>| async move {
-                let ids = ids.ok().and_then(|RoutePath((project, repository))| Some((project_id(&project)?, devoption_projects::RepositoryId::from_bytes(project_id(&repository)?.to_bytes()))));
+                let ids = ids.ok().and_then(|RoutePath((project, repository))| Some((project_id(&project)?, devoption_projects::RepositoryId::from_hex(&repository)?)));
                 let Some((project, repository)) = ids else {
                     return (StatusCode::NOT_FOUND, [(CACHE_CONTROL, "no-store")], "Repository is unavailable.").into_response();
                 };
@@ -412,14 +412,7 @@ impl From<Error> for Failure {
 }
 
 fn project_id(value: &str) -> Option<ProjectId> {
-    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-        return None;
-    }
-    let mut bytes = [0; 16];
-    for (i, byte) in bytes.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&value[i * 2..i * 2 + 2], 16).ok()?;
-    }
-    Some(ProjectId::from_bytes(bytes))
+    ProjectId::from_hex(value)
 }
 
 fn render(catalog: &Catalog, attachment_available: bool) -> String {

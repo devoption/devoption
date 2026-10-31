@@ -58,6 +58,9 @@ For a source checkout, use `cargo run --locked --offline -- check-source` with t
 same options. Replace both IDs with the saved 32-character hexadecimal values:
 the project ID is in `/projects/{project}`, and **Check source** links to
 `/projects/{project}/builds/{repository}`. Names and checkout paths are not IDs.
+HTTP and CLI use the same strict project/repository ID parser: exactly 32 ASCII
+hexadecimal characters, with either letter case accepted and leading zeros
+preserved. Parsing alone grants no existence or access rights.
 All four options are required; there is no default storage path or managed-write
 option. Relative paths, unknown/duplicate options and malformed IDs are rejected.
 

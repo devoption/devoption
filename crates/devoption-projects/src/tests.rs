@@ -133,3 +133,41 @@ fn catalog_capacity_is_bounded_without_limiting_projects_to_one_repository() {
     }
     assert_eq!(catalog.projects()[0].repositories().len(), MAX_REPOSITORIES);
 }
+
+#[test]
+fn identifier_text_preserves_case_independent_bytes_and_leading_zeros() {
+    for (value, expected) in [
+        ("00000000000000000000000000000000", [0; 16]),
+        ("aF".repeat(16).as_str(), [0xaf; 16]),
+        (
+            "000102030405060708090a0B0c0D0e0F",
+            std::array::from_fn(|i| i as u8),
+        ),
+        ("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", [255; 16]),
+    ] {
+        assert_eq!(ProjectId::from_hex(value).unwrap().to_bytes(), expected);
+        assert_eq!(RepositoryId::from_hex(value).unwrap().to_bytes(), expected);
+    }
+}
+
+#[test]
+fn identifier_text_rejects_malformed_values_without_panicking() {
+    for value in [
+        "",
+        &"0".repeat(31),
+        &"0".repeat(33),
+        &format!("+{}", "0".repeat(31)),
+        &format!("-{}", "0".repeat(31)),
+        &"gg".repeat(16),
+        &"é".repeat(16),
+        &"０".repeat(32),
+        &format!("{}é", "0".repeat(30)),
+        " 0000000000000000000000000000000",
+        "0000000000000000000000000000000\n",
+        "0x000000000000000000000000000000",
+        "0000000000000000000000000000000\0",
+    ] {
+        assert!(ProjectId::from_hex(value).is_none(), "{value:?}");
+        assert!(RepositoryId::from_hex(value).is_none(), "{value:?}");
+    }
+}

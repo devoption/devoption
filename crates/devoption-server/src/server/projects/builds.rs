@@ -6,7 +6,7 @@ use devoption_ui::{PreparationCheck, PreparationView};
 
 pub(super) fn routes(projects: Projects) -> Router {
     Router::new().route("/projects/{project}/builds/{repository}", get(move |ids: Result<RoutePath<(String, String)>, PathRejection>| async move {
-        let ids = ids.ok().and_then(|RoutePath((p, r))| Some((project_id(&p)?, RepositoryId::from_bytes(project_id(&r)?.to_bytes()))));
+        let ids = ids.ok().and_then(|RoutePath((p, r))| Some((project_id(&p)?, RepositoryId::from_hex(&r)?)));
         let Some((project, repository)) = ids else { return missing(); };
         let root = projects.root.clone();
         let execution_available = projects.execution.is_some();

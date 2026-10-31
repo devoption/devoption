@@ -10,6 +10,12 @@ pub const MAX_NAME_BYTES: usize = 128;
 pub struct ProjectId(pub(crate) [u8; 16]);
 
 impl ProjectId {
+    /// Parse exactly 32 ASCII hexadecimal characters, accepting either case and
+    /// preserving leading zeros. Parsing grants no existence or access rights.
+    pub fn from_hex(value: &str) -> Option<Self> {
+        parse_id(value).map(Self)
+    }
+
     /// Decode an identifier supplied by a caller; existence and authorization
     /// must still be checked before any operation.
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
@@ -26,6 +32,12 @@ impl ProjectId {
 pub struct RepositoryId(pub(crate) [u8; 16]);
 
 impl RepositoryId {
+    /// Parse exactly 32 ASCII hexadecimal characters, accepting either case and
+    /// preserving leading zeros. Parsing grants no existence or access rights.
+    pub fn from_hex(value: &str) -> Option<Self> {
+        parse_id(value).map(Self)
+    }
+
     /// Decode an identifier supplied by an adapter; this grants no authority.
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
@@ -34,6 +46,18 @@ impl RepositoryId {
     pub const fn to_bytes(self) -> [u8; 16] {
         self.0
     }
+}
+
+// Validate ASCII before slicing so malformed UTF-8 boundaries cannot panic.
+fn parse_id(value: &str) -> Option<[u8; 16]> {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    let mut bytes = [0; 16];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).ok()?;
+    }
+    Some(bytes)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

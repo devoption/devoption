@@ -45,8 +45,7 @@ async fn show(
     repository: String,
     path: Option<String>,
 ) -> axum::response::Response {
-    let Some((project, repository)) = project_id(&project)
-        .zip(project_id(&repository).map(|id| RepositoryId::from_bytes(id.to_bytes())))
+    let Some((project, repository)) = project_id(&project).zip(RepositoryId::from_hex(&repository))
     else {
         return missing();
     };

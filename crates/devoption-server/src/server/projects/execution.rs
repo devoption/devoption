@@ -39,10 +39,7 @@ impl Engine {
     }
 }
 fn ids(p: &str, r: &str) -> Option<(ProjectId, RepositoryId)> {
-    Some((
-        project_id(p)?,
-        RepositoryId::from_bytes(project_id(r)?.to_bytes()),
-    ))
+    Some((project_id(p)?, RepositoryId::from_hex(r)?))
 }
 fn failure(status: StatusCode) -> axum::response::Response {
     (status,[(CACHE_CONTROL,"no-store")],"Build action unavailable. Refresh the build page and check the saved attempt before retrying.").into_response()
