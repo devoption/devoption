@@ -1,30 +1,32 @@
-# Reviewed statements for the next proposal; this is not release approval.
+# Reviewed statements for preview.3 preparation; this is not publication approval.
 schema_version = 2
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 channel = "preview"
 platforms = ["ubuntu-24.04-amd64"]
 
 [compatibility]
-installation = "fresh-and-upgrade"
-upgrade_from = ["0.1.0-preview.1"]
+installation = "fresh-only"
+upgrade_from = []
 data_schema = 1
 configuration_schema = 1
-data = "Fresh installation or operator-triggered upgrade of a verified 0.1.0-preview.1 base bundle installation with unchanged data schema 1; preserve owner, projects, profile and repositories through the verified offline backup/restore procedure in docs/platform-upgrades.md."
-configuration = "Unchanged configuration schema 1 on dedicated Ubuntu 24.04 amd64 with the same hostname, service identities and pinned proxy; source installations, custom configuration, separate state mounts and app/build opt-ins are unsupported upgrade sources."
+data = "Fresh installation only. This preview adds shared workspace accounts and operational telemetry; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state."
+configuration = "Dedicated Ubuntu 24.04 amd64 with explicitly reviewed owner, repository, build and app configuration. Existing source, custom, base-bundle and app-capable installations are not approved upgrade sources for this preview; no automatic configuration conversion is provided."
 
 [migration]
 required = false
-instructions = "No data or configuration migration is required or executed for the declared base-bundle path. Any schema or configuration conversion requires a separately reviewed upgrade contract; do not bypass preflight."
+instructions = "No migration runs for a fresh installation. Migration of existing accounts, sessions, catalogs, build history, secrets or deployment state requires a separate reviewed compatibility and recovery contract."
 
 [recovery]
 binary_rollback = false
-instructions = "Use explicit full-state recovery in docs/platform-upgrades.md with both verified packets and the sealed offline backup (initial limit 256 MiB and 20,000 entries). Recovery causes downtime and removes post-backup writes from the live view while preserving displaced trees privately; replacing only the executable is not recovery."
+instructions = "No cross-version rollback or upgrade recovery path is declared for preview.3. Preserve the prior installation and its verified packets/backups before a separately approved transition; replacing only executables is not recovery. The earlier preview.1-to-preview.2 base-bundle acceptance does not establish preview.3 compatibility."
 
 [support]
 status = "development-preview"
 warnings = [
-  "One owner and one trusted stateless Rust/WASIp2 app on a dedicated Ubuntu 24.04 amd64 node; arbitrary applications and hostile multi-tenant hosting are unsupported.",
-  "Verified bundle installation and same-schema base upgrades are implemented; signed preview.1-to-preview.2 packet acceptance remains pending. Source-built Ubuntu/systemd/TLS and actual reboot fixtures do not replace signed-candidate validation.",
-  "Upgrades refuse app/build opt-ins and migrations. Operator login/data checks and a maintenance window are required; unattended upgrades and stable/channel promotion are unavailable.",
-  "Preview metadata is not production-readiness evidence or permission to publish; the release approval gate under issue #21 still applies."
+  "Trusted single-node Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.",
+  "Workspace members share all projects and configured capabilities; project-specific roles and read-only membership are unavailable.",
+  "Monitoring covers the DevOption Wasm worker, not separate native backends or external proxy traffic. Active users are per-app anonymous browser estimates; telemetry history resets on worker restart.",
+  "Security scanning and MCP access are not implemented. External harnesses are the intended MCP clients; DevOption does not host agents.",
+  "Preview.3 signed-packet installation acceptance and the issue #21 release gate remain pending. Source-built CI and earlier retained preview packets do not replace validation of this candidate.",
+  "Unattended upgrades, automatic publication, stable promotion and DigitalOcean image distribution remain unavailable. No production-readiness claim is made."
 ]

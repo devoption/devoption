@@ -508,7 +508,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-builds"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "devoption-projects",
  "devoption-registry",
@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-cli"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "devoption-builds",
  "devoption-projects",
@@ -534,7 +534,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-projects"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "getrandom 0.4.3",
  "rustix",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-registry"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "sha2 0.11.1",
  "tempfile",
@@ -553,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-runtime"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "http-body-util",
  "httparse",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-server"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "argon2",
  "axum",
@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "devoption-ui"
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 dependencies = [
  "pulldown-cmark",
 ]

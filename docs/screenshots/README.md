@@ -234,7 +234,7 @@ worker, deployment, active-user, agent, security, or backup evidence. The defaul
 
 For `platform-update.jpg`, add `DEVOPTION_BROWSER_UPGRADE=not-started` to the
 browser fixture command and use 1280 × 1000. This test-binary-only flag supplies
-a synthetic preview.2-to-preview.3 observation with fixed sample digests and a
+a synthetic current-preview-to-next-preview observation with fixed sample digests and a
 42-second age. It creates no host notice, signed packet or upgrade. The production
 binary has no such override. Other supported fixture values are `healthy`, `failed`
 and `restored`; do not describe these captures as real upgrade evidence. Expand **Platform maintenance** and scroll that disclosure into view for

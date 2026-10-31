@@ -54,7 +54,7 @@ metadata and historical release notes are not rewritten by upgrade implementatio
 Validate the record without generating or publishing anything:
 
 ```sh
-python3 scripts/release_metadata.py 0.1.0-preview.2
+python3 scripts/release_metadata.py 0.1.0-preview.3
 ```
 
 The committed source supplies the metadata. Preview preparation validates it
@@ -78,7 +78,7 @@ After applying a proposal in its reviewed branch, the existing read-only command
 checks version/date/change notes and requires exactly the current metadata block:
 
 ```sh
-python3 scripts/release_notes.py 0.1.0-preview.2
+python3 scripts/release_notes.py 0.1.0-preview.3
 ```
 
 Missing, modified, duplicated or stale blocks fail before notes are printed.

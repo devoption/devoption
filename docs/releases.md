@@ -1,12 +1,19 @@
 # Preparing a release
 
 There is no published product release. The prepared source version is
-`0.1.0-preview.2`, with reviewed schema-2 metadata for the preview.1 base-bundle
-upgrade path. Both packets are reserved in the [candidate catalog](release-candidates.md),
-and [signed base-upgrade/reboot acceptance passed](bundle-upgrade-acceptance.md).
-Both packets have long-lived unpublished validation drafts with
-[verified retention/readback](release-reconciliation.md#live-retention-evidence).
-Preparation and acceptance are not publication approval.
+`0.1.0-preview.3`, with reviewed fresh-install-only metadata. It includes the
+operational Overview and monitoring, shared workspace accounts, and the current
+trusted app workflow. No prior preview is declared as a supported upgrade source
+for this version; see [release metadata](release-metadata.md).
+
+Preview.1 and preview.2 remain immutable signed validation packets in the
+[candidate catalog](release-candidates.md), with unpublished retained drafts and
+[verified readback](release-reconciliation.md#live-retention-evidence). Their
+[base-upgrade/reboot acceptance](bundle-upgrade-acceptance.md) does not establish
+preview.3 compatibility. Preview.3 still needs exact-version signed packet and
+installer acceptance and the owner release gate under
+[#21](https://github.com/devoption/devoption/issues/21). Preparation and source CI
+are not publication approval; the promotion stop remains enabled.
 
 ## Delivery status against the six issues
 
@@ -54,7 +61,7 @@ the exact ZIP. It requires explicit tag/draft/upload approval and does not close
 When a maintainer intentionally chooses to release:
 
 1. Open a release issue first and make a topic branch/draft PR. Choose a stable
-   numbered preview such as `0.1.0-preview.2`; publication is not automated here.
+   numbered preview such as `0.1.0-preview.3`; publication is not automated here.
    Review and commit its support/migration metadata before generating the proposal;
    the generator binds current-version statements to the selected preview.
 2. Apply the exact generated preview proposal to its reviewed topic branch. It
@@ -62,12 +69,12 @@ When a maintainer intentionally chooses to release:
    inputs, binds metadata and generates the new dated notes. Keep `publish = false`;
    version preparation does not enable registry publishing.
 3. Move the relevant `Unreleased` entries to a section named exactly
-   `## [0.1.0-preview.2] - YYYY-MM-DD`, using the actual release date. Leave `Unreleased`
+   `## [0.1.0-preview.3] - YYYY-MM-DD`, using the actual release date. Leave `Unreleased`
    for later changes. Notes need real change bullets and repository issue links;
    describe limitations and any breaking changes honestly. Prefer applying the
    generated proposal, which retains the human notes and adds the required
    metadata block, over manually constructing that block.
-4. Run all [development checks](development.md#checks) and `python3 scripts/release_notes.py 0.1.0-preview.2`.
+4. Run all [development checks](development.md#checks) and `python3 scripts/release_notes.py 0.1.0-preview.3`.
    The script rejects mismatched versions, missing/duplicate sections, invalid
    or future dates, notes without issue links and missing/stale metadata blocks.
    Review the output; automation
@@ -79,17 +86,17 @@ When a maintainer intentionally chooses to release:
    and push the new tag (never move an existing tag). For example:
 
    ```sh
-   git tag -a v0.1.0-preview.2 <reviewed-commit-sha> -m 'DevOption 0.1.0-preview.2'
-   git push origin refs/tags/v0.1.0-preview.2
+   git tag -a v0.1.0-preview.3 <reviewed-commit-sha> -m 'DevOption 0.1.0-preview.3'
+   git push origin refs/tags/v0.1.0-preview.3
    ```
 
 7. From a checkout of that tag, extract the exact notes and use them to create a
    **draft** GitHub release, using existing maintainer authentication:
 
    ```sh
-   python3 scripts/release_notes.py 0.1.0-preview.2 > /tmp/devoption-release-notes.md
-   gh release create v0.1.0-preview.2 --repo devoption/devoption --verify-tag --draft --prerelease \
-     --title 'DevOption 0.1.0-preview.2' --notes-file /tmp/devoption-release-notes.md
+   python3 scripts/release_notes.py 0.1.0-preview.3 > /tmp/devoption-release-notes.md
+   gh release create v0.1.0-preview.3 --repo devoption/devoption --verify-tag --draft --prerelease \
+     --title 'DevOption 0.1.0-preview.3' --notes-file /tmp/devoption-release-notes.md
    ```
 
 8. Review the draft, then deliberately publish it in GitHub. Record the release
