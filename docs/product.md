@@ -18,6 +18,14 @@ Human-only workflows must remain complete. Compatible external AI clients can
 eventually use the optional built-in MCP interface under the same permissioned
 operations as the UI and CLI; an AI subscription is not a prerequisite.
 
+DevOption is not an agent host or a replacement for an agent harness. The intended
+integration exposes an MCP server, platform tools, and skills to a user's chosen
+external harness. The harness owns the agent loop, model, memory, and scheduling;
+DevOption owns its permissioned operations, approval boundaries, and execution
+evidence. Overview reports platform health, work, outcomes, and required decisions,
+not the internal state of externally hosted agents. This is product direction;
+MCP transport, tools, and skills are not implemented yet.
+
 ## Non-goals and boundaries
 
 - A local-only workspace is not the product boundary; current preview restrictions

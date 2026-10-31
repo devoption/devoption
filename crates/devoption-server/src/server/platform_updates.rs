@@ -9,16 +9,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub(super) async fn home(installed: bool) -> impl IntoResponse {
-    let view = tokio::task::spawn_blocking(move || observation(installed))
-        .await
-        .unwrap_or_else(|_| unavailable());
-    (
-        [(CACHE_CONTROL, "no-store")],
-        Html(devoption_ui::render_platform_home(&view)),
-    )
-}
-
 fn unavailable() -> PlatformUpdates {
     PlatformUpdates {
         running_version: env!("CARGO_PKG_VERSION").into(),
@@ -27,7 +17,7 @@ fn unavailable() -> PlatformUpdates {
     }
 }
 
-fn observation(installed: bool) -> PlatformUpdates {
+pub(super) fn observation(installed: bool) -> PlatformUpdates {
     // The disposable browser test binary alone can render a named synthetic
     // observation. Production builds have no environment/path override.
     #[cfg(test)]

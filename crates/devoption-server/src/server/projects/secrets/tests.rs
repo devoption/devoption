@@ -78,6 +78,7 @@ impl Fixture {
             session.clone(),
             super::super::routes(self.projects.clone()),
             false,
+            None,
         );
         super::super::super::protect(pages, 3000, session)
     }

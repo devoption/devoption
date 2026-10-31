@@ -18,7 +18,7 @@ mod builds;
 pub(super) mod deployment;
 mod execution;
 mod files;
-mod history;
+pub(super) mod history;
 mod managed;
 mod pages;
 mod secrets;
@@ -28,12 +28,13 @@ mod startup_tests;
 
 #[derive(Clone)]
 pub(super) struct Projects {
-    directory: Arc<CatalogDirectory>,
+    pub(super) directory: Arc<CatalogDirectory>,
     secrets: Option<Arc<Mutex<crate::project_secrets::Store>>>,
     pub(super) deployment: Option<Arc<Mutex<deployment::Engine>>>,
     execution: Option<Arc<Mutex<execution::Engine>>>,
-    history: Option<Arc<Mutex<devoption_builds::history::History>>>,
-    gate: Arc<Mutex<()>>,
+    pub(super) history: Option<Arc<Mutex<devoption_builds::history::History>>>,
+    pub(super) overview_cache: Arc<Mutex<Option<(std::time::Instant, serde_json::Value)>>>,
+    pub(super) gate: Arc<Mutex<()>>,
     root: Option<Arc<PermittedRoot>>,
     managed: Option<Arc<devoption_projects::worktree::ManagedRoot>>,
 }
@@ -132,6 +133,7 @@ impl Projects {
             history: None,
             execution: None,
             deployment: None,
+            overview_cache: Default::default(),
             gate: Arc::new(Mutex::new(())),
             root: root.map(Arc::new),
             managed: None,

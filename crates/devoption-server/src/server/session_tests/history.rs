@@ -75,7 +75,13 @@ fn fixture(configured: bool) -> Fixture {
     )
     .unwrap();
     let app = protect(
-        page_routes(true, Arc::clone(&slot), projects::routes(projects), false),
+        page_routes(
+            true,
+            Arc::clone(&slot),
+            projects::routes(projects.clone()),
+            false,
+            Some(projects),
+        ),
         3000,
         Arc::clone(&slot),
     );
@@ -377,5 +383,43 @@ fn build_actions_require_session_csrf_and_explicit_runner_without_mutating_histo
     assert_eq!(
         fs::read(f.history.join("build-history.bin")).unwrap(),
         saved
+    );
+}
+
+#[test]
+fn overview_and_project_monitoring_are_guarded_scoped_and_honest_about_gaps() {
+    let f = fixture(true);
+    for path in [
+        "/".to_owned(),
+        format!("/projects/{}/monitoring", f.project),
+    ] {
+        assert_eq!(read(&f, &path, false).0, StatusCode::SEE_OTHER);
+        let (status, html) = read(&f, &path, true);
+        assert_eq!(status, StatusCode::OK);
+        assert!(html.contains("Active users"));
+        assert!(html.contains("No observations"));
+        assert!(!html.contains("All systems operational"));
+        assert!(!html.contains("<Project>"));
+    }
+    let (_, html) = read(&f, "/", true);
+    assert!(html.contains("&lt;Project&gt;"));
+    assert!(html.contains("Other project"));
+    assert!(html.contains("Needs attention"));
+    assert!(!html.contains("Agent operations"));
+    let (_, scoped) = read(
+        &f,
+        &format!("/projects/{}/monitoring?range=1h", f.project),
+        true,
+    );
+    assert!(scoped.contains("−1h"));
+    assert!(!scoped.contains("Other project"));
+    assert_eq!(
+        read(
+            &f,
+            &format!("/projects/{}/monitoring", "ff".repeat(16)),
+            true
+        )
+        .0,
+        StatusCode::NOT_FOUND
     );
 }
