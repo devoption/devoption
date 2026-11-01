@@ -11,6 +11,8 @@ pub enum Page {
     SignIn,
 }
 
+mod mcp;
+pub use mcp::{render_mcp_consent, render_mcp_grants};
 mod auth;
 mod users;
 const ACCOUNTS: &str = include_str!("../assets/accounts.js");

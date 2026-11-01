@@ -99,7 +99,7 @@ async fn runtime(projects: &projects::Projects) -> Option<Value> {
 async fn snapshot(projects: projects::Projects, hours: u64) -> Overview {
     snapshot_scoped(projects, hours, None).await
 }
-async fn snapshot_scoped(
+pub(super) async fn snapshot_scoped(
     projects: projects::Projects,
     hours: u64,
     scope: Option<[u8; 16]>,
