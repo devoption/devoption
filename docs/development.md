@@ -9,6 +9,31 @@ See the [architecture map](architecture.md) for crate responsibilities, implemen
 data flow and planned boundaries. Focused references are in the
 [documentation index](README.md).
 
+## Project-page rendering
+
+The [#22 audit](https://github.com/devoption/devoption/issues/22) found repeated
+identity definition rows in build history and deployment details, and repeated
+live action-status paragraphs in build and deployment review. Small private Rust
+helpers in `crates/devoption-ui/src/projects/render.rs` own those fragments. They
+accept text and escape each value, label and attribute; callers must not pass
+pre-escaped content or raw HTML. Identity rows retain semantic `dt`/`dd` and
+`code` markup. Review status paragraphs retain their existing IDs, `role="status"`
+and `aria-live="polite"` for the browser action handlers.
+
+The audit also covered project/repository forms, source checks, saved build states
+and deployment controls. Form fields have different constraints, autocomplete,
+help/error relationships and JavaScript hooks; they stay with their page renderers.
+Build-state badges, source check outcomes and deployment health text have different
+structures and meanings. Keep those local too. Page-specific controls still own
+their action attributes, disabled state and approval boundaries. There is no shared
+form schema, status-policy mapper or new component framework.
+
+This extraction preserves rendered output, escaping, semantic labels, keyboard
+controls, focus targets, visible status text and theme tokens. A before/after
+comparison of 28 build/release/history page variants was byte-for-byte identical,
+so existing screenshots remain applicable. Any later visible UI change still
+requires the captures in the contribution guide.
+
 ## Checks
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm

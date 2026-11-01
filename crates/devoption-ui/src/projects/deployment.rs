@@ -1,3 +1,4 @@
+use super::render::code_row;
 mod review;
 
 use super::{ProjectSection, ProjectSummary, escape_into, identifier};
@@ -51,7 +52,14 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
                 html.push_str(&format!(r#"<h3>App hostname</h3><p><a href="{}" target="_blank" rel="noopener noreferrer">Open app: {}</a></p><p>{}</p><p>Hostname changes are operator-managed. <a href="https://github.com/devoption/devoption/blob/main/docs/app-hostnames.md" target="_blank" rel="noopener noreferrer">App hostname setup</a>.</p>"#,escaped(url),escaped(url),escaped(status)));
             }
             if let Some(current) = &view.current {
-                html.push_str(&format!("<dl class=\"build-identities\"><div><dt>Selected release</dt><dd><code>{}</code></dd></div><div><dt>Private app endpoint on this node</dt><dd><code>http://127.0.0.1:{}</code></dd></div></dl>",escaped(current),view.port));
+                html.push_str("<dl class=\"build-identities\">");
+                code_row(&mut html, "Selected release", current);
+                code_row(
+                    &mut html,
+                    "Private app endpoint on this node",
+                    &format!("http://127.0.0.1:{}", view.port),
+                );
+                html.push_str("</dl>");
             }
             html.push_str(if view.independent { "<p>This project has an independent app deployment. Updates can have downtime for this app.</p>" } else { "<p>One app runs on this node. Updates can have downtime.</p>" });
             html.push_str(r#"<a class="text-button" href="">Refresh health and logs</a> "#);
@@ -71,7 +79,10 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &DeploymentView) -> St
         }
         for release in &view.releases {
             let id = escaped(&release.id);
-            html.push_str(&format!(r#"<details class="build-source-details"><summary>Commit {}</summary><dl class="build-identities"><div><dt>Release</dt><dd><code>{id}</code></dd></div><div><dt>Artifact SHA-256</dt><dd><code>{}</code></dd></div><div><dt>Build</dt><dd><a href="/projects/{}/builds/attempts/{}">Open build and logs</a></dd></div></dl>"#,escaped(&release.commit),escaped(&release.checksum),identifier(&project.id),escaped(&release.job)));
+            html.push_str(&format!(r#"<details class="build-source-details"><summary>Commit {}</summary><dl class="build-identities">"#, escaped(&release.commit)));
+            code_row(&mut html, "Release", &release.id);
+            code_row(&mut html, "Artifact SHA-256", &release.checksum);
+            html.push_str(&format!(r#"<div><dt>Build</dt><dd><a href="/projects/{}/builds/attempts/{}">Open build and logs</a></dd></div></dl>"#, identifier(&project.id), escaped(&release.job)));
             if !view.bound_elsewhere {
                 html.push_str(&format!(r#"<label>Expected health response <input data-health="{id}" type="text" maxlength="128" placeholder="ok A" autocomplete="off"></label> <button class="action-button" data-deploy-action="prepare" data-value="{id}">Review deployment</button>"#));
             }
