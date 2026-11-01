@@ -51,7 +51,7 @@ A separate selection job compares the PR head against its merge base with the
 current PR base, using full Git history and a NUL-delimited diff without rename
 detection. This includes both sides of moves and avoids API file-count limits.
 
-The expensive release build and installation job is skipped only when every
+The expensive release build and installation matrix is skipped only when every
 changed path is in `docs/`, `crates/devoption-ui/assets/`, or is a root `README.md`,
 `CHANGELOG.md`, `CONTRIBUTING.md`, or `AGENTS.md`. Shipped bundle inputs
 (including installation instructions under `docs/` and `LICENSE`) always require
@@ -74,14 +74,28 @@ missing decisions, failures, cancellation and other skipped jobs fail the gate.
 Each validation job checks for tracked-file changes. `Issue and change
 documentation` remains a separate required status. Repository settings are unchanged.
 
-The installation job downloads Caddy using the existing exact version/checksum
+Installation coverage runs in four parallel suites on separate disposable runners:
+`bundle` covers source installation, proxy, packaged runtime, named apps and fresh
+VM installation; `records` covers HTTPS and scoped/managed PostgreSQL;
+`upgrade` covers prior-preview upgrade, recovery and four kernel boots; `apps`
+covers independent app deployments and their three kernel boots. Each suite builds
+its own locked release workspace and has a 15-minute job deadline. This repeats
+compilation to reduce elapsed time without transferring compiled artifacts between
+runners. Matrix fail-fast is disabled so a failed suite does not cancel the others.
+The required gate consumes the combined matrix result and requires every selected
+suite to pass. VM tool installation has a three-minute step deadline, two apt
+download retries, 30-second HTTP/HTTPS timeouts and a 60-second package-lock wait.
+These bounds fail stalled setup promptly; they do not turn failed acceptance into
+a passing check.
+
+The bundle suite downloads Caddy using the existing exact version/checksum
 pin and explicitly runs the ignored `public_https_proxy` test. It uses loopback
 ports and temporary server/client certificates without installing trust or host
 services. Both ordinary and protected access are checked, including certificate
 verification/leaf authorization, real owner login, revocation after proxy restart,
 forged-header/cross-host rejection and independent public-app routing.
 
-The installation job also assembles a local preview bundle from the release
+The bundle suite also assembles a local preview bundle from the release
 executable, runs its version/help checks, and compares every archived byte and
 manifest entry, source-inventory SBOM and unsigned assembly statement with the
 trusted checkout/build inputs. It uploads no artifacts;
@@ -98,12 +112,12 @@ reinstall. No system accounts, host units or services are changed. Signature
 failure/acceptance policy is tested separately; real privileged installer and
 reboot acceptance remain subject to the [installer's validation limits](bundle-installation.md#validation-scope).
 
-The installation job also runs the [scoped HTTPS proof](app-https.md#disposable-proof-and-limits)
+The records suite runs the [scoped HTTPS proof](app-https.md#disposable-proof-and-limits)
 with a real WASIp2 guest, disposable CA and synthetic bearer token. Managed Linux
 acceptance covers systemd credentials and exact recovery with both worker identities.
 Neither checker contacts a real integration provider.
 
-The installation job additionally runs `check_named_web_app.py` with explicit
+The bundle suite additionally runs `check_named_web_app.py` with explicit
 `--disposable-system-host`. It refuses existing build helpers/configuration,
 prepares and verifies the public static site's offline dependencies, temporarily
 installs the real build broker/worker, and builds two independently named-app
@@ -113,7 +127,7 @@ unit and removes its installed files. This proves compiler/runtime compatibility
 not full project UI, immutable-release promotion, HTTPS or reboot acceptance.
 Never run this privileged fixture on an existing installation or workstation.
 
-The same job builds checksum-pinned PostgreSQL from official source in runner
+The records suite builds checksum-pinned PostgreSQL from official source in runner
 temporary storage and runs [the scoped record proof](app-records.md#disposable-local-proof)
 using a generic WASIp2 fixture. The first proof uses a private Unix socket and no
 host service or login password. A second, explicitly disposable Linux checker
@@ -123,7 +137,7 @@ revocation/restart refusal and saved stateless recovery. It refuses existing
 deployment files/units/identities and removes only its fixture resources after
 stopping them. No remote database or production secret is used.
 
-The installation job also builds the exact reserved prior source and a disposable
+The upgrade suite also builds the exact reserved prior source and a disposable
 next-preview source fixture with real versioned executables, then runs
 `check_bundle_upgrade.py` on its fresh GitHub-hosted Ubuntu runner. Its explicit
 `sudo` mode creates real dedicated service identities, units, state and a local
@@ -141,7 +155,7 @@ The hosted runner's writable `/opt` parent is temporarily made root-owned mode
 0755 during this explicit fixture, then restored to its original UID/GID/mode.
 Production installation/upgrade checks continue to reject writable ancestors.
 
-The same job installs QEMU/xorriso and runs `check_upgrade_reboot.py --fixtures
+The upgrade suite installs QEMU/xorriso and runs `check_upgrade_reboot.py --fixtures
 FIXTURE_DIRECTORY --report NEW_REPORT_PATH` in an isolated guest. It verifies the
 SHA-256-pinned, dated Ubuntu image, creates a private disposable disk and performs
 four kernel boots: initial upgrade, completed-upgrade verification/interrupted
@@ -150,7 +164,7 @@ verification. It checks TLS login and persisted project/profile/Git data, exact
 selected version, disabled pending services, and recovery retries. KVM access is
 granted only to the ephemeral runner user when available; otherwise QEMU uses
 software emulation. All boots share a ten-minute deadline. Missing/failed evidence
-or repeated boot IDs fail the required installation job. The runner kills/waits
+or repeated boot IDs fail the required upgrade suite. The runner kills/waits
 for a timed-out guest and deletes its temporary disks/shares/logs. This creates no
 cloud resources, exports no credentials, forwards no network ports and retains no
 owner/certificate data. The small JSON report records only stages, versions and

@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Run bundle, record, upgrade and independent-app installation acceptance in four
+  parallel suites with 15-minute job limits; bound VM package setup to three
+  minutes with explicit apt network retries and timeouts, keeping all selected
+  suites required ([#364](https://github.com/devoption/devoption/issues/364)).
+
 - Share strict project/repository ID parsing between HTTP and CLI, preserving
   case acceptance, leading zeros, adapter errors and access checks
   ([#207](https://github.com/devoption/devoption/issues/207)).
