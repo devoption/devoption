@@ -184,3 +184,9 @@ fixture; the capture records no build or deployment.
 **Create account (registration open, owner approval required)**
 
 ![Create a workspace account](join.jpg)
+
+**MCP consent and client access (disposable authenticated fixture)**
+
+![Explicit read-only client consent](mcp-consent.jpg)
+
+![Per-account client revocation](mcp-grants.jpg)

@@ -104,7 +104,11 @@ combines fresh catalog associations, saved build history, and read-only broker
 runtime summaries. The Wasm worker publishes bounded aggregate telemetry in its
 existing host runtime directory; invocation binding and freshness checks prevent
 old workers from supplying current coverage. No observation grants workload or
-approval authority. MCP transport and security scans remain unimplemented.
+approval authority. The optional [MCP adapter](mcp.md) uses those read-only
+observations alongside bounded catalog/history readers. Its OAuth bearer boundary
+is separate from browser mutations, with explicit browser consent, current account
+checks, expiring revocable grants, and private audit writes. Security scans remain
+unimplemented.
 
 ## Planned flow and unresolved boundaries
 
@@ -113,7 +117,8 @@ platform expansion beyond the selected trusted single-node app profile.
 
 [Product goals](product.md) define the external-harness boundary and optional MCP
 parity with human operations.
-MCP has no implemented transport here and must not become a permission bypass.
+MCP writes and skills remain unimplemented; the [read-only transport](mcp.md)
+must not become a permission bypass.
 The first Wasm runtime/ABI and app subset are selected in
 [decision 0004](decisions/0004-first-wasm-web-app.md). The deployment guide
 describes the implemented private worker and its limits. Broader

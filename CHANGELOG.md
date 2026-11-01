@@ -18,6 +18,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add opt-in authenticated HTTP MCP with pre-registered OAuth clients, explicit
+  consent, S256 PKCE, expiring revocable read grants, fresh account checks,
+  five bounded observation tools and private audit records
+  ([#362](https://github.com/devoption/devoption/issues/362)).
+
 - Reserve the signed `0.1.0-preview.3` validation candidate from reviewed source
   `dbe5a5c`, after exact-main checks, signing, independent Actions readback and
   local ZIP/proof verification. Preserve earlier reservations and false publication

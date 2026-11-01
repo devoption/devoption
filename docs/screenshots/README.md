@@ -45,6 +45,8 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Create account | `/join` | Open registration; 1280 × 1000 | `join.jpg` |
 | Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
 | Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
+| MCP consent | `/oauth/authorize?...` | Authenticated disposable client, before consent; 1280 × 1000 | `mcp-consent.jpg` |
+| MCP client access | `/mcp/grants` | One disposable active grant, before revocation; 1280 × 1000 | `mcp-grants.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
 | Check account | `/sign-in` | Session verification blocked | `sign-in-check.jpg` |
 | Sign in, light | `/sign-in` | Signed out; Nord / Light / Purple | `sign-in-light.jpg` |
@@ -269,3 +271,31 @@ Check the three account pages at 320, 375, 768 and 1280 pixels. Owner/member log
 and registration share five attempts per minute; wait for the window or start a
 fresh disposable fixture if needed. Existing owner-only captures retain their
 scope and do not prove per-member workload attribution.
+
+## MCP consent and revocation
+
+Run the disposable MCP fixture with
+`DEVOPTION_MCP_FIXTURE_INFO=ABSOLUTE_TEMP_JSON_PATH cargo test -p devoption-server
+--lib manual_mcp_browser_fixture --locked --offline -- --ignored --nocapture`.
+It writes its random loopback address and fixed test authorization URL to that
+external temporary file and stops after ten minutes. No real owner, service, TLS
+configuration, client grant or workload is used.
+
+For this fixture only, a browser automation proxy maps
+`https://platform.example.test` requests to the reported loopback address, preserving
+the canonical Host and browser Origin. Set the fixture's Secure session cookie
+`__Host-devoption_session` to `ab` repeated 32 times on that synthetic HTTPS origin.
+The real `/auth/session` endpoint supplies the fixture CSRF header; never reuse
+these predictable test values outside the disposable router. Navigate to the
+reported authorization path, capture the consent page before allowing, and route
+the callback to a local synthetic client. Exchange its code with verifier
+`public-fixture-verifier-with-at-least-43-characters` and the registered fixture
+client/resource/callback from the fixture. Capture `/mcp/grants`, then revoke and
+confirm that a subsequent read-only MCP call receives 401.
+
+Captures use **1280 × 1000**. Also check **375 × 1000** for overflow and readable
+controls. The recorded browser run used installed Chrome through Playwright
+because the Browser plugin was unavailable. Page identity, visible content,
+console health, screenshots, callback/PKCE exchange, actual project reads and
+browser revocation passed. This synthetic proxy is browser/handler evidence, not
+public DNS/TLS or external harness compatibility acceptance.

@@ -54,6 +54,25 @@ impl PublicOrigin {
             .is_some_and(|host| self.authority_matches(host))
     }
 
+    /// Non-browser clients may omit Origin; supplied origins are always checked.
+    pub(super) fn check_mcp(&self, request: &Request) -> Result<(), axum::http::StatusCode> {
+        use axum::http::StatusCode;
+        if !self.host_valid(request) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        let origins: Vec<_> = request.headers().get_all(ORIGIN).iter().collect();
+        if !origins.is_empty()
+            && (origins.len() != 1
+                || !origins[0]
+                    .to_str()
+                    .ok()
+                    .is_some_and(|v| self.origin_matches(v)))
+        {
+            return Err(StatusCode::FORBIDDEN);
+        }
+        Ok(())
+    }
+
     fn host_valid(&self, request: &Request) -> bool {
         // The configured proxy removes forwarding metadata, including its own.
         // Never infer public authority or scheme from caller-supplied headers.
