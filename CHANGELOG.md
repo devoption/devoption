@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Share escaped identity-row and live action-status rendering across build and
+  release pages while preserving their HTML, controls and approval boundaries
+  ([#22](https://github.com/devoption/devoption/issues/22)).
+
 - Document the catalog inspection gate's queueing tradeoff and add deterministic
   regression coverage for queued reads/writes, caller cancellation, failed
   inspection and fresh scope/storage validation; retain existing serialization

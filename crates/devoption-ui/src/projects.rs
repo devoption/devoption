@@ -1,3 +1,4 @@
+mod render;
 mod secrets;
 pub(super) use secrets::content as secrets_content;
 pub use secrets::{EnvironmentSecretsView, SecretEventView, SecretMetadataView};

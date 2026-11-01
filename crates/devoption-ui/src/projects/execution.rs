@@ -1,3 +1,4 @@
+use super::render::action_status;
 use super::{ProjectSection, ProjectSummary, escape_into, identifier};
 pub struct BuildExecutionView {
     pub repository: [u8; 16],
@@ -23,9 +24,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildExecutionView) -
     if ready {
         html.push_str(r#"<h3 class="build-review-state">Ready for your approval</h3>"#);
     }
-    html.push_str(r#"<p id="build-action-status" role="status" aria-live="polite">"#);
-    escape_into(&mut html, &view.message);
-    html.push_str("</p>");
+    action_status(&mut html, "build-action-status", &view.message);
     if view.running {
         html.push_str(r#"<button class="action-button" data-build-action="cancel">Cancel build</button><p>Cancellation is complete only when the saved attempt says Cancelled.</p>"#);
     } else if let Some(token) = &view.token {

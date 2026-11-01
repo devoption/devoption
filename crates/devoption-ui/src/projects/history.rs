@@ -1,3 +1,4 @@
+use super::render::code_row;
 use super::{ProjectSection, ProjectSummary, escape_into, identifier};
 
 pub struct BuildAttemptView {
@@ -68,17 +69,12 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> 
                 ("Commit", attempt.commit.clone()),
                 ("Source snapshot SHA-256", attempt.source.clone()),
             ] {
-                html.push_str("<div><dt>");
-                escape_into(&mut html, label);
-                html.push_str("</dt><dd><code>");
-                escape_into(&mut html, &value);
-                html.push_str("</code></dd></div>");
+                code_row(&mut html, label, &value);
             }
             if let Some((digest, bytes)) = &attempt.artifact {
-                html.push_str("<div><dt>Recorded component SHA-256</dt><dd><code>");
-                escape_into(&mut html, digest);
+                code_row(&mut html, "Recorded component SHA-256", digest);
                 html.push_str(&format!(
-                    "</code></dd></div><div><dt>Component size</dt><dd>{bytes} bytes</dd></div>"
+                    "<div><dt>Component size</dt><dd>{bytes} bytes</dd></div>"
                 ));
             }
             html.push_str("</dl></details><h3>Saved output</h3><p class=\"preparation-note\">This is the last saved checkpoint, not a live stream. Output alone does not prove completion. No artifact download is available.</p>");

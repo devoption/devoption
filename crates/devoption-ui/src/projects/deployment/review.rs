@@ -1,12 +1,13 @@
+use super::super::render::{action_status, code_row};
 use super::{DeploymentView, ReleaseView, escaped};
 
 pub(super) fn content(project: &super::ProjectSummary<'_>, view: &DeploymentView) -> String {
     let (token, candidate, health, fingerprint) = view.review.as_ref().expect("review selected");
     let mut html = String::from(
-        r#"<header class="deployment-review-heading"><h2 id="deployment-review-title">Review deployment</h2><p id="deployment-action-status" role="status" aria-live="polite">"#,
+        r#"<header class="deployment-review-heading"><h2 id="deployment-review-title">Review deployment</h2>"#,
     );
-    html.push_str(&escaped(&view.status));
-    html.push_str(r#"</p></header><ol class="deployment-review-stages" aria-label="Delivery stages"><li>Source <span>Captured in release</span></li><li>Build <span>Saved artifact</span></li><li>Release <span>Selected for review</span></li><li aria-current="step">Deploy <span>Review and approve</span></li></ol><div class="deployment-comparison"><section aria-labelledby="deployment-current-title"><p class="deployment-eyebrow">Current selection</p><h3 id="deployment-current-title">"#);
+    action_status(&mut html, "deployment-action-status", &view.status);
+    html.push_str(r#"</header><ol class="deployment-review-stages" aria-label="Delivery stages"><li>Source <span>Captured in release</span></li><li>Build <span>Saved artifact</span></li><li>Release <span>Selected for review</span></li><li aria-current="step">Deploy <span>Review and approve</span></li></ol><div class="deployment-comparison"><section aria-labelledby="deployment-current-title"><p class="deployment-eyebrow">Current selection</p><h3 id="deployment-current-title">"#);
     if let Some(current) = &view.current {
         html.push_str("Selected release</h3>");
         release_summary(&mut html, view, current);
@@ -72,32 +73,32 @@ pub(super) fn content(project: &super::ProjectSummary<'_>, view: &DeploymentView
     }
     html.push_str(r#"</dd></div></dl></section><details class="deployment-runtime-details"><summary>Runtime limits, release identity &amp; technical details</summary><dl class="build-identities">"#);
     if let Some(current) = &view.current {
-        identity(&mut html, "Selected release", current);
+        code_row(&mut html, "Selected release", current);
         if let Some((observed, intent)) = &view.current_state {
-            identity(&mut html, "Observed app state", observed);
-            identity(&mut html, "Desired app state", intent);
+            code_row(&mut html, "Observed app state", observed);
+            code_row(&mut html, "Desired app state", intent);
         }
         if let Some(release) = find_release(view, current) {
-            identity(&mut html, "Selected source commit", &release.commit);
+            code_row(&mut html, "Selected source commit", &release.commit);
         }
     }
-    identity(&mut html, "Candidate release", candidate);
+    code_row(&mut html, "Candidate release", candidate);
     if let Some(release) = find_release(view, candidate) {
-        identity(&mut html, "Candidate source commit", &release.commit);
-        identity(&mut html, "Candidate artifact SHA-256", &release.checksum);
+        code_row(&mut html, "Candidate source commit", &release.commit);
+        code_row(&mut html, "Candidate artifact SHA-256", &release.checksum);
     }
-    identity(
+    code_row(
         &mut html,
         "Private listener on this server",
         &format!("127.0.0.1:{}", view.port),
     );
-    identity(
+    code_row(
         &mut html,
         "Installed runtime configuration SHA-256",
         fingerprint,
     );
     if let Some(grant) = &view.review_records {
-        identity(&mut html, "App storage grant SHA-256", grant);
+        code_row(&mut html, "App storage grant SHA-256", grant);
     }
     html.push_str("</dl><p>WasiHttpV1: Wasmtime 49.0.4. No guest files, environment, sockets or DNS. HTTPS is denied unless the integration above is explicitly bound. One request at a time, 64 MiB guest memory, 10 million fuel units and five seconds per request. Worker: one CPU, 512 MiB RAM, no swap, 64 tasks. Startup health must pass in 30 seconds.</p><p>A healthy approved app resumes after platform restart only when its bound grants and exact secret revision remain available; a stopped app stays stopped.</p></details><section class=\"deployment-approval\" aria-labelledby=\"deployment-impact-title\"><h3 id=\"deployment-impact-title\">");
     if view.replaces_other_app {
@@ -137,12 +138,5 @@ fn release_summary(html: &mut String, view: &DeploymentView, id: &str) {
     html.push_str(&format!(
         "<p class=\"deployment-note\">Release <code>{}</code></p>",
         shortened(id)
-    ));
-}
-fn identity(html: &mut String, label: &str, value: &str) {
-    html.push_str(&format!(
-        "<div><dt>{}</dt><dd><code>{}</code></dd></div>",
-        escaped(label),
-        escaped(value)
     ));
 }
