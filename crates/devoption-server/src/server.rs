@@ -26,6 +26,8 @@ mod auth;
 #[cfg(unix)]
 mod input;
 #[cfg(unix)]
+mod mcp;
+#[cfg(unix)]
 mod overview;
 #[cfg(unix)]
 mod platform_updates;
@@ -378,6 +380,18 @@ fn run_with_roots(
         return Err(io::Error::other("build execution requires Linux"));
     }
     #[cfg(unix)]
+    let mcp_config = owner_store
+        .as_ref()
+        .map(mcp::Configuration::open)
+        .transpose()?
+        .flatten();
+    #[cfg(unix)]
+    if mcp_config.is_some() && (public_origin.is_none() || !configured) {
+        return Err(io::Error::other(
+            "MCP requires an existing owner and explicit HTTPS public origin",
+        ));
+    }
+    #[cfg(unix)]
     let owner_auth = owner_store
         .map(|store| {
             if configured {
@@ -450,7 +464,7 @@ fn run_with_roots(
                 {
                     #[cfg(unix)]
                     {
-                        overview_projects
+                        overview_projects.clone()
                     }
                     #[cfg(not(unix))]
                     {
@@ -459,9 +473,24 @@ fn run_with_roots(
                 },
             );
             let origin = public_origin
+                .clone()
                 .map(RequestOrigin::Public)
                 .unwrap_or(RequestOrigin::Local(address.port()));
             let app = protect(app, origin.clone(), Arc::clone(&session));
+            #[cfg(unix)]
+            let app = if let Some(config) = mcp_config {
+                let (auth, _) = owner_auth.as_ref().expect("MCP requires owner");
+                mcp::routes(
+                    config,
+                    public_origin.clone().expect("MCP requires HTTPS"),
+                    auth.clone(),
+                    session.clone(),
+                    overview_projects.clone().expect("configured projects"),
+                )
+                .merge(app)
+            } else {
+                app
+            };
             #[cfg(unix)]
             let app = match &owner_auth {
                 Some((auth, true)) => {

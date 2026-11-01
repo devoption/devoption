@@ -317,7 +317,8 @@ clearing, automated HTML clients, and private HTTP access can distort estimates;
 non-browser clients are not identified. This is not a count of registered accounts
 or globally deduplicated people.
 
-Security scans and MCP access are not implemented. Overview reports platform
+Security scans remain unimplemented. Optional [authenticated read-only MCP](mcp.md)
+provides platform observations for compatible clients. Overview reports platform
 observations and missing security coverage; it does not claim to host agents or
 track an external harness's internal runs. See the [product boundary](product.md)
 for the intended MCP, tools, and skills integration. Runtime health is a point-in-time

@@ -192,6 +192,24 @@ impl OwnerAuthService {
         .map_err(|_| ServiceError::Unavailable)?
     }
 
+    /// Fresh account checks for delegated MCP access; no session or authority is issued.
+    pub(crate) async fn mcp_access(&self, identity: IdentityId) -> Result<bool, ServiceError> {
+        self.accounts(false, move |owner, users| {
+            let Some(record) = owner.load().map_err(std::io::Error::other)? else {
+                return Ok(false);
+            };
+            if record.identity() == identity {
+                return Ok(true);
+            }
+            Ok(users
+                .load()?
+                .users
+                .iter()
+                .any(|u| u.id == identity.to_bytes() && u.status == crate::users::Status::Active))
+        })
+        .await
+    }
+
     pub(crate) async fn sign_in_user(
         &self,
         email: String,

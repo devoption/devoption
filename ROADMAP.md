@@ -54,7 +54,8 @@ The supported profile is trusted Rust/WASIp2 apps in explicit project slots on U
 24.04 x86_64, with explicit operator-installed build and deployment support.
 [Standalone app identities and embedded assets](docs/web-app-builds.md#application-identity-and-assets)
 are supported; other target profiles, general stateful apps, hostile
-multi-tenant hosting, MCP and project-specific team roles remain unimplemented.
+multi-tenant hosting and project-specific team roles remain unimplemented.
+[Authenticated read-only MCP](docs/mcp.md) is optional.
 [Shared workspace membership](docs/users.md) supports invitations and owner-approved registration. There is no published product release. The older native
 [build contracts](docs/build-plans.md) remain separate from this selected
 [Wasm implementation contract](docs/decisions/0004-first-wasm-web-app.md).
@@ -126,7 +127,7 @@ readiness. The provisional [v0.1.0 milestone](https://github.com/devoption/devop
 and [release approval gate #21](https://github.com/devoption/devoption/issues/21)
 remain separate from functional acceptance.
 
-Themes, UI refactoring, optional authentication maintenance, MCP, package hosting,
+Themes, UI refactoring, optional authentication maintenance, MCP expansion, package hosting,
 teams, configurable workflow engines and multi-server orchestration are deferred
 unless a concrete blocker to this path is established. Creating the task series
 is not permission to spend money, create credentials, change DNS or repository
@@ -134,11 +135,11 @@ security, execute real workloads, merge changes or publish releases.
 
 ## Optional MCP, across the platform
 
-A built-in, optional Model Context Protocol (MCP) interface is planned as a
-first-class way to use the same platform capabilities alongside the UI and CLI.
-It should grow with those capabilities, starting with read-only project, source
-and status access. Later, add scoped build and deployment operations only when
-those workflows are available and their approval rules are enforced.
+The optional [authenticated HTTP MCP interface](docs/mcp.md) provides read-only
+project/repository identities, saved build checkpoints, runtime observations and
+diagnostics through explicit OAuth consent. Source-file reads, skills and writes
+remain planned. Grow this interface alongside the UI and CLI; add scoped build
+and deployment operations only when their approval rules are enforced.
 
 MCP operations must use the same identity, access scope, review, approval and audit
 rules as UI/CLI operations. Connecting a client must not grant extra permissions or
