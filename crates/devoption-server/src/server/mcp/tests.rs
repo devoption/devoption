@@ -558,9 +558,22 @@ fn manual_mcp_browser_fixture() {
             fs::write(path,json!({"address":format!("http://{address}"),"authorization":fixture.authorization()}).to_string()).unwrap();
         }
         println!("MCP browser fixture at http://{address}; synthetic authority {ISSUER}");
+        let stop_file =
+            std::env::var_os("DEVOPTION_MCP_FIXTURE_STOP").map(std::path::PathBuf::from);
+        let shutdown = async move {
+            if let Some(path) = stop_file {
+                while !path.exists() {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+            } else {
+                std::future::pending::<()>().await;
+            }
+        };
         let _ = tokio::time::timeout(
             Duration::from_secs(600),
-            axum::serve(listener, app).into_future(),
+            axum::serve(listener, app)
+                .with_graceful_shutdown(shutdown)
+                .into_future(),
         )
         .await;
         drop(fixture);

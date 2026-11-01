@@ -134,6 +134,97 @@ contain client registration and private audit records. Preserve them under the
 same private custody as existing owner data; outstanding tokens never survive a
 restart or restore.
 
+## Connect Codex
+
+Codex CLI **0.166.0** has passed the disposable acceptance check below using
+pre-registration, exact callback matching and issuer-bound responses. No dynamic
+registration or redirect-policy relaxation is needed for this configuration.
+The [official Codex MCP guide](https://learn.chatgpt.com/docs/extend/mcp#oauth-client-registration-and-callbacks)
+owns client settings and callback-selection behavior; recheck it when upgrading.
+
+Register a public client in DevOption's operator-owned allowlist:
+
+```json
+{
+  "client_id": "codex",
+  "name": "Codex",
+  "redirect_uris": ["http://127.0.0.1:43123/callback"]
+}
+```
+
+This is one entry inside the existing version-1 `clients` array, not a replacement
+for that document. Keep other authorized clients. After the operator deliberately
+enables/restarts DevOption, add the matching client configuration to Codex's
+`config.toml` (replace the example platform origin):
+
+```toml
+[mcp_servers.devoption]
+url = "https://platform.example.test/mcp"
+scopes = ["mcp:read"]
+
+[mcp_servers.devoption.oauth]
+client_id = "codex"
+callback_url = "http://127.0.0.1:43123/callback"
+callback_port = 43123
+```
+
+Configure **both** the callback URL and listener port. Codex otherwise selects an
+ephemeral listener port, which won't match this exact DevOption registration.
+Do not use a client secret for this public client. DevOption advertises issuer
+support and returns `iss`, so Codex reuses the configured `/callback` path.
+The selected local port must be free. If changing it, update both client settings
+and the operator's exact registration together.
+
+Run `codex mcp login devoption`, sign in to DevOption, and explicitly allow read
+access. For a manual callback flow, use `codex mcp login devoption --no-browser`;
+after consent, paste the complete callback URL into Codex's hidden input. Treat
+that temporary URL as sensitive and never paste it into a chat or an issue.
+
+Restart/reconnect the Codex surface to load a changed MCP configuration. The client
+should discover the five tools listed above. Access still expires after 15 minutes;
+repeat login/consent when necessary. Revoke platform access at `/mcp/grants`.
+`codex mcp logout devoption` clears Codex's stored credentials; use the platform
+revocation page as well when withdrawing the grant itself.
+
+### Repeat the disposable Codex proof
+
+With an installed Codex CLI, OpenSSL, Cargo and the locked offline development
+inputs, run from the repository root:
+
+```sh
+python3 scripts/check_codex_mcp.py --codex codex
+```
+
+The opt-in checker starts the existing temporary Rust MCP fixture, creates a
+private temporary Codex configuration/credential store and test CA, and uses a
+loopback CONNECT proxy limited to `platform.example.test:443`. A local TLS gateway
+forwards to the real DevOption handlers without rewriting OAuth metadata, issuer,
+resource, callback, credentials or MCP payloads. Certificates are verified; no
+DNS, system trust, host services or normal Codex settings are changed. Codex's
+[custom CA setting](https://learn.chatgpt.com/docs/auth#custom-ca-bundles) is set
+only in the test subprocess. A CA and separate server certificate are required;
+a self-signed CA used directly as the server leaf is rejected by Codex.
+
+The checker verifies the real CLI's authorization request and PKCE exchange,
+then uses Codex's app-server runtime to initialize MCP, discover exactly five
+tools, call all five against a disposable project, revoke the grant, and confirm
+that a subsequent Codex tool call fails with an observed HTTP 401. It also runs
+the app-server OAuth login, delivers consent to its real loopback callback
+listener, verifies the matching successful completion notification, and reads
+through a newly consented native client runtime before revoking that grant.
+Ephemeral
+client runtime is created; no model turn is started, no model-provider request is
+made, and no API key is forwarded. Codex can attempt background catalog/plugin
+connections during startup; the restricted proxy rejects those CONNECT requests
+without contacting their hosts and reports the count.
+
+All fixture processes, test trust and Codex credentials are temporary. The checker
+requests graceful Rust fixture shutdown using `DEVOPTION_MCP_FIXTURE_STOP` so the
+fixture's private state is removed too. It does not install/update Codex, and is
+not part of ordinary CI, which does not require an external Codex binary. Its
+app-server methods are experimental; test the installed client version again
+after upgrading rather than inferring compatibility from a version number.
+
 ## Validation and limits
 
 `cargo test -p devoption-server --lib server::mcp --locked --offline` covers
@@ -143,9 +234,8 @@ credentials, read-only dispatch, unsafe configuration and audit failure.
 UI escaping is covered in `devoption-ui`. The disposable browser fixture is
 recorded in the [screenshot instructions](screenshots/README.md).
 
-This slice has no deployment, live credential issuance or external harness
-compatibility acceptance. The browser proof uses a synthetic proxy to exercise
-real handlers; it does not establish public DNS/TLS or production readiness.
-Client integration must be tested for the selected harness and callback before
-operational enablement. Automatic registration, refresh grants, project-specific
+Codex CLI 0.166.0 OAuth and native MCP client-runtime compatibility passed using
+the repeatable disposable proof above. This is not a model-driven Codex turn,
+desktop UI acceptance, public DNS/TLS acceptance, production deployment or a live
+account connection. Other clients and configurations remain unverified. Automatic registration, refresh grants, project-specific
 scopes, source reads, and permissioned writes remain future work.

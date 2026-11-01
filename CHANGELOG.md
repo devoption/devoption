@@ -23,6 +23,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
+  denial through a disposable, certificate-verified native client check; document
+  matching client/callback settings and keep production authentication unchanged
+  ([#367](https://github.com/devoption/devoption/issues/367)).
+
 - Add opt-in authenticated HTTP MCP with pre-registered OAuth clients, explicit
   consent, S256 PKCE, expiring revocable read grants, fresh account checks,
   five bounded observation tools and private audit records
