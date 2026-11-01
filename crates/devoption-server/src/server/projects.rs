@@ -24,6 +24,8 @@ mod pages;
 mod secrets;
 
 #[cfg(test)]
+mod gate_tests;
+#[cfg(test)]
 mod startup_tests;
 
 #[derive(Clone)]

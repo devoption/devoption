@@ -17,6 +17,44 @@ status using controlled Git reads. [#162](https://github.com/devoption/devoption
 adds [explicitly managed empty repository creation](managed-repositories.md) using
 the same version 2 catalog and identities.
 
+## Inspection serialization and latency
+
+The [#206 review](https://github.com/devoption/devoption/issues/206) retains the
+single in-process catalog gate for each complete `Projects::access` operation.
+Repository status and source preparation run their bounded Git inspections inside
+that gate. An unrelated catalog read or mutation can therefore wait for inspection;
+multiple queued operations can compound the delay. The per-command Git deadline
+and output bounds are not an end-to-end HTTP latency or queue-length guarantee.
+
+The gate moves into the blocking task before inspection or mutation begins.
+Cancelling the awaiting HTTP task does not release it while the blocking operation
+is still running. A waiter cancelled before acquiring the gate performs no catalog
+operation. This process-local gate is separate from the advisory on-disk writer
+lock: read-only inspection holds the former, while mutations acquire the latter
+for their fresh load/modify/atomic-save transaction. External cooperating writers
+are governed by the disk lock, not this process's mutex. Checkout/root validation
+and before/after Git identity checks remain necessary despite serialization.
+
+Selected tradeoff: retain serialization rather than introduce snapshot/revalidation
+phases or an admission timeout in this review. Moving Git reads outside the gate
+could allow unrelated operations to proceed, but would require revalidating the
+catalog association and root/checkout evidence after inspection and defining what
+to return when those change. Build review and promotion must not consume stale
+results. A bounded admission policy could reject queued requests sooner, but would
+not make successful inspection faster and would change HTTP availability/error
+behavior. Neither alternative is selected without a separately scoped contract.
+This decision accepts head-of-line waiting; it does not claim improved throughput,
+a bounded queue, or measured production latency.
+
+`projects/gate_tests.rs` deterministically enqueues a read and mutation behind a
+real disposable repository inspection, holds the blocking closure at a test-only
+barrier, cancels its caller, and verifies FIFO progress after success and failure.
+Further interleavings replace a catalog association or checkout before a queued
+inspection starts, proving it loads fresh scope and refuses stale storage. These
+are ordering/safety tests, not a slow-Git benchmark: the controlled pause is in the
+test closure, and no production hook or Git resource limit is changed. Fixtures
+inspect metadata only and never compile or execute repository code.
+
 ## Authenticated service view and creation
 
 With an existing owner, startup derives an unlocked `CatalogDirectory` from the

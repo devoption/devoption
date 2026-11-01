@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Document the catalog inspection gate's queueing tradeoff and add deterministic
+  regression coverage for queued reads/writes, caller cancellation, failed
+  inspection and fresh scope/storage validation; retain existing serialization
+  and Git limits ([#206](https://github.com/devoption/devoption/issues/206)).
+
 - Run bundle, record, upgrade and independent-app installation acceptance in four
   parallel suites with 15-minute job limits; bound VM package setup to three
   minutes with explicit apt network retries and timeouts, keeping all selected
