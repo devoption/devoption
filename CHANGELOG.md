@@ -37,6 +37,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add three explicitly illustrative Code, Builds and Releases image concepts for
+  owner review, keeping source checks, build approval, release promotion and
+  deployment approval distinct; no interface behavior changes
+  ([#315](https://github.com/devoption/devoption/issues/315)).
+
 - Add an explicitly illustrative Overview image concept for review, grounded in
   current runtime/monitoring boundaries; no interface behavior changes
   ([#352](https://github.com/devoption/devoption/issues/352)).
