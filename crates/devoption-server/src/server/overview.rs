@@ -412,6 +412,18 @@ mod tests {
         assert!(validated(&bad, 1000).is_none());
     }
     #[test]
+    fn additive_host_outcome_counts_preserve_version_one_aggregation() {
+        let mut value = metrics(1000, 10, 3, 4);
+        value["buckets"][0]["outcomes"] = serde_json::json!({
+            "guest_response": 7, "admission_unavailable": 1,
+            "deadline_exceeded": 1, "invocation_failed": 1, "request_rejected": 0,
+        });
+        let m = aggregate(&[validated(&value, 1000).unwrap()], 1, 1, 1000);
+        assert_eq!(m.requests, Some(10));
+        assert_eq!(m.errors, Some(30.0));
+        assert_eq!(m.p95, Some(100));
+    }
+    #[test]
     fn aggregates_histograms_and_rates_by_request_count_not_average_of_apps() {
         let a = validated(&metrics(1000, 100, 1, 3), 1000).unwrap();
         let mut b = metrics(1000, 10, 2, 5);
