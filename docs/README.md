@@ -32,6 +32,7 @@ applications; project-specific roles remain planned.
 - [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)
 - [Development setup and checks](development.md)
 - [Screenshot gallery](screenshots/gallery.md) and [capture guide](screenshots/README.md)
+- [Overview design concept](design/352-overview/README.md) — proposed image, not implemented UI
 - [Contribution guide](../CONTRIBUTING.md) and [maintainer checklist](maintainers.md)
 - [Release process and approval gates](releases.md)
 - [Local platform bundle candidates and remaining trust gates](release-bundles.md)
