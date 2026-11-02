@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Reconcile the named-app build contract with its merged implementation, current
+  regression checks and disposable Linux acceptance, retaining the separate
+  browser/HTTPS/reboot evidence limits
+  ([#295](https://github.com/devoption/devoption/issues/295)).
+
 - Share escaped identity-row and live action-status rendering across build and
   release pages while preserving their HTML, controls and approval boundaries
   ([#22](https://github.com/devoption/devoption/issues/22)).
@@ -31,6 +36,11 @@ Entries describe implemented changes, not the roadmap.
   exact release/grant binding, receiver-side idempotency and restart/restore fault
   acceptance; background execution remains unimplemented
   ([#296](https://github.com/devoption/devoption/issues/296)).
+
+- Distinguish fixed host HTTP outcome classes in worker telemetry while preserving
+  request/5xx totals, health-probe exclusion and version-1 consumers; retain no
+  routes, raw errors or request identifiers in the new counters
+  ([#373](https://github.com/devoption/devoption/issues/373)).
 
 - Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
   denial through a disposable, certificate-verified native client check; document
