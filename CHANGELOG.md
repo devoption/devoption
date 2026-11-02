@@ -32,6 +32,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Distinguish fixed host HTTP outcome classes in worker telemetry while preserving
+  request/5xx totals, health-probe exclusion and version-1 consumers; retain no
+  routes, raw errors or request identifiers in the new counters
+  ([#373](https://github.com/devoption/devoption/issues/373)).
+
 - Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
   denial through a disposable, certificate-verified native client check; document
   matching client/callback settings and keep production authentication unchanged
