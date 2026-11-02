@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Reconcile the named-app build contract with its merged implementation, current
+  regression checks and disposable Linux acceptance, retaining the separate
+  browser/HTTPS/reboot evidence limits
+  ([#295](https://github.com/devoption/devoption/issues/295)).
+
 - Share escaped identity-row and live action-status rendering across build and
   release pages while preserving their HTML, controls and approval boundaries
   ([#22](https://github.com/devoption/devoption/issues/22)).
