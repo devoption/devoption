@@ -51,6 +51,28 @@ for the complete source snapshot including Git metadata, 4 MiB per component and
 this contract does not silently expand those limits. Runtime HTTP compatibility
 validation is still required before deployment.
 
+### Named-app acceptance and limits
+
+[#295](https://github.com/devoption/devoption/issues/295)'s fixed-fixture build
+restriction was removed by [merged #301](https://github.com/devoption/devoption/pull/301).
+The implementation derives the conventional package/library/artifact identity
+from the reviewed source; it does not accept a caller-selected artifact path.
+The current regression tests in `devoption-builds` bind that identity, command
+and embedded asset bytes, and invalidate approval after a rename or asset edit.
+The installed worker tests cover both the original fixture and `sample-site`,
+including rejection of substituted library names and paths.
+
+The [disposable named-app checker](../scripts/check_named_web_app.py) builds two
+revisions of the committed, independently named static-site example through the
+real offline broker/worker, verifies unchanged source, exact CSS/JavaScript
+responses and distinct component bytes, then serves A → B → saved A with the real
+runtime. This checker passed in [#301's Linux CI](https://github.com/devoption/devoption/actions/runs/39895560413)
+and remains in the ordinary CI bundle suite. This is evidence for the named-app
+build/runtime and embedded-asset contract; it does not establish a complete
+named-app browser promotion, public HTTPS or reboot acceptance run. The existing
+deployment and installation guides describe those separate lifecycle boundaries.
+No general Node pipeline or larger resource policy was added.
+
 ## Prepare the node
 
 Use the existing unprivileged platform account and existing owner. Do not run the

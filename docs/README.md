@@ -27,12 +27,14 @@ applications; project-specific roles remain planned.
 - [Project environment secrets and key custody](project-secrets.md)
 - [Independent project app deployments and hostnames](multiple-apps.md)
 - [Deployment-bound secrets and scoped HTTPS integrations](app-https.md)
+- [Proposed durable app job contract and required fault evidence](background-jobs-proposal.md)
 - [Same-schema preview upgrades and full-state recovery](platform-upgrades.md)
 - [Signed preview upgrade, interruption and reboot acceptance](bundle-upgrade-acceptance.md)
 - [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)
 - [Development setup and checks](development.md)
 - [Screenshot gallery](screenshots/gallery.md) and [capture guide](screenshots/README.md)
 - [Code, Builds and Releases concepts](design/315-project-workflow/README.md) — proposed images, not implemented UI
+- [Overview design concept](design/352-overview/README.md) — proposed image, not implemented UI
 - [Contribution guide](../CONTRIBUTING.md) and [maintainer checklist](maintainers.md)
 - [Release process and approval gates](releases.md)
 - [Local platform bundle candidates and remaining trust gates](release-bundles.md)

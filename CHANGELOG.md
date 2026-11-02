@@ -7,6 +7,16 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Document the implemented browser-local appearance preferences and reconcile
+  the light/dark requirement with its merged increments and current validation,
+  without selecting additional themes or changing the UI
+  ([#23](https://github.com/devoption/devoption/issues/23)).
+
+- Reconcile the named-app build contract with its merged implementation, current
+  regression checks and disposable Linux acceptance, retaining the separate
+  browser/HTTPS/reboot evidence limits
+  ([#295](https://github.com/devoption/devoption/issues/295)).
+
 - Share escaped identity-row and live action-status rendering across build and
   release pages while preserving their HTML, controls and approval boundaries
   ([#22](https://github.com/devoption/devoption/issues/22)).
@@ -31,6 +41,20 @@ Entries describe implemented changes, not the roadmap.
   owner review, keeping source checks, build approval, release promotion and
   deployment approval distinct; no interface behavior changes
   ([#315](https://github.com/devoption/devoption/issues/315)).
+
+- Add an explicitly illustrative Overview image concept for review, grounded in
+  current runtime/monitoring boundaries; no interface behavior changes
+  ([#352](https://github.com/devoption/devoption/issues/352)).
+
+- Propose a separate durable app-job contract with PostgreSQL admission/leases,
+  exact release/grant binding, receiver-side idempotency and restart/restore fault
+  acceptance; background execution remains unimplemented
+  ([#296](https://github.com/devoption/devoption/issues/296)).
+
+- Distinguish fixed host HTTP outcome classes in worker telemetry while preserving
+  request/5xx totals, health-probe exclusion and version-1 consumers; retain no
+  routes, raw errors or request identifiers in the new counters
+  ([#373](https://github.com/devoption/devoption/issues/373)).
 
 - Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
   denial through a disposable, certificate-verified native client check; document
