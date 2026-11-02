@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Document the implemented browser-local appearance preferences and reconcile
+  the light/dark requirement with its merged increments and current validation,
+  without selecting additional themes or changing the UI
+  ([#23](https://github.com/devoption/devoption/issues/23)).
+
 - Reconcile the named-app build contract with its merged implementation, current
   regression checks and disposable Linux acceptance, retaining the separate
   browser/HTTPS/reboot evidence limits
