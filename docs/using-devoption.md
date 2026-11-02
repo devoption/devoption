@@ -59,6 +59,42 @@ can reject unauthorized connections before sign-in content is served. A permitte
 device must still sign in to a platform account. This proxy policy is separate
 from [workspace membership](users.md), browser SSO or agent credentials.
 
+## Browser appearance
+
+Open **Appearance** from the account menu. A fresh browser defaults to Nord,
+Dark and Purple. Choose Light or Dark explicitly, or System to follow the
+device's color scheme. Mode, theme and accent are stored independently in this
+browser's local storage; they are not account preferences synchronized by the
+server. Saved choices apply before content renders and are restored on navigation
+and browser history. Other open pages pick up saved changes when reloaded.
+
+Invalid or unreadable preferences fall back independently to the defaults. If
+saving fails, the current page still changes appearance and reports that the
+choice could not be saved. JavaScript is required for switching; without it,
+pages use the default dark appearance. The existing theme choices are Nord,
+Dracula and Tokyo Night. Custom primary colors have an accent-contrast warning,
+not an accessibility guarantee; use a preset if a chosen color is hard to read.
+
+### Appearance acceptance
+
+The browser-local light/dark requirement in
+[#23](https://github.com/devoption/devoption/issues/23) was implemented through
+[#29](https://github.com/devoption/devoption/issues/29) and
+[merged #30](https://github.com/devoption/devoption/pull/30). That PR records real
+keyboard, navigation, narrow-screen and light/dark checks, plus the default and
+alternate captures. Later selected increments added System mode and the existing
+themes; [#42](https://github.com/devoption/devoption/issues/42) and
+[merged #43](https://github.com/devoption/devoption/pull/43) complete the selected
+Tokyo Night increment. This reconciliation selects no new theme or visual change.
+
+Current `scripts/test_appearance.cjs` checks independent persistence, invalid and
+unavailable storage, failed saves, history restoration, System changes and
+semantic text/interactive contrast across the existing palettes. These automated
+checks do not replace real keyboard or browser review. Existing
+[default and alternate captures](screenshots/gallery.md) remain evidence of their
+documented capture fixtures; historical browser checks are not a fresh audit of
+every page in every theme.
+
 ## HTTP authentication in the current preview
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`

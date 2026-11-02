@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Document the implemented browser-local appearance preferences and reconcile
+  the light/dark requirement with its merged increments and current validation,
+  without selecting additional themes or changing the UI
+  ([#23](https://github.com/devoption/devoption/issues/23)).
+
 - Share escaped identity-row and live action-status rendering across build and
   release pages while preserving their HTML, controls and approval boundaries
   ([#22](https://github.com/devoption/devoption/issues/22)).
