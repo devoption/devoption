@@ -283,6 +283,25 @@ fn failure(status: u16) -> Response<Bytes> {
         .body(Bytes::from_static(b"Application request unavailable\n"))
         .expect("fixed response")
 }
+
+fn invocation_response(
+    result: Result<wasmtime::Result<Response<Bytes>>, tokio::time::error::Elapsed>,
+) -> (Response<Bytes>, telemetry::Outcome) {
+    use telemetry::Outcome;
+    match result {
+        Err(_) => (failure(504), Outcome::DeadlineExceeded),
+        Ok(Err(error))
+            if matches!(
+                error.downcast_ref::<wasmtime::Trap>(),
+                Some(wasmtime::Trap::Interrupt)
+            ) =>
+        {
+            (failure(504), Outcome::DeadlineExceeded)
+        }
+        Ok(Err(_)) => (failure(502), Outcome::InvocationFailed),
+        Ok(Ok(response)) => (response, Outcome::GuestResponse),
+    }
+}
 async fn connection(
     mut stream: TcpStream,
     pre: ProxyPre<State>,
@@ -295,9 +314,9 @@ async fn connection(
     let mut visitor = None;
     let mut fresh = false;
     let mut probe = false;
-    let response = match tokio::time::timeout(DEADLINE, receive(&mut stream)).await {
-        Err(_) => failure(408),
-        Ok(Err(code)) => failure(code),
+    let (response, outcome) = match tokio::time::timeout(DEADLINE, receive(&mut stream)).await {
+        Err(_) => (failure(408), telemetry::Outcome::RequestRejected),
+        Ok(Err(code)) => (failure(code), telemetry::Outcome::RequestRejected),
         Ok(Ok(mut request)) => {
             probe = request.uri().path() == "/healthz";
             // Health probes and bots without HTML navigation do not create users.
@@ -320,35 +339,20 @@ async fn connection(
                 fresh = new;
             }
             match admit(&admission).await {
-                None => failure(503),
-                Some(_permit) => {
-                    match tokio::time::timeout(DEADLINE, invoke(&pre, request, records, https))
-                        .await
-                    {
-                        Err(_) => failure(504),
-                        Ok(Err(error))
-                            if matches!(
-                                error.downcast_ref::<wasmtime::Trap>(),
-                                Some(wasmtime::Trap::Interrupt)
-                            ) =>
-                        {
-                            failure(504)
-                        }
-                        Ok(Err(_)) => failure(502),
-                        Ok(Ok(response)) => response,
-                    }
-                }
+                None => (failure(503), telemetry::Outcome::AdmissionUnavailable),
+                Some(_permit) => invocation_response(
+                    tokio::time::timeout(DEADLINE, invoke(&pre, request, records, https)).await,
+                ),
             }
         }
     };
-    if !probe {
-        telemetry.lock().expect("telemetry lock").record(
-            telemetry::now(),
-            started.elapsed().as_millis().min(u64::MAX as u128) as u64,
-            response.status().is_server_error(),
-            visitor.clone(),
-        );
-    }
+    telemetry.lock().expect("telemetry lock").record(
+        telemetry::now(),
+        started.elapsed().as_millis().min(u64::MAX as u128) as u64,
+        response.status().is_server_error(),
+        (!probe).then_some(outcome),
+        visitor.clone(),
+    );
     log(&format!("request completed: {}", response.status()));
     let invocation = std::env::var("INVOCATION_ID").unwrap_or_default();
     let invocation = if invocation.len() == 32 && invocation.bytes().all(|b| b.is_ascii_hexdigit())
@@ -487,6 +491,51 @@ fn run_inner(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn host_outcomes_distinguish_guest_statuses_traps_and_deadlines() {
+        use telemetry::Outcome;
+        // Identical wire statuses must not turn an app response into a host fault.
+        for status in [200, 400, 500, 502, 503, 504, 599] {
+            let mut response = failure(status);
+            response
+                .headers_mut()
+                .insert("x-app", "preserved".parse().unwrap());
+            let (response, outcome) = invocation_response(Ok(Ok(response)));
+            assert_eq!(response.status(), status);
+            assert_eq!(response.headers()["x-app"], "preserved");
+            assert_eq!(outcome, Outcome::GuestResponse);
+        }
+        for (error, status, expected) in [
+            (
+                wasmtime::Error::from(wasmtime::Trap::Interrupt),
+                504,
+                Outcome::DeadlineExceeded,
+            ),
+            (
+                wasmtime::Error::from(wasmtime::Trap::OutOfFuel),
+                502,
+                Outcome::InvocationFailed,
+            ),
+            (
+                wasmtime::format_err!("private runtime diagnostic"),
+                502,
+                Outcome::InvocationFailed,
+            ),
+        ] {
+            let (response, outcome) = invocation_response(Ok(Err(error)));
+            assert_eq!(response.status(), status);
+            assert_eq!(outcome, expected);
+            assert_eq!(
+                response.body().as_ref(),
+                b"Application request unavailable\n"
+            );
+        }
+        let timeout = tokio::time::timeout(Duration::ZERO, std::future::pending()).await;
+        let (response, outcome) = invocation_response(timeout);
+        assert_eq!(response.status(), 504);
+        assert_eq!(outcome, Outcome::DeadlineExceeded);
+    }
+
     #[tokio::test]
     async fn activity_identifier_survives_ingress_only_as_host_metadata() {
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))

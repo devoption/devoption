@@ -27,6 +27,7 @@ applications; project-specific roles remain planned.
 - [Project environment secrets and key custody](project-secrets.md)
 - [Independent project app deployments and hostnames](multiple-apps.md)
 - [Deployment-bound secrets and scoped HTTPS integrations](app-https.md)
+- [Proposed durable app job contract and required fault evidence](background-jobs-proposal.md)
 - [Same-schema preview upgrades and full-state recovery](platform-upgrades.md)
 - [Signed preview upgrade, interruption and reboot acceptance](bundle-upgrade-acceptance.md)
 - [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)

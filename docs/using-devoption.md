@@ -341,6 +341,25 @@ histograms, not an average of project percentiles. The p95 estimate is unavailab
 if it falls in the overflow bucket above 12.8 seconds. Idle buckets have no latency
 or error-rate sample. `/healthz` probes are excluded.
 
+New worker snapshots also include a host-only `outcomes` object in each bucket:
+`guest_response`, `admission_unavailable`, `deadline_exceeded`,
+`invocation_failed` and `request_rejected`. Each counted request increments one
+class; their sum equals the bucket's request count. Guest responses include all
+application status codes, including 502/503/504. Host admission failures return
+503; invocation deadlines or Wasmtime interrupts return 504; other invocation
+errors return 502. Receive/parser failures form the request-rejected class.
+The existing `errors` total still counts all HTTP 5xx responses independently.
+These additive version-1 fields do not change Overview or its error-rate chart.
+Older workers have no outcome fields; absent fields mean unavailable attribution,
+not zero failures. No earlier history is reconstructed.
+
+The new counters contain no routes, query strings, request identifiers or raw
+errors. They distinguish host control-flow categories, not affected endpoints or
+root causes within an invocation. Response-transfer failures remain outside the
+metric: observation happens before writing the response to the client. Worker
+logs contain bounded completion statuses and guest output, without guaranteed
+request correlation; do not infer a host cause from a status code alone.
+
 **Active users** estimates browsers active within the last five minutes. The host
 sets a per-app `__Host-devoption-activity` cookie on HTML navigation, using Secure,
 HttpOnly, SameSite=Lax, a root path, and a 24-hour lifetime. This is an anonymous
