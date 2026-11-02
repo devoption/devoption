@@ -32,6 +32,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Propose a separate durable app-job contract with PostgreSQL admission/leases,
+  exact release/grant binding, receiver-side idempotency and restart/restore fault
+  acceptance; background execution remains unimplemented
+  ([#296](https://github.com/devoption/devoption/issues/296)).
+
 - Distinguish fixed host HTTP outcome classes in worker telemetry while preserving
   request/5xx totals, health-probe exclusion and version-1 consumers; retain no
   routes, raw errors or request identifiers in the new counters
