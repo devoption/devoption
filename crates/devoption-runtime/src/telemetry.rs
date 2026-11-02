@@ -16,6 +16,36 @@ pub(crate) fn cookie_id(cookie: &str) -> Option<&str> {
         .filter(|id| id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 pub(crate) const COOKIE: &str = "__Host-devoption-activity";
+
+/// Host control-flow outcome, never inferred from an application's status code.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Outcome {
+    GuestResponse,
+    AdmissionUnavailable,
+    DeadlineExceeded,
+    InvocationFailed,
+    RequestRejected,
+}
+
+#[derive(Clone, Default, Serialize)]
+struct Outcomes {
+    guest_response: u64,
+    admission_unavailable: u64,
+    deadline_exceeded: u64,
+    invocation_failed: u64,
+    request_rejected: u64,
+}
+impl Outcomes {
+    fn record(&mut self, outcome: Outcome) {
+        *match outcome {
+            Outcome::GuestResponse => &mut self.guest_response,
+            Outcome::AdmissionUnavailable => &mut self.admission_unavailable,
+            Outcome::DeadlineExceeded => &mut self.deadline_exceeded,
+            Outcome::InvocationFailed => &mut self.invocation_failed,
+            Outcome::RequestRejected => &mut self.request_rejected,
+        } += 1;
+    }
+}
 const LIMITS: [u64; 12] = [
     10,
     25,
@@ -43,6 +73,7 @@ struct Bucket {
     errors: u64,
     latency: [u64; 12],
     active: usize,
+    outcomes: Outcomes,
 }
 pub(crate) struct Telemetry {
     started: u64,
@@ -76,7 +107,16 @@ impl Telemetry {
         let b = self.random.hash_one((self.started, self.serial, 1));
         (format!("{a:016x}{b:016x}"), true)
     }
-    pub(crate) fn record(&mut self, at: u64, elapsed: u64, error: bool, visitor: Option<String>) {
+    /// None excludes a health probe from every counter and visitor observation.
+    pub(crate) fn record(
+        &mut self,
+        at: u64,
+        elapsed: u64,
+        error: bool,
+        outcome: Option<Outcome>,
+        visitor: Option<String>,
+    ) {
+        let Some(outcome) = outcome else { return };
         self.prune(at);
         if let Some(id) = visitor {
             if self.visitors.len() < 10000 || self.visitors.contains_key(&id) {
@@ -89,6 +129,7 @@ impl Telemetry {
         bucket.at = at / 300 * 300;
         bucket.requests += 1;
         bucket.errors += u64::from(error);
+        bucket.outcomes.record(outcome);
         bucket.latency[LIMITS.iter().position(|n| elapsed <= *n).unwrap_or(11)] += 1;
         bucket.active = self.visitors.len();
     }
@@ -151,11 +192,71 @@ pub(crate) fn start() -> Arc<Mutex<Telemetry>> {
 mod tests {
     use super::*;
     #[test]
+    fn outcome_counts_preserve_totals_exclude_probes_and_expire_with_buckets() {
+        let mut t = Telemetry::new();
+        t.started = 1000;
+        for outcome in [
+            Outcome::GuestResponse,
+            Outcome::AdmissionUnavailable,
+            Outcome::DeadlineExceeded,
+            Outcome::InvocationFailed,
+            Outcome::RequestRejected,
+        ] {
+            let error = !matches!(outcome, Outcome::GuestResponse | Outcome::RequestRejected);
+            t.record(1000, 20, error, Some(outcome), None);
+        }
+        t.record(1001, 20, true, Some(Outcome::GuestResponse), None);
+        let before = t.snapshot(1002, "worker");
+        let bucket = &before["buckets"][0];
+        assert_eq!(bucket["requests"], 6);
+        assert_eq!(bucket["errors"], 4);
+        assert_eq!(bucket["latency"][1], 6);
+        assert_eq!(
+            bucket["outcomes"],
+            serde_json::json!({
+                "guest_response": 2, "admission_unavailable": 1,
+                "deadline_exceeded": 1, "invocation_failed": 1, "request_rejected": 1,
+            })
+        );
+        // Both healthy and failed probes leave all counters and users untouched.
+        for error in [false, true] {
+            t.record(1002, 5000, error, None, Some("excluded-probe".into()));
+        }
+        assert_eq!(t.snapshot(1002, "worker"), before);
+        t.record(1300, 20, false, Some(Outcome::GuestResponse), None);
+        let next = t.snapshot(1300, "worker");
+        assert_eq!(next["buckets"][1]["requests"], 1);
+        assert_eq!(next["buckets"][1]["outcomes"]["guest_response"], 1);
+        let expired = t.snapshot(100000, "worker");
+        assert_eq!(expired["buckets"].as_array().unwrap().len(), 1);
+        assert_eq!(expired["buckets"][0]["requests"], 0);
+        assert!(
+            expired["buckets"][0]["outcomes"]
+                .as_object()
+                .unwrap()
+                .values()
+                .all(|n| n == 0)
+        );
+    }
+
+    #[test]
     fn observations_expire_and_do_not_export_identifiers() {
         let mut t = Telemetry::new();
         t.started = 1000;
-        t.record(1000, 151, false, Some("private-browser-id".into()));
-        t.record(1001, 42, true, Some("private-browser-id".into()));
+        t.record(
+            1000,
+            151,
+            false,
+            Some(Outcome::GuestResponse),
+            Some("private-browser-id".into()),
+        );
+        t.record(
+            1001,
+            42,
+            true,
+            Some(Outcome::GuestResponse),
+            Some("private-browser-id".into()),
+        );
         let s = t.snapshot(1002, "worker");
         assert_eq!(s["active"], 1);
         assert_eq!(s["buckets"][0]["requests"], 2);
@@ -174,7 +275,13 @@ mod tests {
     fn activity_memory_is_bounded_and_saturation_expires() {
         let mut t = Telemetry::new();
         for i in 0..10001 {
-            t.record(1000, 1, false, Some(format!("visitor-{i}")));
+            t.record(
+                1000,
+                1,
+                false,
+                Some(Outcome::GuestResponse),
+                Some(format!("visitor-{i}")),
+            );
         }
         assert_eq!(t.visitors.len(), 10000);
         assert_eq!(t.snapshot(1000, "worker")["overflow"], true);

@@ -86,6 +86,8 @@ Do not retry with a new operation key after an ambiguous result. Interpret the
 provider's response and idempotency contract in the application. This slice adds
 no durable queue, scheduling, retry worker or transactional outbox. The existing
 five-second app request deadline and other guest resource limits remain in force.
+The [durable-job proposal](background-jobs-proposal.md) describes a separate
+future execution contract; it is not enabled by an HTTPS grant.
 
 ## Rotation, stopping and recovery
 
