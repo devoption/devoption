@@ -27,6 +27,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Propose a separate durable app-job contract with PostgreSQL admission/leases,
+  exact release/grant binding, receiver-side idempotency and restart/restore fault
+  acceptance; background execution remains unimplemented
+  ([#296](https://github.com/devoption/devoption/issues/296)).
+
 - Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
   denial through a disposable, certificate-verified native client check; document
   matching client/callback settings and keep production authentication unchanged
