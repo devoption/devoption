@@ -37,6 +37,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add an explicitly illustrative Overview image concept for review, grounded in
+  current runtime/monitoring boundaries; no interface behavior changes
+  ([#352](https://github.com/devoption/devoption/issues/352)).
+
 - Propose a separate durable app-job contract with PostgreSQL admission/leases,
   exact release/grant binding, receiver-side idempotency and restart/restore fault
   acceptance; background execution remains unimplemented
