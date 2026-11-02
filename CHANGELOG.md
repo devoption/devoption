@@ -27,6 +27,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add an explicitly illustrative Overview image concept for review, grounded in
+  current runtime/monitoring boundaries; no interface behavior changes
+  ([#352](https://github.com/devoption/devoption/issues/352)).
+
 - Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
   denial through a disposable, certificate-verified native client check; document
   matching client/callback settings and keep production authentication unchanged
