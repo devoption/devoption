@@ -27,6 +27,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Added
 
+- Add three explicitly illustrative Code, Builds and Releases image concepts for
+  owner review, keeping source checks, build approval, release promotion and
+  deployment approval distinct; no interface behavior changes
+  ([#315](https://github.com/devoption/devoption/issues/315)).
+
 - Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
   denial through a disposable, certificate-verified native client check; document
   matching client/callback settings and keep production authentication unchanged
