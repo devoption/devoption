@@ -232,9 +232,12 @@ These restrictions do not make untrusted code supported: selected source,
 dependencies, toolchain, OS and other processes under the platform UID remain
 trusted. Concurrent out-of-band writes by that UID are outside this contract.
 
-Completed attempts retain source, artifact and receipts on disk; there is no
-retention/garbage-collection UI yet. Stop the service before operator maintenance;
-never remove a running attempt or rewrite a recorded successful artifact.
+Project Settings configures [per-project build retention](build-history.md#per-project-retention-and-automatic-cleanup),
+defaulting to ten completed attempts. Automatic cleanup reclaims eligible staging,
+artifacts, receipts and output while protecting in-flight work, saved releases and
+recovery evidence. Legacy attempts without verified path bindings remain preserved
+with an incomplete-cleanup result. Never manually remove a running attempt or
+rewrite a recorded successful artifact.
 
 ## Local evidence and remaining limits
 

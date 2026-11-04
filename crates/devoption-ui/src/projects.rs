@@ -1,4 +1,7 @@
 mod render;
+mod retention;
+pub use retention::RetentionView;
+pub(super) use retention::content as retention_content;
 mod secrets;
 pub(super) use secrets::content as secrets_content;
 pub use secrets::{EnvironmentSecretsView, SecretEventView, SecretMetadataView};

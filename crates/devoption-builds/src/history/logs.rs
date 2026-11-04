@@ -1,7 +1,7 @@
 use super::*;
 use crate::output::{BuildOutput, persistence::MAX_SNAPSHOT};
 
-fn filename(id: JobId) -> String {
+pub(super) fn filename(id: JobId) -> String {
     let hex: String = id
         .to_bytes()
         .iter()

@@ -40,16 +40,15 @@ idempotent. No terminal outcome can be replaced. A summary does not contain the
 complete plan, so these identity checks cannot replace exact approval-plan binding.
 There is no general public record constructor, state setter or history-to-plan API.
 
-At most 100 attempts are retained, including unfinished attempts. Capacity rejects
-new IDs without eviction. This first store has no deletion, seven-day expiry,
-completed-job retention policy; it fails closed at capacity. IDs are guaranteed
-noncolliding only against this store's retained records; random generation makes
-cross-store collisions unlikely but is not a global uniqueness registry. Do not
-reset, roll back or delete history to reuse attempt IDs. Future retention must
-preserve the fresh-attempt invariant. Compiler resource limits and single-job
-admission are unchanged. Existing ten-record stores remain readable without
-migration. Older binaries limited to ten records reject larger stores; do not
-reset history to make an older binary accept it.
+At most 65,536 records may be retained simultaneously, including protected and
+unfinished attempts. This is an active-storage safety bound, not a lifetime build
+count: successful retention removes eligible records and releases slots. The
+per-project default is ten completed attempts. Compact per-ID audit records retain
+identity/provenance after pruning, so allocation checks both active records and
+audit names before returning a new random ID. No small lifetime audit-count bound
+is imposed; compact metadata still consumes disk and is not secure erasure.
+Never reset, roll back or delete history/audits to reuse attempt IDs. Legacy ten-
+and hundred-record stores remain readable; see migration and downgrade limits below.
 
 Allocation does not validate current source/catalog state, consume approval,
 serialize single-job admission, prove process cleanup or perform startup recovery.
@@ -57,53 +56,91 @@ It can queue more than one attempt up to capacity; production admission remains
 separate. The lower-level `BuildJob::queued` constructor is still an in-memory
 model API and cannot insert caller-chosen IDs into this history store.
 
-## Retention planning prerequisite
+## Per-project retention and automatic cleanup
 
-[#314](https://github.com/devoption/devoption/issues/314) adds the pure
-`devoption_builds::retention` planner. It is not connected to the history store,
-server or Settings page and performs no filesystem operations. Current allocation
-limits and retained files are unchanged.
+[#314](https://github.com/devoption/devoption/issues/314) connects the pure
+`devoption_builds::retention` planner to private history, execution and Settings.
+An authenticated workspace owner can save 1–1000 completed attempts per project,
+default 10, on **Project → Settings → Build retention**. The policy is stored in
+that history directory, separately for each stable project identity. History must
+be explicitly configured; unavailable storage cannot be treated as a saved policy.
+Saving explains cleanup and exceptions before the action. Members cannot change it.
 
-A validated `Policy` selects 1–1000 terminal attempts per project (default 10).
-The planner counts succeeded, failed, cancelled and interrupted attempts in the
-newest-N window. Older release-referenced or promotion-referenced attempts remain
-in addition to that window. Queued/running attempts are always retained; terminal
-attempts without confirmed process cleanup are also retained. The result lists
-candidate IDs oldest first and retained IDs with their primary protection reason.
-It reports no reclaimed bytes or successful deletion.
+All terminal outcomes count, including failed, cancelled and interrupted attempts.
+A durable increasing completion sequence orders transitions; input row order and
+wall-clock timestamps do not determine new completions. The newest N are retained.
+Older queued/running attempts, unconfirmed process cleanup, active promotion and
+all saved-release references (including deployed and recovery releases) are
+protected in addition to the window. Protected counts can exceed the configured
+limit. Interrupted attempts become cleanup-eligible only after startup has stopped
+and verified the complete old build unit; recovery never resumes a workload.
 
-Inputs must be a complete, consistent cross-project snapshot with unique attempt
-IDs and a durable, nonzero terminal-completion sequence unique within each project.
-Admission order, wall-clock timestamps and row position cannot substitute for that
-sequence. Duplicate identities/orders, missing terminal sequences, completion
-sequences on unfinished attempts and references absent from the snapshot fail
-closed. Other projects' terminal sequences can coincide without sharing a policy.
-The current history format does **not** record these sequences or confirmed cleanup,
-so callers cannot safely manufacture planner inputs from existing rows alone.
+Cleanup runs after final execution checkpoints, after replacing a prepared review,
+after a setting change and before listening after restart. The controller holds
+execution, history and catalog gates in that order. The installed promotion broker
+also uses the work root's private `retention.lock`, with nonblocking exclusive
+flock, through copying the artifact and saving its immutable release. Cleanup holds
+that same lock while observing references and deleting. Reference lookup failures
+preserve builds, and every candidate gets a fresh reference check immediately
+before removal. Existing local release bytes are never rewritten or removed.
 
-The caller must supply all saved-release references, including deployed/recovery
-releases, and active promotions. These are caller observations, not independently
-verified evidence. A returned candidate is not deletion authority. A future adapter
-must serialize snapshot collection and removal with build admission/promotion,
-recheck references immediately before removal and verify owned paths without
-following symlinks. Replanning is deterministic after partial progress, but durable
-cleanup checkpoints, failure reporting and restart reconciliation are still needed.
+Preparation binds each allocated attempt to its exact direct staging child, root
+and child device/inode in private `build-owned-ID.bin` metadata. Cleanup accepts
+only that directory, refuses symlinks, hard-linked files, cross-device trees,
+unexpected ownership/writable modes and changed identities, and verifies the
+whole tree before deleting entries through retained no-follow descriptors. It
+removes staged source, target/compiler files, artifact, receipt, temporary/home/
+Cargo files and the saved output checkpoint. Concurrent out-of-band changes by
+the trusted platform OS user remain outside the contract.
 
-This slice does not persist policies, expose settings, allocate fresh identities,
-remove artifacts/staged source/compiler output/receipts, reclaim capacity, or prove
-release rollback after deletion. Those remain acceptance work under #314. The
-planner itself has no lifetime-attempt count cap; the existing store's cap remains.
+Before deletion it durably writes `build-audit-ID.bin`, containing the compact
+terminal identity/source/artifact claims and completion metadata. History keeps
+the original record until removal finishes, then atomically compacts it while
+preserving the completion high-water mark. Audit and owned-path metadata remain;
+allocation consults audits to prevent reuse. If interrupted after partial tree,
+directory or output removal, restart retries from the retained record and binding.
+Missing already-removed paths are harmless; replacement identities are refused.
+Retention publications use content-addressed private `.retention-DIGEST.tmp`
+files: a matching partial prefix can be completed on retry, while unsafe or
+unrelated bytes are refused. Other history/output writes keep their existing
+poisoned-writer inspection rules.
 
-Run `cargo test -p devoption-builds --locked --offline retention::` for independent
-project policies, limit validation/lowering, mixed terminal outcomes, protected
-exceptions, input rejection, reference changes, repeatable partial-progress planning
-and planning across 10,000 synthetic attempts. These tests perform no deletion.
+Settings shows the last cleanup's retained/protected counts, successful removals
+and reclaimed file-byte count, plus an explicit incomplete result on failure.
+Only successful removals contribute bytes; failed or partially removed attempts
+claim none. These are file lengths, not a filesystem free-space guarantee. Saving
+a policy and successful cleanup are distinct results. Re-saving retries cleanup.
+A failed status publication is logged; unavailable status storage is shown as such.
+
+### Legacy data and limits
+
+Version-1 records have no completion clock. Reads establish a deterministic
+migration order from existing terminal row positions, without claiming historical
+wall-clock order; new terminal transitions follow that high-water mark. The first
+history write uses version 2. Existing identity, provenance and log bytes are
+preserved. Old binaries cannot read version 2: restore a matching full-state backup
+for downgrade rather than resetting data. Policy absence defaults to ten.
+
+Legacy attempts also lack a verified staging-path binding. Cleanup preserves those
+attempts/files and reports incomplete cleanup instead of guessing a directory.
+This exception can exceed the policy; existing unmanaged/conflicting paths are not
+automatically adopted or deleted. New prepared attempts have a binding and are
+reclaimed normally. Compact audit metadata has no age-based expiry. The active
+record bound and ordinary storage failures still fail closed.
+
+Run `cargo test -p devoption-builds --locked --offline history::` and `retention::`
+for policies, migration, completion order, protected references, disk/capacity
+reclamation, interrupted retries, unsafe paths and ID/approval single use beyond
+the former 64/100 attempt ceilings. The disposable multi-app Linux checker also
+builds two unsaved components, verifies older staging/artifact/receipt/output
+removal and retained audit metadata, then deploys the saved old release again.
 
 ## Format and publication
 
 `build-history.bin` uses the nine-byte magic/version `DVHISTRY` followed by byte
-`01`, a one-byte count, that many 161-byte records, then SHA-256 of all preceding
-bytes. Maximum size is 16,142 bytes. Each record contains, in order:
+`02`, a big-endian u32 count and u64 completion high-water mark, that many
+170-byte records, then SHA-256 of all preceding bytes. The maximum is 11,141,173
+bytes. Version 1 with its one-byte count and 161-byte records remains readable. Each record contains, in order:
 
 - Attempt, project and repository IDs: 16 bytes each.
 - Exact commit: 40 lowercase ASCII hex bytes, nonzero.
@@ -112,6 +149,10 @@ bytes. Maximum size is 16,142 bytes. Each record contains, in order:
   terminated/artifact failures 3–7, Cancelled 8, Interrupted 9).
 - Artifact digest and big-endian size: 32 and 8 bytes. Non-success states require
   all zeros; success requires 1 byte–4 MiB. These are metadata claims, not artifact proof.
+
+Version-2 records append a big-endian u64 completion sequence (zero only for
+unfinished attempts) and a cleanup-confirmed byte (0 or 1). Duplicate completion
+sequences, sequences beyond the watermark and inconsistent terminal flags fail.
 
 Duplicate IDs, malformed/unknown fields, truncation, oversized or trailing data and
 checksum mismatches fail; they never trigger an empty reset. Missing record alone
@@ -164,13 +205,14 @@ Logs use the same retained directory/lock, no-follow bounded reads, metadata/nam
 checks, fixed pending filename, atomic replacement and file/directory sync as
 summaries. Corrupt or unsafe existing logs cannot be overwritten. Failed writes
 poison the shared writer, leaving uncertain files for inspection. No directory
-scan, orphan adoption, deletion or eviction is performed. At 100 retained attempts,
-managed log data is bounded to approximately 100 MiB plus one pending snapshot;
-unrelated entries or same-account modifications are outside that bound.
+scan or orphan adoption is performed by log reads/writes. Retention separately
+removes eligible output checkpoints. Each retained attempt can keep approximately
+1 MiB of logs; protected exceptions and the active-record bound still apply.
+Unrelated entries or same-account modifications are outside that bound.
 
 Raw stored logs can contain secrets or private paths. Private filesystem modes
 are not redaction or secure deletion. The opt-in Linux integration checkpoints bounded output during a build;
-there is no retention expiry yet.
+retention removes eligible old checkpoints using the policy above.
 
 ## Explicit restart recovery
 

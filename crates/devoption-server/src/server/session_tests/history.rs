@@ -66,6 +66,7 @@ fn fixture(configured: bool) -> Fixture {
         projects.recover_build_history(&mut store).unwrap();
         projects = projects.with_history(store);
     }
+    projects.owner = Some(IDENTITY);
     let slot = Arc::new(SessionSlot::default());
     slot.activate(
         Session::new(IDENTITY, FIXTURE, MAX_LIFETIME)
@@ -422,4 +423,66 @@ fn overview_and_project_monitoring_are_guarded_scoped_and_honest_about_gaps() {
         .0,
         StatusCode::NOT_FOUND
     );
+}
+
+#[test]
+fn retention_settings_require_owner_csrf_and_persist_project_specific_limits() {
+    let f = fixture(true);
+    let settings = format!("/projects/{}/settings", f.project);
+    let (_, html) = read(&f, &settings, true);
+    assert!(html.contains("Build retention"));
+    assert!(html.contains("value=\"10\""));
+    let save = |body: &str, authorized: bool, csrf: bool, project: &str| {
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri(format!("/projects/{project}/retention"))
+            .header(HOST, "127.0.0.1:3000")
+            .header(ORIGIN, "http://127.0.0.1:3000")
+            .header("content-type", "text/plain;charset=UTF-8")
+            .body(Body::from(body.to_owned()))
+            .unwrap();
+        if authorized {
+            authorize(&mut request, &FIXTURE, &CSRF);
+        }
+        if !csrf {
+            request.headers_mut().remove(CSRF_HEADER);
+        }
+        Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async { f.app.clone().oneshot(request).await.unwrap().status() })
+    };
+    assert_eq!(
+        save("1", false, false, &f.project),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(save("1", true, false, &f.project), StatusCode::UNAUTHORIZED);
+    for body in ["0", "1001", "-1", "1.5", "", "one"] {
+        assert_eq!(save(body, true, true, &f.project), StatusCode::BAD_REQUEST);
+    }
+    assert_eq!(
+        save("1", true, true, &"00".repeat(16)),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(save("1", true, true, &f.project), StatusCode::NO_CONTENT);
+    let (_, html) = read(&f, &settings, true);
+    assert!(html.contains("value=\"1\""));
+    assert!(html.contains("Cleanup is incomplete")); // legacy unbound directories are preserved
+    assert!(
+        read(&f, &format!("/projects/{}/settings", f.other), true)
+            .1
+            .contains("value=\"10\"")
+    );
+    // A valid member session still cannot change owner-controlled retention.
+    f.slot.logout(Some(&FIXTURE));
+    f.slot
+        .activate(
+            Session::new(IdentityId::from_bytes([2; 16]), FIXTURE, MAX_LIFETIME)
+                .unwrap()
+                .with_csrf(CSRF),
+            &FIXTURE,
+        )
+        .unwrap();
+    assert_eq!(save("2", true, true, &f.project), StatusCode::FORBIDDEN);
 }

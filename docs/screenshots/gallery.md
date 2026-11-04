@@ -48,7 +48,7 @@ for dimensions, states and refresh instructions.
 
 ![Project Packages, unavailable](project-packages.jpg)
 
-![Project Settings](project-settings.jpg)
+![Project Settings with per-project build retention](project-settings.jpg)
 
 **New project, ready for its first repository**
 

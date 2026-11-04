@@ -85,7 +85,13 @@ finally:
 for _ in range(2):
     process = start()
     try:
-        assert record.read_bytes() == summary([9, 9, 8])
+        # Legacy terminal row 3 establishes migration sequence 3. Startup
+        # interrupts queued/running rows afterward, assigning 4 and 5 without
+        # claiming process cleanup. Every original identity/source byte survives.
+        legacy = summary([9, 9, 8])[10:-32]
+        rows = b''.join(legacy[i*161:(i+1)*161] + sequence.to_bytes(8, 'big') + bytes([confirmed])
+                        for i, (sequence, confirmed) in enumerate([(4, 0), (5, 0), (3, 1)]))
+        assert record.read_bytes() == signed(b'DVHISTRY\x02' + (3).to_bytes(4, 'big') + (5).to_bytes(8, 'big') + rows)
         assert log.read_bytes() == log_bytes
         # Catalog edits must remain available after startup validation finishes.
         with (owner / ".projects.lock").open("rb") as catalog_lock:

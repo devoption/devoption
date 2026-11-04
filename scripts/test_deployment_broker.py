@@ -308,6 +308,26 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(broker.desired(self.config)['intent'],'stopped')
 
 
+    def test_promotion_refuses_cleanup_lock_and_preserves_saved_rollback(self):
+        release = self.promote()
+        before = {p.name:p.read_bytes() for p in (self.config['state']/release).iterdir()}
+        with broker.promotion_lock(self.config):
+            with self.assertRaises(BlockingIOError): self.promote()
+        self.assertEqual(self.promote(),release)
+        self.assertEqual({p.name:p.read_bytes() for p in (self.config['state']/release).iterdir()},before)
+
+    def test_retention_lock_symlinks_and_hardlinks_are_refused(self):
+        target = self.config['state']/'unrelated'
+        target.write_bytes(b'preserve'); target.chmod(0o600)
+        lock = self.config['build_work']/'retention.lock'
+        lock.symlink_to(target)
+        with self.assertRaises(OSError): self.promote()
+        self.assertEqual(target.read_bytes(),b'preserve')
+        lock.unlink(); os.link(target,lock)
+        with self.assertRaises(ValueError): self.promote()
+        self.assertEqual(target.read_bytes(),b'preserve')
+
+
 class IdentityTests(unittest.TestCase):
     def test_record_identity_rejects_login_privilege_groups_and_writable_socket_ancestors(self):
         with tempfile.TemporaryDirectory() as temp:

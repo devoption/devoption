@@ -7,9 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
-- Add a pure per-project build-retention planner with a default ten-attempt
-  window, deterministic completion ordering and protected build exceptions.
-  Settings, persistence and disk cleanup remain unimplemented
+- Add owner-controlled per-project build retention (default 10), durable completion
+  ordering, protected saved-release/in-flight exceptions, resumable verified-path
+  cleanup and compact audit metadata with ID non-reuse. Reclaim eligible source,
+  compiler/artifact/receipt/output files and active capacity; show saved policy,
+  cleanup counts and failures separately. Preserve unbound legacy attempts and
+  document version-2 history migration/downgrade limits. Scope runner approval
+  registries to persisted single-use reviews to avoid a service lifetime ceiling
   ([#314](https://github.com/devoption/devoption/issues/314)).
 
 - Resolve the deferred authentication review decisions with source and regression

@@ -15,10 +15,13 @@ use std::{
 };
 mod codec;
 mod logs;
+mod retention;
+pub use retention::RetentionStatus;
 const RECORD: &str = "build-history.bin";
 const LOCK: &str = "build-history.lock";
 const PENDING: &str = ".build-history.pending";
-pub const MAX_JOBS: usize = 100;
+/// Simultaneously retained records, not lifetime allocations. Cleanup releases slots.
+pub const MAX_JOBS: usize = 65_536;
 const DIRECTORY: OFlags = OFlags::RDONLY
     .union(OFlags::DIRECTORY)
     .union(OFlags::NOFOLLOW)
@@ -37,6 +40,8 @@ pub struct Record {
     commit: String,
     source: [u8; 32],
     state: State,
+    completion: Option<u64>,
+    cleanup_confirmed: bool,
 }
 impl Record {
     fn from_job(job: &BuildJob) -> Self {
@@ -48,6 +53,8 @@ impl Record {
             commit: plan.commit.clone(),
             source: *plan.source.sha256().bytes(),
             state: job.state().clone(),
+            completion: None,
+            cleanup_confirmed: false,
         }
     }
     pub fn id(&self) -> JobId {
@@ -68,6 +75,12 @@ impl Record {
     pub fn state(&self) -> &State {
         &self.state
     }
+    pub fn completion(&self) -> Option<u64> {
+        self.completion
+    }
+    pub fn cleanup_confirmed(&self) -> bool {
+        self.cleanup_confirmed
+    }
     fn same_identity(&self, other: &Self) -> bool {
         self.id == other.id
             && self.project == other.project
@@ -84,6 +97,7 @@ pub struct History {
     lock: File,
     uid: u32,
     poisoned: bool,
+    retention_status_failures: std::collections::HashSet<[u8; 16]>,
 }
 impl History {
     pub fn open(path: &str) -> Result<Self, Error> {
@@ -120,6 +134,7 @@ impl History {
             lock,
             uid,
             poisoned: false,
+            retention_status_failures: Default::default(),
         };
         result.load()?;
         Ok(result)
@@ -201,7 +216,7 @@ impl History {
             let mut bytes = [0; 16];
             random(&mut bytes)?;
             let id = JobId::from_bytes(bytes);
-            if records.iter().any(|record| record.id == id) {
+            if records.iter().any(|record| record.id == id) || self.audit_exists(id)? {
                 continue;
             }
             let job = BuildJob::queued(id, plan);
@@ -215,7 +230,7 @@ impl History {
     /// harmless; other updates need matching identity and a legal lifecycle edge.
     pub fn record(&mut self, job: &BuildJob) -> Result<(), Error> {
         let mut records = self.load()?;
-        let next = Record::from_job(job);
+        let mut next = Record::from_job(job);
         let old = records
             .iter_mut()
             .find(|r| r.id == next.id)
@@ -223,11 +238,19 @@ impl History {
         if !old.same_identity(&next) {
             return Err(Error::Changed);
         }
+        next.completion = old.completion;
+        next.cleanup_confirmed = old.cleanup_confirmed;
         if *old == next {
             return Ok(());
         }
         if !transition(&old.state, &next.state) {
             return Err(Error::Transition);
+        }
+        if terminal(&next.state) {
+            next.completion = Some(self.watermark()?.checked_add(1).ok_or(Error::Capacity)?);
+            // Interrupted never proves process termination. Other runner terminal
+            // events require cleanup; queued cancellation has no child to stop.
+            next.cleanup_confirmed = !matches!(next.state, State::Interrupted);
         }
         *old = next;
         self.publish(&records)
@@ -236,9 +259,13 @@ impl History {
     pub fn recover_interrupted(&mut self) -> Result<usize, Error> {
         let mut records = self.load()?;
         let mut count = 0;
+        let mut sequence = self.watermark()?;
         for record in &mut records {
             if matches!(record.state, State::Queued | State::Running) {
                 record.state = State::Interrupted;
+                sequence = sequence.checked_add(1).ok_or(Error::Capacity)?;
+                record.completion = Some(sequence);
+                record.cleanup_confirmed = false;
                 count += 1;
             }
         }
@@ -255,9 +282,16 @@ impl History {
         records: &[Record],
         write: impl FnOnce(&mut File, &[u8]) -> std::io::Result<()>,
     ) -> Result<(), Error> {
-        let bytes = codec::encode(records)?;
+        let bytes = codec::encode_with_watermark(records, self.watermark()?)?;
         self.publish_snapshot(RECORD, &bytes, codec::MAX_BYTES, write)
     }
+    fn watermark(&self) -> Result<u64, Error> {
+        self.read_snapshot(RECORD, codec::MAX_BYTES)?
+            .map(|bytes| codec::watermark(&bytes))
+            .transpose()
+            .map(|value| value.unwrap_or(0))
+    }
+
     fn publish_snapshot(
         &mut self,
         name: &str,
@@ -300,6 +334,9 @@ impl History {
         Ok(())
     }
 }
+fn terminal(state: &State) -> bool {
+    !matches!(state, State::Queued | State::Running)
+}
 fn transition(old: &State, new: &State) -> bool {
     use crate::jobs::Failure;
     matches!(
@@ -316,7 +353,7 @@ fn transition(old: &State, new: &State) -> bool {
         )
     )
 }
-fn directory(path: &str) -> Result<File, Error> {
+pub(crate) fn directory(path: &str) -> Result<File, Error> {
     if !absolute_path(path) || path.split('/').skip(1).count() > 64 {
         return Err(Error::Unsafe);
     }

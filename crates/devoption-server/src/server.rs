@@ -431,6 +431,10 @@ fn run_with_roots(
                         port,
                     )?;
             }
+            #[cfg(unix)]
+            if let Some(configured_projects) = projects.clone() {
+                projects::retention::reconcile_projects(configured_projects).await;
+            }
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, port)).await?;
             let address = listener.local_addr()?;
             println!("Listening on http://{address} (Ctrl+C to stop)");
