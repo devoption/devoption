@@ -51,7 +51,7 @@ authentication/CSRF requirements and input bound, with rejection tests showing
 that a denied request never reaches its mutation. Session authentication is not
 job approval. Safe file reads must not start a job or implicitly register source.
 This retains the existing safe-method classification; adding routes requires
-reassessment as tracked in [#99](https://github.com/devoption/devoption/issues/99).
+reassessment under the [authentication review decisions](authentication-review.md#route-methods-and-authorization).
 
 Password forms currently have a 4096-byte limit and five-second read deadline.
 Other mutation bodies use bounded parsers with a five-second deadline and explicit
@@ -221,9 +221,10 @@ output escaping and filesystem-preservation tests before enabling execution.
 Residual risks include same-account compromise, malicious trusted code/browser
 extensions, local denial of service against shared authentication capacity,
 filesystem races outside the stated trusted-writer model, and secret-bearing
-program output. The optional authentication decisions in #99 are not all closure
-requirements for #15. The method policy above must continue to be checked for each
-new route. Loopback access is not proof of a caller's OS identity.
+program output. The [authentication review decisions](authentication-review.md)
+retain these tradeoffs without selecting further hardening. The method policy
+above must continue to be checked for each new route. Loopback access is not
+proof of a caller's OS identity.
 
 Close #15 only after the policy PR is reviewed and merged with passing required
 checks. Leave execution disabled: [#17](https://github.com/devoption/devoption/issues/17)

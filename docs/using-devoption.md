@@ -132,8 +132,10 @@ Pre-sessions last five minutes with at most 16 pending pairs. Full capacity retu
 a challenge may free capacity sooner. Each submission needs
 a fresh challenge, including retries after a failed password or invalid form.
 Owner/member sign-in and account registration share one worker and five admitted
-attempts per minute. One active session per account is retained in memory for at
-most an hour; another sign-in replaces only that account’s session, and restarting
+attempts per minute. See the [authentication admission review](authentication-review.md#shared-authentication-admission)
+for shared-capacity availability tradeoffs. One active session per account is
+retained in memory for at most an hour; another sign-in replaces only that
+account’s session, and restarting
 loses every session. Tokens must not enter URLs, logs, or browser-local storage.
 The browser keeps CSRF tokens only in page memory and clears the password field
 on submission. A stale tab's logout is rejected without ending a newer session;
