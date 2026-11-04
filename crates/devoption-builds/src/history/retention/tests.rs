@@ -286,3 +286,54 @@ fn references_are_rechecked_before_deletion_and_changed_directories_are_refused(
     assert_eq!(std::fs::read(path.join("unrelated")).unwrap(), b"preserve");
     assert!(preserved.join("artifact/bytes").exists());
 }
+
+#[test]
+fn failed_status_publication_does_not_expose_an_older_success_as_current_evidence() {
+    let (dir, _work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    let old = RetentionStatus {
+        removed: 1,
+        reclaimed_bytes: 24_576,
+        ..Default::default()
+    };
+    store.save_retention_status(project, &old).unwrap();
+    let failed = RetentionStatus {
+        failed: true,
+        retained: 12,
+        ..Default::default()
+    };
+    let name = key("retention", JobId::from_bytes(project.to_bytes()));
+    let mut bytes = Vec::new();
+    for n in [12u64, 0, 0, 0] {
+        bytes.extend(n.to_be_bytes());
+    }
+    bytes.push(1);
+    let digest = devoption_registry::Sha256::digest(&[name.as_bytes(), bytes.as_slice()].concat());
+    let pending = dir.path().join(format!(
+        ".retention-{}.tmp",
+        digest
+            .bytes()
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    ));
+    // A conflicting pending file is preserved, while the previous valid result
+    // remains on disk. The live reader must report unavailable, not that old
+    // success, until this project's result can be published successfully.
+    std::fs::write(&pending, b"unrelated").unwrap();
+    std::fs::set_permissions(&pending, std::fs::Permissions::from_mode(0o600)).unwrap();
+    let before = std::fs::read(dir.path().join(&name)).unwrap();
+    assert!(store.save_retention_status(project, &failed).is_err());
+    assert_eq!(store.retention_status(project), Err(Error::Unavailable));
+    assert_eq!(std::fs::read(dir.path().join(&name)).unwrap(), before);
+    assert_eq!(std::fs::read(&pending).unwrap(), b"unrelated");
+    assert!(
+        store
+            .retention_status(ProjectId::from_bytes([72; 16]))
+            .unwrap()
+            .is_none()
+    );
+    std::fs::remove_file(pending).unwrap();
+    store.save_retention_status(project, &failed).unwrap();
+    assert_eq!(store.retention_status(project).unwrap(), Some(failed));
+}
