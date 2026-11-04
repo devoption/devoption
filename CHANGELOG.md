@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Resolve the deferred authentication review decisions with source and regression
+  references for shared admission, method guards, public Rust/path APIs and secret
+  lifetime; retain existing runtime policy and document the remaining tradeoffs
+  ([#99](https://github.com/devoption/devoption/issues/99)).
+
 - Document the implemented browser-local appearance preferences and reconcile
   the light/dark requirement with its merged increments and current validation,
   without selecting additional themes or changing the UI
