@@ -308,6 +308,45 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(broker.desired(self.config)['intent'],'stopped')
 
 
+    def test_promotion_refuses_cleanup_lock_and_preserves_saved_rollback(self):
+        release = self.promote()
+        before = {p.name:p.read_bytes() for p in (self.config['state']/release).iterdir()}
+        with broker.promotion_lock(self.config):
+            with self.assertRaises(BlockingIOError): self.promote()
+        self.assertEqual(self.promote(),release)
+        self.assertEqual({p.name:p.read_bytes() for p in (self.config['state']/release).iterdir()},before)
+
+    def test_retention_lock_symlinks_and_hardlinks_are_refused(self):
+        target = self.config['state']/'unrelated'
+        target.write_bytes(b'preserve'); target.chmod(0o600)
+        lock = self.config['build_work']/'retention.lock'
+        lock.symlink_to(target)
+        with self.assertRaises(OSError): self.promote()
+        self.assertEqual(target.read_bytes(),b'preserve')
+        lock.unlink(); os.link(target,lock)
+        with self.assertRaises(ValueError): self.promote()
+        self.assertEqual(target.read_bytes(),b'preserve')
+
+
+    def test_retention_inventory_is_strict_about_corrupt_pending_and_recovery_releases(self):
+        release = self.promote()
+        with patch.object(broker, 'desired', return_value=None):
+            self.assertEqual(broker.dispatch(self.config, ['retention-references']), {'jobs': [self.job]})
+            pending = self.config['state']/('f'*64+'.pending')
+            pending.mkdir(mode=0o700)
+            with self.assertRaisesRegex(ValueError, 'unfinished release'):
+                broker.dispatch(self.config, ['retention-references'])
+            pending.rmdir()
+            manifest = self.config['state']/release/'manifest.json'
+            manifest.chmod(0o600); manifest.write_bytes(b'corrupt'); manifest.chmod(0o400)
+            with self.assertRaises(ValueError): broker.dispatch(self.config, ['retention-references'])
+        # Also refuse a missing recovery target even when the remaining inventory
+        # is well formed, rather than interpreting it as no protected reference.
+        with patch.object(broker, 'load_release', return_value={'job':self.job}), patch.object(broker, 'desired', return_value={'release':release,'previous':'0'*64}):
+            with self.assertRaisesRegex(ValueError, 'recovery release'):
+                broker.dispatch(self.config, ['retention-references'])
+
+
 class IdentityTests(unittest.TestCase):
     def test_record_identity_rejects_login_privilege_groups_and_writable_socket_ancestors(self):
         with tempfile.TemporaryDirectory() as temp:

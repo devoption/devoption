@@ -94,3 +94,14 @@ Run `cargo test -p devoption-builds --locked --offline`, then the
 approval, filesystem freshness, dependency verification, durable atomic admission,
 OS isolation, process cleanup or restart recovery. Those require the separate Linux integration and its validation; consuming an
 approval alone does not bypass the job event seal.
+
+## Persisted execution adapter and retention
+
+The HTTP execution adapter consumes each prepared review by value exactly once
+and creates an approval registry for that durably allocated attempt. Its queued
+identity is persisted before preparation returns; history and compact retention
+audits prevent reuse after deletion. This avoids the generic in-memory registry's
+64-attempt lifetime bound becoming a service-wide build limit. Approval consumption
+within an attempt remains single use. The standalone registry still requires its
+tombstones; replacing registries without the persisted allocation/review lifecycle
+is not a substitute for freshness or uniqueness.

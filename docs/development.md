@@ -103,7 +103,8 @@ Installation coverage runs in four parallel suites on separate disposable runner
 `bundle` covers source installation, proxy, packaged runtime, named apps and fresh
 VM installation; `records` covers HTTPS and scoped/managed PostgreSQL;
 `upgrade` covers prior-preview upgrade, recovery and four kernel boots; `apps`
-covers independent app deployments and their three kernel boots. Each suite builds
+covers independent app deployments, real build-retention disk reclamation with
+saved-release rollback, and their three kernel boots. Each suite builds
 its own locked release workspace and has a 15-minute job deadline. This repeats
 compilation to reduce elapsed time without transferring compiled artifacts between
 runners. Matrix fail-fast is disabled so a failed suite does not cancel the others.

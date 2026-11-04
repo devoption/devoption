@@ -201,6 +201,37 @@ impl Configuration {
         }
         Ok(())
     }
+    pub fn work_root(&self) -> &Path {
+        &self.work
+    }
+
+    /// Cross-process exclusion with installed deployment promotion. The returned
+    /// descriptor holds the lock through reference checks and removals.
+    pub fn retention_lock(&self) -> io::Result<fs::File> {
+        let root = crate::history::directory(self.work.to_str().ok_or_else(error)?)
+            .map_err(io::Error::other)?;
+        let file = fs::File::from(rustix::fs::openat(
+            &root,
+            "retention.lock",
+            rustix::fs::OFlags::RDWR
+                | rustix::fs::OFlags::CREATE
+                | rustix::fs::OFlags::NOFOLLOW
+                | rustix::fs::OFlags::NONBLOCK
+                | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
+        )?);
+        let meta = file.metadata()?;
+        if !meta.is_file()
+            || meta.uid() != self.uid
+            || meta.nlink() != 1
+            || meta.mode() & 0o7777 != 0o600
+        {
+            return Err(error());
+        }
+        rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive)?;
+        Ok(file)
+    }
+
     pub fn stop_previous(&self) -> io::Result<()> {
         let mut child = Command::new("/usr/bin/sudo")
             .args(["-n", BROKER, "stop"])
@@ -259,7 +290,7 @@ impl Review {
     pub fn discard(mut self, history: &mut History) -> io::Result<()> {
         self.job.cancel_queued().map_err(io::Error::other)?;
         history.record(&self.job).map_err(io::Error::other)?;
-        fs::remove_dir_all(&self.directory)
+        Ok(())
     }
 }
 
@@ -407,6 +438,9 @@ pub fn prepare(
         )
         .map_err(io::Error::other)?;
         let job = history.queue(plan).map_err(io::Error::other)?;
+        history
+            .bind_work(job.id(), &config.work, &directory)
+            .map_err(io::Error::other)?;
         Ok(Review {
             job,
             context,

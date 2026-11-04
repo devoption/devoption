@@ -17,9 +17,8 @@ type Admission = (
 );
 
 pub(super) struct Engine {
-    config: Configuration,
+    pub(super) config: Configuration,
     owner: OwnerId,
-    approvals: Approvals,
     pending: Option<Review>,
     active: Option<(ProjectId, RepositoryId)>,
     cancel: Arc<AtomicBool>,
@@ -30,7 +29,6 @@ impl Engine {
         Self {
             config,
             owner: OwnerId::from_bytes(owner.to_bytes()),
-            approvals: Approvals::default(),
             pending: None,
             active: None,
             cancel: Arc::new(AtomicBool::new(false)),
@@ -209,6 +207,7 @@ async fn action(
     }
     let mut history_guard = history.clone().lock_owned().await;
     let catalog_guard = projects.gate.clone().lock_owned().await;
+    let cleanup_projects = projects.clone();
     let result = tokio::task::spawn_blocking(move || -> Result<Option<Admission>, StatusCode> {
         let _catalog_guard = catalog_guard;
         let catalog = projects
@@ -251,7 +250,10 @@ async fn action(
                 review,
                 source,
                 engine_guard.owner,
-                engine_guard.approvals.clone(),
+                // One registry for this consumed, durably allocated review.
+                // History/audit preserves IDs across cleanup; the review is
+                // moved out exactly once and can never be submitted again.
+                Approvals::default(),
                 engine_guard.cancel.clone(),
             )))
         } else {
@@ -292,6 +294,11 @@ async fn action(
                     },
                 );
                 let mut engine = engine.blocking_lock();
+                let mut history = history.blocking_lock();
+                let _gate = cleanup_projects.gate.blocking_lock();
+                if let Ok(Some(catalog)) = cleanup_projects.directory.load() {
+                    super::retention::reconcile(&mut history, Some(&engine.config), &catalog, None);
+                }
                 engine.active = None;
                 if let Err(error) = &result {
                     eprintln!("Build supervision stopped: {error}");
@@ -300,7 +307,10 @@ async fn action(
             });
             StatusCode::ACCEPTED.into_response()
         }
-        Ok(Ok(None)) => StatusCode::NO_CONTENT.into_response(),
+        Ok(Ok(None)) => {
+            super::retention::reconcile_projects(cleanup_projects).await;
+            StatusCode::NO_CONTENT.into_response()
+        }
         Ok(Err(status)) => failure(status),
         Err(_) => failure(StatusCode::SERVICE_UNAVAILABLE),
     }

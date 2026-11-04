@@ -442,7 +442,7 @@ def read_build(base, uid, job):
         if info.st_uid != uid or info.st_mode & 0o077:
             raise ValueError('invalid build root')
         entries = os.listdir(root)
-        if len(entries) > 256: raise ValueError('build staging limit exceeded')
+        if len(entries) > 65538: raise ValueError('build staging limit exceeded')
         found = None
         for entry in entries:
             if not ID.fullmatch(entry): continue
@@ -468,7 +468,45 @@ def read_build(base, uid, job):
     finally: os.close(root)
 
 
+def promotion_lock(config):
+    """Shared path with the controller's cleanup lock; no caller-selected path."""
+    flags = os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    root = os.open('/', directory_flags)
+    try:
+        for part in config['build_work'].parts[1:]:
+            child = os.open(part, directory_flags, dir_fd=root)
+            os.close(root); root = child
+        meta = os.fstat(root)
+        if meta.st_uid != config['uid'] or meta.st_mode & 0o7777 != 0o700:
+            raise ValueError('unsafe build work root')
+        try:
+            fd = os.open('retention.lock', flags | os.O_EXCL, 0o600, dir_fd=root)
+        except FileExistsError:
+            fd = os.open('retention.lock', flags & ~os.O_CREAT, dir_fd=root)
+        else:
+            if os.geteuid() == 0:
+                os.fchown(fd, config['uid'], -1)
+        try:
+            meta = os.fstat(fd)
+            if (not stat.S_ISREG(meta.st_mode) or meta.st_uid != config['uid']
+                    or meta.st_mode & 0o7777 != 0o600 or meta.st_nlink != 1):
+                raise ValueError('unsafe retention lock')
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return os.fdopen(fd, 'r+b')
+        except BaseException:
+            os.close(fd)
+            raise
+    finally:
+        os.close(root)
+
+
 def promote(config, job, expected, provenance):
+    with promotion_lock(config):
+        return promote_locked(config, job, expected, provenance)
+
+
+def promote_locked(config, job, expected, provenance):
     if not ID.fullmatch(job) or not HEX.fullmatch(expected):
         raise ValueError('invalid build identity')
     if config.get('project') and provenance[0] != config['project']:
@@ -736,7 +774,31 @@ def overview(config):
     return {'apps': result}
 
 
+def retention_references(config):
+    """Strict inventory: page status may omit corrupt releases, cleanup cannot."""
+    jobs = set()
+    for slot in config.get('apps', [config]):
+        releases = set()
+        for entry in slot['state'].iterdir():
+            if HEX.fullmatch(entry.name):
+                manifest = load_release(slot, entry.name)
+                if not ID.fullmatch(manifest.get('job', '')):
+                    raise ValueError('invalid saved release job identity')
+                jobs.add(manifest['job'])
+                releases.add(entry.name)
+            elif re.fullmatch(r'[0-9a-f]{64}\.pending', entry.name):
+                raise ValueError('unfinished release promotion needs inspection')
+        record = desired(slot)
+        if record:
+            for key in ('release', 'previous', 'last_healthy'):
+                if record.get(key) is not None and record[key] not in releases:
+                    raise ValueError('deployment recovery release is unavailable')
+    return {'jobs': sorted(jobs)}
+
+
 def dispatch(config, args):
+    if args == ['retention-references']:
+        return retention_references(config)
     if args == ['overview']:
         return overview(config)
     if args[:1] == ['project']:

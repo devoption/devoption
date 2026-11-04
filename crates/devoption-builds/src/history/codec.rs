@@ -1,9 +1,11 @@
 use super::*;
 use crate::jobs::{ArtifactMetadata, Failure};
 use devoption_registry::Sha256;
-const MAGIC: &[u8; 9] = b"DVHISTRY\x01";
-const WIDTH: usize = 161;
-pub(super) const MAX_BYTES: usize = 10 + MAX_JOBS * WIDTH + 32;
+const MAGIC: &[u8; 9] = b"DVHISTRY\x02";
+const LEGACY_WIDTH: usize = 161;
+const WIDTH: usize = 170;
+const HEADER: usize = 21;
+pub(super) const MAX_BYTES: usize = HEADER + MAX_JOBS * WIDTH + 32;
 fn state_tag(state: &State) -> u8 {
     match state {
         State::Queued => 0,
@@ -18,12 +20,23 @@ fn state_tag(state: &State) -> u8 {
         State::Interrupted => 9,
     }
 }
+#[cfg(test)]
 pub(super) fn encode(records: &[Record]) -> Result<Vec<u8>, Error> {
+    encode_with_watermark(records, 0)
+}
+pub(super) fn encode_with_watermark(records: &[Record], watermark: u64) -> Result<Vec<u8>, Error> {
     if records.len() > MAX_JOBS {
         return Err(Error::Capacity);
     }
     let mut bytes = MAGIC.to_vec();
-    bytes.push(records.len() as u8);
+    bytes.extend((records.len() as u32).to_be_bytes());
+    let watermark = records
+        .iter()
+        .filter_map(|r| r.completion)
+        .max()
+        .unwrap_or(0)
+        .max(watermark);
+    bytes.extend(watermark.to_be_bytes());
     for r in records {
         bytes.extend(r.id.to_bytes());
         bytes.extend(r.project);
@@ -37,17 +50,35 @@ pub(super) fn encode(records: &[Record]) -> Result<Vec<u8>, Error> {
         } else {
             bytes.extend([0; 40]);
         }
+        bytes.extend(r.completion.unwrap_or(0).to_be_bytes());
+        bytes.push(u8::from(r.cleanup_confirmed));
     }
     bytes.extend(*Sha256::digest(&bytes).bytes());
     decode(&bytes)?;
     Ok(bytes)
 }
 pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
-    if bytes.len() < 42 || bytes.len() > MAX_BYTES || &bytes[..9] != MAGIC {
+    if bytes.len() < 42
+        || bytes.len() > MAX_BYTES
+        || &bytes[..8] != b"DVHISTRY"
+        || !matches!(bytes[8], 1 | 2)
+    {
         return Err(Error::Corrupt);
     }
-    let count = bytes[9] as usize;
-    if count > MAX_JOBS || bytes.len() != 10 + count * WIDTH + 32 {
+    let legacy = bytes[8] == 1;
+    let (count, start, width) = if legacy {
+        (bytes[9] as usize, 10, LEGACY_WIDTH)
+    } else {
+        if bytes.len() < HEADER + 32 {
+            return Err(Error::Corrupt);
+        }
+        (
+            u32::from_be_bytes(bytes[9..13].try_into().unwrap()) as usize,
+            HEADER,
+            WIDTH,
+        )
+    };
+    if count > MAX_JOBS || bytes.len() != start + count * width + 32 {
         return Err(Error::Corrupt);
     }
     let end = bytes.len() - 32;
@@ -55,9 +86,11 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
         return Err(Error::Corrupt);
     }
     let mut records = Vec::new();
-    for r in bytes[10..end].as_chunks::<WIDTH>().0 {
+    let mut seen = std::collections::HashSet::new();
+    let mut sequences = std::collections::HashSet::new();
+    for r in bytes[start..end].chunks_exact(width) {
         let id = JobId::from_bytes(r[..16].try_into().unwrap());
-        if records.iter().any(|old: &Record| old.id == id) {
+        if !seen.insert(id) {
             return Err(Error::Corrupt);
         }
         let commit = std::str::from_utf8(&r[48..88]).map_err(|_| Error::Corrupt)?;
@@ -94,7 +127,32 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
             9 => State::Interrupted,
             _ => return Err(Error::Corrupt),
         };
-        if r[120] != 2 && r[121..].iter().any(|b| *b != 0) {
+        if r[120] != 2 && r[121..161].iter().any(|b| *b != 0) {
+            return Err(Error::Corrupt);
+        }
+        let completion = if legacy {
+            // Legacy stores have no completion clock. Establish a deterministic
+            // migration order from their existing rows, preserving all evidence.
+            terminal(&state).then_some(records.len() as u64 + 1)
+        } else {
+            match u64::from_be_bytes(r[161..169].try_into().unwrap()) {
+                0 => None,
+                value => Some(value),
+            }
+        };
+        let cleanup_confirmed = if legacy {
+            !matches!(state, State::Interrupted | State::Queued | State::Running)
+        } else {
+            match r[169] {
+                0 => false,
+                1 => true,
+                _ => return Err(Error::Corrupt),
+            }
+        };
+        if terminal(&state) != completion.is_some()
+            || completion.is_some_and(|n| !sequences.insert(n))
+            || (!terminal(&state) && cleanup_confirmed)
+        {
             return Err(Error::Corrupt);
         }
         records.push(Record {
@@ -104,7 +162,32 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
             commit: commit.into(),
             source: r[88..120].try_into().unwrap(),
             state,
+            completion,
+            cleanup_confirmed,
         });
     }
+    if !legacy {
+        let high = u64::from_be_bytes(bytes[13..21].try_into().unwrap());
+        if records
+            .iter()
+            .filter_map(|r| r.completion)
+            .any(|n| n > high)
+        {
+            return Err(Error::Corrupt);
+        }
+    }
     Ok(records)
+}
+
+pub(super) fn watermark(bytes: &[u8]) -> Result<u64, Error> {
+    let records = decode(bytes)?;
+    Ok(if bytes[8] == 1 {
+        records
+            .iter()
+            .filter_map(|r| r.completion)
+            .max()
+            .unwrap_or(0)
+    } else {
+        u64::from_be_bytes(bytes[13..21].try_into().unwrap())
+    })
 }

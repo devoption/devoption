@@ -21,6 +21,7 @@ mod files;
 pub(super) mod history;
 mod managed;
 mod pages;
+pub(super) mod retention;
 mod secrets;
 
 #[cfg(test)]
@@ -30,6 +31,7 @@ mod startup_tests;
 
 #[derive(Clone)]
 pub(super) struct Projects {
+    pub(super) owner: Option<IdentityId>,
     pub(super) directory: Arc<CatalogDirectory>,
     secrets: Option<Arc<Mutex<crate::project_secrets::Store>>>,
     pub(super) deployment: Option<Arc<Mutex<deployment::Engine>>>,
@@ -130,6 +132,10 @@ impl Projects {
             catalog.check_repository_root(root)?;
         }
         Ok(Self {
+            owner: owner
+                .load()
+                .map_err(|_| Error::InvalidCatalog)?
+                .map(|record| record.identity()),
             directory: Arc::new(directory),
             secrets: None,
             history: None,
@@ -184,6 +190,11 @@ impl Projects {
         history.recover_interrupted().map_err(|error| {
             io::Error::other(format!("build history recovery unavailable: {error}"))
         })?;
+        if self.execution.is_some() {
+            history
+                .confirm_interrupted_cleanup()
+                .map_err(io::Error::other)?;
+        }
         Ok(())
     }
 
@@ -212,6 +223,7 @@ pub(super) fn routes(projects: Projects) -> Router {
     Router::new()
         .merge(pages::routes(projects.clone()))
         .merge(secrets::routes(projects.clone()))
+        .merge(retention::routes(projects.clone()))
         .merge(files::routes(projects.clone()))
         .merge(builds::routes(projects.clone()))
         .merge(execution::routes(projects.clone()))

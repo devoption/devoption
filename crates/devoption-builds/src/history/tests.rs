@@ -132,8 +132,8 @@ fn ten_record_store_reopens_and_accepts_an_eleventh_without_losing_history() {
     }
     let original = store.load().unwrap();
     let encoded = fs::read(temp.path().join(RECORD)).unwrap();
-    assert_eq!(&encoded[..10], b"DVHISTRY\x01\x0a");
-    assert_eq!(encoded.len(), 1652);
+    assert_eq!(&encoded[..9], b"DVHISTRY\x02");
+    assert_eq!(encoded.len(), 1753);
     drop(store);
 
     let mut store = History::open(&path).unwrap();
@@ -150,9 +150,14 @@ fn ten_record_store_reopens_and_accepts_an_eleventh_without_losing_history() {
 fn retained_attempt_bound_never_evicts_or_overwrites() {
     let (temp, path, job) = fixture();
     let mut store = History::open(&path).unwrap();
-    for _ in 0..MAX_JOBS {
-        store.queue(job.plan().clone()).unwrap();
-    }
+    let records: Vec<_> = (0..MAX_JOBS)
+        .map(|n| {
+            let mut r = Record::from_job(&job);
+            r.id = JobId::from_bytes((n as u128).to_be_bytes());
+            r
+        })
+        .collect();
+    store.publish(&records).unwrap();
     let before = fs::read(temp.path().join(RECORD)).unwrap();
     assert!(matches!(
         store.queue(job.plan().clone()),
@@ -186,6 +191,7 @@ fn codec_roundtrips_states_rejects_corruption_duplicates_and_trailing_bytes() {
     ] {
         let mut r = base.clone();
         r.state = state;
+        r.completion = terminal(&r.state).then_some(1);
         let bytes = codec::encode(&[r.clone()]).unwrap();
         assert!(codec::decode(&bytes).unwrap() == vec![r]);
         for n in [0, 8, 9, 10, 130, bytes.len() - 1] {
@@ -209,6 +215,7 @@ fn recovery_preserves_completed_claims_and_interrupts_running() {
     let mut terminal = running.clone();
     terminal.id = JobId::from_bytes([2; 16]);
     terminal.state = State::Cancelled;
+    terminal.completion = Some(1);
     // Synthetic persisted claims only; no production RunnerEvent is issued.
     store.publish(&[running, terminal]).unwrap();
     assert_eq!(store.recover_interrupted(), Ok(1));
@@ -236,6 +243,7 @@ fn interrupted_write_preserves_old_snapshot_and_leaves_pending_for_inspection() 
     let before = fs::read(temp.path().join(RECORD)).unwrap();
     let mut record = Record::from_job(&job);
     record.state = State::Interrupted;
+    record.completion = Some(1);
     assert_eq!(
         store.publish_using(&[record], |file, bytes| {
             file.write_all(&bytes[..12])?;
@@ -251,7 +259,7 @@ fn interrupted_write_preserves_old_snapshot_and_leaves_pending_for_inspection() 
 fn checksum_does_not_bypass_structural_validation() {
     let (_temp, _path, job) = fixture();
     let original = codec::encode(&[Record::from_job(&job)]).unwrap();
-    for (offset, value) in [(10 + 120, 255), (10 + 48, b'z'), (10 + 121, 1)] {
+    for (offset, value) in [(21 + 120, 255), (21 + 48, b'z'), (21 + 121, 1)] {
         let mut bytes = original.clone();
         bytes[offset] = value;
         let end = bytes.len() - 32;
@@ -364,4 +372,21 @@ fn failed_queue_returns_no_attempt_and_preserves_existing_history() {
     assert_eq!(fs::read(temp.path().join(PENDING)).unwrap(), b"inspect me");
     drop(store);
     assert_eq!(History::open(&path).unwrap().load().unwrap().len(), 1);
+}
+
+#[test]
+fn dropping_history_releases_writer_even_with_an_inherited_descriptor() {
+    let (_temp, path, _job) = fixture();
+    let store = History::open(&path).unwrap();
+    // Concurrent subprocess creation can briefly inherit this open-file
+    // description before CLOEXEC runs. Reproduce its lifetime deterministically.
+    let inherited = store.lock.try_clone().unwrap();
+    assert!(matches!(History::open(&path), Err(Error::Busy)));
+    drop(store);
+    let next = History::open(&path).unwrap();
+    assert!(matches!(History::open(&path), Err(Error::Busy)));
+    drop(inherited);
+    assert!(matches!(History::open(&path), Err(Error::Busy)));
+    drop(next);
+    assert!(History::open(&path).is_ok());
 }

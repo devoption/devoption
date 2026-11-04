@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 
 from check_bundle_installer import enroll
 from check_public_proxy import fixture_clients
@@ -203,8 +204,10 @@ def check(binary, runtime, caddy, reboot_fixture=None):
             def deploy(project, release, health):
                 mutate(f'/projects/{project}/releases/approve', review(project, release, health))
 
-            def build(project):
-                old_jobs = {r['job'] for r in snapshot(project)['releases']}
+            def build(project, promote=True):
+                old_page = request('GET', f'/projects/{project}/releases')[2]
+                old_jobs = {job.decode() for job in re.findall(rb'data-deploy-action="promote" data-value="([0-9a-f]{32})"', old_page)}
+                old_jobs.update(r['job'] for r in snapshot(project)['releases'])
                 page = request('GET', f'/projects/{project}/builds')[2]
                 repository = re.search(rb'/builds/([0-9a-f]{32})', page)[1].decode()
                 base = f'/projects/{project}/builds/{repository}'
@@ -217,6 +220,7 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                     jobs = re.findall(rb'data-deploy-action="promote" data-value="([0-9a-f]{32})"', page)
                     fresh = [job.decode() for job in jobs if job.decode() not in old_jobs]
                     if fresh:
+                        if not promote: return fresh[0]
                         mutate(f'/projects/{project}/releases/promote', fresh[0])
                         return next(r['release'] for r in snapshot(project)['releases'] if r['job'] == fresh[0])
                     time.sleep(.25)
@@ -253,7 +257,33 @@ def check(binary, runtime, caddy, reboot_fixture=None):
             newer = build(projects[0]); assert newer != releases[0]
             deploy(projects[0], newer, 'ok updated')
             assert snapshot(projects[1])['deployment'] == untouched
+            # Keep saved A/B protected while real unsaved build C is collected
+            # after D finishes. Verify all staging and receipt bytes disappear,
+            # the independent project keeps its policy, and rollback still works.
+            saved = snapshot(projects[0])['releases']
+            mutate(f'/projects/{projects[0]}/retention', '1')
+            assert b'value="1"' in request('GET', f'/projects/{projects[0]}/settings')[2]
+            assert b'value="10"' in request('GET', f'/projects/{projects[1]}/settings')[2]
+            disposable = build(projects[0], promote=False)
+            def staged(job):
+                matches = [p.parent.parent for p in (root/'jobs').glob('*/artifact/receipt.toml')
+                           if tomllib.loads(p.read_text()).get('job') == job]
+                assert len(matches) == 1
+                return matches[0]
+            garbage = staged(disposable)
+            assert (garbage/'source/src/lib.rs').is_file()
+            assert (garbage/'artifact/component.wasm').is_file()
+            retained = build(projects[0], promote=False)
+            assert retained != disposable
+            settings = request('GET', f'/projects/{projects[0]}/settings')[2]
+            assert b'Cleanup is incomplete' not in settings
+            assert not garbage.exists()
+            assert not (root/'history'/f'build-output-{disposable}.bin').exists()
+            assert (root/'history'/f'build-audit-{disposable}.bin').is_file()
+            assert staged(retained).is_dir()
+            assert snapshot(projects[0])['releases'] == saved
             deploy(projects[0], releases[0], 'ok 0')
+            assert snapshot(projects[0])['deployment']['observed'] == 'healthy'
             assert snapshot(projects[1])['deployment'] == untouched
             mutate(f'/projects/{projects[0]}/releases/stop')
             assert snapshot(projects[1])['deployment'] == untouched
@@ -279,7 +309,7 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                 shutil.copyfile(caddy, reboot_fixture/'caddy')
                 for value in policy.values():
                     shutil.copyfile(value, reboot_fixture/Path(value).name)
-            print('Two authenticated builds/releases/deployments, protected HTTPS origins, update/rollback/stop isolation and independent service recovery passed.')
+            print('Two authenticated builds/releases/deployments, protected HTTPS origins, retention disk reclamation with saved-release rollback, update/stop isolation and independent service recovery passed.')
         finally:
             if controller is not None:
                 controller.terminate(); controller.wait(timeout=15)

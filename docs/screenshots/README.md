@@ -31,7 +31,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Deployment review | `/projects/{id}/releases` | Synthetic independent-project destination and selected/candidate comparison, scoped storage/HTTPS access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
 | Project releases | `/projects/{id}/releases` | Synthetic saved release and health presentation; no deployment or hostname request; 1280 × 1200 | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
-| Project settings | `/projects/{id}/settings` | Saved fixture name, no edit; environment-secrets entry point | `project-settings.jpg` |
+| Project settings | `/projects/{id}/settings` | Saved fixture name and default retention policy; environment-secrets entry point; 1280 × 1400 | `project-settings.jpg` |
 | Project environment secrets | `/projects/{id}/environments/preview` | Real encrypted disposable store; two sample names, blank masked inputs, controls collapsed; 1280 × 1100 | `project-environments.jpg` |
 | Create repository | `/projects/{id}/code` | Empty project’s new repository dialog; sample-service and starter selected, not submitted; 1280 × 900 | `repository-create.jpg` |
 | Starter source checks | `/projects/{id}/builds/{id}` | Real embedded starter and first commit; all source checks passed; runner disabled in this fixture; 1280 × 1400 | `starter-created.jpg` |
@@ -73,7 +73,8 @@ For the project settings/environment captures, also set
 encrypted store using a disposable test key outside its owner/repository roots,
 with sample `SERVICE_API_KEY` and `DATABASE_PASSWORD` values in Preview. Navigate
 from Example application's Settings to environment secrets and select Preview.
-Capture Settings at **1280 × 800** and Preview at **1280 × 1100**, top of page,
+Also enable `DEVOPTION_BROWSER_HISTORY=1` for the retention control.
+Capture Settings at **1280 × 1400** and Preview at **1280 × 1100**, top of page,
 all disclosures collapsed and all inputs empty. These are actual storage/UI
 fixtures, not configured production credentials, runtime injection or deployments.
 Verify add/replace/remove using only disposable values in Development; check

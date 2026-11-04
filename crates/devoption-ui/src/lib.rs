@@ -48,6 +48,7 @@ const BUILD_EXECUTION: &str = concat!(
     "\n",
     include_str!("../assets/deployment.js")
 );
+const BUILD_RETENTION: &str = include_str!("../assets/build-retention.js");
 const AUTH: &str = include_str!("../assets/auth.js");
 const REPOSITORY_STATUS: &str = include_str!("../assets/repository-status.js");
 const PROJECT_FILTER: &str = include_str!("../assets/project-filter.js");
@@ -219,7 +220,18 @@ pub fn render_project_secrets(
     )
 }
 
+pub use projects::RetentionView;
+
+pub fn render_project_settings(project: &ProjectSummary<'_>, view: &RetentionView) -> String {
+    render_page(
+        Page::Projects,
+        true,
+        Some(ProjectView::Retention(project, view)),
+    )
+}
+
 enum ProjectView<'a> {
+    Retention(&'a ProjectSummary<'a>, &'a RetentionView),
     Monitoring(&'a ProjectSummary<'a>, &'a Monitoring, u64),
     Secrets(&'a ProjectSummary<'a>, &'a EnvironmentSecretsView),
     Deployment(&'a ProjectSummary<'a>, &'a DeploymentView),
@@ -293,6 +305,7 @@ fn render_page_with_updates(
                     | ProjectView::Preparation(..)
                     | ProjectView::History(..)
                     | ProjectView::Deployment(..)
+                    | ProjectView::Retention(..)
                     | ProjectView::Secrets(..)
                     | ProjectView::Execution(..),
                 ) => "",
@@ -333,6 +346,7 @@ fn render_page_with_updates(
         | ProjectView::Preparation(project, _)
         | ProjectView::History(project, _)
         | ProjectView::Deployment(project, _)
+        | ProjectView::Retention(project, _)
         | ProjectView::Secrets(project, _)
         | ProjectView::Execution(project, _),
     ) = &projects
@@ -354,6 +368,7 @@ fn render_page_with_updates(
             | ProjectView::Preparation(..)
             | ProjectView::History(..)
             | ProjectView::Deployment(..)
+            | ProjectView::Retention(..)
             | ProjectView::Secrets(..)
             | ProjectView::Execution(..),
         ) => "",
@@ -368,6 +383,7 @@ fn render_page_with_updates(
                 | ProjectView::Preparation(..)
                 | ProjectView::History(..)
                 | ProjectView::Deployment(..)
+                | ProjectView::Retention(..)
                 | ProjectView::Secrets(..)
                 | ProjectView::Execution(..)
         )
@@ -379,6 +395,7 @@ fn render_page_with_updates(
         format!(r#"<p class="breadcrumbs">{title}</p>"#)
     };
     let document_title = match &projects {
+        Some(ProjectView::Retention(..)) => format!("{title} · Settings"),
         Some(ProjectView::Secrets(..)) => format!("{title} · Environments"),
         Some(ProjectView::Deployment(..)) => format!("{title} · Releases"),
         Some(ProjectView::Monitoring(..)) => format!("{title} · Monitoring"),
@@ -402,6 +419,7 @@ fn render_page_with_updates(
                 overview::monitoring(monitoring, hours, &base)
             )
         }
+        ProjectView::Retention(project, view) => projects::retention_content(project, view),
         ProjectView::Secrets(project, view) => projects::secrets_content(project, view),
         ProjectView::Files(project, files) => projects::files_content(project, files),
         ProjectView::History(project, view) => projects::history_content(project, view),
@@ -515,6 +533,7 @@ fn document_with_styles(title: &str, body: &str, overview_styles: &str) -> Strin
   <script>{APPEARANCE}</script>
   <script>{AUTH}</script>
 <script>{BUILD_EXECUTION}</script>
+<script>{BUILD_RETENTION}</script>
 <script>{PROJECT_SECRETS}</script>
   <script>{PROFILE}</script>
   <script>{ACCOUNTS}</script>
