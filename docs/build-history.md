@@ -57,6 +57,48 @@ It can queue more than one attempt up to capacity; production admission remains
 separate. The lower-level `BuildJob::queued` constructor is still an in-memory
 model API and cannot insert caller-chosen IDs into this history store.
 
+## Retention planning prerequisite
+
+[#314](https://github.com/devoption/devoption/issues/314) adds the pure
+`devoption_builds::retention` planner. It is not connected to the history store,
+server or Settings page and performs no filesystem operations. Current allocation
+limits and retained files are unchanged.
+
+A validated `Policy` selects 1–1000 terminal attempts per project (default 10).
+The planner counts succeeded, failed, cancelled and interrupted attempts in the
+newest-N window. Older release-referenced or promotion-referenced attempts remain
+in addition to that window. Queued/running attempts are always retained; terminal
+attempts without confirmed process cleanup are also retained. The result lists
+candidate IDs oldest first and retained IDs with their primary protection reason.
+It reports no reclaimed bytes or successful deletion.
+
+Inputs must be a complete, consistent cross-project snapshot with unique attempt
+IDs and a durable, nonzero terminal-completion sequence unique within each project.
+Admission order, wall-clock timestamps and row position cannot substitute for that
+sequence. Duplicate identities/orders, missing terminal sequences, completion
+sequences on unfinished attempts and references absent from the snapshot fail
+closed. Other projects' terminal sequences can coincide without sharing a policy.
+The current history format does **not** record these sequences or confirmed cleanup,
+so callers cannot safely manufacture planner inputs from existing rows alone.
+
+The caller must supply all saved-release references, including deployed/recovery
+releases, and active promotions. These are caller observations, not independently
+verified evidence. A returned candidate is not deletion authority. A future adapter
+must serialize snapshot collection and removal with build admission/promotion,
+recheck references immediately before removal and verify owned paths without
+following symlinks. Replanning is deterministic after partial progress, but durable
+cleanup checkpoints, failure reporting and restart reconciliation are still needed.
+
+This slice does not persist policies, expose settings, allocate fresh identities,
+remove artifacts/staged source/compiler output/receipts, reclaim capacity, or prove
+release rollback after deletion. Those remain acceptance work under #314. The
+planner itself has no lifetime-attempt count cap; the existing store's cap remains.
+
+Run `cargo test -p devoption-builds --locked --offline retention::` for independent
+project policies, limit validation/lowering, mixed terminal outcomes, protected
+exceptions, input rejection, reference changes, repeatable partial-progress planning
+and planning across 10,000 synthetic attempts. These tests perform no deletion.
+
 ## Format and publication
 
 `build-history.bin` uses the nine-byte magic/version `DVHISTRY` followed by byte
