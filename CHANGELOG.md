@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a pure per-project build-retention planner with a default ten-attempt
+  window, deterministic completion ordering and protected build exceptions.
+  Settings, persistence and disk cleanup remain unimplemented
+  ([#314](https://github.com/devoption/devoption/issues/314)).
+
 - Resolve the deferred authentication review decisions with source and regression
   references for shared admission, method guards, public Rust/path APIs and secret
   lifetime; retain existing runtime policy and document the remaining tradeoffs

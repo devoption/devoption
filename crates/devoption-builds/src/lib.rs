@@ -14,6 +14,7 @@ pub mod history;
 pub mod jobs;
 pub mod output;
 pub mod preparation;
+pub mod retention;
 pub mod review_context;
 pub mod reviewed_directories;
 pub mod reviewed_executables;
