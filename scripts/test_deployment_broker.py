@@ -328,6 +328,25 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(),b'preserve')
 
 
+    def test_retention_inventory_is_strict_about_corrupt_pending_and_recovery_releases(self):
+        release = self.promote()
+        with patch.object(broker, 'desired', return_value=None):
+            self.assertEqual(broker.dispatch(self.config, ['retention-references']), {'jobs': [self.job]})
+            pending = self.config['state']/('f'*64+'.pending')
+            pending.mkdir(mode=0o700)
+            with self.assertRaisesRegex(ValueError, 'unfinished release'):
+                broker.dispatch(self.config, ['retention-references'])
+            pending.rmdir()
+            manifest = self.config['state']/release/'manifest.json'
+            manifest.chmod(0o600); manifest.write_bytes(b'corrupt'); manifest.chmod(0o400)
+            with self.assertRaises(ValueError): broker.dispatch(self.config, ['retention-references'])
+        # Also refuse a missing recovery target even when the remaining inventory
+        # is well formed, rather than interpreting it as no protected reference.
+        with patch.object(broker, 'load_release', return_value={'job':self.job}), patch.object(broker, 'desired', return_value={'release':release,'previous':'0'*64}):
+            with self.assertRaisesRegex(ValueError, 'recovery release'):
+                broker.dispatch(self.config, ['retention-references'])
+
+
 class IdentityTests(unittest.TestCase):
     def test_record_identity_rejects_login_privilege_groups_and_writable_socket_ancestors(self):
         with tempfile.TemporaryDirectory() as temp:

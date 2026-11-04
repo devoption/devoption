@@ -774,7 +774,31 @@ def overview(config):
     return {'apps': result}
 
 
+def retention_references(config):
+    """Strict inventory: page status may omit corrupt releases, cleanup cannot."""
+    jobs = set()
+    for slot in config.get('apps', [config]):
+        releases = set()
+        for entry in slot['state'].iterdir():
+            if HEX.fullmatch(entry.name):
+                manifest = load_release(slot, entry.name)
+                if not ID.fullmatch(manifest.get('job', '')):
+                    raise ValueError('invalid saved release job identity')
+                jobs.add(manifest['job'])
+                releases.add(entry.name)
+            elif re.fullmatch(r'[0-9a-f]{64}\.pending', entry.name):
+                raise ValueError('unfinished release promotion needs inspection')
+        record = desired(slot)
+        if record:
+            for key in ('release', 'previous', 'last_healthy'):
+                if record.get(key) is not None and record[key] not in releases:
+                    raise ValueError('deployment recovery release is unavailable')
+    return {'jobs': sorted(jobs)}
+
+
 def dispatch(config, args):
+    if args == ['retention-references']:
+        return retention_references(config)
     if args == ['overview']:
         return overview(config)
     if args[:1] == ['project']:

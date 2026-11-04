@@ -15,21 +15,14 @@ fn release_references() -> Result<Vec<JobId>, devoption_builds::history::Error> 
         Err(_) => return Err(E::Unavailable),
         Ok(_) => {}
     }
-    let state = deployment::broker(&["status"]).map_err(|_| E::Unavailable)?;
-    let apps = state
-        .get("apps")
-        .and_then(serde_json::Value::as_array)
-        .cloned()
-        .unwrap_or_else(|| vec![state]);
+    let state = deployment::broker(&["retention-references"]).map_err(|_| E::Unavailable)?;
     let mut ids = Vec::new();
-    for app in apps {
-        for release in app["releases"].as_array().ok_or(E::Corrupt)? {
-            let text = release["job"].as_str().ok_or(E::Corrupt)?;
-            let bytes = devoption_projects::ProjectId::from_hex(text)
-                .ok_or(E::Corrupt)?
-                .to_bytes();
-            ids.push(JobId::from_bytes(bytes));
-        }
+    for job in state["jobs"].as_array().ok_or(E::Corrupt)? {
+        let text = job.as_str().ok_or(E::Corrupt)?;
+        let bytes = devoption_projects::ProjectId::from_hex(text)
+            .ok_or(E::Corrupt)?
+            .to_bytes();
+        ids.push(JobId::from_bytes(bytes));
     }
     Ok(ids)
 }

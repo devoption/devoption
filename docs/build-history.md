@@ -80,7 +80,8 @@ after a setting change and before listening after restart. The controller holds
 execution, history and catalog gates in that order. The installed promotion broker
 also uses the work root's private `retention.lock`, with nonblocking exclusive
 flock, through copying the artifact and saving its immutable release. Cleanup holds
-that same lock while observing references and deleting. Reference lookup failures
+that same lock while observing references and deleting. The strict `retention-references` broker query refuses corrupt manifests,
+unfinished promotions and missing deployment/recovery targets. Lookup failures
 preserve builds, and every candidate gets a fresh reference check immediately
 before removal. Existing local release bytes are never rewritten or removed.
 
