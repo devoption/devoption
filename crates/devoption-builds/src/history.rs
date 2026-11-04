@@ -99,6 +99,13 @@ pub struct History {
     poisoned: bool,
     retention_status_failures: std::collections::HashSet<[u8; 16]>,
 }
+impl Drop for History {
+    fn drop(&mut self) {
+        // A concurrent spawn can briefly retain a duplicate until exec. Release
+        // this writer's lock now, independently of inherited descriptor lifetime.
+        let _ = flock(&self.lock, FlockOperation::Unlock);
+    }
+}
 impl History {
     pub fn open(path: &str) -> Result<Self, Error> {
         let uid = geteuid().as_raw();

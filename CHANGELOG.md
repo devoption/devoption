@@ -13,7 +13,8 @@ Entries describe implemented changes, not the roadmap.
   compiler/artifact/receipt/output files and active capacity; show saved policy,
   cleanup counts and failures separately. Preserve unbound legacy attempts and
   document version-2 history migration/downgrade limits. Scope runner approval
-  registries to persisted single-use reviews to avoid a service lifetime ceiling
+  registries to persisted single-use reviews to avoid a service lifetime ceiling;
+  release history writer locks independently of inherited subprocess descriptors
   ([#314](https://github.com/devoption/devoption/issues/314)).
 
 - Resolve the deferred authentication review decisions with source and regression

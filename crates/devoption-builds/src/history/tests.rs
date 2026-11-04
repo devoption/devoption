@@ -373,3 +373,20 @@ fn failed_queue_returns_no_attempt_and_preserves_existing_history() {
     drop(store);
     assert_eq!(History::open(&path).unwrap().load().unwrap().len(), 1);
 }
+
+#[test]
+fn dropping_history_releases_writer_even_with_an_inherited_descriptor() {
+    let (_temp, path, _job) = fixture();
+    let store = History::open(&path).unwrap();
+    // Concurrent subprocess creation can briefly inherit this open-file
+    // description before CLOEXEC runs. Reproduce its lifetime deterministically.
+    let inherited = store.lock.try_clone().unwrap();
+    assert!(matches!(History::open(&path), Err(Error::Busy)));
+    drop(store);
+    let next = History::open(&path).unwrap();
+    assert!(matches!(History::open(&path), Err(Error::Busy)));
+    drop(inherited);
+    assert!(matches!(History::open(&path), Err(Error::Busy)));
+    drop(next);
+    assert!(History::open(&path).is_ok());
+}
