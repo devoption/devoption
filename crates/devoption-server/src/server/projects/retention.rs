@@ -57,7 +57,7 @@ pub(super) fn reconcile(
                         .filter(|r| r.project() == project.id().to_bytes())
                         .count()
                 })
-                .unwrap_or(0),
+                .ok(),
             ..Default::default()
         });
         if history
@@ -192,7 +192,7 @@ pub(super) async fn show(projects: Projects, id: ProjectId) -> axum::response::R
             }
             match history.retention_status(id) {
                 Ok(Some(status)) => {
-                    view.retained = Some(status.retained);
+                    view.retained = status.retained;
                     view.protected = status.protected;
                     view.removed = status.removed;
                     view.reclaimed_bytes = status.reclaimed_bytes;

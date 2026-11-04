@@ -12,8 +12,10 @@ fn key(prefix: &str, id: JobId) -> String {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RetentionStatus {
-    pub retained: usize,
-    pub protected: usize,
+    /// None means the retained snapshot could not be verified.
+    pub retained: Option<usize>,
+    /// None means reference/protection verification did not complete.
+    pub protected: Option<usize>,
     pub removed: usize,
     /// Bytes from successful removals in this reconciliation only.
     pub reclaimed_bytes: u64,
@@ -126,8 +128,16 @@ impl History {
         }
         let n = |offset| u64::from_be_bytes(bytes[offset..offset + 8].try_into().unwrap());
         Ok(Some(RetentionStatus {
-            retained: usize::try_from(n(0)).map_err(|_| Error::Corrupt)?,
-            protected: usize::try_from(n(8)).map_err(|_| Error::Corrupt)?,
+            retained: if n(0) == u64::MAX {
+                None
+            } else {
+                Some(usize::try_from(n(0)).map_err(|_| Error::Corrupt)?)
+            },
+            protected: if n(8) == u64::MAX {
+                None
+            } else {
+                Some(usize::try_from(n(8)).map_err(|_| Error::Corrupt)?)
+            },
             removed: usize::try_from(n(16)).map_err(|_| Error::Corrupt)?,
             reclaimed_bytes: n(24),
             failed: bytes[32] == 1,
@@ -141,8 +151,8 @@ impl History {
     ) -> Result<(), Error> {
         let mut bytes = Vec::new();
         for n in [
-            status.retained as u64,
-            status.protected as u64,
+            status.retained.map(|n| n as u64).unwrap_or(u64::MAX),
+            status.protected.map(|n| n as u64).unwrap_or(u64::MAX),
             status.removed as u64,
             status.reclaimed_bytes,
         ] {
@@ -240,18 +250,19 @@ impl History {
         let plan = retention::plan(project, self.retention_policy(project)?, &attempts, &refs)
             .map_err(|_| Error::Corrupt)?;
         let mut status = RetentionStatus {
-            retained: plan.retained.len(),
-            protected: plan
-                .retained
-                .iter()
-                .filter(|(_, reason)| *reason != retention::KeepReason::Newest)
-                .count(),
+            retained: Some(plan.retained.len()),
+            protected: Some(
+                plan.retained
+                    .iter()
+                    .filter(|(_, reason)| *reason != retention::KeepReason::Newest)
+                    .count(),
+            ),
             ..Default::default()
         };
         for id in plan.candidates {
             if references()?.contains(&id) {
-                status.retained += 1;
-                status.protected += 1;
+                status.retained = status.retained.map(|count| count + 1);
+                status.protected = status.protected.map(|count| count + 1);
                 continue;
             }
             match self.prune(id, work) {
@@ -261,7 +272,7 @@ impl History {
                 }
                 Err(_) => {
                     status.failed = true;
-                    status.retained += 1;
+                    status.retained = status.retained.map(|count| count + 1);
                 }
             }
         }
@@ -276,6 +287,14 @@ impl History {
             .ok_or(Error::UnknownAttempt)?;
         if !terminal(&record.state) || !record.cleanup_confirmed {
             return Err(Error::Transition);
+        }
+        // Verify the output's embedded attempt identity and checksum before
+        // removing any staged files. A private filename alone is not evidence
+        // that its contents belong to this attempt.
+        let output = logs::filename(id);
+        let output_bytes = self.read_snapshot(&output, crate::output::persistence::MAX_SNAPSHOT)?;
+        if let Some(data) = &output_bytes {
+            crate::output::BuildOutput::restore(data, id)?;
         }
         let audit = codec::encode_with_watermark(std::slice::from_ref(record), 0)?;
         let audit_name = key("audit", id);
@@ -326,8 +345,12 @@ impl History {
             // files and evidence rather than guessing a directory.
             return Err(Error::Unavailable);
         }
-        let output = logs::filename(id);
-        if let Some(data) = self.read_snapshot(&output, crate::output::persistence::MAX_SNAPSHOT)? {
+        let current_output =
+            self.read_snapshot(&output, crate::output::persistence::MAX_SNAPSHOT)?;
+        if current_output != output_bytes {
+            return Err(Error::Changed);
+        }
+        if let Some(data) = current_output {
             bytes += data.len() as u64;
             unlinkat(&self.directory, output.as_str(), AtFlags::empty())
                 .map_err(|_| Error::Unavailable)?;

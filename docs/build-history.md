@@ -15,7 +15,8 @@ UTF-8 path (4096 bytes, at most 64 components). Every component is opened withou
 following symlinks. The final directory must be owned by the current non-root
 account with exact mode `0700`. Opening creates only `build-history.lock`, mode
 `0600`, and takes a nonblocking exclusive flock for the handle's lifetime. Another
-cooperating writer gets Busy. Directories are never created or repaired.
+cooperating writer gets Busy. Dropping the writer explicitly unlocks it, including
+when a concurrent subprocess briefly retains an inherited descriptor before exec. Directories are never created or repaired.
 
 Directory and lock descriptors remain pinned. Every operation checks their current
 ownership/mode, link count and name bindings. Lock and record files must be regular,
@@ -89,8 +90,9 @@ Preparation binds each allocated attempt to its exact direct staging child, root
 and child device/inode in private `build-owned-ID.bin` metadata. Cleanup accepts
 only that directory, refuses symlinks, hard-linked files, cross-device trees,
 unexpected ownership/writable modes and changed identities, and verifies the
-whole tree before deleting entries through retained no-follow descriptors. It
-removes staged source, target/compiler files, artifact, receipt, temporary/home/
+whole tree before deleting entries through retained no-follow descriptors. Saved
+output must pass checksum and embedded-attempt validation before any staged files
+are removed. Cleanup removes staged source, target/compiler files, artifact, receipt, temporary/home/
 Cargo files and the saved output checkpoint. Concurrent out-of-band changes by
 the trusted platform OS user remain outside the contract.
 
@@ -108,6 +110,8 @@ poisoned-writer inspection rules.
 
 Settings shows the last cleanup's retained/protected counts, successful removals
 and reclaimed file-byte count, plus an explicit incomplete result on failure.
+Verified retained/protected counts remain visible when removal fails; counts
+that could not be verified are shown as unavailable rather than zero.
 Only successful removals contribute bytes; failed or partially removed attempts
 claim none. These are file lengths, not a filesystem free-space guarantee. Saving
 a policy and successful cleanup are distinct results. Re-saving retries cleanup.

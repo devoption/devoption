@@ -123,7 +123,7 @@ fn independent_policies_and_release_references_preserve_exact_bytes() {
         .unwrap();
     assert_eq!(
         (status.retained, status.protected, status.removed),
-        (2, 1, 10)
+        (Some(2), Some(1), 10)
     );
     assert!(status.reclaimed_bytes >= 10 * 6 * 4096);
     assert_eq!(
@@ -169,7 +169,7 @@ fn unsafe_paths_and_unconfirmed_processes_are_preserved_then_retried() {
             .reconcile_retention(project, Some(work.path()), || Ok(vec![]))
             .unwrap()
             .protected,
-        1
+        Some(1)
     );
     assert!(path.exists());
     store.confirm_interrupted_cleanup().unwrap();
@@ -271,7 +271,7 @@ fn references_are_rechecked_before_deletion_and_changed_directories_are_refused(
         })
         .unwrap();
     assert_eq!(calls, 2);
-    assert_eq!((status.removed, status.protected), (0, 1));
+    assert_eq!((status.removed, status.protected), (0, Some(1)));
     assert!(path.join("artifact/bytes").exists());
     let preserved = path.with_extension("preserved");
     std::fs::rename(&path, &preserved).unwrap();
@@ -299,12 +299,12 @@ fn failed_status_publication_does_not_expose_an_older_success_as_current_evidenc
     store.save_retention_status(project, &old).unwrap();
     let failed = RetentionStatus {
         failed: true,
-        retained: 12,
+        retained: Some(12),
         ..Default::default()
     };
     let name = key("retention", JobId::from_bytes(project.to_bytes()));
     let mut bytes = Vec::new();
-    for n in [12u64, 0, 0, 0] {
+    for n in [12u64, u64::MAX, 0, 0] {
         bytes.extend(n.to_be_bytes());
     }
     bytes.push(1);
@@ -336,4 +336,41 @@ fn failed_status_publication_does_not_expose_an_older_success_as_current_evidenc
     std::fs::remove_file(pending).unwrap();
     store.save_retention_status(project, &failed).unwrap();
     assert_eq!(store.retention_status(project).unwrap(), Some(failed));
+}
+
+#[test]
+fn unrelated_or_corrupt_output_preserves_staged_files_until_verified_retry() {
+    let (dir, work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    let (mut old, path) = stage(&mut store, work.path(), plan.clone(), 1);
+    cancel(&mut store, &mut old);
+    let (mut new, _) = stage(&mut store, work.path(), plan, 2);
+    cancel(&mut store, &mut new);
+    store
+        .set_retention_policy(project, Policy::new(1).unwrap())
+        .unwrap();
+    let output = dir.path().join(logs::filename(old.id()));
+    let original = std::fs::read(&output).unwrap();
+    let foreign = std::fs::read(dir.path().join(logs::filename(new.id()))).unwrap();
+    for bad in [foreign, b"corrupt output".to_vec()] {
+        std::fs::write(&output, &bad).unwrap();
+        let status = store
+            .reconcile_retention(project, Some(work.path()), || Ok(vec![]))
+            .unwrap();
+        assert!(status.failed);
+        assert_eq!(status.removed, 0);
+        assert_eq!(status.reclaimed_bytes, 0);
+        assert!(path.join("source/bytes").is_file());
+        assert!(path.join("artifact/bytes").is_file());
+        assert_eq!(std::fs::read(&output).unwrap(), bad);
+        assert_eq!(store.load().unwrap().len(), 2);
+    }
+    std::fs::write(&output, original).unwrap();
+    let status = store
+        .reconcile_retention(project, Some(work.path()), || Ok(vec![]))
+        .unwrap();
+    assert!(!status.failed);
+    assert_eq!(status.removed, 1);
+    assert!(!path.exists());
+    assert!(!output.exists());
 }
