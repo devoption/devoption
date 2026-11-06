@@ -114,7 +114,8 @@ def check(binary, root, fixture):
         assert b'Save verified source' in source_page
         before = set(re.findall(rb'/attempts/([0-9a-f]{32})', history))
         assert request('POST', base + '/prepare', authenticated=False)[0] == 401
-        assert request('POST', base + '/prepare', with_csrf=False)[0] == 403
+        # The cookie+CSRF adapter treats a missing token as unauthenticated.
+        assert request('POST', base + '/prepare', with_csrf=False)[0] == 401
         mutate(base + '/prepare')
         page = request('GET', base + '/run')[2]
         for expected in [b'LibraryBuildV1', b'Library source package (.tar)', b'cargo build --release --locked --offline', b'cargo test --release --locked --offline', b'wasm32-wasip2']:
