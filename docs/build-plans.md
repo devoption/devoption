@@ -81,9 +81,11 @@ approval, freshness check or durable plan identifier.
   with a letter or underscore and then permit letters, digits, `_` and `-`.
   Both must match the verified package's conventional binary at `src/main.rs`.
   Additional automatic/explicit targets are rejected by the source snapshot.
-  The additional selected Wasm target is the fixed `devoption-web-fixture`
-  package / `devoption_web_fixture` cdylib, Rust 1.99.0 and `wasm32-wasip2`;
-  its fixed command ends in `--target wasm32-wasip2 --package devoption-web-fixture --lib`.
+  The additional selected Wasm target uses the reviewed package and conventional
+  `cdylib` name, Rust 1.99.0 and `wasm32-wasip2`; its fixed command ends in
+  `--target wasm32-wasip2 --package PACKAGE --lib`.
+  Ordinary `rlib` source snapshots are rejected with `TargetMismatch`; source
+  admission does not supply a library execution profile.
   Arbitrary Cargo flags and other target kinds are unsupported.
 - Up to 32 explicit environment entries: unique, case-sensitive POSIX-style
   names of 1–64 ASCII bytes and values of at most 1024 UTF-8 bytes without control

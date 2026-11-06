@@ -91,7 +91,9 @@ impl SourceSnapshot {
     pub fn binary(&self) -> Option<&str> {
         match self.target {
             cargo_inputs::SourceTarget::Binary => Some(&self.package),
-            cargo_inputs::SourceTarget::Cdylib { .. } => None,
+            cargo_inputs::SourceTarget::Cdylib { .. } | cargo_inputs::SourceTarget::Rlib { .. } => {
+                None
+            }
         }
     }
     pub fn target(&self) -> &cargo_inputs::SourceTarget {
@@ -199,7 +201,9 @@ pub fn verify(
     }
     let excluded = match target {
         cargo_inputs::SourceTarget::Binary => "src/lib.rs",
-        cargo_inputs::SourceTarget::Cdylib { .. } => "src/main.rs",
+        cargo_inputs::SourceTarget::Cdylib { .. } | cargo_inputs::SourceTarget::Rlib { .. } => {
+            "src/main.rs"
+        }
     };
     if files.iter().any(|file| {
         file.path.eq_ignore_ascii_case(excluded)

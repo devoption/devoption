@@ -25,7 +25,7 @@ once and expanded at every path, with separate expansion bounds.
 The [root Cargo verifier](cargo-source-proof.md) and [Cargo adapter](cargo-inputs.md)
 validate the exact committed manifest/lockfile bytes. A snapshot requires nonempty
 UTF-8 source at the selected conventional path: `src/main.rs` for a default binary,
-or `src/lib.rs` for the explicit sole `cdylib` admitted by the Cargo adapter.
+or `src/lib.rs` for an explicit sole `cdylib` or `rlib` admitted by the Cargo adapter.
 The other target path is rejected. Package/version, target shape/name and source
 path are read-only getters; `binary()` returns `None` for a library.
 Presence does not prove syntax, successful compilation, HTTP behavior or that
@@ -51,10 +51,11 @@ Candidate [build plans](build-plans.md) require the complete snapshot. Validatio
 matches commit, full dependency request, package and binary; a target mismatch
 returns `TargetMismatch`. Plan/job equality retains the files, bytes, digest and
 Cargo proof. The earlier two-file proof alone cannot create a candidate plan.
-The current planner is native-only and rejects a `cdylib` snapshot with
-`TargetMismatch`, even when supplied package/binary names match. Wasm command,
-toolchain/ABI review, execution and artifact integration remain pending under
-[#231](https://github.com/devoption/devoption/issues/231).
+The planner accepts the selected `cdylib` Wasm shape through the
+[web-app build profile](web-app-builds.md). An `rlib` snapshot is admitted as
+source only and is rejected by plan validation with `TargetMismatch`, even when
+supplied package/target names match; [library execution](reusable-packages.md)
+requires a separate profile.
 
 ## Supported tree and bounds
 
@@ -76,7 +77,7 @@ toolchain/ABI review, execution and artifact integration remain pending under
 - Root `build.rs`, `tests`, `examples`, `benches` and `src/bin` fail, ignoring ASCII
   case. A binary rejects `src/lib.rs`; a library rejects `src/main.rs`, including
   case variants. The manifest requires `build = false` and permits only the
-  conventional binary or narrow `cdylib` form, without a workspace or extra targets.
+  conventional binary or narrow `cdylib`/`rlib` form, without a workspace or extra targets.
 
 Failures return fixed diagnostics without source content or paths and no partial
 snapshot. Bounded memory is allocated; no durable snapshot or extracted file is

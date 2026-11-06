@@ -537,11 +537,12 @@ fn actual_git_commit_supplies_complete_owned_snapshot_without_checkout_writes() 
 
 impl ProofFixture {
     pub(crate) fn cdylib() -> Self {
-        let manifest = [
-            MANIFEST,
-            b"\n[lib]\nname = 'ExampleService'\ncrate-type = ['cdylib']\n",
-        ]
-        .concat();
+        Self::library("cdylib")
+    }
+
+    pub(crate) fn library(kind: &str) -> Self {
+        let library = format!("\n[lib]\nname = 'ExampleService'\ncrate-type = ['{kind}']\n");
+        let manifest = [MANIFEST, library.as_bytes()].concat();
         Self::with_files(&[
             ("Cargo.toml", &manifest),
             ("Cargo.lock", LOCK),
@@ -619,4 +620,59 @@ fn cdylib_source_is_owned_without_native_binary_authority() {
         .err(),
         Some(Error::UnsupportedTarget)
     );
+}
+
+#[test]
+fn reusable_library_snapshot_binds_source_and_rejects_extra_targets() {
+    let snapshot = ProofFixture::library("rlib").verify().unwrap();
+    assert_eq!(snapshot.binary(), None);
+    assert_eq!(snapshot.target_path(), "src/lib.rs");
+    assert_eq!(
+        snapshot.target(),
+        &cargo_inputs::SourceTarget::Rlib {
+            name: "ExampleService".into()
+        }
+    );
+    assert!(snapshot.sha256() != ProofFixture::cdylib().verify().unwrap().sha256());
+    let manifest = [
+        MANIFEST,
+        b"\n[lib]\nname = 'ExampleService'\ncrate-type = ['rlib']\n",
+    ]
+    .concat();
+    for source in [b"".as_slice(), b" \n", b"\xff"] {
+        assert!(
+            ProofFixture::with_files(&[
+                ("Cargo.toml", &manifest),
+                ("Cargo.lock", LOCK),
+                ("src/lib.rs", source)
+            ])
+            .verify()
+            .is_err()
+        );
+    }
+    for extra in [
+        "src/main.rs",
+        "src/bin/extra.rs",
+        "build.rs",
+        ".cargo/config.toml",
+    ] {
+        assert!(
+            ProofFixture::with_files(&[
+                ("Cargo.toml", &manifest),
+                ("Cargo.lock", LOCK),
+                ("src/lib.rs", MAIN),
+                (extra, b"extra")
+            ])
+            .verify()
+            .is_err()
+        );
+    }
+    let changed = ProofFixture::with_files(&[
+        ("Cargo.toml", &manifest),
+        ("Cargo.lock", LOCK),
+        ("src/lib.rs", b"pub fn changed() {}"),
+    ])
+    .verify()
+    .unwrap();
+    assert!(changed.sha256() != snapshot.sha256());
 }

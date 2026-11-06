@@ -26,13 +26,14 @@ pub struct InputHashes {
 pub enum SourceTarget {
     Binary,
     Cdylib { name: String },
+    Rlib { name: String },
 }
 
 impl SourceTarget {
     pub fn path(&self) -> &'static str {
         match self {
             Self::Binary => "src/main.rs",
-            Self::Cdylib { .. } => "src/lib.rs",
+            Self::Cdylib { .. } | Self::Rlib { .. } => "src/lib.rs",
         }
     }
 }
@@ -136,11 +137,18 @@ fn inspect_expected(
                 || !name.bytes().enumerate().all(|(i, b)| {
                     b == b'_' || b.is_ascii_alphabetic() || (i > 0 && b.is_ascii_digit())
                 })
-                || !matches!(types, Some(values) if values.len() == 1 && values[0].as_str() == Some("cdylib"))
             {
                 return Err(Error::Unsupported);
             }
-            SourceTarget::Cdylib { name: name.into() }
+            match types.map(Vec::as_slice) {
+                Some([kind]) if kind.as_str() == Some("cdylib") => {
+                    SourceTarget::Cdylib { name: name.into() }
+                }
+                Some([kind]) if kind.as_str() == Some("rlib") => {
+                    SourceTarget::Rlib { name: name.into() }
+                }
+                _ => return Err(Error::Unsupported),
+            }
         }
     };
     let mut direct = BTreeMap::new();

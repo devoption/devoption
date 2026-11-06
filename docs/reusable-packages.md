@@ -1,0 +1,97 @@
+# Reusable libraries and packages
+
+The platform does not yet provide an end-to-end build, publication and
+cross-project consumption workflow for reusable packages. This assessment under
+[#383](https://github.com/devoption/devoption/issues/383) separates source support
+from execution and distribution. It concerns libraries in separate repositories,
+not extracting or publishing the platform's internal `devoption-ui` crate.
+
+## Current support
+
+| Capability | Implemented boundary |
+| --- | --- |
+| Separate project/repository | Register a repository and inspect its tracked source with the existing project/Code flow. |
+| Ordinary Rust library source | Explicit conventional `rlib` manifests pass bounded Cargo input inspection, source preparation and complete immutable source capture. This does not compile the library. |
+| Hosted app compilation | The opt-in Linux runner builds a standalone `cdylib` for `wasm32-wasip2`, after review and approval, using verified operator-prepared offline dependencies. |
+| Reusing existing crates.io packages | Exact-pinned dependencies and a complete verified archive/vendor set are supported for the web-app profile. Acquisition is separate operator setup, not a build-time download. |
+| Hosted registry identity | The registry domain distinguishes DevOption-hosted origins from crates.io, but the manifest/lock adapter accepts only crates.io dependencies. Identity metadata is not a registry service. |
+| Library build/test/package jobs | No execution profile or source-package output exists. A library source snapshot cannot select the binary or Wasm build profile. |
+| Cross-project or global package distribution | No hosted index, package ingestion/publication, authenticated download or automatic dependency-update workflow exists. Path, Git and custom registry dependencies remain rejected. |
+| Other package ecosystems | No npm or general package build/publication pipeline is implemented. |
+
+The implementation references are [Cargo admission](cargo-inputs.md),
+[source preparation](build-preparation.md), [immutable snapshots](source-snapshots.md),
+[web-app builds](web-app-builds.md) and the [registry contract](registry-contract.md).
+Earlier #119/#125 established the registry contract and a trusted offline fixture;
+#295/#301 generalized app identity and assets, and #310 added a narrow
+default-features-disabled dependency form. Their closure does not establish
+ordinary library execution or a hosted package service. The open-issue review
+for this assessment found no existing issue delivering those remaining outcomes;
+#383 and its follow-ups track them explicitly.
+
+A library maintained and published outside DevOption can already be consumed by
+a supported hosted app as a crates.io dependency, provided its graph fits Cargo
+admission, its code supports the app target/resource policy, and the operator
+prepares and verifies all offline archives/vendor inputs. This existing route
+does not provide library build/test jobs, publish the package, or automate
+updates. Publishing a new package still needs explicit authorization.
+
+## Prepare a separate library
+
+A standalone library can use the following deliberately narrow source shape:
+
+```toml
+[package]
+name = "shared-dashboard"
+version = "0.1.0"
+edition = "2024"
+build = false
+
+[lib]
+name = "shared_dashboard"
+crate-type = ["rlib"]
+```
+
+Commit `src/lib.rs` and a version-4 `Cargo.lock`, including for a library. Generate
+and check the lockfile with Cargo outside DevOption. The lockfile root must match
+the package, with the complete locked registry graph for any dependencies.
+The [Cargo input subset](cargo-inputs.md) remains authoritative: package metadata,
+features, dev dependencies, workspaces and custom paths are currently outside
+that subset. A conventional `cargo new --lib` manifest needs the explicit fields
+above before these source checks can pass. Library name must match the package
+name with hyphens changed to underscores. Absence of `[lib]` still selects the
+existing binary source shape; source inspection does not infer targets from disk.
+
+Keep reusable rendering code independent of a server/runtime where practical.
+For reuse by hosted apps, verify that dependencies support `wasm32-wasip2`.
+CSS/JavaScript assets can be committed and embedded by the library/consumer using
+the existing [app asset contract](web-app-builds.md#application-identity-and-assets).
+A reusable library is linked into each consumer's app component; each consumer
+needs its own build and deployment to receive an update. An `rlib` is a
+compiler-specific output, not the portable source package to distribute between
+projects. No separate library runtime route is required.
+
+Source checks can start once the admission change is merged and installed, but
+passing them does not establish buildability or dependency availability. A
+separate library can be developed and tested with ordinary Cargo immediately;
+platform integration testing remains blocked on the following work.
+
+## Remaining delivery path
+
+1. [#384: Library build and package profile](https://github.com/devoption/devoption/issues/384).
+   Add approved, bounded locked/offline library compilation/tests and a source
+   package with exact version, revision and archive digest. Exercise a trusted
+   separate library and consumer on native and Wasm targets. Preserve review,
+   approval, cancellation, history and cleanup controls.
+2. [#385: Verified cross-project distribution](https://github.com/devoption/devoption/issues/385).
+   Add immutable package storage/index metadata, explicit hosted registry admission,
+   access/visibility and publication policy, complete verified offline dependency
+   materialization, and two independent consumers with version-update and
+   older-version reproducibility checks. Installation-local availability and
+   globally reachable distribution must be demonstrated separately.
+
+These are implementation requirements, not available services. Registry credentials,
+public package publication, production installation, external availability and
+access-policy changes require their own explicit authority. No existing web-app
+release artifact or DevOption product release workflow substitutes for this
+package lifecycle.
