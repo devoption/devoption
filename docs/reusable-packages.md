@@ -16,7 +16,8 @@ not extracting or publishing the platform's internal `devoption-ui` crate.
 | Reusing existing crates.io packages | Exact-pinned dependencies and a complete verified archive/vendor set are supported for the web-app profile. Acquisition is separate operator setup, not a build-time download. |
 | Hosted registry identity | Explicit binding APIs admit distinct hosted origins and preserve them through source proofs/plans. Existing service callers still use an empty binding set. See [hosted Cargo inputs](hosted-cargo-inputs.md); identity metadata is not a registry service. |
 | Library build/test/package jobs | The trusted-adapter `LibraryBuildV1` API compiles natively, runs inline library unit tests, compiles for WASIp2 and saves a verified-source archive. The project interface selects this profile from captured source and provides verified local archive/receipt downloads; see [library builds](library-builds.md). |
-| Cross-project or global package distribution | No hosted index, package ingestion/publication, authenticated download or automatic dependency-update workflow exists. Path, Git and custom registry dependencies remain rejected. |
+| Library source staging | A trusted-adapter API privately retains immutable source archives and exact registry/version/source provenance, with conflict and corruption refusal. It is not connected to the service; see [source staging](library-source-staging.md). |
+| Cross-project or global package distribution | No hosted Cargo archive ingestion/index, package publication, authenticated registry download or automatic dependency-update workflow exists. Service callers still reject path, Git and custom registry dependencies. |
 | Other package ecosystems | No npm or general package build/publication pipeline is implemented. |
 
 The implementation references are [Cargo admission](cargo-inputs.md),

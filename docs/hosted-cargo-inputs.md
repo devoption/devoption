@@ -108,6 +108,8 @@ to an installation or public registry. This is a Cargo/metadata proof, not a
 platform-hosted consumer acceptance test, OS network-isolation proof, access-control
 acceptance or evidence of globally reachable distribution.
 
-#385 remains open for immutable package ingestion/storage/index metadata, explicit
+#385 now also has a private [source-package staging API](library-source-staging.md),
+separate from Cargo registry archives and serving. It remains open for Cargo
+package ingestion/storage/index metadata, explicit
 promotion/publication policy, project access and version/yank/recovery behavior,
 verified runner materialization and two consumers through the actual platform.
