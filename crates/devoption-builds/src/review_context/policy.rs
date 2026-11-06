@@ -5,8 +5,9 @@ use std::collections::{HashMap, HashSet};
 
 pub(super) fn permits(plan: &BuildPlan, context: &Input) -> bool {
     match context.policy {
-        Policy::InitialBuildV1 => !plan.is_wasm() && initial(plan, context),
-        Policy::WasmBuildV1 => wasm(plan, context),
+        Policy::InitialBuildV1 => !plan.is_wasm() && !plan.is_library() && initial(plan, context),
+        Policy::WasmBuildV1 => plan.is_wasm() && isolated(plan, context),
+        Policy::LibraryBuildV1 => plan.is_library() && isolated(plan, context),
     }
 }
 
@@ -93,7 +94,7 @@ fn overlaps(left: &str, right: &str) -> bool {
 #[cfg(test)]
 mod tests;
 
-fn wasm(plan: &BuildPlan, context: &Input) -> bool {
+fn isolated(plan: &BuildPlan, context: &Input) -> bool {
     let environment = [
         ("PATH", "/toolchain/bin:/usr/bin"),
         ("RUSTC", "/toolchain/bin/rustc"),
@@ -108,8 +109,7 @@ fn wasm(plan: &BuildPlan, context: &Input) -> bool {
         ("RUSTC_WRAPPER", ""),
         ("RUSTC_WORKSPACE_WRAPPER", ""),
     ];
-    plan.is_wasm()
-        && plan.details().limits.elapsed_seconds == 60
+    plan.details().limits.elapsed_seconds == 60
         && plan.details().limits.log_bytes == 1_048_576
         && context.cargo.path == "/toolchain/bin/cargo"
         && context.rustc.path == "/toolchain/bin/rustc"

@@ -12,6 +12,7 @@ pub mod cargo_source;
 pub mod execution;
 pub mod history;
 pub mod jobs;
+pub mod library;
 pub mod output;
 pub mod preparation;
 pub mod retention;
@@ -131,8 +132,9 @@ impl BuildPlan {
             return Err(Error::InvalidTarget);
         }
         let target_matches = match input.source.target() {
-            // Library source admission does not grant an execution profile.
-            devoption_registry::cargo_inputs::SourceTarget::Rlib { .. } => false,
+            devoption_registry::cargo_inputs::SourceTarget::Rlib { name } => {
+                input.binary == *name && input.rust_version == "1.99.0"
+            }
             devoption_registry::cargo_inputs::SourceTarget::Binary => {
                 Some(input.binary.as_str()) == input.source.binary()
             }
@@ -173,8 +175,17 @@ impl BuildPlan {
         )
     }
 
+    pub fn is_library(&self) -> bool {
+        matches!(
+            self.0.source.target(),
+            devoption_registry::cargo_inputs::SourceTarget::Rlib { .. }
+        )
+    }
+
     pub fn artifact_path(&self) -> String {
-        if self.is_wasm() {
+        if self.is_library() {
+            "source.tar".into()
+        } else if self.is_wasm() {
             format!("wasm32-wasip2/release/{}.wasm", self.0.binary)
         } else {
             format!("release/{}", self.0.binary)
@@ -186,9 +197,33 @@ impl BuildPlan {
         &self.0
     }
 
+    /// All library commands share one review, deadline and combined log budget.
+    pub fn library_commands(&self) -> Vec<Vec<&str>> {
+        if !self.is_library() {
+            return Vec::new();
+        }
+        let base = |operation| {
+            vec![
+                operation,
+                "--release",
+                "--locked",
+                "--offline",
+                "--package",
+                &self.0.package,
+                "--lib",
+            ]
+        };
+        let mut wasm = base("build");
+        wasm.extend(["--target", "wasm32-wasip2"]);
+        vec![base("build"), base("test"), wasm]
+    }
+
     /// Fixed argument vector for review. These flags constrain Cargo dependency
     /// resolution; they do not sandbox build scripts or prevent network access.
     pub fn cargo_arguments(&self) -> Vec<&str> {
+        if self.is_library() {
+            return self.library_commands().remove(0);
+        }
         if self.is_wasm() {
             return vec![
                 "build",

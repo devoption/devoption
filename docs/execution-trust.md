@@ -61,7 +61,10 @@ and test limits before mounting. No unbounded JSON/form/log ingestion is allowed
 The implemented `WasmBuildV1` mapping, including split executable target scratch,
 read-only host staging, reserved storage and recovery, is specified in the
 [build workflow](web-app-builds.md#enforced-policy-and-recovery). The native
-`InitialBuildV1` proposal below remains a contract, not a native runner.
+`InitialBuildV1` proposal below remains a contract, not a native runner. The separate
+[`LibraryBuildV1` API](library-builds.md) uses the existing isolated worker for
+native library compilation/unit tests and WASIp2 compilation, with source-archive
+output. It adds no HTTP action or implicit app-build authority.
 
 ## Required review and approval contract
 

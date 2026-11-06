@@ -719,7 +719,7 @@ fn named_wasm_approval_is_invalidated_by_a_rename_or_asset_edit() {
 }
 
 #[test]
-fn reusable_library_admission_cannot_select_a_binary_or_wasm_build() {
+fn reusable_library_plan_selects_only_its_fixed_profile_commands() {
     let (catalog, mut input) = fixture();
     input.source = source_snapshot::tests::ProofFixture::library("rlib")
         .verify()
@@ -729,5 +729,43 @@ fn reusable_library_admission_cannot_select_a_binary_or_wasm_build() {
     input.package = input.source.package().into();
     input.binary = "ExampleService".into();
     input.rust_version = "1.99.0".into();
+    let plan = BuildPlan::validate(input.clone(), &catalog).unwrap();
+    assert!(plan.is_library() && !plan.is_wasm());
+    assert_eq!(plan.artifact_path(), "source.tar");
+    assert_eq!(
+        plan.library_commands(),
+        vec![
+            vec![
+                "build",
+                "--release",
+                "--locked",
+                "--offline",
+                "--package",
+                "ExampleService",
+                "--lib"
+            ],
+            vec![
+                "test",
+                "--release",
+                "--locked",
+                "--offline",
+                "--package",
+                "ExampleService",
+                "--lib"
+            ],
+            vec![
+                "build",
+                "--release",
+                "--locked",
+                "--offline",
+                "--package",
+                "ExampleService",
+                "--lib",
+                "--target",
+                "wasm32-wasip2"
+            ],
+        ]
+    );
+    input.binary = "other".into();
     rejected(&catalog, input, Error::TargetMismatch);
 }

@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a separate `LibraryBuildV1` trusted-adapter API for fixed offline native
+  library builds/unit tests and WASIp2 compilation under existing approval and
+  isolation controls. Save bounded deterministic source archives and distinct
+  provenance receipts; keep the app UI/profile separate. Add disposable Linux
+  acceptance and document remaining library controls/package distribution
+  ([#384](https://github.com/devoption/devoption/issues/384)).
+
 - Admit explicit standalone `rlib` packages for Cargo source inspection and
   immutable source snapshots, with conventional `src/lib.rs` selection and exact
   input identity. Keep library execution unavailable and document the remaining

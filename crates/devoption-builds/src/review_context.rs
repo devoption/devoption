@@ -12,6 +12,7 @@ use std::{collections::HashSet, fmt};
 pub enum Policy {
     InitialBuildV1,
     WasmBuildV1,
+    LibraryBuildV1,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -146,6 +147,7 @@ impl ReviewContext {
             &[match input.policy {
                 Policy::InitialBuildV1 => 1,
                 Policy::WasmBuildV1 => 2,
+                Policy::LibraryBuildV1 => 3,
             }],
         );
         field(&mut out, 2, input.rust_version.as_bytes());

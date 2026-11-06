@@ -31,8 +31,7 @@ iterative. These are input-validation bounds, not execution/resource permissions
   use ASCII Rust identifier syntax. Its conventional source is `src/lib.rs`;
   without `[lib]`, the source shape remains the default binary at `src/main.rs`.
   The `rlib` shape admits ordinary reusable library source for inspection and
-  immutable capture; it has no build execution profile yet
-  ([reusable packages](reusable-packages.md)). The `cdylib` shape admits the
+  immutable capture, plus the separate [library runner API](library-builds.md). The `cdylib` shape admits the
   [selected web-app manifest](decisions/0004-first-wasm-web-app.md)
   under [#231](https://github.com/devoption/devoption/issues/231), but does not
   prove a Wasm target, HTTP ABI, source presence or a successful compilation.

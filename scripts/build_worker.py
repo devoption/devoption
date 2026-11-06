@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Fixed compiler worker inside the installed systemd build boundary.
 
-stdout carries only the bounded component; stderr carries bounded compiler logs.
+stdout carries only a bounded component or fixed library completion record; stderr carries bounded compiler logs.
 Never invoke this directly as an alternative to the broker's isolation.
 """
 import os
@@ -25,7 +25,7 @@ class WorkerFailure(Exception):
         self.code = code
 
 
-def build_target(manifest):
+def target_identity(manifest, kind):
     """Select only a conventional library from the already reviewed source.
 
     The Rust snapshot validator owns full manifest/lock/source admission. Repeat
@@ -45,16 +45,43 @@ def build_target(manifest):
                 or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_-]{0,127}', name)
                 or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,127}', target)
                 or target != name.replace('-', '_')
-                or library['crate-type'] != ['cdylib']
+                or library['crate-type'] != [kind]
                 or package['build'] is not False
                 or package['edition'] not in ('2021', '2024')):
             raise ValueError('unsupported target')
     except (KeyError, TypeError, ValueError, UnicodeError):
         raise WorkerFailure(126, 'compiler manifest rejected') from None
+    return name, target
+
+
+def build_target(manifest):
+    name, target = target_identity(manifest, 'cdylib')
     command = ['/toolchain/bin/cargo', 'build', '--release', '--locked', '--offline',
                '--target', 'wasm32-wasip2', '--package', name, '--lib']
     artifact = Path('wasm32-wasip2/release') / f'{target}.wasm'
     return command, artifact
+
+
+LIBRARY_COMPLETION = b'devoption-library-build-v1\n'
+
+
+def library_commands(manifest):
+    name, _ = target_identity(manifest, 'rlib')
+    def fixed(operation):
+        return ['/toolchain/bin/cargo', operation, '--release', '--locked', '--offline',
+                '--package', name, '--lib']
+    return [fixed('build'), fixed('test'), fixed('build') + ['--target', 'wasm32-wasip2']]
+
+
+def selected_commands(manifest):
+    try:
+        kind = tomllib.loads(manifest.decode('utf-8'))['lib']['crate-type']
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        raise WorkerFailure(126, 'compiler manifest rejected') from None
+    if kind == ['rlib']:
+        return library_commands(manifest), None
+    command, artifact = build_target(manifest)
+    return [command], artifact
 
 
 def read_component_candidate(path):
@@ -72,6 +99,47 @@ def read_component_candidate(path):
                 != (after.st_size, after.st_mtime_ns, after.st_ctime_ns)):
             raise WorkerFailure(126, 'compiler component rejected')
     return data
+
+
+COMPILER_SECONDS = 55
+
+
+def run_compilers(commands, environment, source_directory='/source'):
+    """Internal fixed-command runner, with a shared wall time and output budget."""
+    retained = 0
+    deadline = time.monotonic() + COMPILER_SECONDS
+    for command in commands:
+        if time.monotonic() >= deadline:
+            raise WorkerFailure(124, 'compiler deadline reached')
+        child = subprocess.Popen(command, cwd=source_directory, env=environment,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT)
+        selector = selectors.DefaultSelector()
+        selector.register(child.stdout, selectors.EVENT_READ)
+        try:
+            while selector.get_map():
+                if time.monotonic() >= deadline:
+                    raise WorkerFailure(124, 'compiler deadline reached')
+                for key, _ in selector.select(0.1):
+                    chunk = os.read(key.fileobj.fileno(), 8192)
+                    if not chunk:
+                        selector.unregister(key.fileobj)
+                        continue
+                    available = max(0, LIMIT - retained)
+                    sys.stderr.buffer.write(chunk[:available])
+                    sys.stderr.buffer.flush()
+                    retained += len(chunk)
+                    if retained >= LIMIT:
+                        raise WorkerFailure(125, 'compiler output limit reached')
+            if child.wait(timeout=max(0.1, deadline - time.monotonic())) != 0:
+                return False
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.wait()
+            selector.close()
+            child.stdout.close()
+    return True
 
 
 def main():
@@ -119,42 +187,16 @@ def main():
         'RUSTC_WRAPPER': '', 'RUSTC_WORKSPACE_WRAPPER': '',
     }
     with Path('/source/Cargo.toml').open('rb') as source:
-        command, artifact_path = build_target(source.read(65537))
-    child = subprocess.Popen(command, cwd='/source', env=environment,
-                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT)
-    selector = selectors.DefaultSelector()
-    selector.register(child.stdout, selectors.EVENT_READ)
-    retained = 0
-    deadline = time.monotonic() + 55
-    try:
-        while selector.get_map():
-            if time.monotonic() >= deadline:
-                raise WorkerFailure(124, 'compiler deadline reached')
-            for key, _ in selector.select(0.1):
-                chunk = os.read(key.fileobj.fileno(), 8192)
-                if not chunk:
-                    selector.unregister(key.fileobj)
-                    continue
-                available = max(0, LIMIT - retained)
-                sys.stderr.buffer.write(chunk[:available])
-                sys.stderr.buffer.flush()
-                retained += len(chunk)
-                if retained >= LIMIT:
-                    raise WorkerFailure(125, 'compiler output limit reached')
-        if child.wait(timeout=max(0.1, deadline - time.monotonic())) != 0:
-            return 1
-        artifact = root / 'target' / artifact_path
-        data = read_component_candidate(artifact)
-        # The supervisor retains an independent copy only after complete cgroup stop.
-        sys.stdout.buffer.write(data)
-        sys.stdout.buffer.flush()
-        return 0
-    finally:
-        if child.poll() is None:
-            child.kill()
-            child.wait()
-        selector.close()
+        commands, artifact_path = selected_commands(source.read(65537))
+    if not run_compilers(commands, environment):
+        return 1
+    data = (read_component_candidate(root / 'target' / artifact_path)
+            if artifact_path is not None else LIBRARY_COMPLETION)
+    # The supervisor retains output only after complete cgroup stop. For a
+    # library it packages its own verified snapshot, never compiler scratch.
+    sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
+    return 0
 
 
 if __name__ == '__main__':

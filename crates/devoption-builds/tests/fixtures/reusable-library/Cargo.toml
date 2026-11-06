@@ -1,0 +1,9 @@
+[package]
+name = "reusable-fixture"
+version = "0.1.0"
+edition = "2024"
+build = false
+
+[lib]
+name = "reusable_fixture"
+crate-type = ["rlib"]

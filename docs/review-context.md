@@ -8,6 +8,11 @@ native-only. The seven directory records describe host staging identities;
 `/source`, `/toolchain`, `/vendor` and `/job` are the worker's fixed mount mapping.
 The pure context validator performs no OS enforcement.
 
+`LibraryBuildV1` uses policy tag 3 for the separate [library runner API](library-builds.md).
+It requires an `rlib` plan and the same bounded worker mapping/environment,
+with a fixed native build/unit-test/WASIp2 build sequence and source-package
+output. Neither the initial binary nor Wasm app policy admits a library plan.
+
 
 [#194](https://github.com/devoption/devoption/issues/194) replaces the arbitrary
 external digest accepted by [approval records](build-approvals.md) with immutable
@@ -94,7 +99,7 @@ Digest payloads are the raw 32 bytes. Integers use fixed-width big-endian bytes.
 
 | Tag | Payload |
 | --- | --- |
-| 1 | InitialBuildV1 policy byte `01` |
+| 1 | Policy byte: InitialBuildV1 `01`, WasmBuildV1 `02`, LibraryBuildV1 `03` |
 | 2 | Rust version |
 | 3–6 | Cargo path, Cargo hash, rustc path, rustc hash |
 | 7–11 | Toolchain manifest, catalog binding, source snapshot, dependency bundle, configuration hashes |

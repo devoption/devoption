@@ -84,8 +84,10 @@ approval, freshness check or durable plan identifier.
   The additional selected Wasm target uses the reviewed package and conventional
   `cdylib` name, Rust 1.99.0 and `wasm32-wasip2`; its fixed command ends in
   `--target wasm32-wasip2 --package PACKAGE --lib`.
-  Ordinary `rlib` source snapshots are rejected with `TargetMismatch`; source
-  admission does not supply a library execution profile.
+  Ordinary `rlib` source snapshots require the matching conventional library name
+  and Rust 1.99.0. Their fixed [library command sequence](library-builds.md) uses
+  native build/unit tests and WASIp2 build, with `source.tar` as saved output.
+  Only `LibraryBuildV1` admits their isolated execution context.
   Arbitrary Cargo flags and other target kinds are unsupported.
 - Up to 32 explicit environment entries: unique, case-sensitive POSIX-style
   names of 1–64 ASCII bytes and values of at most 1024 UTF-8 bytes without control

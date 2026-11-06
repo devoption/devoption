@@ -53,9 +53,8 @@ returns `TargetMismatch`. Plan/job equality retains the files, bytes, digest and
 Cargo proof. The earlier two-file proof alone cannot create a candidate plan.
 The planner accepts the selected `cdylib` Wasm shape through the
 [web-app build profile](web-app-builds.md). An `rlib` snapshot is admitted as
-source only and is rejected by plan validation with `TargetMismatch`, even when
-supplied package/target names match; [library execution](reusable-packages.md)
-requires a separate profile.
+a library source and selects only the separate [library build profile](library-builds.md);
+it cannot use the app execution entry point or the `WasmBuildV1` approval policy.
 
 ## Supported tree and bounds
 

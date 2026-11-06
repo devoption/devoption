@@ -63,6 +63,10 @@ installed Rust toolchain/linker are required):
 cargo test -p devoption-registry --test offline_build --locked --offline -- --ignored --nocapture
 ```
 
+The separate [library runner acceptance](library-builds.md#validation) runs only
+on an explicitly disposable Linux systemd host. Ordinary workspace tests compile
+but do not execute that privileged acceptance fixture.
+
 ## Continuous integration
 
 Code validation runs when a PR is opened, reopened, or receives new commits, on

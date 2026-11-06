@@ -15,7 +15,7 @@ not extracting or publishing the platform's internal `devoption-ui` crate.
 | Hosted app compilation | The opt-in Linux runner builds a standalone `cdylib` for `wasm32-wasip2`, after review and approval, using verified operator-prepared offline dependencies. |
 | Reusing existing crates.io packages | Exact-pinned dependencies and a complete verified archive/vendor set are supported for the web-app profile. Acquisition is separate operator setup, not a build-time download. |
 | Hosted registry identity | The registry domain distinguishes DevOption-hosted origins from crates.io, but the manifest/lock adapter accepts only crates.io dependencies. Identity metadata is not a registry service. |
-| Library build/test/package jobs | No execution profile or source-package output exists. A library source snapshot cannot select the binary or Wasm build profile. |
+| Library build/test/package jobs | The trusted-adapter `LibraryBuildV1` API compiles natively, runs inline library unit tests, compiles for WASIp2 and saves a verified-source archive. It is separate from the app UI; see [library builds](library-builds.md). |
 | Cross-project or global package distribution | No hosted index, package ingestion/publication, authenticated download or automatic dependency-update workflow exists. Path, Git and custom registry dependencies remain rejected. |
 | Other package ecosystems | No npm or general package build/publication pipeline is implemented. |
 
@@ -71,18 +71,20 @@ needs its own build and deployment to receive an update. An `rlib` is a
 compiler-specific output, not the portable source package to distribute between
 projects. No separate library runtime route is required.
 
-Source checks can start once the admission change is merged and installed, but
-passing them does not establish buildability or dependency availability. A
+Source admission is implemented, but passing source checks does not establish
+buildability or dependency availability. A
 separate library can be developed and tested with ordinary Cargo immediately;
-platform integration testing remains blocked on the following work.
+the [library runner acceptance](library-builds.md#validation) exercises that shape
+on a disposable Linux node. Wiring a real project through a user-facing library
+build action and cross-project package consumption remains outstanding.
 
 ## Remaining delivery path
 
 1. [#384: Library build and package profile](https://github.com/devoption/devoption/issues/384).
-   Add approved, bounded locked/offline library compilation/tests and a source
-   package with exact version, revision and archive digest. Exercise a trusted
-   separate library and consumer on native and Wasm targets. Preserve review,
-   approval, cancellation, history and cleanup controls.
+   The runner API now implements bounded compilation/unit tests and a canonical
+   source package with version, revision and digest. Disposable acceptance covers
+   native/Wasm compilation, a separate consumer and failure/recovery behavior.
+   User-facing library review/approval and package access remain to be integrated.
 2. [#385: Verified cross-project distribution](https://github.com/devoption/devoption/issues/385).
    Add immutable package storage/index metadata, explicit hosted registry admission,
    access/visibility and publication policy, complete verified offline dependency
@@ -90,7 +92,7 @@ platform integration testing remains blocked on the following work.
    older-version reproducibility checks. Installation-local availability and
    globally reachable distribution must be demonstrated separately.
 
-These are implementation requirements, not available services. Registry credentials,
+The remaining distribution requirements do not describe available services. Registry credentials,
 public package publication, production installation, external availability and
 access-policy changes require their own explicit authority. No existing web-app
 release artifact or DevOption product release workflow substitutes for this
