@@ -431,3 +431,104 @@ fn registered_cdylib_capture_retains_fresh_checkout_checks() {
     fs::write(f.app().join("src/lib.rs"), "changed source\n").unwrap();
     assert!(f.capture().is_err());
 }
+
+#[test]
+fn explicit_registry_bindings_survive_capture_and_change_plan_identity() {
+    use devoption_registry::{
+        CargoMaterialization, CargoOrigin, HostedRegistries, HostedRegistry, Sha256,
+    };
+    let mut f = Fixture::new();
+    let index = "sparse+https://packages.example.test/index/";
+    fs::write(
+        f.app().join("Cargo.toml"),
+        format!("{MANIFEST}\n[dependencies]\nshared={{version='=1.0.0',registry='team'}}\n"),
+    )
+    .unwrap();
+    fs::write(f.app().join("Cargo.lock"), format!("{LOCK}dependencies=['shared']\n[[package]]\nname='shared'\nversion='1.0.0'\nsource='{index}'\nchecksum='{}'\n", "1".repeat(64))).unwrap();
+    f.commit();
+    assert!(f.capture().is_err());
+    let bindings = HostedRegistries::new(vec![
+        HostedRegistry::new(RegistryId::new("team").unwrap(), index).unwrap(),
+    ])
+    .unwrap();
+    let captured = |bindings: &HostedRegistries| {
+        capture_with_registries(
+            &f.catalog,
+            f.project,
+            f.repository,
+            &f.root,
+            &f.selected,
+            RegistryId::new("fixture-registry").unwrap(),
+            bindings,
+        )
+    };
+    let source = captured(&bindings).unwrap();
+    assert!(source.request().hosted_registries() == &bindings);
+    assert!(
+        source.request().packages()[0].origin
+            == CargoOrigin::DevOption(RegistryId::new("team").unwrap())
+    );
+    let extra = HostedRegistries::new(vec![
+        bindings.bindings()[0].clone(),
+        HostedRegistry::new(
+            RegistryId::new("other").unwrap(),
+            "https://other.example.test/index",
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let changed = captured(&extra).unwrap();
+    assert!(source != changed);
+    assert!(source.sha256() == changed.sha256()); // source bytes unchanged; external policy is separate
+    let make_plan = |source: SourceSnapshot| {
+        let (_, mut input) = crate::tests::fixture();
+        input.project = f.project;
+        input.repository = f.repository;
+        input.commit = source.commit().into();
+        input.package = source.package().into();
+        input.binary = source.package().into();
+        input.dependencies = CargoMaterialization::new(
+            source.request().clone(),
+            Sha256::digest(b"fixture bundle"),
+            14,
+        );
+        input.source = source;
+        crate::BuildPlan::validate(input, &f.catalog).unwrap()
+    };
+    let first = make_plan(source);
+    let second = make_plan(changed);
+    assert!(first != second);
+    use crate::{
+        approvals::{Approvals, OwnerId},
+        jobs::{BuildJob, JobId},
+        review_context::ReviewContext,
+    };
+    // Add a policy-complete initial environment to both immutable plans while
+    // preserving the exact captured source/materialization bindings.
+    let policy = crate::review_context::tests::plan();
+    let job = |mut plan: crate::BuildPlan| {
+        plan.0.environment = policy.details().environment.clone();
+        BuildJob::queued(JobId::from_bytes([7; 16]), plan)
+    };
+    let first = job(first);
+    let second = job(second);
+    let context = |job: &BuildJob| {
+        ReviewContext::validate(job.plan(), crate::review_context::tests::input(job.plan()))
+            .unwrap()
+    };
+    let owner = OwnerId::from_bytes([1; 16]);
+    let approvals = Approvals::default();
+    let approval = approvals.approve(owner, &first, context(&first)).unwrap();
+    assert!(
+        approvals
+            .consume(&approval, owner, &second, &context(&second))
+            .is_err()
+    );
+    assert!(
+        approvals
+            .consume(&approval, owner, &first, &context(&first))
+            .is_err()
+    );
+    // No checkout compiler output was created by either inspection/capture path.
+    assert!(!f.app().join("target").exists());
+}

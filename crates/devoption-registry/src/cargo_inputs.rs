@@ -1,7 +1,9 @@
 //! Validate supplied Cargo bytes, never a checkout or proof of committedness.
 //! Supported subset and remaining source/registry proofs: docs/cargo-inputs.md.
 
-use crate::{CargoDependencyRequest, CargoOrigin, LockedPackage, RegistryId, Sha256};
+use crate::{
+    CargoDependencyRequest, CargoOrigin, HostedRegistries, LockedPackage, RegistryId, Sha256,
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -51,6 +53,7 @@ pub struct InspectedInputs {
     hashes: InputHashes,
     packages: Vec<LockedPackage>,
     target: SourceTarget,
+    hosted_registries: HostedRegistries,
 }
 
 impl InspectedInputs {
@@ -76,6 +79,7 @@ impl InspectedInputs {
             manifest_sha256: self.hashes.manifest,
             lockfile_sha256: self.hashes.lockfile,
             packages: self.packages,
+            hosted_registries: self.hosted_registries,
         }
     }
 }
@@ -83,7 +87,7 @@ impl InspectedInputs {
 /// Inspect current supplied bytes without selecting a registry or claiming that
 /// expected hashes came from an independently verified source snapshot.
 pub fn inspect(manifest: &[u8], lockfile: &[u8]) -> Result<InspectedInputs, Error> {
-    inspect_expected(manifest, lockfile, None)
+    inspect_with_registries(manifest, lockfile, &HostedRegistries::default())
 }
 
 /// Validate one standalone package, exact direct pins and a closed v4 lock graph.
@@ -95,13 +99,40 @@ pub fn validate(
     lockfile: &[u8],
     expected: InputHashes,
 ) -> Result<CargoDependencyRequest, Error> {
-    Ok(inspect_expected(manifest, lockfile, Some(expected))?.into_request(registry))
+    validate_with_registries(
+        registry,
+        manifest,
+        lockfile,
+        expected,
+        &HostedRegistries::default(),
+    )
+}
+
+/// Inspect using an explicit binding set; bindings are metadata, not access grants.
+pub fn inspect_with_registries(
+    manifest: &[u8],
+    lockfile: &[u8],
+    registries: &HostedRegistries,
+) -> Result<InspectedInputs, Error> {
+    inspect_expected(manifest, lockfile, None, registries)
+}
+
+/// Bind exact input bytes and every supplied registry mapping into the request.
+pub fn validate_with_registries(
+    registry: RegistryId,
+    manifest: &[u8],
+    lockfile: &[u8],
+    expected: InputHashes,
+    registries: &HostedRegistries,
+) -> Result<CargoDependencyRequest, Error> {
+    Ok(inspect_expected(manifest, lockfile, Some(expected), registries)?.into_request(registry))
 }
 
 fn inspect_expected(
     manifest: &[u8],
     lockfile: &[u8],
     expected: Option<InputHashes>,
+    registries: &HostedRegistries,
 ) -> Result<InspectedInputs, Error> {
     if manifest.is_empty() || lockfile.is_empty() {
         return Err(Error::MissingInput);
@@ -159,14 +190,28 @@ fn inspect_expected(
     let mut direct = BTreeMap::new();
     if let Some(dependencies) = manifest.get("dependencies") {
         for (name, value) in table(Some(dependencies))? {
-            let requirement = match value {
-                Value::String(pin) => pin.as_str(),
+            let (requirement, origin) = match value {
+                Value::String(pin) => (pin.as_str(), CargoOrigin::CratesIo),
                 Value::Table(dependency) => {
-                    keys(dependency, &["version", "default-features"])?;
-                    if dependency.get("default-features").and_then(Value::as_bool) != Some(false) {
+                    keys(dependency, &["version", "default-features", "registry"])?;
+                    if dependency
+                        .get("default-features")
+                        .is_some_and(|v| v.as_bool() != Some(false))
+                    {
                         return Err(Error::Unsupported);
                     }
-                    string(dependency.get("version"))?
+                    let origin = if let Some(value) = dependency.get("registry") {
+                        let binding = registries
+                            .named(string(Some(value))?)
+                            .ok_or(Error::Unsupported)?;
+                        CargoOrigin::DevOption(binding.id().clone())
+                    } else {
+                        if dependency.get("default-features").is_none() {
+                            return Err(Error::Unsupported);
+                        }
+                        CargoOrigin::CratesIo
+                    };
+                    (string(dependency.get("version"))?, origin)
                 }
                 _ => return Err(Error::Unsupported),
             };
@@ -174,7 +219,7 @@ fn inspect_expected(
             if !crate::package_name_valid(name) || !crate::exact_version(pin) {
                 return Err(Error::Unsupported);
             }
-            direct.insert(name.as_str(), pin);
+            direct.insert(name.as_str(), (pin, origin));
         }
     }
     if direct.len() > crate::MAX_PACKAGES {
@@ -208,20 +253,30 @@ fn inspect_expected(
         if !crate::package_name_valid(name) || !crate::exact_version(version) {
             return Err(Error::InvalidPackage);
         }
-        if let Some(source) = row.get("source") {
-            if string(Some(source))? != CRATES_IO_SOURCE {
-                return Err(Error::Unsupported);
-            }
+        let source = row.get("source").map(|v| string(Some(v))).transpose()?;
+        let origin = if let Some(source) = source {
+            let origin = if source == CRATES_IO_SOURCE {
+                CargoOrigin::CratesIo
+            } else {
+                CargoOrigin::DevOption(
+                    registries
+                        .source(source)
+                        .ok_or(Error::Unsupported)?
+                        .id()
+                        .clone(),
+                )
+            };
             let checksum = row
                 .get("checksum")
                 .and_then(Value::as_str)
                 .ok_or(Error::InvalidChecksum)?;
             packages.push(LockedPackage {
-                origin: CargoOrigin::CratesIo,
+                origin: origin.clone(),
                 name: name.into(),
                 version: version.into(),
                 archive_sha256: Sha256::from_hex(checksum).map_err(|_| Error::InvalidChecksum)?,
             });
+            Some(origin)
         } else {
             if root.replace(nodes.len()).is_some() || row.contains_key("checksum") {
                 return Err(Error::Unsupported);
@@ -229,7 +284,8 @@ fn inspect_expected(
             if name != root_name || version != root_version {
                 return Err(Error::RootMismatch);
             }
-        }
+            None
+        };
         let mut dependencies = Vec::new();
         if let Some(value) = row.get("dependencies") {
             let entries = value.as_array().ok_or(Error::InvalidInput)?;
@@ -241,7 +297,12 @@ fn inspect_expected(
             }
             for entry in entries {
                 let reference = string(Some(entry))?;
-                if reference.len() > crate::MAX_PACKAGE_NAME_BYTES + 1 + crate::MAX_VERSION_BYTES {
+                if reference.len()
+                    > crate::MAX_PACKAGE_NAME_BYTES
+                        + crate::MAX_VERSION_BYTES
+                        + crate::hosted::MAX_INDEX_BYTES
+                        + 16
+                {
                     return Err(Error::Unsupported);
                 }
                 dependencies.push(reference.to_owned());
@@ -250,6 +311,8 @@ fn inspect_expected(
         nodes.push(Node {
             name: name.into(),
             version: version.into(),
+            source: source.map(str::to_owned),
+            origin,
             dependencies,
         });
     }
@@ -258,11 +321,14 @@ fn inspect_expected(
     let edges = resolve_edges(&nodes)?;
     if edges[root].len() != direct.len()
         || edges[root].iter().any(|&i| {
-            direct.get(nodes[i].name.as_str()).is_none_or(|pin| {
-                // Cargo ignores build metadata in version requirements. Full locked
-                // versions and checksums remain in the dependency request identity.
-                release_version(pin) != release_version(&nodes[i].version)
-            })
+            direct
+                .get(nodes[i].name.as_str())
+                .is_none_or(|(pin, origin)| {
+                    // Cargo ignores build metadata in version requirements. Full locked
+                    // versions and checksums remain in the dependency request identity.
+                    release_version(pin) != release_version(&nodes[i].version)
+                        || nodes[i].origin.as_ref() != Some(origin)
+                })
         })
     {
         return Err(Error::DependencyMismatch);
@@ -274,6 +340,7 @@ fn inspect_expected(
         hashes: actual,
         packages,
         target,
+        hosted_registries: registries.clone(),
     })
 }
 
@@ -286,36 +353,61 @@ fn release_version(version: &str) -> &str {
 struct Node {
     name: String,
     version: String,
+    source: Option<String>,
+    origin: Option<CargoOrigin>,
     dependencies: Vec<String>,
 }
 
 fn resolve_edges(nodes: &[Node]) -> Result<Vec<Vec<usize>>, Error> {
     let mut names: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
-    let mut exact = BTreeMap::new();
+    let mut exact: BTreeMap<(&str, &str), Vec<usize>> = BTreeMap::new();
+    let mut sourced = BTreeMap::new();
     for (i, node) in nodes.iter().enumerate() {
         names.entry(&node.name).or_default().push(i);
-        if exact
-            .insert((node.name.as_str(), node.version.as_str()), i)
+        exact
+            .entry((&node.name, &node.version))
+            .or_default()
+            .push(i);
+        if sourced
+            .insert(
+                (
+                    node.name.as_str(),
+                    node.version.as_str(),
+                    node.source.as_deref(),
+                ),
+                i,
+            )
             .is_some()
         {
             return Err(Error::AmbiguousDependency);
         }
     }
+    let unique = |entries: Option<&Vec<usize>>| match entries.map(Vec::as_slice) {
+        Some([only]) => Ok(*only),
+        Some(_) => Err(Error::AmbiguousDependency),
+        None => Err(Error::MissingDependency),
+    };
     let mut edges = Vec::new();
     for node in nodes {
         let mut seen = BTreeSet::new();
         let mut targets = Vec::new();
         for reference in &node.dependencies {
-            let parts: Vec<_> = reference.split(' ').take(3).collect();
+            let parts: Vec<_> = reference.split(' ').take(4).collect();
             let target = match parts.as_slice() {
-                [name] => match names.get(name).map(Vec::as_slice) {
-                    Some([only]) => *only,
-                    Some(_) => return Err(Error::AmbiguousDependency),
-                    None => return Err(Error::MissingDependency),
-                },
-                [name, version] if !name.is_empty() && !version.is_empty() => *exact
-                    .get(&(*name, *version))
-                    .ok_or(Error::MissingDependency)?,
+                [name] => unique(names.get(name))?,
+                [name, version] if !name.is_empty() && !version.is_empty() => {
+                    unique(exact.get(&(*name, *version)))?
+                }
+                [name, version, source] if !name.is_empty() && !version.is_empty() => {
+                    let source = source
+                        .strip_prefix('(')
+                        .and_then(|s| s.strip_suffix(')'))
+                        .filter(|s| !s.is_empty())
+                        .ok_or(Error::Unsupported)?;
+                    *sourced
+                        .get(&(*name, *version, Some(source)))
+                        .ok_or(Error::MissingDependency)?
+                }
                 _ => return Err(Error::Unsupported),
             };
             if !seen.insert(target) {
@@ -419,3 +511,6 @@ impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod hosted_tests;

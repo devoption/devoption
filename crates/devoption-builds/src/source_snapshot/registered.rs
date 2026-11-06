@@ -1,5 +1,5 @@
 //! Explicit registered-repository adapter; no approval, extraction or execution.
-use super::{Object, ObjectKind, SourceSnapshot, verify};
+use super::{Object, ObjectKind, SourceSnapshot, verify_with_registries};
 use devoption_projects::{
     Catalog, ProjectId, RepositoryId,
     worktree::{GitSourceKind, PermittedRoot},
@@ -19,6 +19,28 @@ pub fn capture(
     selected_commit: &str,
     registry: RegistryId,
 ) -> Result<SourceSnapshot, Error> {
+    capture_with_registries(
+        catalog,
+        project,
+        repository,
+        root,
+        selected_commit,
+        registry,
+        &devoption_registry::HostedRegistries::default(),
+    )
+}
+
+/// The caller supplies independently selected registry bindings. No index URL is
+/// discovered from the checkout or contacted, and no build is authorized.
+pub fn capture_with_registries(
+    catalog: &Catalog,
+    project: ProjectId,
+    repository: RepositoryId,
+    root: &PermittedRoot,
+    selected_commit: &str,
+    registry: RegistryId,
+    registries: &devoption_registry::HostedRegistries,
+) -> Result<SourceSnapshot, Error> {
     let raw = catalog
         .source_objects(project, repository, root, selected_commit)
         .map_err(Error::Repository)?;
@@ -33,8 +55,14 @@ pub fn capture(
             bytes: object.bytes(),
         })
         .collect();
-    let source =
-        verify(registry, selected_commit, raw.commit(), &objects).map_err(Error::Snapshot)?;
+    let source = verify_with_registries(
+        registry,
+        selected_commit,
+        raw.commit(),
+        &objects,
+        registries,
+    )
+    .map_err(Error::Snapshot)?;
     let files: Vec<_> = source
         .files()
         .iter()

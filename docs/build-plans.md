@@ -16,7 +16,9 @@ Every plan also carries an immutable [Cargo dependency descriptor](registry-cont
 from the DevOption registry contract added in
 [#119](https://github.com/devoption/devoption/issues/119). The descriptor records
 manifest/lockfile input hashes, claimed package checksums, original source and serving-registry identity,
-and bundle digest/size. Every field participates in plan equality. No lockfile or
+and bundle digest/size. Every field participates in plan equality. The request also retains the complete
+explicit [hosted registry binding set](hosted-cargo-inputs.md), when supplied
+through the separate source-proof APIs; the current service does not supply one. No lockfile or
 dependency bytes are read or verified here, and no direct-public-fetch fallback exists.
 The separate [supplied-byte adapter](cargo-inputs.md) validates a narrow Cargo
 subset into that descriptor. It does not verify committed source or actual archives.

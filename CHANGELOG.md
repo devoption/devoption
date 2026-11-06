@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add explicit canonical hosted-registry bindings to Cargo input/source-proof
+  APIs and immutable request identity. Resolve source-qualified lock references
+  without conflating identical names/versions across origins; retain empty-policy
+  refusal in existing service callers. Prove two offline Cargo consumers,
+  version update/older-version reuse and missing/corrupt archive refusal with
+  actual generated lockfiles; hosted storage/access/serving remain separate work
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Connect authenticated project build review/approval to the captured library
   profile and show all native/test/WASIp2 commands and source-package output.
   Add scoped archive/receipt downloads that recheck retained success, directory

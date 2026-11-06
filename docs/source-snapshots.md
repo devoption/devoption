@@ -148,3 +148,17 @@ without printing paths, source content or OS error details. Disposable tests cov
 packed/linked storage, binary/nested files, hidden-dirty source, revision/binding
 changes, unsupported inputs, protocol bounds and unchanged catalog/index/source.
 No test builds or executes repository code.
+
+
+## Explicit hosted registry bindings
+
+`verify_with_registries` and the registered adapter's `capture_with_registries`
+accept an independently selected [binding set](hosted-cargo-inputs.md), propagate
+it through root Cargo membership and retain it in the owned dependency request.
+They still verify every source object and compare all checkout bytes. Registry
+names/index identities are never discovered from repository `.cargo` files.
+Changing supplied bindings changes snapshot/plan equality and invalidates approval;
+the source-only SHA-256 remains unchanged when all source bytes are unchanged.
+Existing entry points pass an empty set and refuse hosted packages. These new
+APIs introduce no registry lookup, access grant, physical materialization or
+production runner configuration.

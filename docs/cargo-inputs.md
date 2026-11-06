@@ -11,6 +11,10 @@ hashes, source-target shape and dependency count to the [source preparation flow
 `validate` retains its expected-hash check and explicit registry identity; neither
 entry point proves source provenance or archive availability.
 
+The separate `inspect_with_registries` and `validate_with_registries` entry points
+accept an explicit bounded [hosted registry binding set](hosted-cargo-inputs.md).
+Existing callers use an empty set and continue to reject hosted dependencies.
+
 The adapter hashes the exact bytes with pinned `sha2` and parses them with pinned
 `toml`. Parser errors become fixed diagnostics that omit input text. TOML's
 default recursion limits remain enabled. Size limits apply before hashing or
@@ -51,22 +55,24 @@ iterative. These are input-validation bounds, not execution/resource permissions
   Package entries permit only `name`, `version`, `source`, `checksum` and
   `dependencies`. Exactly one entry has no source: it must match the manifest's
   package name/version and must not have a checksum.
-- Every other package must use Cargo's canonical crates.io lock source,
+- With an empty binding set, every other package must use Cargo's canonical crates.io lock source,
   `registry+https://github.com/rust-lang/crates.io-index`, and contain a complete
   lowercase SHA-256 archive checksum. This string identifies original provenance;
   it is never used as a network destination. Acquisition remains behind DevOption's
   registry interface.
 - Lock references are either a unique exact package name or `name version`.
-  Qualified references support multiple locked versions. Missing or ambiguous
+  Qualified references support multiple locked versions. Exact
+  `name version (source)` references also disambiguate registry origins; the
+  source must exactly match an admitted lock entry. Missing or ambiguous
   references, repeated edges, duplicate registry coordinates, cycles and entries
   unreachable from the root are rejected. Root edges must exactly match the
   manifest's direct pins. Dependency-free packages are supported.
 
 Everything outside that subset is rejected rather than ignored: workspaces and
-workspace inheritance, path/Git/private registry dependencies, other dependency tables,
+workspace inheritance, path/Git and unconfigured private registry dependencies, other dependency tables,
 renames, optional dependencies, features, target conditions, dev/build dependencies,
 patches/replacements, profiles, other explicit targets, other manifest metadata/keys,
-source-qualified lock references and other lockfile versions. Even benign metadata
+malformed or unresolved source-qualified lock references and other lockfile versions. Even benign metadata
 such as a package description is currently outside this narrow adapter. It cannot
 consume DevOption's own workspace manifest.
 
