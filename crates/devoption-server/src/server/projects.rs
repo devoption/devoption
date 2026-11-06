@@ -20,6 +20,7 @@ mod execution;
 mod files;
 pub(super) mod history;
 mod managed;
+mod packages;
 mod pages;
 pub(super) mod retention;
 mod secrets;
@@ -229,6 +230,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         .merge(execution::routes(projects.clone()))
         .merge(deployment::routes(projects.clone()))
         .merge(history::routes(projects.clone()))
+        .merge(packages::routes(projects.clone()))
         .merge(creation)
         .route(
             "/projects/{project}/name",

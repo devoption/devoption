@@ -14,7 +14,9 @@ use std::{
     os::unix::fs::MetadataExt,
 };
 mod codec;
+mod library_packages;
 mod logs;
+pub use library_packages::LibraryPackage;
 mod retention;
 pub use retention::RetentionStatus;
 const RECORD: &str = "build-history.bin";

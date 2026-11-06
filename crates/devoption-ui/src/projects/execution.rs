@@ -2,6 +2,7 @@ use super::render::action_status;
 use super::{ProjectSection, ProjectSummary, escape_into, identifier};
 pub struct BuildExecutionView {
     pub repository: [u8; 16],
+    pub library: bool,
     pub token: Option<String>,
     pub review: Vec<(String, String)>,
     pub running: bool,
@@ -16,8 +17,17 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildExecutionView) -
     );
     let ready = view.token.is_some() && !view.running;
     let mut html = super::workspace::navigation(project, ProjectSection::Builds);
-    html.push_str(&format!(r#"<section class="build-review" id="build-execution" data-base="{base}" aria-labelledby="build-review-title"><header class="build-review-heading"><h2 id="build-review-title">Review your build</h2><p>Build the committed app into a web app component (Wasm).</p></header>"#));
-    if ready {
+    let description = if view.library {
+        "Compile and test the committed library, then save its source package."
+    } else if ready {
+        "Build the committed app into a web app component (Wasm)."
+    } else {
+        "Prepare a supported web app or Rust library for review."
+    };
+    html.push_str(&format!(r#"<section class="build-review" id="build-execution" data-base="{base}" aria-labelledby="build-review-title"><header class="build-review-heading"><h2 id="build-review-title">Review your build</h2><p>{description}</p></header>"#));
+    if ready && view.library {
+        html.push_str(r#"<ol class="build-review-stages" aria-label="Library build stages"><li>Source <span>Captured</span></li><li aria-current="step">Build <span>Compile and test</span></li><li>Package <span>Save source</span></li></ol>"#);
+    } else if ready {
         html.push_str(r#"<ol class="build-review-stages" aria-label="Delivery stages"><li>Source <span>Captured</span></li><li aria-current="step">Build <span>Review and approve</span></li><li>Release <span>Next, after success</span></li><li>Deploy <span>Separate approval</span></li></ol>"#);
     }
     html.push_str(r#"<div class="build-review-layout"><div class="build-review-main">"#);
@@ -44,7 +54,22 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildExecutionView) -
             "Commit",
             commit.as_deref().unwrap_or("Unavailable"),
         );
-        summary_row(&mut html, "Output", "Web app component (Wasm)");
+        summary_row(
+            &mut html,
+            "Output",
+            if view.library {
+                "Library source package (.tar)"
+            } else {
+                "Web app component (Wasm)"
+            },
+        );
+        if view.library {
+            summary_row(
+                &mut html,
+                "Validation",
+                "Native compilation and unit tests; WASIp2 compilation",
+            );
+        }
         if let Some(limits) = field(view, "Build limits") {
             summary_row(&mut html, "Build limits", limits);
         }
@@ -62,7 +87,12 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildExecutionView) -
             escape_into(&mut html, value);
             html.push_str("</pre></dd></div>");
         }
-        html.push_str(r#"</dl></details></div><aside class="build-review-next" aria-labelledby="build-next-title"><h3 id="build-next-title">What happens next</h3><ol><li><strong>Compile the reviewed source</strong><p>Use the reviewed command and limits in an isolated worker.</p></li><li><strong>Save the build result</strong><p>Check saved status and output in build history.</p></li><li><strong>Review a release separately</strong><p>Save a successful build in Releases. Deployment requires its own approval.</p></li></ol></aside></div><div class="build-review-approval"><div><strong>Only approve source and dependencies you trust.</strong><p>Approval is single-use and expires after five minutes. Changed source or prepared inputs require a new review.</p></div><div class="build-review-actions"><button class="action-button primary" data-build-action="approve" data-token=""#);
+        if view.library {
+            html.push_str(r#"</dl></details></div><aside class="build-review-next" aria-labelledby="build-next-title"><h3 id="build-next-title">What happens next</h3><ol><li><strong>Compile and test the library</strong><p>Run the reviewed native build and unit tests, then check WASIp2 compilation.</p></li><li><strong>Save the source package</strong><p>After success, download the verified source archive and build receipt from the saved attempt.</p></li><li><strong>Distribute separately</strong><p>This build does not publish a crate or deploy an app. Cross-project registry distribution is not available yet.</p></li></ol></aside>"#);
+        } else {
+            html.push_str(r#"</dl></details></div><aside class="build-review-next" aria-labelledby="build-next-title"><h3 id="build-next-title">What happens next</h3><ol><li><strong>Compile the reviewed source</strong><p>Use the reviewed command and limits in an isolated worker.</p></li><li><strong>Save the build result</strong><p>Check saved status and output in build history.</p></li><li><strong>Review a release separately</strong><p>Save a successful build in Releases. Deployment requires its own approval.</p></li></ol></aside>"#);
+        }
+        html.push_str(r#"</div><div class="build-review-approval"><div><strong>Only approve source and dependencies you trust.</strong><p>Approval is single-use and expires after five minutes. Changed source or prepared inputs require a new review.</p></div><div class="build-review-actions"><button class="action-button primary" data-build-action="approve" data-token=""#);
         escape_into(&mut html, token);
         html.push_str(r#"">Approve and build</button><button class="text-button" data-build-action="prepare">Prepare new review</button></div></div>"#);
     } else if view.available {
@@ -100,6 +130,7 @@ mod tests {
         };
         let mut view = BuildExecutionView {
             repository: [2; 16],
+            library: false,
             token: None,
             review: vec![],
             running: false,
@@ -172,6 +203,7 @@ mod tests {
         };
         let view = BuildExecutionView {
             repository: [2; 16],
+            library: false,
             token: Some("cd".repeat(16)),
             running: false,
             available: true,
@@ -195,12 +227,53 @@ mod tests {
         (project, view)
     }
 
+    fn library_capture_view() -> (ProjectSummary<'static>, BuildExecutionView) {
+        let (mut project, mut view) = capture_view();
+        project.name = "Reusable library";
+        project.repositories[0].name = "shared-components";
+        view.library = true;
+        for (key, value) in &mut view.review {
+            match key.as_str() {
+                "Command inside isolated worker" => *value = [
+                    "/toolchain/bin/cargo build --release --locked --offline --package shared-components --lib",
+                    "/toolchain/bin/cargo test --release --locked --offline --package shared-components --lib",
+                    "/toolchain/bin/cargo build --release --locked --offline --package shared-components --lib --target wasm32-wasip2",
+                ].join("\n"),
+                "Artifact" => *value = "source.tar".into(),
+                "Policy" => *value = "LibraryBuildV1: native compilation and unit tests, then WASIp2 compilation; one shared 60-second limit; 512 MiB RAM; no network; 4 MiB source package.".into(),
+                _ => {},
+            }
+        }
+        (project, view)
+    }
+
+    #[test]
+    fn library_review_identifies_all_commands_and_source_output_without_deployment_steps() {
+        let (project, view) = library_capture_view();
+        let html = content(&project, &view);
+        assert!(html.contains("Library source package (.tar)"));
+        assert!(html.contains("Native compilation and unit tests; WASIp2 compilation"));
+        for (_, value) in &view.review {
+            assert!(html.contains(value));
+        }
+        assert!(html.contains("does not publish a crate or deploy an app"));
+        assert!(!html.contains("Deployment requires its own approval"));
+        assert!(!html.contains("<li>Deploy"));
+        assert!(html.contains("data-build-action=\"approve\""));
+    }
+
     #[test]
     #[ignore = "explicit synthetic build review screenshot fixture; executes no build"]
     fn manual_build_review_fixture() {
         let directory = std::env::var_os("DEVOPTION_BUILD_REVIEW_CAPTURE_DIR")
             .expect("explicit existing output directory");
         let directory = std::path::Path::new(&directory);
+        let (library, library_view) = library_capture_view();
+        std::fs::write(
+            directory.join("library.html"),
+            crate::render_build_execution(&library, &library_view),
+        )
+        .unwrap();
         let (project, mut view) = capture_view();
         std::fs::write(
             directory.join("index.html"),

@@ -5,7 +5,7 @@ use devoption_projects::ProjectId;
 use rustix::fs::{AtFlags, Dir, unlinkat};
 use std::{ffi::CStr, io, path::Path};
 
-fn key(prefix: &str, id: JobId) -> String {
+pub(super) fn key(prefix: &str, id: JobId) -> String {
     let hex: String = id.to_bytes().iter().map(|b| format!("{b:02x}")).collect();
     format!("build-{prefix}-{hex}.bin")
 }
@@ -367,13 +367,17 @@ impl History {
     }
 }
 
-fn token(name: &str) -> bool {
+pub(super) fn token(name: &str) -> bool {
     name.len() == 32
         && name
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn same_child(parent: &File, name: impl rustix::path::Arg, child: &File) -> Result<(), Error> {
+pub(super) fn same_child(
+    parent: &File,
+    name: impl rustix::path::Arg,
+    child: &File,
+) -> Result<(), Error> {
     let now = File::from(openat(parent, name, READ, Mode::empty()).map_err(|_| Error::Changed)?);
     if identity(&now)? != identity(child)? {
         return Err(Error::Changed);

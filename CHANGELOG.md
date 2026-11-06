@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Connect authenticated project build review/approval to the captured library
+  profile and show all native/test/WASIp2 commands and source-package output.
+  Add scoped archive/receipt downloads that recheck retained success, directory
+  identity, provenance and bytes under retention serialization; extend real
+  Linux HTTP acceptance and library UI captures
+  ([#384](https://github.com/devoption/devoption/issues/384)).
+
 - Add a separate `LibraryBuildV1` trusted-adapter API for fixed offline native
   library builds/unit tests and WASIp2 compilation under existing approval and
   isolation controls. Save bounded deterministic source archives and distinct

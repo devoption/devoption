@@ -486,3 +486,22 @@ fn retention_settings_require_owner_csrf_and_persist_project_specific_limits() {
         .unwrap();
     assert_eq!(save("2", true, true, &f.project), StatusCode::FORBIDDEN);
 }
+
+#[test]
+fn library_package_routes_require_a_session_and_scope_before_reading_files() {
+    let f = fixture(true);
+    for suffix in ["package", "package/receipt"] {
+        let path = format!(
+            "/projects/{}/builds/attempts/{}/{suffix}",
+            f.project,
+            "03".repeat(16)
+        );
+        assert_eq!(read(&f, &path, false).0, StatusCode::SEE_OTHER);
+        // These historical fixtures have no configured runner/artifact root.
+        assert_eq!(read(&f, &path, true).0, StatusCode::SERVICE_UNAVAILABLE);
+        let foreign = path.replace(&f.project, &f.other);
+        assert_eq!(read(&f, &foreign, true).0, StatusCode::NOT_FOUND);
+        let invalid = path.replace(&"03".repeat(16), "not-an-attempt");
+        assert_eq!(read(&f, &invalid, true).0, StatusCode::NOT_FOUND);
+    }
+}

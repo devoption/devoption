@@ -30,6 +30,11 @@ pub enum SourceTarget {
 }
 
 impl SourceTarget {
+    /// Ordinary Rust library, distinct from a deployable cdylib component.
+    pub fn is_library(&self) -> bool {
+        matches!(self, Self::Rlib { .. })
+    }
+
     pub fn path(&self) -> &'static str {
         match self {
             Self::Binary => "src/main.rs",

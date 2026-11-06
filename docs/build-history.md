@@ -333,3 +333,15 @@ covers authentication/logout, project scoping, stale catalog associations, inval
 IDs, missing/corrupt logs, unsafe Host/mutation methods, HEAD and output escaping.
 The [screenshot guide](screenshots/README.md) describes synthetic history fixtures;
 those records are display tests, not evidence of successful builds.
+
+
+## Retained library source downloads
+
+Successful library attempts can expose verified local source-package and receipt
+downloads when the configured runner root and retained files are available.
+These reads check the saved project/repository/attempt, owned directory binding,
+private file types/permissions, receipt provenance and actual archive digest/size,
+while serialized against retention. Unsafe or changed retained state refuses a
+download without rewriting the historical outcome. App, failed, pruned and
+unbound legacy attempts have no library package. See [library builds](library-builds.md#use-the-project-interface)
+for the controls, limits and distinction from registry publication.

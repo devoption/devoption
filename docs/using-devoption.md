@@ -162,6 +162,9 @@ arbitrary commits and Git hosting remain unavailable. The selected
 web app has an opt-in [Linux build workflow](web-app-builds.md) and
 [private same-node deployment](web-app-deployments.md).
 
+Standalone reusable Rust libraries have a separate [review, build and source-download flow](library-builds.md).
+Registry publication and cross-project package distribution remain unimplemented.
+
 Projects displays saved names, repository names and counts from the
 [catalog](project-catalog.md). Open a project name to see its repositories,
 or use **Filter projects by name** to find a case-insensitive name fragment in the

@@ -64,7 +64,9 @@ read-only host staging, reserved storage and recovery, is specified in the
 `InitialBuildV1` proposal below remains a contract, not a native runner. The separate
 [`LibraryBuildV1` API](library-builds.md) uses the existing isolated worker for
 native library compilation/unit tests and WASIp2 compilation, with source-archive
-output. It adds no HTTP action or implicit app-build authority.
+output. Its [project controls](library-builds.md#use-the-project-interface) retain
+explicit authenticated approval under the shared workspace policy; source-package
+downloads are scoped read-only operations.
 
 ## Required review and approval contract
 

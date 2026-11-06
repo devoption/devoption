@@ -29,10 +29,10 @@ mod profile;
 pub use platform_updates::{PlatformUpdates, UpgradeNotice};
 mod projects;
 pub use projects::{
-    BuildAttemptView, BuildExecutionView, BuildHistoryView, BuildLogView, DeploymentView,
-    EnvironmentSecretsView, FileEntry, FilePreview, HistoryAvailability, PreparationCheck,
-    PreparationView, ProjectSection, ProjectSummary, ReleaseView, RepositoryFilesView,
-    RepositorySummary, SecretEventView, SecretMetadataView,
+    BuildAttemptView, BuildExecutionView, BuildHistoryView, BuildLogView, BuildPackageView,
+    DeploymentView, EnvironmentSecretsView, FileEntry, FilePreview, HistoryAvailability,
+    PreparationCheck, PreparationView, ProjectSection, ProjectSummary, ReleaseView,
+    RepositoryFilesView, RepositorySummary, SecretEventView, SecretMetadataView,
 };
 
 const HOME: &str = r#"<section class="empty-state"><h2>Start with a project</h2><p>Create a project to organize your source code, builds and app releases.</p><a class="action-button primary" href="/projects">Open Projects <span aria-hidden="true">→</span></a></section>"#;

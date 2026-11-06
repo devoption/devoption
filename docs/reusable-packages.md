@@ -15,7 +15,7 @@ not extracting or publishing the platform's internal `devoption-ui` crate.
 | Hosted app compilation | The opt-in Linux runner builds a standalone `cdylib` for `wasm32-wasip2`, after review and approval, using verified operator-prepared offline dependencies. |
 | Reusing existing crates.io packages | Exact-pinned dependencies and a complete verified archive/vendor set are supported for the web-app profile. Acquisition is separate operator setup, not a build-time download. |
 | Hosted registry identity | The registry domain distinguishes DevOption-hosted origins from crates.io, but the manifest/lock adapter accepts only crates.io dependencies. Identity metadata is not a registry service. |
-| Library build/test/package jobs | The trusted-adapter `LibraryBuildV1` API compiles natively, runs inline library unit tests, compiles for WASIp2 and saves a verified-source archive. It is separate from the app UI; see [library builds](library-builds.md). |
+| Library build/test/package jobs | The trusted-adapter `LibraryBuildV1` API compiles natively, runs inline library unit tests, compiles for WASIp2 and saves a verified-source archive. The project interface selects this profile from captured source and provides verified local archive/receipt downloads; see [library builds](library-builds.md). |
 | Cross-project or global package distribution | No hosted index, package ingestion/publication, authenticated download or automatic dependency-update workflow exists. Path, Git and custom registry dependencies remain rejected. |
 | Other package ecosystems | No npm or general package build/publication pipeline is implemented. |
 
@@ -75,8 +75,8 @@ Source admission is implemented, but passing source checks does not establish
 buildability or dependency availability. A
 separate library can be developed and tested with ordinary Cargo immediately;
 the [library runner acceptance](library-builds.md#validation) exercises that shape
-on a disposable Linux node. Wiring a real project through a user-facing library
-build action and cross-project package consumption remains outstanding.
+on a disposable Linux node. A real supported library can use that project build/download flow once installed.
+Cross-project package consumption remains outstanding.
 
 ## Remaining delivery path
 
@@ -84,7 +84,8 @@ build action and cross-project package consumption remains outstanding.
    The runner API now implements bounded compilation/unit tests and a canonical
    source package with version, revision and digest. Disposable acceptance covers
    native/Wasm compilation, a separate consumer and failure/recovery behavior.
-   User-facing library review/approval and package access remain to be integrated.
+   Authenticated project review/approval and retained package/receipt downloads
+   now use the same lifecycle. Registry ingestion remains the next separate step.
 2. [#385: Verified cross-project distribution](https://github.com/devoption/devoption/issues/385).
    Add immutable package storage/index metadata, explicit hosted registry admission,
    access/visibility and publication policy, complete verified offline dependency

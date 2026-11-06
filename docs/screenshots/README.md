@@ -21,6 +21,10 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Repository file | `/projects/{id}/repositories/{id}/files/src/main.rs` | frontend highlighted source with expanded src folder; 1280 × 900 | `repository-file.jpg` |
 | Project builds | `/projects/{id}/builds` | Synthetic saved attempt states; runner unconfigured; 1280 × 1200 | `project-builds.jpg` |
 | Build review | `/projects/{id}/builds/{repository}/run` | Synthetic prepared review, technical details collapsed; 1280 × 1200 | `build-review.jpg` |
+| Library build review | Synthetic explicit `rlib` review | No executed library or publication; 1280 × 1400 | `build-library-review.jpg` |
+| Library source checks | Synthetic `rlib` source observations | No source inspection or execution; 1280 × 1400 | `build-library-source.jpg` |
+| Library build list | Synthetic configured build list | Shared app/library action; no executed build; 1280 × 1200 | `build-library-list.jpg` |
+| Library saved package | Synthetic saved success/download presentation | No actual downloadable archive in capture; 1280 × 1200 | `build-library-succeeded.jpg` |
 | Successful build | `/projects/{id}/builds/attempts/{id}` | Synthetic saved success record; no output checkpoint or executed build; 1280 × 1200 | `build-succeeded.jpg` |
 | Build attempt | `/projects/{id}/builds/attempts/{id}` | Interrupted synthetic record, saved streams, source details collapsed; 1280 × 1200 | `build-attempt.jpg` |
 | Truncated output | `/projects/{id}/builds/attempts/{id}` | Failed synthetic record with inert script/ANSI/bidi text; 1280 × 1200 | `build-output-truncated.jpg` |
@@ -200,6 +204,14 @@ fixture into an existing temporary directory:
 ```sh
 DEVOPTION_BUILD_REVIEW_CAPTURE_DIR=ABSOLUTE_TEMPORARY_DIRECTORY cargo test -p devoption-ui manual_build_review_fixture --locked --offline -- --ignored --nocapture
 ```
+
+The fixture additionally writes `library.html` for `build-library-review.jpg`.
+Use `manual_library_history_fixture` with the same output variable for
+`library-builds.html` and `library-succeeded.html`; the source-readiness fixture
+writes `library-source.html`. These are synthetic renderer inputs with no live
+owner action, build or downloadable archive. Capture the library review/source
+at **1280 × 1400** and history/list at **1280 × 1200**. Library execution and
+authenticated downloads are tested separately by the disposable Linux checker.
 
 Serve only that directory on loopback and open `index.html` for `build-review.jpg`
 at **1280 × 1200**, with technical details collapsed. The fixture also writes

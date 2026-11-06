@@ -13,6 +13,7 @@ pub struct PreparationView<'a> {
     pub commit: Option<&'a str>,
     pub branch: Option<&'a str>,
     pub execution_available: bool,
+    pub library: bool,
     pub package: Option<(&'a str, &'a str, usize)>,
     pub checks: Vec<PreparationCheck<'a>>,
     pub unavailable: Option<&'a str>,
@@ -72,7 +73,12 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &PreparationView<'_>) 
         !view.checks.is_empty() && view.checks.iter().all(|c| c.outcome == "Passed");
     let mut files = String::new();
     let mut html = super::workspace::navigation(project, ProjectSection::Builds);
-    html.push_str(r#"<section class="source-readiness" aria-labelledby="source-readiness-title"><header class="source-readiness-heading"><h2 id="source-readiness-title">Review your source</h2><p>Inspect the checkout before preparing a build.</p></header><ol class="source-readiness-stages" aria-label="Delivery stages"><li aria-current="step">Source <span>Inspect checkout</span></li><li>Build <span>Review and approve</span></li><li>Release <span>Save a successful build</span></li><li>Deploy <span>Separate approval</span></li></ol><div class="source-readiness-layout"><div class="source-readiness-main"><p class="source-readiness-label">Repository</p><h3>"#);
+    let stages = if view.library {
+        r#"<li>Package <span>Save verified source</span></li>"#
+    } else {
+        r#"<li>Release <span>Save a successful build</span></li><li>Deploy <span>Separate approval</span></li>"#
+    };
+    html.push_str(&format!(r#"<section class="source-readiness" aria-labelledby="source-readiness-title"><header class="source-readiness-heading"><h2 id="source-readiness-title">Review your source</h2><p>Inspect the checkout before preparing a build.</p></header><ol class="source-readiness-stages" aria-label="Delivery stages"><li aria-current="step">Source <span>Inspect checkout</span></li><li>Build <span>Review and approve</span></li>{stages}</ol><div class="source-readiness-layout"><div class="source-readiness-main"><p class="source-readiness-label">Repository</p><h3>"#));
     escape_into(&mut html, view.repository_name);
     html.push_str(r#"</h3><dl class="source-identity"><div><dt>Branch</dt><dd>"#);
     escape_into(
@@ -157,13 +163,20 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &PreparationView<'_>) 
     } else if !git_ready {
         html.push_str(&format!(r#"<h3 id="source-next-title">Resolve source changes</h3><p>Review the commit and working-tree observations. Update or commit this checkout using your Git tools, then refresh source.</p><a class="action-button primary" href="/projects/{id}/code">Open Code</a>"#));
     } else if view.execution_available {
-        html.push_str(r#"<h3 id="source-next-title">Next: prepare a build</h3><p>Continue to the web-app build page to capture committed source and review the build settings.</p>"#);
+        html.push_str(r#"<h3 id="source-next-title">Next: prepare a build</h3><p>"#);
+        html.push_str(if view.library { "Continue to the library build page to capture committed source and review compilation, tests and source packaging." } else { "Continue to the web-app build page to capture committed source and review the build settings." });
+        html.push_str("</p>");
         if !initial_passed {
-            html.push_str(r#"<p class="source-readiness-problem">The initial file checks need attention. They use a binary-source format; web-app build review validates its supported source layout separately.</p>"#);
+            html.push_str(r#"<p class="source-readiness-problem">The initial file checks need attention. Build review validates the complete supported source layout and prepared inputs separately.</p>"#);
         }
         html.push_str(&format!(r#"<a class="action-button primary" href="{url}/run">Continue to build review</a><p class="source-next-note">Opening the page does not prepare, approve or run a build.</p>"#));
     } else {
-        html.push_str(&format!(r#"<h3 id="source-next-title">Build runner not enabled</h3><p>Source inspection is available. An administrator must enable the Linux web-app build runner before a build review can be prepared.</p><a class="text-button" href="/projects/{id}/code">Open Code</a>"#));
+        let runner = if view.library {
+            "Linux library build runner"
+        } else {
+            "Linux web-app build runner"
+        };
+        html.push_str(&format!(r#"<h3 id="source-next-title">Build runner not enabled</h3><p>Source inspection is available. An administrator must enable the {runner} before a build review can be prepared.</p><a class="text-button" href="/projects/{id}/code">Open Code</a>"#));
     }
     html.push_str(r#"<div class="source-git-guidance"><h4>Pushing a change?</h4><p>DevOption reads the attached server checkout. Update and commit it using your Git tools, then refresh source here.</p></div></aside>"#);
     html.push_str(&files);
@@ -192,7 +205,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &PreparationView<'_>) 
     for check in &view.checks {
         check_row(&mut html, check, check.label, None);
     }
-    html.push_str(r#"</ol><p>The initial checks inspect a supported standalone package: tracked Cargo.toml, version-4 Cargo.lock and the declared nonempty src/main.rs or src/lib.rs. Each inspected text file is limited to 64 KiB. These checks do not verify compiler validity, dependency availability or complete committed bytes.</p><p>The opt-in web-app build review checks its supported library source, toolchain and prepared dependencies independently before approval. A passing source report is not build admission.</p><a class="text-button" href="https://github.com/devoption/devoption/blob/main/docs/build-preparation.md" target="_blank" rel="noopener noreferrer">Source inspection limits</a></details>"#);
+    html.push_str(r#"</ol><p>The initial checks inspect a supported standalone package: tracked Cargo.toml, version-4 Cargo.lock and the declared nonempty src/main.rs or src/lib.rs. Each inspected text file is limited to 64 KiB. These checks do not verify compiler validity, dependency availability or complete committed bytes.</p><p>Build review checks the selected app or library profile, toolchain and prepared dependencies independently before approval. A passing source report is not build admission.</p><a class="text-button" href="https://github.com/devoption/devoption/blob/main/docs/build-preparation.md" target="_blank" rel="noopener noreferrer">Source inspection limits</a></details>"#);
     html.push_str(&format!(r#"<footer class="source-readiness-links"><a class="text-button" href="/projects/{id}/builds">Back to Builds</a><a class="text-button" href="/projects/{id}/code">Browse source in Code</a></footer></section>"#));
     html
 }

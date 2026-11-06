@@ -26,7 +26,14 @@ pub enum BuildLogView {
         limit_reached: bool,
     },
 }
+pub enum BuildPackageView {
+    NotAvailable,
+    Available,
+    Unavailable,
+}
+
 pub struct BuildHistoryView {
+    pub package: BuildPackageView,
     pub attempts: Vec<BuildAttemptView>,
     pub availability: HistoryAvailability,
     pub selected: Option<[u8; 16]>,
@@ -38,7 +45,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> 
     let mut html = super::workspace::navigation(project, ProjectSection::Builds);
     let base = format!("/projects/{}/builds", identifier(&project.id));
     if view.selected.is_none() && view.execution_available {
-        html.push_str("<section class=\"build-preparation\"><h2>Build web app</h2><p>Prepare, review and build the committed app. Only one build runs at a time.</p><ul>");
+        html.push_str("<section class=\"build-preparation\"><h2>Build app or library</h2><p>Prepare, review and build committed source. Only one build runs at a time.</p><ul>");
         for repository in &project.repositories {
             html.push_str(&format!(
                 "<li><a class=\"text-button\" href=\"{}/{}/run\">",
@@ -46,7 +53,7 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> 
                 identifier(&repository.id)
             ));
             escape_into(&mut html, repository.name);
-            html.push_str(" · Build app</a></li>");
+            html.push_str(" · Build</a></li>");
         }
         html.push_str("</ul></section>");
     }
@@ -72,12 +79,22 @@ pub(crate) fn content(project: &ProjectSummary<'_>, view: &BuildHistoryView) -> 
                 code_row(&mut html, label, &value);
             }
             if let Some((digest, bytes)) = &attempt.artifact {
-                code_row(&mut html, "Recorded component SHA-256", digest);
+                code_row(&mut html, "Recorded artifact SHA-256", digest);
                 html.push_str(&format!(
-                    "<div><dt>Component size</dt><dd>{bytes} bytes</dd></div>"
+                    "<div><dt>Artifact size</dt><dd>{bytes} bytes</dd></div>"
                 ));
             }
-            html.push_str("</dl></details><h3>Saved output</h3><p class=\"preparation-note\">This is the last saved checkpoint, not a live stream. Output alone does not prove completion. No artifact download is available.</p>");
+            html.push_str("</dl></details>");
+            match view.package {
+                BuildPackageView::Available => html.push_str(&format!(r#"<section aria-labelledby="library-package-title"><h3 id="library-package-title">Library source package</h3><p>The retained archive and receipt match this successful attempt. Downloads recheck their identity and checksum. This download does not publish a crate.</p><a class="text-button" href="{base}/attempts/{}/package">Download source package</a><a class="text-button" href="{base}/attempts/{}/package/receipt">Download build receipt</a></section>"#, identifier(&id), identifier(&id))),
+                BuildPackageView::Unavailable => html.push_str(r#"<p role="status">The retained package could not be verified. No download is available. Inspect retained files before retrying.</p>"#),
+                BuildPackageView::NotAvailable => {},
+            }
+            html.push_str("<h3>Saved output</h3><p class=\"preparation-note\">This is the last saved checkpoint, not a live stream. Output alone does not prove completion.");
+            if matches!(view.package, BuildPackageView::NotAvailable) {
+                html.push_str(" No artifact download is available.");
+            }
+            html.push_str("</p>");
             match &view.log {
                 BuildLogView::Missing => {
                     html.push_str("<p>No output checkpoint was saved for this attempt.</p>")
@@ -175,6 +192,7 @@ mod tests {
             repositories: vec![],
         };
         let mut view = BuildHistoryView {
+            package: BuildPackageView::NotAvailable,
             attempts: vec![],
             availability: HistoryAvailability::Available,
             selected: None,
@@ -219,5 +237,54 @@ mod tests {
         assert!(html.contains("No bytes saved for this stream"));
         assert!(html.contains("aria-current=\"page\""));
         assert!(!html.contains(">Run build<"));
+    }
+}
+
+#[cfg(test)]
+mod captures {
+    use super::*;
+    #[test]
+    #[ignore = "explicit synthetic library history screenshot fixture; no executed build"]
+    fn manual_library_history_fixture() {
+        let directory = std::path::PathBuf::from(
+            std::env::var_os("DEVOPTION_BUILD_REVIEW_CAPTURE_DIR")
+                .expect("explicit output directory"),
+        );
+        let project = ProjectSummary {
+            id: [1; 16],
+            name: "Reusable library",
+            repositories: vec![super::super::RepositorySummary {
+                id: [2; 16],
+                name: "shared-components",
+                default_checkout: None,
+            }],
+        };
+        let mut view = BuildHistoryView {
+            package: BuildPackageView::Available,
+            attempts: vec![BuildAttemptView {
+                id: [3; 16],
+                repository: "shared-components".into(),
+                commit: "50ade5be0f9eaf56f039815032518ca9e358f669".into(),
+                source: "34".repeat(32),
+                state: "Succeeded",
+                artifact: Some(("56".repeat(32), 4096)),
+                explanation: "Synthetic saved success for layout inspection; no library ran in this fixture.",
+            }],
+            availability: HistoryAvailability::Available,
+            selected: Some([3; 16]),
+            log: BuildLogView::Missing,
+            source_available: true,
+            execution_available: true,
+        };
+        let html = crate::render_build_history(&project, &view);
+        assert!(html.contains("Download source package"));
+        assert!(html.contains("/package/receipt"));
+        std::fs::write(directory.join("library-succeeded.html"), html).unwrap();
+        view.selected = None;
+        std::fs::write(
+            directory.join("library-builds.html"),
+            crate::render_build_history(&project, &view),
+        )
+        .unwrap();
     }
 }

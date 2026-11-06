@@ -40,6 +40,7 @@ pub(super) fn routes(projects: Projects) -> Router {
             commit: report.and_then(|r| r.status.commit.as_deref()),
             branch: report.and_then(|r| r.status.branch.as_deref()),
             execution_available,
+            library: report.and_then(|r| r.cargo.as_ref()).is_some_and(|c| c.target().is_library()),
             package: report.and_then(|r| r.cargo.as_ref()).map(|c| (c.package(), c.version(), c.dependency_count())),
             checks: report.map(|r| r.checks.iter().map(|c| PreparationCheck { label: c.label, outcome: match c.outcome { Outcome::Passed => "Passed", Outcome::ChangesNeeded => "Needs changes", Outcome::Unavailable => "Unavailable" }, detail: &c.detail }).collect()).unwrap_or_default(),
             unavailable,

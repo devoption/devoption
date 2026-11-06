@@ -38,6 +38,10 @@ pub(super) async fn show(
     project: ProjectId,
     attempt: Option<JobId>,
 ) -> axum::response::Response {
+    let config = match projects.execution.as_ref() {
+        Some(engine) => Some(engine.lock().await.config.clone()),
+        None => None,
+    };
     // Match startup lock order: history, then catalog. Move guards into the
     // blocking task so disconnected requests cannot release serialization early.
     let history = match projects.history.clone() {
@@ -58,6 +62,7 @@ pub(super) async fn show(
             .find(|p| p.id() == project)
             .ok_or(StatusCode::NOT_FOUND)?;
         let mut view = BuildHistoryView {
+            package: devoption_ui::BuildPackageView::NotAvailable,
             attempts: Vec::new(),
             availability: HistoryAvailability::Unconfigured,
             selected: attempt.map(JobId::to_bytes),
@@ -115,6 +120,15 @@ pub(super) async fn show(
                     if let Some(id) = attempt {
                         if !view.attempts.iter().any(|r| r.id == id.to_bytes()) {
                             return Err(StatusCode::NOT_FOUND);
+                        }
+                        if let Some(config) = &config {
+                            view.package = match config.retention_lock().ok().and_then(|_lock| {
+                                history.library_package(id, config.work_root()).ok()
+                            }) {
+                                Some(Some(_)) => devoption_ui::BuildPackageView::Available,
+                                Some(None) => devoption_ui::BuildPackageView::NotAvailable,
+                                None => devoption_ui::BuildPackageView::Unavailable,
+                            };
                         }
                         view.log = match history.load_output(id) {
                             Ok(None) => BuildLogView::Missing,
