@@ -113,3 +113,6 @@ separate from Cargo registry archives and serving. It remains open for Cargo
 package ingestion/storage/index metadata, explicit
 promotion/publication policy, project access and version/yank/recovery behavior,
 verified runner materialization and two consumers through the actual platform.
+The separate [Cargo generator](cargo-package-generation.md) now produces candidate
+archive/index bytes and proves native offline consumption of those artifacts,
+without implementing the registry service or platform integration.

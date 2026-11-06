@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Generate bounded deterministic Cargo `.crate` archives and candidate index
+  metadata from verified library plans, normalizing exact dependency registry
+  identities while preserving the original manifest/source provenance. Prove
+  two offline consumers, version update/older-version rebuild and missing/corrupt
+  refusal with generated packages. Publication, storage/serving and platform
+  consumer integration remain separate ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Add a private immutable library source-staging API with exact registry/version,
   project/repository and source provenance, bounded checksum-verified persistence,
   idempotent retry and overwrite/alias refusal. Preserve interrupted-write evidence

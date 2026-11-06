@@ -117,6 +117,8 @@ A package version or digest does not itself authorize publication.
 The separate [source-staging API](library-source-staging.md) can privately retain
 canonical archives from verified source plans. It does not import retained build
 receipts or attest build success, and is not connected to this download flow.
+The [Cargo generator](cargo-package-generation.md) produces candidate `.crate` and
+index bytes from library plans; publication/registry ingestion remain separate.
 
 ## Validation
 

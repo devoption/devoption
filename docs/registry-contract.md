@@ -11,6 +11,8 @@ service. The [Cargo adapter](cargo-inputs.md) and explicit
 bindings do not grant access or enable the existing service's hosted-source path.
 The separate [library source-staging API](library-source-staging.md) retains private
 canonical source archives/provenance, without Cargo ingestion, serving or publication.
+The [Cargo generator](cargo-package-generation.md) creates candidate archive/index
+bytes from verified library plans, without registry mutation or publication.
 
 The crate is independent of the build/server crates. `devoption-builds` retains
 the complete request/materialization in plans, while production source checks

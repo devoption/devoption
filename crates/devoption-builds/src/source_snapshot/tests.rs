@@ -53,7 +53,13 @@ impl ProofFixture {
         ])
     }
     pub fn verify(&self) -> Result<SourceSnapshot, Error> {
-        verify(
+        self.verify_with_registries(&devoption_registry::HostedRegistries::default())
+    }
+    pub(crate) fn verify_with_registries(
+        &self,
+        registries: &devoption_registry::HostedRegistries,
+    ) -> Result<SourceSnapshot, Error> {
+        super::verify_with_registries(
             RegistryId::new("fixture-registry").unwrap(),
             &hex(&cargo_source::object_id("commit", &self.commit).unwrap()),
             &self.commit,
@@ -62,6 +68,7 @@ impl ProofFixture {
                 .iter()
                 .map(|(kind, bytes)| Object { kind: *kind, bytes })
                 .collect::<Vec<_>>(),
+            registries,
         )
     }
 }
