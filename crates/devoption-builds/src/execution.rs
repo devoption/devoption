@@ -302,6 +302,39 @@ pub fn prepare(
     source: SourceSnapshot,
     history: &mut History,
 ) -> io::Result<Review> {
+    if !matches!(
+        source.target(),
+        devoption_registry::cargo_inputs::SourceTarget::Cdylib { .. }
+    ) {
+        return Err(io::Error::other(
+            "app execution requires a Wasm HTTP library",
+        ));
+    }
+    prepare_profile(config, catalog, project, repository, source, history)
+}
+
+/// Trusted adapter entry point, separate from the app UI. Calling prepare grants
+/// no execution authority; execute still requires an explicit authenticated action.
+pub fn prepare_library(
+    config: &Configuration,
+    catalog: &Catalog,
+    project: ProjectId,
+    repository: RepositoryId,
+    source: SourceSnapshot,
+    history: &mut History,
+) -> io::Result<Review> {
+    crate::library::source_package(&source)?;
+    prepare_profile(config, catalog, project, repository, source, history)
+}
+
+fn prepare_profile(
+    config: &Configuration,
+    catalog: &Catalog,
+    project: ProjectId,
+    repository: RepositoryId,
+    source: SourceSnapshot,
+    history: &mut History,
+) -> io::Result<Review> {
     config.revalidate()?;
     if source.request().lockfile_sha256() != config.lock_hash {
         return Err(io::Error::other(
@@ -381,7 +414,8 @@ pub fn prepare(
         );
         let package = source.package().to_owned();
         let binary = match source.target() {
-            devoption_registry::cargo_inputs::SourceTarget::Cdylib { name } => name.clone(),
+            devoption_registry::cargo_inputs::SourceTarget::Cdylib { name }
+            | devoption_registry::cargo_inputs::SourceTarget::Rlib { name } => name.clone(),
             _ => return Err(io::Error::other("build execution requires a Wasm library")),
         };
         let plan = BuildPlan::validate(
@@ -411,7 +445,11 @@ pub fn prepare(
         let context = ReviewContext::validate(
             &plan,
             review_context::Input {
-                policy: review_context::Policy::WasmBuildV1,
+                policy: if plan.is_library() {
+                    review_context::Policy::LibraryBuildV1
+                } else {
+                    review_context::Policy::WasmBuildV1
+                },
                 rust_version: "1.99.0".into(),
                 cargo: review_context::Executable {
                     path: "/toolchain/bin/cargo".into(),
@@ -657,6 +695,11 @@ pub fn execute(
     let _ = stderr.join();
     // Even successful completion must establish that the complete owned unit stopped.
     review.configuration.stop_previous()?;
+    let valid_output = if review.job.plan().is_library() {
+        artifact == crate::library::COMPLETION
+    } else {
+        artifact.len() >= 8 && artifact[..8] == *b"\0asm\x0d\0\x01\0"
+    };
     let state = if cancel.load(Ordering::SeqCst) {
         State::Cancelled
     } else if let Some(failure) = reason {
@@ -670,11 +713,22 @@ pub fn execute(
             Some(126) => Failure::ArtifactRejected,
             _ => Failure::ExitFailure,
         })
-    } else if artifact.len() < 8 || artifact[..8] != *b"\0asm\x0d\0\x01\0" {
+    } else if !valid_output {
         State::Failed(Failure::ArtifactRejected)
     } else {
+        let library = review.job.plan().is_library();
+        let artifact = if library {
+            crate::library::source_package(&review.job.plan().details().source)?
+        } else {
+            artifact
+        };
+        let filename = if library {
+            "source.tar"
+        } else {
+            "component.wasm"
+        };
         let digest = Sha256::digest(&artifact);
-        let path = review.directory.join("artifact/component.wasm");
+        let path = review.directory.join("artifact").join(filename);
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -683,7 +737,7 @@ pub fn execute(
         file.write_all(&artifact)?;
         file.sync_all()?;
         let receipt = format!(
-            "version = 2\njob = \"{}\"\nproject = \"{}\"\nrepository = \"{}\"\ncommit = \"{}\"\nsource_sha256 = \"{}\"\nreview_sha256 = \"{}\"\nartifact_sha256 = \"{}\"\nartifact_bytes = {}\nartifact = \"component.wasm\"\n",
+            "version = 2\njob = \"{}\"\nproject = \"{}\"\nrepository = \"{}\"\ncommit = \"{}\"\nsource_sha256 = \"{}\"\nreview_sha256 = \"{}\"\nartifact_sha256 = \"{}\"\nartifact_bytes = {}\nartifact = \"{filename}\"\n",
             hex(&review.job.id().to_bytes()),
             hex(&review.job.plan().details().project.to_bytes()),
             hex(&review.job.plan().details().repository.to_bytes()),
@@ -694,8 +748,17 @@ pub fn execute(
             artifact.len()
         );
         let context = review.context.details();
+        let profile = if library {
+            format!(
+                "build_policy = \"LibraryBuildV1\"\ntarget = \"native+wasm32-wasip2\"\npackage = \"{}\"\npackage_version = \"{}\"\npackage_format = \"ustar-source-v1\"\n",
+                review.job.plan().details().source.package(),
+                review.job.plan().details().source.version()
+            )
+        } else {
+            "build_policy = \"WasmBuildV1\"\ntarget = \"wasm32-wasip2\"\nabi = \"wasi:http/proxy@0.2.4\"\n".into()
+        };
         let receipt = format!(
-            "{receipt}toolchain_sha256 = \"{}\"\ndependency_sha256 = \"{}\"\nconfiguration_sha256 = \"{}\"\nbuild_policy = \"WasmBuildV1\"\ntarget = \"wasm32-wasip2\"\nabi = \"wasi:http/proxy@0.2.4\"\n",
+            "{receipt}toolchain_sha256 = \"{}\"\ndependency_sha256 = \"{}\"\nconfiguration_sha256 = \"{}\"\n{profile}",
             hex(context.toolchain_manifest.bytes()),
             hex(context.dependency_bundle.bytes()),
             hex(context.configuration.bytes())

@@ -70,6 +70,64 @@ class ArtifactTests(unittest.TestCase):
         with self.assertRaises(WorkerFailure):
             read_component_candidate(self.path)
 
+class LibraryTests(unittest.TestCase):
+    def test_library_has_three_fixed_commands_and_no_component_path(self):
+        from build_worker import selected_commands
+        original = Path('examples/static-site/Cargo.toml').read_bytes()
+        manifest = original.replace(b'["cdylib"]', b'["rlib"]')
+        commands, artifact = selected_commands(manifest)
+        self.assertIsNone(artifact)
+        base = ['--release', '--locked', '--offline', '--package', 'sample-site', '--lib']
+        self.assertEqual(commands, [['/toolchain/bin/cargo', 'build'] + base,
+                                    ['/toolchain/bin/cargo', 'test'] + base,
+                                    ['/toolchain/bin/cargo', 'build'] + base + ['--target', 'wasm32-wasip2']])
+        with self.assertRaises(WorkerFailure):
+            build_target(manifest)
+        self.assertEqual(selected_commands(original)[0], [build_target(original)[0]])
+
+    def test_library_target_substitution_is_rejected(self):
+        from build_worker import library_commands
+        original = Path('examples/static-site/Cargo.toml').read_bytes().replace(b'["cdylib"]', b'["rlib"]')
+        for manifest in [original.replace(b'sample_site', b'other'),
+                         original.replace(b'["rlib"]', b'["rlib", "cdylib"]'),
+                         original.replace(b'[lib]', b'[lib]\npath = "../other.rs"'),
+                         original.replace(b'build = false', b'build = true'),
+                         original + b'\n[workspace]\n', b'x' * 65537]:
+            with self.subTest(manifest=manifest[:100]), self.assertRaises(WorkerFailure):
+                library_commands(manifest)
+
+
+class CompilerSequenceTests(unittest.TestCase):
+    def run_commands(self, sources, limit=1048576, seconds=55):
+        import io
+        import sys
+        from unittest.mock import patch
+        import build_worker
+        output = io.TextIOWrapper(io.BytesIO())
+        with tempfile.TemporaryDirectory() as directory, \
+                patch.object(build_worker, 'LIMIT', limit), \
+                patch.object(build_worker, 'COMPILER_SECONDS', seconds), \
+                patch.object(build_worker.sys, 'stderr', output):
+            result = build_worker.run_compilers([[sys.executable, '-c', source] for source in sources],
+                                                {}, directory)
+        output.flush()
+        return result, output.buffer.getvalue()
+
+    def test_failed_phase_stops_later_commands(self):
+        result, output = self.run_commands(['print("build")', 'raise SystemExit(1)', 'print("must not run")'])
+        self.assertFalse(result)
+        self.assertEqual(output, b'build\n')
+
+    def test_log_budget_is_shared_across_phases(self):
+        with self.assertRaises(WorkerFailure) as failure:
+            self.run_commands(['print("12345678")'] * 2, limit=16)
+        self.assertEqual(failure.exception.code, 125)
+
+    def test_one_deadline_covers_the_whole_sequence(self):
+        with self.assertRaises(WorkerFailure) as failure:
+            self.run_commands(['import time; time.sleep(0.15)'] * 3, seconds=0.25)
+        self.assertEqual(failure.exception.code, 124)
+
 
 if __name__ == '__main__':
     unittest.main()

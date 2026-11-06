@@ -152,6 +152,9 @@ jobs:
       - name: Build and serve a named app with embedded assets on the disposable runner
         if: matrix.suite == 'bundle'
         run: python3 scripts/check_named_web_app.py --disposable-system-host --runtime target/release/devoption-runtime
+      - name: Build, test and package a reusable library on the disposable runner
+        if: matrix.suite == 'bundle'
+        run: python3 scripts/check_library_build.py --disposable-system-host --binary target/release/devoption
       - name: Prepare unified installer acceptance inputs from the selected source build
         if: matrix.suite == 'bundle'
         run: python3 scripts/check_app_installation.py --prepare "$RUNNER_TEMP/app-install-inputs" --binary target/release/devoption --runtime target/release/devoption-runtime --caddy-archive "$RUNNER_TEMP/devoption-proxy-test/caddy.tar.gz"

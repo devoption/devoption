@@ -74,6 +74,16 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(broker.load_release(self.config, old_id), legacy)
         self.assertEqual({p.name: (p.stat().st_ino, p.stat().st_mode, p.read_bytes()) for p in old.iterdir()}, original)
 
+    def test_library_source_package_cannot_be_promoted_as_an_app(self):
+        self.receipt.update(artifact='source.tar', build_policy='LibraryBuildV1',
+                            target='native+wasm32-wasip2', package='reusable-fixture',
+                            package_version='0.1.0', package_format='ustar-source-v1')
+        self.receipt.pop('abi')
+        self.write_receipt()
+        with self.assertRaises(ValueError):
+            self.promote()
+        self.assertEqual(list(self.config['state'].iterdir()), [])
+
     def test_old_receipt_and_mismatched_history_provenance_are_rejected(self):
         self.receipt['version'] = 1; self.write_receipt()
         with self.assertRaises(ValueError): self.promote()
