@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Admit explicit standalone `rlib` packages for Cargo source inspection and
+  immutable source snapshots, with conventional `src/lib.rs` selection and exact
+  input identity. Keep library execution unavailable and document the remaining
+  cross-project package build/distribution work
+  ([#383](https://github.com/devoption/devoption/issues/383)).
+
 - Add owner-controlled per-project build retention (default 10), durable completion
   ordering, protected saved-release/in-flight exceptions, resumable verified-path
   cleanup and compact audit metadata with ID non-reuse. Reclaim eligible source,

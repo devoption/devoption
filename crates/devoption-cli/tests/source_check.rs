@@ -332,3 +332,27 @@ fn missing_duplicate_unknown_relative_and_non_hex_arguments_exit_two() {
         assert!(!text.contains(f.base.to_str().unwrap()));
     }
 }
+
+#[test]
+fn reusable_library_source_check_requires_lib_source_and_never_compiles() {
+    let f = Fixture::new();
+    f.seed();
+    let manifest = format!(
+        "{}\n[lib]\nname = 'fixture_app'\ncrate-type = ['rlib']\n",
+        MANIFEST
+    );
+    fs::write(f.app().join("Cargo.toml"), manifest).unwrap();
+    fs::rename(f.app().join("src/main.rs"), f.app().join("src/lib.rs")).unwrap();
+    f.git(&["add", "--all"]);
+    f.git(&["commit", "-m", "Library fixture"]);
+    let before = fs::read(f.app().join("src/lib.rs")).unwrap();
+    let text = report(f.check(), 0);
+    assert!(text.contains("src/lib.rs: passed"));
+    assert!(!text.contains("src/main.rs:"));
+    assert_eq!(before, fs::read(f.app().join("src/lib.rs")).unwrap());
+    assert!(!f.app().join("target").exists());
+    fs::remove_file(f.app().join("src/lib.rs")).unwrap();
+    f.git(&["add", "--all"]);
+    f.git(&["commit", "-m", "Missing library fixture"]);
+    assert!(report(f.check(), 1).contains("src/lib.rs: changes needed"));
+}

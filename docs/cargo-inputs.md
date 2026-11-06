@@ -25,11 +25,15 @@ iterative. These are input-validation bounds, not execution/resource permissions
   and `build`; all are required. Edition is `2021` or `2024`, and `build = false`
   disables automatic root build-script discovery. Package names and versions use
   the [registry contract's bounds](registry-contract.md#source-identity-and-bounds).
-- An optional `[lib]` must contain exactly `name` and `crate-type = ["cdylib"]`.
+- An optional `[lib]` must contain exactly `name` and either `crate-type = ["cdylib"]` or
+  `crate-type = ["rlib"]`.
   Its name must equal the package name with hyphens replaced by underscores and
   use ASCII Rust identifier syntax. Its conventional source is `src/lib.rs`;
   without `[lib]`, the source shape remains the default binary at `src/main.rs`.
-  This admits the [selected web-app manifest](decisions/0004-first-wasm-web-app.md)
+  The `rlib` shape admits ordinary reusable library source for inspection and
+  immutable capture; it has no build execution profile yet
+  ([reusable packages](reusable-packages.md)). The `cdylib` shape admits the
+  [selected web-app manifest](decisions/0004-first-wasm-web-app.md)
   under [#231](https://github.com/devoption/devoption/issues/231), but does not
   prove a Wasm target, HTTP ABI, source presence or a successful compilation.
 - Direct dependencies are string-valued exact pins, such as `http = "=1.2.3"`,

@@ -97,6 +97,11 @@ path/Git dependencies and unsupported manifest keys fail this check. The report
 shows the actual inspected package name/version and locked registry dependency
 count. It does not select a registry or manufacture materialization metadata.
 
+Explicit conventional `rlib` packages also select `src/lib.rs`, following the
+[Cargo input subset](cargo-inputs.md). This enables source preparation for a
+separate reusable library repository; [library execution and package distribution](reusable-packages.md)
+remain separate work.
+
 The selected entry point is checked for tracked text presence only. Its Rust
 syntax, target semantics and buildability are not checked. Tests deliberately use
 invalid Rust text to establish that this check does not invoke a compiler. The

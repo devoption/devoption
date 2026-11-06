@@ -480,7 +480,7 @@ fn cdylib_requires_one_conventional_named_library() {
     for changed in [
         manifest.replace("name = 'ExampleService'", "name = 'different'"),
         manifest.replace("crate-type = ['cdylib']", "crate-type = ['cdylib', 'rlib']"),
-        manifest.replace("crate-type = ['cdylib']", "crate-type = ['rlib']"),
+        manifest.replace("crate-type = ['cdylib']", "crate-type = ['dylib']"),
         manifest.replace("crate-type = ['cdylib']", "crate-type = []"),
         manifest.replace("crate-type = ['cdylib']", "crate-type = 'cdylib'"),
         manifest.replace("crate-type = ['cdylib']", ""),
@@ -522,4 +522,60 @@ fn exact_requirements_ignore_only_build_metadata_and_keep_full_locked_identity()
             assert_eq!(result.err(), Some(Error::DependencyMismatch));
         }
     }
+}
+
+#[test]
+fn reusable_library_inputs_preserve_hashes_and_dependency_checks() {
+    let manifest = format!(
+        "{}\n[lib]\nname = 'ExampleService'\ncrate-type = ['rlib']\n",
+        text(MANIFEST)
+    );
+    let inputs = inspect(manifest.as_bytes(), LOCK).unwrap();
+    assert_eq!(
+        inputs.target(),
+        &SourceTarget::Rlib {
+            name: "ExampleService".into()
+        }
+    );
+    assert_eq!(inputs.target().path(), "src/lib.rs");
+    let request = check(manifest.as_bytes(), LOCK).unwrap();
+    let binary = check(MANIFEST, LOCK).unwrap();
+    assert!(request.packages() == binary.packages());
+    assert!(request.manifest_sha256() != binary.manifest_sha256());
+    assert_eq!(
+        validate(
+            RegistryId::new("fixture-registry").unwrap(),
+            manifest.as_bytes(),
+            LOCK,
+            hashes(MANIFEST, LOCK)
+        )
+        .err(),
+        Some(Error::HashMismatch)
+    );
+    let mismatch = manifest.replace("=1.2.3", "=1.2.4");
+    assert_eq!(
+        check(mismatch.as_bytes(), LOCK).err(),
+        Some(Error::DependencyMismatch)
+    );
+    for replacement in [
+        "['rlib', 'cdylib']",
+        "['staticlib']",
+        "['proc-macro']",
+        "[]",
+        "'rlib'",
+    ] {
+        assert!(inspect(manifest.replace("['rlib']", replacement).as_bytes(), LOCK).is_err());
+    }
+    for addition in ["path = 'other.rs'", "proc-macro = true"] {
+        assert!(inspect(format!("{manifest}{addition}\n").as_bytes(), LOCK).is_err());
+    }
+    assert!(
+        inspect(
+            manifest
+                .replace("name = 'ExampleService'", "name = 'different'")
+                .as_bytes(),
+            LOCK
+        )
+        .is_err()
+    );
 }

@@ -717,3 +717,17 @@ fn named_wasm_approval_is_invalidated_by_a_rename_or_asset_edit() {
         );
     }
 }
+
+#[test]
+fn reusable_library_admission_cannot_select_a_binary_or_wasm_build() {
+    let (catalog, mut input) = fixture();
+    input.source = source_snapshot::tests::ProofFixture::library("rlib")
+        .verify()
+        .unwrap();
+    input.commit = input.source.commit().into();
+    input.dependencies = dependencies(&input.source);
+    input.package = input.source.package().into();
+    input.binary = "ExampleService".into();
+    input.rust_version = "1.99.0".into();
+    rejected(&catalog, input, Error::TargetMismatch);
+}

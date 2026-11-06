@@ -131,6 +131,8 @@ impl BuildPlan {
             return Err(Error::InvalidTarget);
         }
         let target_matches = match input.source.target() {
+            // Library source admission does not grant an execution profile.
+            devoption_registry::cargo_inputs::SourceTarget::Rlib { .. } => false,
             devoption_registry::cargo_inputs::SourceTarget::Binary => {
                 Some(input.binary.as_str()) == input.source.binary()
             }
