@@ -11,7 +11,9 @@
 use std::{cmp::Ordering, fmt};
 
 pub mod cargo_inputs;
+pub mod hosted;
 pub mod seeded;
+pub use hosted::{HostedRegistries, HostedRegistry};
 
 pub const MAX_REGISTRY_ID_BYTES: usize = 64;
 pub const MAX_PACKAGE_NAME_BYTES: usize = 64;
@@ -103,6 +105,7 @@ pub struct CargoDependencyRequest {
     manifest_sha256: Sha256,
     lockfile_sha256: Sha256,
     packages: Vec<LockedPackage>,
+    hosted_registries: HostedRegistries,
 }
 
 impl CargoDependencyRequest {
@@ -118,7 +121,12 @@ impl CargoDependencyRequest {
             manifest_sha256,
             lockfile_sha256,
             packages,
+            hosted_registries: HostedRegistries::default(),
         })
+    }
+
+    pub fn hosted_registries(&self) -> &HostedRegistries {
+        &self.hosted_registries
     }
 
     pub fn registry(&self) -> &RegistryId {

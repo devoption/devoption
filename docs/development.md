@@ -60,8 +60,13 @@ On Linux, also run the explicit trusted fixture build (GNU `timeout` and the
 installed Rust toolchain/linker are required):
 
 ```sh
-cargo test -p devoption-registry --test offline_build --locked --offline -- --ignored --nocapture
+cargo test -p devoption-registry --test offline_build --test hosted_offline --locked --offline -- --ignored --nocapture
 ```
+
+The hosted-registry fixture additionally runs on Unix with just
+`--test hosted_offline`. It builds trusted temporary Cargo projects against
+separate local source replacements, without registry services or downloads; see
+[the proof and its limits](hosted-cargo-inputs.md#validation).
 
 The separate [library runner acceptance](library-builds.md#validation) runs only
 on an explicitly disposable Linux systemd host. Ordinary workspace tests compile

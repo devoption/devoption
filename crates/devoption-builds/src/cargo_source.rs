@@ -54,6 +54,22 @@ pub fn verify_root(
     selected_commit: &str,
     proof: RootProof<'_>,
 ) -> Result<RootCargoSource, Error> {
+    verify_root_with_registries(
+        registry,
+        selected_commit,
+        proof,
+        &devoption_registry::HostedRegistries::default(),
+    )
+}
+
+/// Explicit registry mappings are retained in the verified request. They must
+/// come from a separately authorized integration, not repository configuration.
+pub fn verify_root_with_registries(
+    registry: RegistryId,
+    selected_commit: &str,
+    proof: RootProof<'_>,
+    registries: &devoption_registry::HostedRegistries,
+) -> Result<RootCargoSource, Error> {
     for (bytes, limit) in [
         (proof.commit, MAX_COMMIT_BYTES),
         (proof.tree, MAX_TREE_BYTES),
@@ -74,7 +90,7 @@ pub fn verify_root(
     let (manifest, lockfile) = root_entries(proof.tree)?;
     require_object("blob", proof.manifest, manifest)?;
     require_object("blob", proof.lockfile, lockfile)?;
-    let request = cargo_inputs::validate(
+    let request = cargo_inputs::validate_with_registries(
         registry,
         proof.manifest,
         proof.lockfile,
@@ -82,6 +98,7 @@ pub fn verify_root(
             manifest: Sha256::digest(proof.manifest),
             lockfile: Sha256::digest(proof.lockfile),
         },
+        registries,
     )
     .map_err(Error::CargoInputs)?;
     Ok(RootCargoSource {

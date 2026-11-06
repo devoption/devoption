@@ -119,6 +119,24 @@ pub fn verify(
     commit: &[u8],
     objects: &[Object<'_>],
 ) -> Result<SourceSnapshot, Error> {
+    verify_with_registries(
+        registry,
+        selected_commit,
+        commit,
+        objects,
+        &devoption_registry::HostedRegistries::default(),
+    )
+}
+
+/// Capture source and exact external registry bindings as one owned value. This
+/// verifies consistency and object membership, not registry access authorization.
+pub fn verify_with_registries(
+    registry: RegistryId,
+    selected_commit: &str,
+    commit: &[u8],
+    objects: &[Object<'_>],
+    registries: &devoption_registry::HostedRegistries,
+) -> Result<SourceSnapshot, Error> {
     if commit.is_empty()
         || commit.len() > cargo_source::MAX_COMMIT_BYTES
         || objects.len() > MAX_OBJECTS
@@ -179,7 +197,7 @@ pub fn verify(
     };
     let manifest = file("Cargo.toml")?;
     let lockfile = file("Cargo.lock")?;
-    let cargo = cargo_source::verify_root(
+    let cargo = cargo_source::verify_root_with_registries(
         registry,
         selected_commit,
         RootProof {
@@ -188,9 +206,10 @@ pub fn verify(
             manifest,
             lockfile,
         },
+        registries,
     )?;
-    let inputs =
-        cargo_inputs::inspect(manifest, lockfile).map_err(cargo_source::Error::CargoInputs)?;
+    let inputs = cargo_inputs::inspect_with_registries(manifest, lockfile, registries)
+        .map_err(cargo_source::Error::CargoInputs)?;
     if !crate::target_name(inputs.package()) {
         return Err(Error::UnsupportedTarget);
     }

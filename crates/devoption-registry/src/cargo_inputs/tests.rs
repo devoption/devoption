@@ -354,10 +354,12 @@ fn missing_ambiguous_or_duplicate_references_never_guess_a_package() {
     );
     let source_qualified =
         text(LOCK).replace("bytes 1.0.0", &format!("bytes 1.0.0 ({CRATES_IO_SOURCE})"));
-    assert_eq!(
-        check(MANIFEST, source_qualified.as_bytes()).err(),
-        Some(Error::Unsupported)
+    assert!(check(MANIFEST, source_qualified.as_bytes()).is_ok());
+    let unknown = source_qualified.replace(
+        CRATES_IO_SOURCE,
+        "registry+https://unknown.example.test/index",
     );
+    assert!(check(MANIFEST, unknown.as_bytes()).is_err());
 }
 
 #[test]
