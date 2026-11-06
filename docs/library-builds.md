@@ -114,6 +114,9 @@ This archive is a local verified source package, not a published Cargo `.crate`.
 Registry ingestion must validate it, establish namespace/visibility/version policy
 and prepare the registry archive/index under [#385](https://github.com/devoption/devoption/issues/385).
 A package version or digest does not itself authorize publication.
+The separate [source-staging API](library-source-staging.md) can privately retain
+canonical archives from verified source plans. It does not import retained build
+receipts or attest build success, and is not connected to this download flow.
 
 ## Validation
 

@@ -5,10 +5,12 @@
 direction: dependency acquisition through DevOption's registry/proxy, followed by
 separately approved isolated offline builds. The current app/library runners use
 verified operator-prepared inputs. There is no hosted registry server, network
-acquisition client, package store, credential transport or package publication
+acquisition client, Cargo archive store, credential transport or package publication
 service. The [Cargo adapter](cargo-inputs.md) and explicit
 [hosted registry bindings](hosted-cargo-inputs.md) validate supplied metadata;
 bindings do not grant access or enable the existing service's hosted-source path.
+The separate [library source-staging API](library-source-staging.md) retains private
+canonical source archives/provenance, without Cargo ingestion, serving or publication.
 
 The crate is independent of the build/server crates. `devoption-builds` retains
 the complete request/materialization in plans, while production source checks

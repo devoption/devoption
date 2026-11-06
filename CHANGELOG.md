@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a private immutable library source-staging API with exact registry/version,
+  project/repository and source provenance, bounded checksum-verified persistence,
+  idempotent retry and overwrite/alias refusal. Preserve interrupted-write evidence
+  and reject unsafe/corrupt storage. Staging does not publish packages or enable
+  hosted dependency consumption ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Add explicit canonical hosted-registry bindings to Cargo input/source-proof
   APIs and immutable request identity. Resolve source-qualified lock references
   without conflating identical names/versions across origins; retain empty-policy

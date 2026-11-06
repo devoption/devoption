@@ -3,6 +3,8 @@ use crate::source_snapshot::SourceSnapshot;
 use devoption_registry::cargo_inputs::SourceTarget;
 use std::io;
 
+pub mod staging;
+
 pub(crate) const COMPLETION: &[u8] = b"devoption-library-build-v1\n";
 pub const MAX_PACKAGE_BYTES: usize = 4 * 1024 * 1024;
 
