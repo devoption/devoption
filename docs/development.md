@@ -68,6 +68,15 @@ The hosted-registry fixture additionally runs on Unix with just
 separate local source replacements, without registry services or downloads; see
 [the proof and its limits](hosted-cargo-inputs.md#validation).
 
+On Unix, also check the trusted consumers of DevOption-generated packages:
+
+```sh
+cargo test -p devoption-builds --lib generated_cargo_packages --locked --offline -- --ignored --nocapture
+```
+
+This uses only installed tools and disposable local seeds; see
+[Cargo package generation](cargo-package-generation.md#validation-and-remaining-work).
+
 The separate [library runner acceptance](library-builds.md#validation) runs only
 on an explicitly disposable Linux systemd host. Ordinary workspace tests compile
 but do not execute that privileged acceptance fixture.

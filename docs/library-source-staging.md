@@ -93,8 +93,10 @@ Injected partial/short writes and a late occupied destination exercise the same
 write path, proving refusal and evidence preservation without overwriting the
 destination. No workload or package publication is required by these tests.
 
-This implements source-package staging and private metadata lookup. It does not
-implement Cargo archive normalization/ingestion or an index, public/private
+This implements source-package staging and private metadata lookup. A separate
+[Cargo generator](cargo-package-generation.md) produces normalized archive and
+candidate index bytes from source plans; it does not persist them here. Staging does not
+implement Cargo archive ingestion or an index service, public/private
 visibility grants, registry authentication/serving, publication approval,
 yank/recovery policy, dependency closure verification, offline runner integration,
 or consumers through the running platform. Those remain open under #385.
