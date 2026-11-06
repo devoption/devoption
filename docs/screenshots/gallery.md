@@ -142,6 +142,20 @@ with no output checkpoint. Real build and runtime acceptance is checked separate
 
 ![Synthetic saved success record without an output checkpoint](build-succeeded.jpg)
 
+## Reusable library builds
+
+These renderer captures use synthetic review/history inputs. They execute no
+library and expose no downloadable archive. The separate Linux acceptance checks
+actual build approval, saved packages, authenticated downloads and restart.
+
+![Library source checks](build-library-source.jpg)
+
+![Library review with explicit compilation and test scope](build-library-review.jpg)
+
+![Configured app and library build actions](build-library-list.jpg)
+
+![Saved library package and receipt controls](build-library-succeeded.jpg)
+
 ## Public cloud acceptance
 
 The [fresh cloud acceptance report](../public-cloud-acceptance.md) identifies the

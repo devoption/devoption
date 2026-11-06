@@ -1,15 +1,53 @@
-# Reusable library build API
+# Build and download a reusable library
 
 [#384](https://github.com/devoption/devoption/issues/384) adds a separate
 `devoption_builds::execution::prepare_library` API for trusted local adapters.
 It uses existing registered source snapshots, verified operator-prepared
 inputs, immutable review, single-use approval, persisted job state/output,
-cancellation and complete-unit cleanup. This is a runner implementation;
-the browser's **Build app** action remains an app-only flow. There is no new
-user-facing library command, HTTP action, package download or registry here.
-Those controls must supply an authenticated explicit review/approval action
-before calling `execute`; preparing source or constructing a plan grants no
-execution authority. [Package distribution](reusable-packages.md) is separate.
+cancellation and complete-unit cleanup. Signed-in workspace users can prepare and approve
+library builds through project Builds, then download a retained source archive
+and receipt from the successful attempt. [Package distribution](reusable-packages.md)
+remains separate; this does not publish a crate or enable cross-project registry
+consumption.
+
+## Use the project interface
+
+Register the separate library repository and use the existing
+[build-input setup](web-app-builds.md#prepare-the-node) with its committed lockfile,
+verified vendor/archive set and pinned toolchain. Open **Builds → Check source**,
+then **Continue to build review** (or the repository's **Build** link).
+Opening the page runs no build. **Prepare build review** captures committed source
+and derives the profile from the verified manifest. A caller cannot choose a
+profile, shell command or target through the request. The ordinary app-only
+runner API still refuses `rlib`; the authenticated dispatcher calls the dedicated
+library API for a captured `rlib` source.
+
+The prepared library review identifies native compilation/unit tests, WASIp2
+compilation, `source.tar`, resource/network limits, and all three exact commands
+inside **Build command, inputs & technical details**. **Approve and build** is a
+separate single-use authenticated action, expiring after five minutes. Source,
+catalog, configuration or prepared-input changes require a new review. Cancellation and
+saved history use the existing build lifecycle; an ambiguous submission must be
+checked in history rather than automatically retried.
+
+After success, open the saved attempt and select **Download source package** or
+**Download build receipt**. These are authenticated workspace downloads, not
+registry endpoints. Both revalidate the successful project/repository/attempt,
+the recorded work-root/job identity, private regular-file bounds, receipt
+provenance, and actual archive SHA-256/size. Symlinks, hard links, substituted
+roots/receipts, corrupt bytes and unsafe permissions are refused. Reads serialize
+with retention and return independent bounded bytes; pruned, unsuccessful and
+non-library attempts have no package. Verification failures are shown separately
+from saved build status. Downloads need the configured build root and may become
+unavailable after retention cleanup. Nothing is fetched from a mutable checkout.
+
+The routes are `GET /projects/{project}/builds/attempts/{attempt}/package` and
+`GET /projects/{project}/builds/attempts/{attempt}/package/receipt`, behind the
+existing workspace-session and Host guards. They use fixed attachment filenames,
+explicit content types, `nosniff` and `Cache-Control: no-store`. Access follows
+the existing [shared-project membership policy](users.md); this adds no
+project-specific user roles. All mutation routes retain Origin/CSRF/session checks. Source checks and HTML review alone do
+not approve execution.
 
 ## Selected profile
 
@@ -69,7 +107,8 @@ SHA-256/size. Library receipts identify `source.tar`, `LibraryBuildV1`,
 `native+wasm32-wasip2`, package name/version and `ustar-source-v1`; they contain no
 HTTP ABI claim. Saved success and matching receipt are both required. Existing
 history recovery and retention apply to library jobs without a history schema
-change. The deployment broker refuses these receipts as app releases.
+change. The deployment broker refuses these receipts as app releases. Downloading a
+package does not protect it from the project's configured build retention policy.
 
 This archive is a local verified source package, not a published Cargo `.crate`.
 Registry ingestion must validate it, establish namespace/visibility/version policy
@@ -102,4 +141,9 @@ recovery. Python independently reads the archive and compares every file against
 the selected fixture, then builds/runs a separate native consumer and compiles it
 for WASIp2. That consumer uses a temporary Cargo path dependency solely as fixture
 wiring; DevOption still rejects path dependencies. This does not claim registry
-admission, global availability, user-facing library controls or production rollout.
+admission, global availability or production rollout. The same disposable
+checker also starts the actual controller and exercises owner login, source/review
+pages, explicit approval, invalid-token/replay and missing-CSRF refusal, saved
+archive/receipt download, cross-project refusal, corrupt archive refusal and
+package access after controller restart. Renderer captures are explicitly
+synthetic UI evidence; the Linux checker supplies execution/HTTP evidence.

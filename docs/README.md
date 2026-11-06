@@ -64,7 +64,7 @@ applications; project-specific roles remain planned.
   [Linux orphan cleanup evidence](descendant-supervision-fixture.md)
 - [Build plans](build-plans.md), [approval lifecycle](build-approvals.md), [job lifecycle](build-jobs.md)
   with [private history](build-history.md), [bounded output](build-output.md) and [supervision decisions](build-supervision.md)
-- [Reusable library and package support](reusable-packages.md) and [library build API](library-builds.md)
+- [Reusable library and package support](reusable-packages.md) and [library builds and source downloads](library-builds.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)

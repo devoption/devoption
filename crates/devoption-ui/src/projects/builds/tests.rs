@@ -13,6 +13,7 @@ fn preparation_escapes_dynamic_values_and_keeps_results_separate_from_execution(
         commit: Some("<commit>"),
         branch: Some("<branch>"),
         execution_available: false,
+        library: false,
         package: Some(("<package>", "<version>", 2)),
         checks: vec![PreparationCheck {
             label: "<label>",
@@ -48,6 +49,7 @@ fn sample_view() -> PreparationView<'static> {
         branch: Some("main"),
         commit: Some("8c42e1a000000000000000000000000000000000"),
         execution_available: true,
+        library: false,
         package: Some(("sample-site", "0.1.0", 0)),
         unavailable: None,
         checks: vec![
@@ -110,7 +112,7 @@ fn source_navigation_respects_git_observations_and_runner_configuration() {
     assert!(
         legacy.contains("Continue to build review")
             && legacy
-                .contains("web-app build review validates its supported source layout separately")
+                .contains("Build review validates the complete supported source layout and prepared inputs separately")
     );
     view.checks[1].outcome = "Needs changes";
     let dirty = content(&project, &view);
@@ -162,6 +164,7 @@ fn manual_source_readiness_fixture() {
     .unwrap();
     let build = super::super::BuildExecutionView {
         repository: [2; 16],
+        library: false,
         token: None,
         review: vec![],
         running: false,
@@ -175,6 +178,12 @@ fn manual_source_readiness_fixture() {
         crate::render_build_execution(&project, &build),
     )
     .unwrap();
+    view.library = true;
+    view.repository_name = "shared-components";
+    view.package = Some(("shared-components", "0.1.0", 0));
+    view.checks[4].label = "src/lib.rs";
+    write("library-source.html", &view);
+    view = sample_view();
     view.headline = "Changes needed";
     view.checks[1].outcome = "Needs changes";
     view.checks[1].detail = "0 staged · 1 modified · 0 untracked · 0 conflicted. Review and commit or resolve these changes with Git, then check again.";

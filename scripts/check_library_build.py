@@ -101,6 +101,8 @@ def check(repository, binary):
                                      '--', '--ignored', '--nocapture'], cwd=repository,
                                     env=environment, timeout=180)
             result.check_returncode()
+            from check_library_http import check as check_http
+            check_http(binary, root, fixture)
             archive = root / 'verified-source.tar'
             consume_archive(archive, root, fixture, toolchain)
             print(f'Library source package: {archive.stat().st_size} bytes, '

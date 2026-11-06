@@ -13,7 +13,9 @@ pub use execution::BuildExecutionView;
 pub(super) use execution::content as execution_content;
 mod history;
 pub(super) use history::content as history_content;
-pub use history::{BuildAttemptView, BuildHistoryView, BuildLogView, HistoryAvailability};
+pub use history::{
+    BuildAttemptView, BuildHistoryView, BuildLogView, BuildPackageView, HistoryAvailability,
+};
 mod builds;
 pub(super) use builds::content as preparation_content;
 pub use builds::{PreparationCheck, PreparationView};

@@ -128,11 +128,12 @@ async fn show(
         .expect("checked project");
     let mut view = devoption_ui::BuildExecutionView {
         repository: repository.to_bytes(),
+        library: false,
         token: None,
         review: Vec::new(),
         running: false,
         available: projects.execution.is_some(),
-        message: "Install and explicitly enable the Linux build runner to build this app.".into(),
+        message: "Install and explicitly enable the Linux build runner to build supported apps or libraries.".into(),
     };
     if let Some(engine) = projects.execution {
         let engine = engine.lock().await;
@@ -145,7 +146,7 @@ async fn show(
         } else if engine.active.is_some() {
             "Another build is running. Only one build can run at a time."
         } else {
-            "Prepare the committed web app for review. Preparation does not run Cargo."
+            "Prepare committed source for review. Preparation does not run Cargo."
         }
         .into();
         if let Some(review) = engine.pending.as_ref().filter(|r| {
@@ -157,8 +158,64 @@ async fn show(
                 "The source snapshot is prepared. Review the details before approving.".into();
             view.token = Some(review.token().into());
             let plan = review.job.plan();
+            view.library = plan.is_library();
             let context = review.context().details();
-            view.review=vec![("Build limits".into(),"1 CPU · 512 MiB memory · 60-second limit".into()),("Network access".into(),"Off".into()),("Commit".into(),plan.details().commit.clone()),("Command inside isolated worker".into(),format!("{} {}",plan.details().cargo_executable,plan.cargo_arguments().join(" "))),("Working directory".into(),"/source (read-only owned snapshot)".into()),("Artifact".into(),plan.artifact_path()),("Policy".into(),"WasmBuildV1: 60 seconds; 512 MiB RAM; no swap; one CPU; 64 tasks; 256 MiB job storage (240 MiB scratch; 16 MiB reserved for staged inputs, artifact and logs); 1 MiB logs; 4 MiB component. No network. Target scratch permits dependency build scripts.".into()),("Toolchain SHA-256".into(),hex(context.toolchain_manifest.bytes())),("Dependency bundle SHA-256".into(),hex(context.dependency_bundle.bytes())),("Source SHA-256".into(),hex(plan.details().source.sha256().bytes())),("Configuration SHA-256".into(),hex(context.configuration.bytes())),("Execution UID".into(),context.execution_uid.to_string()),("Environment (all values)".into(),plan.details().environment.iter().map(|e|format!("{}={}",e.name,e.value)).collect::<Vec<_>>().join("\n"))];
+            let commands = if plan.is_library() {
+                plan.library_commands()
+            } else {
+                vec![plan.cargo_arguments()]
+            };
+            let command = commands
+                .iter()
+                .map(|args| format!("{} {}", plan.details().cargo_executable, args.join(" ")))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let policy = if plan.is_library() {
+                "LibraryBuildV1: native compile and unit tests, then WASIp2 compile. All commands share 60 seconds, 512 MiB RAM, no swap, one CPU, 64 tasks, 256 MiB job storage (240 MiB scratch; 16 MiB reserved), 1 MiB logs and a 4 MiB source package. No network. Native tests execute only in target scratch."
+            } else {
+                "WasmBuildV1: 60 seconds; 512 MiB RAM; no swap; one CPU; 64 tasks; 256 MiB job storage (240 MiB scratch; 16 MiB reserved for staged inputs, artifact and logs); 1 MiB logs; 4 MiB component. No network. Target scratch permits dependency build scripts."
+            };
+            view.review = vec![
+                (
+                    "Build limits".into(),
+                    "1 CPU · 512 MiB memory · 60-second limit".into(),
+                ),
+                ("Network access".into(), "Off".into()),
+                ("Commit".into(), plan.details().commit.clone()),
+                ("Command inside isolated worker".into(), command),
+                (
+                    "Working directory".into(),
+                    "/source (read-only owned snapshot)".into(),
+                ),
+                ("Artifact".into(), plan.artifact_path()),
+                ("Policy".into(), policy.into()),
+                (
+                    "Toolchain SHA-256".into(),
+                    hex(context.toolchain_manifest.bytes()),
+                ),
+                (
+                    "Dependency bundle SHA-256".into(),
+                    hex(context.dependency_bundle.bytes()),
+                ),
+                (
+                    "Source SHA-256".into(),
+                    hex(plan.details().source.sha256().bytes()),
+                ),
+                (
+                    "Configuration SHA-256".into(),
+                    hex(context.configuration.bytes()),
+                ),
+                ("Execution UID".into(), context.execution_uid.to_string()),
+                (
+                    "Environment (all values)".into(),
+                    plan.details()
+                        .environment
+                        .iter()
+                        .map(|e| format!("{}={}", e.name, e.value))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                ),
+            ];
         }
     }
     (
@@ -262,7 +319,12 @@ async fn action(
                     .discard(&mut history_guard)
                     .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
             }
-            let review = devoption_builds::execution::prepare(
+            let prepare = if source.target().is_library() {
+                devoption_builds::execution::prepare_library
+            } else {
+                devoption_builds::execution::prepare
+            };
+            let review = prepare(
                 &engine_guard.config,
                 &catalog,
                 project,
