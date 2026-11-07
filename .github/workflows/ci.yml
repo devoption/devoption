@@ -69,6 +69,8 @@ jobs:
       - run: cargo test --workspace --locked --offline
       - name: Build trusted fixture from verified local registry seed
         run: cargo test -p devoption-registry --test offline_build --test hosted_offline --locked --offline -- --ignored --nocapture
+      - name: Consume DevOption-generated Cargo packages offline
+        run: cargo test -p devoption-builds --lib generated_cargo_packages --locked --offline -- --ignored --nocapture
       - run: cargo build --workspace --locked --offline
       - run: git diff --exit-code
 

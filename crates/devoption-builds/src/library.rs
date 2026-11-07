@@ -3,6 +3,7 @@ use crate::source_snapshot::SourceSnapshot;
 use devoption_registry::cargo_inputs::SourceTarget;
 use std::io;
 
+pub mod cargo_package;
 pub mod staging;
 
 pub(crate) const COMPLETION: &[u8] = b"devoption-library-build-v1\n";
@@ -15,10 +16,25 @@ pub fn source_package(source: &SourceSnapshot) -> io::Result<Vec<u8>> {
     if !matches!(source.target(), SourceTarget::Rlib { .. }) {
         return Err(rejected());
     }
-    let root = format!("{}-{}", source.package(), source.version());
+    source_tar(
+        source.package(),
+        source.version(),
+        source
+            .files()
+            .iter()
+            .map(|file| (file.path(), file.bytes())),
+    )
+}
+
+fn source_tar<'a>(
+    package: &str,
+    version: &str,
+    files: impl IntoIterator<Item = (&'a str, &'a [u8])>,
+) -> io::Result<Vec<u8>> {
+    let root = format!("{package}-{version}");
     let mut archive = Vec::new();
-    for file in source.files() {
-        let path = format!("{root}/{}", file.path());
+    for (relative, bytes) in files {
+        let path = format!("{root}/{relative}");
         let (prefix, name) = if path.len() <= 100 {
             ("", path.as_str())
         } else {
@@ -30,7 +46,7 @@ pub fn source_package(source: &SourceSnapshot) -> io::Result<Vec<u8>> {
                 })
                 .ok_or_else(rejected)?
         };
-        let padded = file.bytes().len().div_ceil(512) * 512;
+        let padded = bytes.len().div_ceil(512) * 512;
         if archive.len() + 512 + padded + 1024 > MAX_PACKAGE_BYTES {
             return Err(rejected());
         }
@@ -39,7 +55,7 @@ pub fn source_package(source: &SourceSnapshot) -> io::Result<Vec<u8>> {
         octal(&mut header[100..108], 0o644)?;
         octal(&mut header[108..116], 0)?;
         octal(&mut header[116..124], 0)?;
-        octal(&mut header[124..136], file.bytes().len())?;
+        octal(&mut header[124..136], bytes.len())?;
         octal(&mut header[136..148], 0)?;
         header[148..156].fill(b' ');
         header[156] = b'0';
@@ -50,8 +66,8 @@ pub fn source_package(source: &SourceSnapshot) -> io::Result<Vec<u8>> {
         octal(&mut header[148..155], checksum)?;
         header[155] = b' ';
         archive.extend_from_slice(&header);
-        archive.extend_from_slice(file.bytes());
-        archive.resize(archive.len() + padded - file.bytes().len(), 0);
+        archive.extend_from_slice(bytes);
+        archive.resize(archive.len() + padded - bytes.len(), 0);
     }
     archive.resize(archive.len() + 1024, 0);
     Ok(archive)
