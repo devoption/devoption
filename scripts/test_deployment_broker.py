@@ -221,6 +221,30 @@ class DeploymentTests(unittest.TestCase):
         self.config['records']['identity']['uid'] += 1
         with self.assertRaises(ValueError): broker.check_record_release(self.config,broker.load_release(self.config,release))
 
+    def test_record_reads_require_new_explicit_retained_policy_and_fresh_review(self):
+        self.record_binding()
+        legacy = self.promote()
+        before = broker.load_release(self.config, legacy)
+        self.assertEqual(before['records']['version'], 1)
+        self.assertNotIn('allow_read', before['records'])
+        for invalid in ('true', 1, None):
+            self.config['records']['grant']['allow_read'] = invalid
+            with self.assertRaises(ValueError): broker.record_policy(self.config, self.receipt['project'])
+        self.config['records']['grant']['allow_read'] = True
+        self.config['records']['bytes'] = broker.canonical(self.config['records']['grant'])
+        readable = self.promote()
+        self.assertNotEqual(readable, legacy)
+        policy = broker.load_release(self.config, readable)['records']
+        self.assertEqual(policy['version'], 2)
+        self.assertIs(policy['allow_read'], True)
+        with self.assertRaisesRegex(ValueError, 'revoked or changed'):
+            broker.check_record_release(self.config, before)
+        # Turning reads off cannot regain them through a retained read release.
+        self.config['records']['grant']['allow_read'] = False
+        self.config['records']['bytes'] = broker.canonical(self.config['records']['grant'])
+        with self.assertRaisesRegex(ValueError, 'revoked or changed'):
+            broker.check_record_release(self.config, broker.load_release(self.config, readable))
+
     def test_grant_for_another_project_does_not_enable_import_or_snapshot(self):
         self.record_binding()
         self.config['records']['grant']['app_id']='f'*32

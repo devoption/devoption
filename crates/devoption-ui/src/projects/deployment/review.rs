@@ -60,7 +60,11 @@ pub(super) fn content(project: &super::ProjectSummary<'_>, view: &DeploymentView
     }
     html.push_str("</dd></div><div><dt>Storage access</dt><dd>");
     if view.review_records.is_some() {
-        html.push_str("Append validated records only.<p class=\"deployment-note\">This release can append to its operator-selected PostgreSQL collection. It cannot read, update, delete or run SQL. Approval includes this storage access.</p>");
+        if view.review_record_reads {
+            html.push_str("Append and look up validated records.<p class=\"deployment-note\">This release can append records and read a record by its exact ID in its operator-selected PostgreSQL collection. It cannot list, update, delete or run SQL. Approval includes this read access. The app must enforce its own member permissions.</p>");
+        } else {
+            html.push_str("Append validated records only.<p class=\"deployment-note\">This release can append to its operator-selected PostgreSQL collection. It cannot read, update, delete or run SQL. Approval includes this storage access.</p>");
+        }
     } else {
         html.push_str("No database access requested.");
     }

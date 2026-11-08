@@ -334,6 +334,8 @@ def resolve_https(config, manifest, delivery):
 
 
 def record_identity(grant, owner_uid):
+    if type(grant.get('allow_read', False)) is not bool:
+        raise ValueError('record read permission must be an explicit boolean')
     user = grant.get('user')
     if not isinstance(user, str) or not re.fullmatch(r'[a-z_][a-z0-9_]{0,30}', user):
         raise ValueError('invalid record service user')
@@ -357,7 +359,15 @@ def record_policy(config, project):
     binding = config.get('records')
     if not binding or binding['grant']['app_id'] != project:
         return None
-    return {'version': 1, 'grant_sha256': digest(binding['bytes']), **binding['identity']}
+    allow_read = binding['grant'].get('allow_read', False)
+    if type(allow_read) is not bool:
+        raise ValueError('record read permission must be an explicit boolean')
+    # Preserve the exact old manifest shape for write-only releases. A separate
+    # version makes read authority explicit in retained review/provenance data.
+    policy = {'version': 1, 'grant_sha256': digest(binding['bytes']), **binding['identity']}
+    if allow_read:
+        policy.update(version=2, allow_read=True)
+    return policy
 
 
 def check_record_release(config, manifest):
@@ -417,11 +427,17 @@ def load_release(config, release):
         raise ValueError('release artifact changed')
     if 'records' in manifest:
         policy = manifest['records']
-        if not isinstance(policy, dict) or set(policy) != {'version', 'grant_sha256', 'user', 'uid', 'gid'} or type(policy['version']) is not int or policy['version'] != 1 or not isinstance(policy.get('grant_sha256'), str) or not HEX.fullmatch(policy['grant_sha256']) or type(policy['uid']) is not int or policy['uid'] < 100 or type(policy['gid']) is not int or policy['gid'] <= 0 or not isinstance(policy['user'], str):
+        keys = {'version', 'grant_sha256', 'user', 'uid', 'gid'}
+        if isinstance(policy, dict) and policy.get('version') == 2:
+            keys.add('allow_read')
+        if not isinstance(policy, dict) or set(policy) != keys or type(policy['version']) is not int or policy['version'] not in (1, 2) or (policy['version'] == 2 and policy.get('allow_read') is not True) or not isinstance(policy.get('grant_sha256'), str) or not HEX.fullmatch(policy['grant_sha256']) or type(policy['uid']) is not int or policy['uid'] < 100 or type(policy['gid']) is not int or policy['gid'] <= 0 or not isinstance(policy['user'], str):
             raise ValueError('invalid saved record policy')
         grant = read_regular(directory/'records.json', 32768, 0)
         if digest(grant) != policy['grant_sha256']:
             raise ValueError('saved record grant changed')
+        read = json.loads(grant).get('allow_read', False)
+        if type(read) is not bool or read != (policy['version'] == 2):
+            raise ValueError('saved record read authority differs')
     if 'https' in manifest:
         validate_https_policy(manifest['https'])
         if manifest['https']['project'] != manifest['project']:

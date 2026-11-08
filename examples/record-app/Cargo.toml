@@ -10,3 +10,6 @@ crate-type = ["cdylib"]
 [dependencies]
 wasip2 = "=1.0.1"
 wit-bindgen = { version = "=0.46.0", default-features = false, features = ["macros"] }
+
+[features]
+record-reads = []

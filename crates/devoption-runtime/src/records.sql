@@ -10,4 +10,5 @@ CREATE TABLE app_records.entries (
     PRIMARY KEY (app_id, collection, id)
 );
 -- Grant the runtime role USAGE on this schema and INSERT/SELECT on this table.
--- No UPDATE/DELETE/DDL grant is needed. The guest has no SELECT operation.
+-- No UPDATE/DELETE/DDL grant is needed. Guests receive fixed host operations,
+-- never SQL; exact-ID lookup additionally requires an explicit host read grant.

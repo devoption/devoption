@@ -19,6 +19,7 @@ pub struct DeploymentView {
     pub builds: Vec<(String, String)>,
     pub review: Option<(String, String, String, String)>,
     pub review_records: Option<String>,
+    pub review_record_reads: bool,
     pub review_https: Option<String>,
 }
 pub struct ReleaseView {
@@ -163,6 +164,12 @@ mod tests {
         let page = content(&project, &view);
         assert!(page.contains("Approval includes this storage access."));
         assert!(page.contains("&lt;grant&gt;"));
+        assert!(page.contains("It cannot read, update, delete or run SQL."));
+        view.review_record_reads = true;
+        let page = content(&project, &view);
+        assert!(page.contains("Approval includes this read access."));
+        assert!(page.contains("read a record by its exact ID"));
+        assert!(!page.contains("It cannot read, update, delete or run SQL."));
     }
 
     fn sample_release(id: &str, commit: &str) -> ReleaseView {
@@ -248,6 +255,7 @@ mod tests {
                 "12".repeat(32),
             )),
             review_records: Some("34".repeat(32)),
+            review_record_reads: true,
             review_https: Some(
                 "preview · SERVICE_API_KEY revision 1 → POST https://api.example.test/events"
                     .into(),

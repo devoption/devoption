@@ -9,4 +9,12 @@ interface records {
     append: func(id: string, payload: string) -> result<write-outcome, write-error>;
 }
 
+/// Separately granted exact-ID lookup. No listing, SQL or destination selection.
+interface record-lookup {
+    enum read-error { invalid, unavailable, denied }
+    /// Missing rows return none, never an error masquerading as empty storage.
+    get: func(id: string) -> result<option<string>, read-error>;
+}
+
 world record-imports { import records; }
+world record-access-imports { import records; import record-lookup; }

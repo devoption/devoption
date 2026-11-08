@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Complete the first operator-managed single-node PostgreSQL path with a
+  separately granted bounded exact-ID WASI lookup, preserving write-only imports
+  and legacy release policies. Show read authority in deployment review and
+  verify read/write persistence, namespace and service-identity isolation,
+  stored-data bounds, failures and redeployment/recovery with disposable fixtures
+  ([#293](https://github.com/devoption/devoption/issues/293)).
+
 - Support bounded app-owned host-only session cookies through generated HTTPS
   app routing and the WASIp2 runtime, preserving platform credential exclusion,
   validating guest cookie scope and requiring matching Origin for app-session
