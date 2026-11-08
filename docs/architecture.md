@@ -17,7 +17,7 @@ The Rust workspace has seven crates. The running service uses
 | `devoption-cli` | Arguments, command dispatch, process diagnostics, and service startup |
 | `devoption-projects` | Project/repository identities, associations, private catalog persistence, and bounded worktree inspection and explicitly managed creation |
 | `devoption-registry` | Cargo input validation, dependency metadata, checked provider contract and verified single-crate seed bytes; no acquisition service |
-| `devoption-runtime` | Separate Wasmtime WASIp2 HTTP worker; private listener, fresh bounded Store per request, denied filesystem/environment/socket/DNS grants and opt-in [host-mediated HTTPS](app-https.md) |
+| `devoption-runtime` | Separate Wasmtime WASIp2 HTTP worker; private listener, fresh bounded Store per request, denied filesystem/environment/socket/DNS grants, opt-in [host-mediated HTTPS](app-https.md) and a separate operator-enabled [durable delivery worker](durable-deliveries.md) |
 | `devoption-server` | HTTP/runtime behavior, request guards, authentication, independent account sessions, owner storage and durable member approvals/invitations |
 | `devoption-ui` | HTML rendering and browser assets |
 

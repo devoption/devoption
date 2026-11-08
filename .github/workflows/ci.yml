@@ -208,6 +208,9 @@ jobs:
           cargo fetch --manifest-path examples/record-app/Cargo.toml --locked
           cargo build --manifest-path examples/record-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/record-smoke"
           cargo build --manifest-path examples/record-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --features record-reads --target-dir "$RUNNER_TEMP/record-read-smoke"
+          cargo build --manifest-path examples/record-app/Cargo.toml --release --target wasm32-wasip2 --locked --offline --features delivery-jobs --target-dir "$RUNNER_TEMP/job-smoke"
+          python3 scripts/check_app_jobs.py --release --pg-bin "$PG_PROOF_ROOT/installed/bin" --worker target/release/devoption-runtime --component "$RUNNER_TEMP/job-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"
+          python3 scripts/check_app_jobs.py --release --pg-bin /usr/lib/postgresql/16/bin --worker target/release/devoption-runtime --component "$RUNNER_TEMP/job-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"
           python3 scripts/check_app_records.py --pg-bin "$PG_PROOF_ROOT/installed/bin" --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm" --read-component "$RUNNER_TEMP/record-read-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"
           test -x /usr/lib/postgresql/16/bin/postgres
           python3 scripts/check_app_records.py --pg-bin /usr/lib/postgresql/16/bin --worker target/release/devoption-runtime --component "$RUNNER_TEMP/record-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm" --read-component "$RUNNER_TEMP/record-read-smoke/wasm32-wasip2/release/devoption_record_fixture.wasm"

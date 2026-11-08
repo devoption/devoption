@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add explicitly granted durable JSON deliveries with PostgreSQL admission,
+  expiring/fenced leases, bounded scheduling/retries, independent host-owned HTTPS
+  dispatch and operator status/cancellation. Preserve operation identity across
+  app/worker/database restart and backup replay; prove one receiver effect after
+  a killed dispatcher loses its acknowledgement. Show enqueue authority in
+  deployment review while keeping dispatcher activation a separate operator action
+  ([#296](https://github.com/devoption/devoption/issues/296)).
+
 - Complete the first operator-managed single-node PostgreSQL path with a
   separately granted bounded exact-ID WASI lookup, preserving write-only imports
   and legacy release policies. Show read authority in deployment review and

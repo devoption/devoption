@@ -60,7 +60,7 @@ fn public(ip: Ipv4Addr) -> bool {
         || (a == 198 && (b == 18 || b == 19 || (b == 51 && c == 100)))
         || (a == 203 && b == 0 && c == 113))
 }
-fn endpoint(value: &str) -> Option<reqwest::Url> {
+pub(crate) fn endpoint(value: &str) -> Option<reqwest::Url> {
     let url = reqwest::Url::parse(value).ok()?;
     let host = url.host_str()?;
     (url.scheme() == "https"
@@ -87,6 +87,32 @@ fn endpoint(value: &str) -> Option<reqwest::Url> {
     .then_some(url)
 }
 impl Grant {
+    pub(crate) fn matches_delivery(&self, policy: &crate::jobs::Policy) -> bool {
+        let p = &self.packet.policy;
+        p.project == policy.project
+            && p.environment == policy.environment
+            && p.secret == policy.secret
+            && p.revision == policy.revision
+            && p.endpoint == policy.endpoint
+    }
+    pub(crate) async fn deliver(&self, key: &str, payload: &[u8]) -> Result<u16, ()> {
+        let request = Request::builder()
+            .method("POST")
+            .uri(&self.packet.policy.endpoint)
+            .header("content-type", "application/json")
+            .header("idempotency-key", key)
+            .body(
+                Full::new(Bytes::copy_from_slice(payload))
+                    .map_err(|never| match never {})
+                    .boxed_unsync(),
+            )
+            .map_err(|_| ())?;
+        tokio::time::timeout(TIMEOUT, self.send(request, Box::new(async { Ok(()) })))
+            .await
+            .map_err(|_| ())?
+            .map(|r| r.0.status().as_u16())
+            .map_err(|_| ())
+    }
     pub(crate) fn load(path: &Path) -> wasmtime::Result<Self> {
         use std::io::Read;
         let file = std::fs::File::open(path)
@@ -97,7 +123,11 @@ impl Grant {
         );
         let mut bytes = Zeroizing::new(Vec::new());
         file.take(32769).read_to_end(&mut bytes)?;
-        let packet: Packet = serde_json::from_slice(&bytes)
+        Self::from_bytes(&bytes)
+    }
+    pub(crate) fn from_bytes(bytes: &[u8]) -> wasmtime::Result<Self> {
+        wasmtime::ensure!(bytes.len() <= 32768, "invalid HTTPS credential");
+        let packet: Packet = serde_json::from_slice(bytes)
             .map_err(|_| wasmtime::Error::msg("invalid HTTPS credential"))?;
         let url = endpoint(&packet.policy.endpoint)
             .ok_or_else(|| wasmtime::Error::msg("invalid HTTPS endpoint"))?;
@@ -281,6 +311,22 @@ impl WasiHttpHooks for Hooks {
         16 * 1024
     }
 }
+#[cfg(test)]
+pub(crate) fn delivery_fixture(
+    bytes: &[u8],
+    ca: &[u8],
+    address: SocketAddr,
+) -> wasmtime::Result<Grant> {
+    assert!(address.ip().is_loopback());
+    let packet: Packet = serde_json::from_slice(bytes)?;
+    let url = endpoint(&packet.policy.endpoint)
+        .ok_or_else(|| wasmtime::format_err!("invalid fixture endpoint"))?;
+    let client = client_builder(&url, &[address])
+        .add_root_certificate(reqwest::Certificate::from_pem(ca)?)
+        .build()?;
+    Ok(Grant { packet, client })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,0 +1,39 @@
+# Optional operator template, not installed or activated by the platform.
+# Substitute the verified absolute runtime path and provision dedicated identities
+# separately. Instance names are app IDs. Review exact public IPAddressAllow
+# entries in a drop-in matching the pinned addresses in the delivered credential.
+[Unit]
+Description=DevOption bounded HTTPS deliveries for app %i
+After=network-online.target postgresql.service
+
+[Service]
+Type=exec
+User=SET_DEDICATED_APP_USER
+Group=SET_DEDICATED_APP_GROUP
+ExecStart=/ABSOLUTE/VERIFIED/PATH/devoption-runtime job-worker /etc/devoption/deliveries/%i.json %d/https.json
+LoadCredential=https.json:/run/devoption-delivery-credentials/%i.json
+Restart=no
+TimeoutStopSec=12s
+KillMode=control-group
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+IPAddressDeny=any
+InaccessiblePaths=-/var/lib/devoption
+CPUQuota=100%
+MemoryMax=256M
+TasksMax=16
+
+[Install]
+WantedBy=multi-user.target

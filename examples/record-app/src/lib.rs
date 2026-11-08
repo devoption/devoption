@@ -2,10 +2,14 @@
 use std::io::Write;
 use wasip2::http::types::{Fields, IncomingRequest, Method, OutgoingBody, OutgoingResponse, ResponseOutparam};
 
-#[cfg(not(feature = "record-reads"))]
+#[cfg(all(feature = "record-reads",feature = "delivery-jobs"))]
+compile_error!("select separate fixture profiles");
+#[cfg(all(not(feature = "record-reads"),not(feature = "delivery-jobs")))]
 wit_bindgen::generate!({ path: "../../crates/devoption-runtime/wit", world: "record-imports" });
-#[cfg(feature = "record-reads")]
+#[cfg(all(feature = "record-reads",not(feature = "delivery-jobs")))]
 wit_bindgen::generate!({ path: "../../crates/devoption-runtime/wit", world: "record-access-imports" });
+#[cfg(feature = "delivery-jobs")]
+wit_bindgen::generate!({ path: "../../crates/devoption-runtime/wit", world: "delivery-imports" });
 struct App;
 wasip2::http::proxy::export!(App);
 
@@ -39,6 +43,24 @@ impl wasip2::exports::http::incoming_handler::Guest for App {
             (200, "files environment sockets DNS outgoing HTTP denied")
         } else if matches!(request.method(), Method::Get) && path == "/healthz" {
             (200, "ok records")
+        } else if matches!(request.method(), Method::Post) && (path.starts_with("/enqueue/") || path.starts_with("/later/")) {
+            #[cfg(feature = "delivery-jobs")]
+            {
+                use devoption::app::delivery_jobs::{enqueue,EnqueueOutcome,EnqueueError};
+                let body=request.consume().unwrap();let stream=body.stream().unwrap();let mut bytes=Vec::new();
+                while let Ok(chunk)=stream.blocking_read(4096) {bytes.extend_from_slice(&chunk);if bytes.len()>24576 {break;}}
+                let (id,delay)=if path.starts_with("/later/"){(&path[7..],60)}else{(&path[9..],0)};
+                match std::str::from_utf8(&bytes).ok().map(|p|enqueue(id,p,delay)) {
+                    Some(Ok(EnqueueOutcome::Accepted))=>(201,"accepted"),
+                    Some(Ok(EnqueueOutcome::Replayed))=>(200,"replayed"),
+                    Some(Err(EnqueueError::Conflict))=>(409,"conflict"),
+                    Some(Err(EnqueueError::Unavailable))=>(503,"unavailable"),
+                    Some(Err(EnqueueError::Denied))=>(403,"denied"),
+                    _=>(422,"invalid"),
+                }
+            }
+            #[cfg(not(feature = "delivery-jobs"))]
+            {(404,"not found")}
         } else if matches!(request.method(), Method::Post) && path.starts_with("/append/") {
             let body = request.consume().unwrap();
             let stream = body.stream().unwrap();

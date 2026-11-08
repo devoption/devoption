@@ -1,6 +1,6 @@
 [package]
 name = "devoption-runtime"
-description = "Bounded private WASI HTTP application worker"
+description = "Bounded private WASI HTTP and durable HTTPS delivery workers"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,6 +21,8 @@ httparse = "=1.10.1"
 http-body-util = "=0.1.5"
 reqwest = { version = "=0.12.28", default-features = false, features = ["rustls-tls-webpki-roots"] }
 zeroize = { version = "=1.9.1", features = ["serde"] }
+sha2 = { version = "=0.11.1", default-features = false }
+signal-hook = { version = "=0.3.18", default-features = false }
 
 [dev-dependencies]
 wasm-encoder = "=0.258.3"

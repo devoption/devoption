@@ -32,7 +32,7 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Source changes | `/projects/{id}/builds/{repository}` | Synthetic source observations with one modified entry, details collapsed; 1280 × 1400 | `build-source-changes.jpg` |
 | App hostname error | `/projects/{id}/releases` | Synthetic certificate error presentation; no hostname request; 1280 × 1200 | `app-hostname-error.jpg` |
 | Deployed app | Separate app HTTPS hostname | Real saved revision A served by the Wasm worker; 1280 × 1200 | `deployed-app.jpg` |
-| Deployment review | `/projects/{id}/releases` | Synthetic independent-project destination and selected/candidate comparison, explicitly granted record reads, scoped HTTPS access and exact health expectation; runtime details collapsed; 1280 × 1500 | `deployment-review.jpg` |
+| Deployment review | `/projects/{id}/releases` | Synthetic independent-project destination and selected/candidate comparison, explicitly granted record reads and durable enqueue access, scoped HTTPS access and exact health expectation; runtime details collapsed; 1280 × 1700 | `deployment-review.jpg` |
 | Project releases | `/projects/{id}/releases` | Synthetic saved release and health presentation; no deployment or hostname request; 1280 × 1200 | `project-releases.jpg` |
 | Project packages | `/projects/{id}/packages` | Unavailable state | `project-packages.jpg` |
 | Project settings | `/projects/{id}/settings` | Saved fixture name and default retention policy; environment-secrets entry point; 1280 × 1400 | `project-settings.jpg` |
@@ -88,7 +88,7 @@ The storage-enabled `deployment-review.jpg` uses the UI renderer's explicit
 synthetic fixture instead. Generate its HTML into a dedicated temporary review
 directory with `DEVOPTION_REVIEW_CAPTURE_HTML=ABSOLUTE_OUTPUT_PATH cargo test
 -p devoption-ui manual_records_review_fixture -- --ignored --nocapture` and
-serve only that directory on loopback for browser capture. Use **1280 × 1500**,
+serve only that directory on loopback for browser capture. Use **1280 × 1700**,
 scroll at the top, and keep runtime details collapsed. Its identifiers, HTTPS binding and
 health/status are synthetic; it cannot deploy an app. Actual managed broker and
 database acceptance is separate in [app records](../app-records.md).

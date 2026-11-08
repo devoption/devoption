@@ -13,3 +13,4 @@ wit-bindgen = { version = "=0.46.0", default-features = false, features = ["macr
 
 [features]
 record-reads = []
+delivery-jobs = []

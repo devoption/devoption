@@ -18,3 +18,12 @@ interface record-lookup {
 
 world record-imports { import records; }
 world record-access-imports { import records; import record-lookup; }
+
+/// A durable JSON delivery to one operator-selected HTTPS integration.
+interface delivery-jobs {
+    enum enqueue-outcome { accepted, replayed }
+    enum enqueue-error { invalid, conflict, unavailable, denied }
+    /// Delay is bounded to 0..3600 seconds; no caller-selected destination.
+    enqueue: func(id: string, payload: string, delay-seconds: u32) -> result<enqueue-outcome, enqueue-error>;
+}
+world delivery-imports { import records; import delivery-jobs; }

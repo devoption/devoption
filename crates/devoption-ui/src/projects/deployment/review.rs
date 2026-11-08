@@ -68,6 +68,13 @@ pub(super) fn content(project: &super::ProjectSummary<'_>, view: &DeploymentView
     } else {
         html.push_str("No database access requested.");
     }
+    html.push_str("</dd></div><div><dt>Durable deliveries</dt><dd>");
+    if let Some(binding) = &view.review_jobs {
+        html.push_str(&escaped(binding));
+        html.push_str("<p class=\"deployment-note\">This app can enqueue JSON for a separate operator-enabled delivery worker. Up to five attempts within 24 hours use the same operation key. The receiver must durably deduplicate requests for the reviewed horizon. Approval includes enqueue access; it does not start the dispatcher.</p>");
+    } else {
+        html.push_str("No durable job access requested.");
+    }
     html.push_str("</dd></div><div><dt>HTTPS integration</dt><dd>");
     if let Some(binding) = &view.review_https {
         html.push_str(&escaped(binding));

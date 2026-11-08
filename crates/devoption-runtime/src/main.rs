@@ -6,10 +6,44 @@ fn main() -> std::process::ExitCode {
             return std::process::ExitCode::SUCCESS;
         }
         [flag] if flag == "--help" => {
-            println!("Usage: devoption-runtime app-worker COMPONENT PORT serve|validate");
+            println!(
+                "Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n       devoption-runtime job-worker GRANT CREDENTIAL\n       devoption-runtime jobs GRANT status|cancel [ID]"
+            );
             return std::process::ExitCode::SUCCESS;
         }
         _ => {}
+    }
+    if let [command, grant, credential] = args.as_slice()
+        && command == "job-worker"
+    {
+        return match devoption_runtime::jobs::worker::run(
+            std::path::Path::new(grant),
+            std::path::Path::new(credential),
+        ) {
+            Ok(()) => std::process::ExitCode::SUCCESS,
+            Err(message) => {
+                eprintln!("{message}");
+                std::process::ExitCode::FAILURE
+            }
+        };
+    }
+    if let [command, grant, action, rest @ ..] = args.as_slice()
+        && command == "jobs"
+        && ((action == "status" && rest.is_empty()) || (action == "cancel" && rest.len() == 1))
+    {
+        return match devoption_runtime::jobs::worker::control(
+            std::path::Path::new(grant),
+            rest.first().map(String::as_str),
+        ) {
+            Ok(json) => {
+                println!("{json}");
+                std::process::ExitCode::SUCCESS
+            }
+            Err(message) => {
+                eprintln!("{message}");
+                std::process::ExitCode::FAILURE
+            }
+        };
     }
     if let [command, path, port, mode, records, https] = args.as_slice()
         && command == "capability-worker"
