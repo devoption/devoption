@@ -12,7 +12,8 @@ Entries describe implemented changes, not the roadmap.
   dispatch and operator status/cancellation. Preserve operation identity across
   app/worker/database restart and backup replay; prove one receiver effect after
   a killed dispatcher loses its acknowledgement. Show enqueue authority in
-  deployment review while keeping dispatcher activation a separate operator action
+  deployment review while keeping dispatcher activation a separate operator action.
+  Validate the expanded runtime command help during bundle assembly and upgrade
   ([#296](https://github.com/devoption/devoption/issues/296)).
 
 - Complete the first operator-managed single-node PostgreSQL path with a
