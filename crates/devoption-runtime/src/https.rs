@@ -18,6 +18,13 @@ type Reply = Result<
     Error,
 >;
 
+fn integration_headers(headers: &hyper::HeaderMap) -> bool {
+    headers.get("content-type").map(|v| v.as_bytes()) == Some(b"application/json".as_slice())
+        && headers.iter().all(|(name, _)| {
+            ["host", "content-length", "content-type", "idempotency-key"].contains(&name.as_str())
+        })
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Policy {
@@ -142,12 +149,7 @@ impl Grant {
             return Err(Error::HttpRequestDenied);
         }
         let headers = request.headers();
-        if headers.get("content-type").map(|v| v.as_bytes()) != Some(b"application/json".as_slice())
-            || headers.iter().any(|(name, _)| {
-                !["host", "content-length", "content-type", "idempotency-key"]
-                    .contains(&name.as_str())
-            })
-        {
+        if !integration_headers(headers) {
             return Err(Error::HttpRequestDenied);
         }
         let retry = headers
@@ -250,7 +252,11 @@ impl Hooks {
 impl WasiHttpHooks for Hooks {
     fn is_forbidden_header(&mut self, name: &hyper::header::HeaderName) -> bool {
         wasmtime_wasi_http::DEFAULT_FORBIDDEN_HEADERS.contains(name)
-            || ["authorization", "cookie", "proxy-authorization"].contains(&name.as_str())
+            // receive() has already reduced Cookie to the bounded app session.
+            // This hook applies to incoming fields as well as guest-created
+            // fields. Grant::send independently refuses outgoing Cookie and all
+            // other headers outside its fixed integration allowlist.
+            || ["authorization", "proxy-authorization"].contains(&name.as_str())
     }
     fn send_request(
         &mut self,
@@ -278,6 +284,26 @@ impl WasiHttpHooks for Hooks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn app_session_visibility_does_not_grant_outbound_credentials() {
+        let mut hooks = Hooks::new(None);
+        assert!(!hooks.is_forbidden_header(&hyper::header::COOKIE));
+        assert!(hooks.is_forbidden_header(&hyper::header::AUTHORIZATION));
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert("content-type", "application/json".parse().unwrap());
+        headers.insert("idempotency-key", "fixture".parse().unwrap());
+        assert!(integration_headers(&headers));
+        for name in [
+            "cookie",
+            "authorization",
+            "x-app-csrf-token",
+            "x-devoption-test",
+        ] {
+            headers.insert(name, "private".parse().unwrap());
+            assert!(!integration_headers(&headers));
+            headers.remove(name);
+        }
+    }
     #[test]
     fn endpoints_and_addresses_fail_closed() {
         assert!(endpoint("https://api.example.com/events").is_some());

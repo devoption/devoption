@@ -50,6 +50,7 @@ applications; project-specific roles remain planned.
 - [Local mutation and execution trust contract](execution-trust.md)
 - [Owner setup and deferred browser enrollment](local-enrollment.md)
 - [Authentication review decisions and retained tradeoffs](authentication-review.md)
+- [Hosted-app session transport and credential isolation](app-authentication.md)
 - [Display-name Profile page](profile.md)
 - [Browser session validation](browser-session-check.md)
 - [Create server-managed repositories](managed-repositories.md)

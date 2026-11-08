@@ -7,6 +7,14 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Support bounded app-owned host-only session cookies through generated HTTPS
+  app routing and the WASIp2 runtime, preserving platform credential exclusion,
+  validating guest cookie scope and requiring matching Origin for app-session
+  mutations. Exercise two app sessions and independent platform login through
+  the real proxy/runtime with disposable identities. Preserve the historical
+  bundle inventory used by strict prior-preview upgrade verification
+  ([#294](https://github.com/devoption/devoption/issues/294)).
+
 - Generate bounded deterministic Cargo `.crate` archives and candidate index
   metadata from verified library plans, normalizing exact dependency registry
   identities while preserving the original manifest/source provenance. Prove

@@ -63,7 +63,7 @@ class ConfigurationTests(unittest.TestCase):
         for app in config['apps']:
             self.assertIn(app['ingress']['app_hostname']+' {', proxy)
             self.assertIn(f"reverse_proxy 127.0.0.1:{app['port']}", proxy)
-        self.assertEqual(proxy.count('header_up -Cookie'), 2)
+            self.assertEqual(proxy.count('header_up Cookie {app_session_cookie}'), 2)
         self.assertEqual(proxy.count('respond @control 404'), 2)
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp); source = root/'deployment.toml'

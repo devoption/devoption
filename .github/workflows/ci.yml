@@ -133,6 +133,19 @@ jobs:
         env:
           DEVOPTION_TEST_CADDY: ${{ runner.temp }}/devoption-proxy-test/caddy
         run: cargo test -p devoption-cli --test server --release --locked --offline public_https_proxy -- --ignored --nocapture
+      - name: Verify isolated hosted-app sessions through the proxy and WASIp2 runtime
+        if: matrix.suite == 'bundle'
+        env:
+          DEVOPTION_TEST_CADDY: ${{ runner.temp }}/devoption-proxy-test/caddy
+          DEVOPTION_TEST_RUNTIME: ${{ github.workspace }}/target/release/devoption-runtime
+          DEVOPTION_TEST_AUTH_COMPONENT: ${{ runner.temp }}/app-auth-target/wasm32-wasip2/release/devoption_web_fixture.wasm
+        run: |
+          mkdir -p "$RUNNER_TEMP/app-auth-fixture/src"
+          cp examples/web-app/Cargo.toml examples/web-app/Cargo.lock "$RUNNER_TEMP/app-auth-fixture/"
+          cp scripts/fixtures/runtime-app-auth.rs "$RUNNER_TEMP/app-auth-fixture/src/lib.rs"
+          cargo fetch --manifest-path "$RUNNER_TEMP/app-auth-fixture/Cargo.toml" --locked
+          cargo build --manifest-path "$RUNNER_TEMP/app-auth-fixture/Cargo.toml" --release --target wasm32-wasip2 --locked --offline --target-dir "$RUNNER_TEMP/app-auth-target"
+          cargo test -p devoption-cli --test server --release --locked --offline hosted_app_authentication -- --ignored --nocapture
       - name: Assemble and inspect the exact release executable
         if: matrix.suite == 'bundle'
         env:

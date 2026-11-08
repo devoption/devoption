@@ -24,7 +24,7 @@ class PlatformAccessTests(unittest.TestCase):
         self.assertIn('header_up -SSL-Client-*', platform)
         self.assertIn('strict_sni_host on', platform)
         self.assertNotIn('client_auth', app)
-        self.assertIn('header_up -Cookie', app)
+        self.assertIn('header_up Cookie {app_session_cookie}', app)
         self.assertIn('reverse_proxy 127.0.0.1:15000', app)
         self.assertNotIn('tls_insecure_skip_verify', proxy)
 
