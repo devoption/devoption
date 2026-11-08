@@ -45,7 +45,7 @@ HELPERS = (
 )
 DOCUMENTS = (
     "public-linux-install.md", "private-linux-install.md", "web-app-builds.md",
-    "web-app-deployments.md", "app-hostnames.md", "app-authentication.md", "same-node-recovery.md",
+    "web-app-deployments.md", "app-hostnames.md", "same-node-recovery.md",
     "release-bundles.md",
 )
 SOURCE_FILES = (

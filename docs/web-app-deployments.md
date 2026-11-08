@@ -147,7 +147,7 @@ browser reviews and build approvals never survive restart.
 App traffic is a separate HTTP listener and never passes through the platform's
 owner/session API. Incoming control cookies, authorization, proxy authorization,
 `x-csrf-token` and `x-devoption-*` headers are removed. The separate bounded
-[app-session transport](app-authentication.md) supports an app-owned host-only
+[app-session transport](https://github.com/devoption/devoption/blob/main/docs/app-authentication.md) supports an app-owned host-only
 cookie and app CSRF header. The host's invocation header binds health
 checks to the selected systemd invocation. Guest response headers cannot replace it.
 

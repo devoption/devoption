@@ -116,7 +116,7 @@ Check both URLs after reboot, and verify an unknown hostname cannot reach either
 application. A stopped app must remain stopped.
 
 Platform cookies remain host-only Secure `__Host-` cookies. The app proxy forwards
-only the bounded app-session cookie defined by [app authentication](app-authentication.md)
+only the bounded app-session cookie defined by [app authentication](https://github.com/devoption/devoption/blob/main/docs/app-authentication.md)
 and removes platform cookies, Authorization, Proxy-Authorization and
 control/forwarding headers; the Wasm host filters credentials again.
 `/auth`, `/auth/*`, `/sign-in`, `/setup` and
