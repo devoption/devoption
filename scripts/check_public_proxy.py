@@ -132,7 +132,13 @@ def check(caddy, backend, protected=False):
 
                 assert request("GET", "/", target=app_host, tls_context=anonymous)[2] == b'app A'
                 assert request("GET", "/", {"Cookie":"__Host-devoption=hidden", "Authorization":"Bearer hidden", "X-DevOption-Test":"hidden", "X-Csrf-Token":"hidden"}, target=app_host, tls_context=anonymous)[0] == 200
-                assert not any(k.lower() in ('cookie','authorization','x-csrf-token') or k.lower().startswith('x-devoption-') for k in App.seen_headers)
+                assert not App.seen_headers.get('Cookie')
+                assert not any(k.lower() in ('authorization','x-csrf-token') or k.lower().startswith('x-devoption-') for k in App.seen_headers)
+                session = '__Host-devoption-app-session=disposable_app_session'
+                assert request('GET', '/', {'Cookie': '__Host-devoption=secret; ' + session,
+                    'X-App-CSRF-Token': 'app-token'}, target=app_host, tls_context=anonymous)[0] == 200
+                assert App.seen_headers.get('Cookie') == session
+                assert App.seen_headers.get('X-App-Csrf-Token') == 'app-token'
                 for path in ['/auth/session', '/auth/sign-in', '/setup', '/sign-in']:
                     assert request("GET", path, target=app_host, tls_context=anonymous)[0] == 404
                 assert request("GET", "/", {"Host":host}, target=app_host, tls_context=anonymous)[0] == 421

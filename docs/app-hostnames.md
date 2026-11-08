@@ -115,11 +115,14 @@ After platform/host restart, the existing deployment recovery policy applies.
 Check both URLs after reboot, and verify an unknown hostname cannot reach either
 application. A stopped app must remain stopped.
 
-Platform cookies remain host-only Secure `__Host-` cookies. The app proxy removes
-Cookie, Authorization, Proxy-Authorization and control/forwarding headers; the Wasm
-host strips control credentials again. `/auth`, `/auth/*`, `/sign-in`, `/setup` and
+Platform cookies remain host-only Secure `__Host-` cookies. The app proxy forwards
+only the bounded app-session cookie defined by [app authentication](app-authentication.md)
+and removes platform cookies, Authorization, Proxy-Authorization and
+control/forwarding headers; the Wasm host filters credentials again.
+`/auth`, `/auth/*`, `/sign-in`, `/setup` and
 `/setup/*` are reserved and return 404 at the app proxy. Other app paths never route
-to the platform. This first stateless app profile does not support app authentication.
+to the platform. Applications own their account/session/CSRF logic; the transport
+does not supply a user directory or durable sessions.
 
 Use the [external HTTPS verification command](first-web-app.md#external-https-verification)
 from an external client to save repeatable per-address routing checks after

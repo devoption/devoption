@@ -145,8 +145,10 @@ failed. A later platform restart makes at most one recovery attempt. Pending
 browser reviews and build approvals never survive restart.
 
 App traffic is a separate HTTP listener and never passes through the platform's
-owner/session API. Incoming cookies, authorization, proxy authorization and
-`x-devoption-*` headers are removed. The host's invocation header binds health
+owner/session API. Incoming control cookies, authorization, proxy authorization,
+`x-csrf-token` and `x-devoption-*` headers are removed. The separate bounded
+[app-session transport](app-authentication.md) supports an app-owned host-only
+cookie and app CSRF header. The host's invocation header binds health
 checks to the selected systemd invocation. Guest response headers cannot replace it.
 
 ## Enforced runtime policy

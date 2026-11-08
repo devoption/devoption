@@ -30,7 +30,8 @@ class HostnameTests(unittest.TestCase):
             proxy=(root/'generated/Caddyfile').read_text()
             self.assertIn('app.example.com {', proxy)
             self.assertIn('reverse_proxy 127.0.0.1:15000', proxy)
-            self.assertIn('header_up -Cookie',proxy)
+            self.assertIn('header_up Cookie {app_session_cookie}',proxy)
+            self.assertIn('~^[A-Za-z0-9_-]{1,512}$',proxy)
             self.assertNotIn('tls_insecure_skip_verify',proxy)
             self.assertNotIn('tls internal',proxy)
             import tomllib

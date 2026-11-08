@@ -286,3 +286,26 @@ fn public_https_proxy() {
         .unwrap();
     assert!(result.success());
 }
+
+#[test]
+#[ignore = "explicit trusted WASIp2 fixture/runtime/Caddy; disposable loopback TLS only"]
+fn hosted_app_authentication() {
+    let (_directory, data) = configured();
+    let (_server, address) = start_public(&data);
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/check_app_auth.py");
+    let result = Command::new("python3")
+        .arg(script)
+        .arg("--caddy")
+        .arg(std::env::var_os("DEVOPTION_TEST_CADDY").expect("supply verified Caddy"))
+        .arg("--runtime")
+        .arg(std::env::var_os("DEVOPTION_TEST_RUNTIME").expect("supply compiled runtime"))
+        .arg("--component")
+        .arg(
+            std::env::var_os("DEVOPTION_TEST_AUTH_COMPONENT").expect("supply trusted auth fixture"),
+        )
+        .arg("--platform-backend")
+        .arg(address.to_string())
+        .status()
+        .unwrap();
+    assert!(result.success());
+}

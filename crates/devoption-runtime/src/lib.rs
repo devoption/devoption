@@ -1,6 +1,7 @@
 //! WASIp2 HTTP host for the separately supervised private app worker.
 //! No owner store, inherited environment or filesystem preopens. Optional HTTPS
 //! authorization stays in the host and requires an explicit deployment grant.
+mod app_auth;
 mod https;
 mod records;
 mod telemetry;
@@ -228,6 +229,7 @@ async fn receive(stream: &mut TcpStream) -> Result<Request<Full<Bytes>>, u16> {
         .method(parsed.method.ok_or(400u16)?)
         .uri(uri);
     let mut length = None;
+    let mut raw_cookies = String::new();
     for h in parsed.headers {
         if h.name.eq_ignore_ascii_case("transfer-encoding") {
             return Err(400);
@@ -248,10 +250,16 @@ async fn receive(stream: &mut TcpStream) -> Result<Request<Full<Bytes>>, u16> {
         {
             request = request.extension(telemetry::ActivityCookie(id.to_owned()));
         }
+        if h.name.eq_ignore_ascii_case("cookie") {
+            let raw = std::str::from_utf8(h.value).map_err(|_| 400u16)?;
+            raw_cookies.push_str(raw);
+            raw_cookies.push(';');
+        }
         if ![
             "authorization",
             "cookie",
             "proxy-authorization",
+            "x-csrf-token",
             "connection",
         ]
         .iter()
@@ -260,6 +268,9 @@ async fn receive(stream: &mut TcpStream) -> Result<Request<Full<Bytes>>, u16> {
         {
             request = request.header(h.name, h.value);
         }
+    }
+    if let Some(cookie) = app_auth::request_cookie(&raw_cookies)? {
+        request = request.header("cookie", cookie);
     }
     let length = length.unwrap_or(0);
     if length > INPUT {
@@ -273,9 +284,11 @@ async fn receive(stream: &mut TcpStream) -> Result<Request<Full<Bytes>>, u16> {
         }
         bytes.extend_from_slice(&chunk[..n]);
     }
-    request
+    let request = request
         .body(Full::new(Bytes::copy_from_slice(&bytes[end..end + length])))
-        .map_err(|_| 400)
+        .map_err(|_| 400u16)?;
+    app_auth::check_origin(request.method(), request.headers())?;
+    Ok(request)
 }
 fn failure(status: u16) -> Response<Bytes> {
     Response::builder()
@@ -325,7 +338,7 @@ async fn connection(
                 .get("accept")
                 .and_then(|v| v.to_str().ok())
                 .is_some_and(|v| v.contains("text/html"));
-            // receive() strips all control cookies before building guest headers,
+            // receive() strips control cookies before building guest headers,
             // retaining only the validated activity identifier in a host extension.
             let cookie = request
                 .extensions_mut()
@@ -368,6 +381,9 @@ async fn connection(
     )
     .into_bytes();
     for (name, value) in response.headers() {
+        if name == "set-cookie" && !value.to_str().is_ok_and(app_auth::response_cookie) {
+            continue;
+        }
         if [
             "connection",
             "content-length",
@@ -648,6 +664,8 @@ mod tests {
                 "POST / HTTP/1.1\r\nHost: app\r\nTransfer-Encoding: chunked\r\n\r\n",
                 "POST / HTTP/1.1\r\nHost: app\r\nContent-Length: 65537\r\n\r\n",
                 "GET http://elsewhere/ HTTP/1.1\r\nHost: app\r\n\r\n",
+                "GET / HTTP/1.1\r\nHost: app\r\nCookie: __Host-devoption-app-session=\r\nCookie: __Host-devoption-app-session=second\r\n\r\n",
+                "POST / HTTP/1.1\r\nHost: app\r\nCookie: __Host-devoption-app-session=session\r\nOrigin: https://evil.test\r\nContent-Length: 0\r\n\r\n",
             ] {
                 let listener=TcpListener::bind("127.0.0.1:0").await.unwrap();
                 let address=listener.local_addr().unwrap();

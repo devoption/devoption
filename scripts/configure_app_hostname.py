@@ -94,13 +94,17 @@ def render(binding, app_port, platform_access=None):
 
 {platform_site}
 {app} {{
+    map {{http.request.cookie.__Host-devoption-app-session}} {{app_session_cookie}} {{
+        default ""
+        ~^[A-Za-z0-9_-]{{1,512}}$ "__Host-devoption-app-session=${{0}}"
+    }}
     request_body {{
         max_size 64KB
     }}
     @control path /auth /auth/* /sign-in /setup /setup/*
     respond @control 404
     reverse_proxy 127.0.0.1:{app_port} {{
-        header_up -Cookie
+        header_up Cookie {{app_session_cookie}}
         header_up -Authorization
         header_up -Proxy-Authorization
         header_up -X-Csrf-Token
@@ -147,7 +151,7 @@ def render_apps(config, platform_access=None):
     first = slots[0]['ingress']
     proxy = render(first, slots[0]['port'], platform_access)
     for slot in slots[1:]:
-        # Reuse the exact cookie/header/control-path boundary for every app.
+        # Reuse the exact app-cookie/header/control-path boundary for every app.
         site = render(slot['ingress'], slot['port'], platform_access)
         proxy += '\n' + site[site.index('\n' + slot['ingress']['app_hostname'] + ' {')+1:]
     return proxy
