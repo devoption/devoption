@@ -45,7 +45,7 @@ applications; project-specific roles remain planned.
 
 ## Implementation references
 
-- [Experimental app-scoped append-only PostgreSQL records](app-records.md)
+- [App-scoped PostgreSQL writes and explicitly granted lookups](app-records.md)
 
 - [Local mutation and execution trust contract](execution-trust.md)
 - [Owner setup and deferred browser enrollment](local-enrollment.md)

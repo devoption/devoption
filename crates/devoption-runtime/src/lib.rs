@@ -90,10 +90,14 @@ impl WasiHttpView for State {
 
 /// Compilation and world validation only; this does not instantiate guest code.
 fn prepare(bytes: &[u8]) -> wasmtime::Result<ProxyPre<State>> {
-    prepare_with_records(bytes, false)
+    prepare_with_records(bytes, false, false)
 }
 
-fn prepare_with_records(bytes: &[u8], records_enabled: bool) -> wasmtime::Result<ProxyPre<State>> {
+fn prepare_with_records(
+    bytes: &[u8],
+    records_enabled: bool,
+    read_enabled: bool,
+) -> wasmtime::Result<ProxyPre<State>> {
     wasmtime::ensure!(
         bytes.len() <= 4 * 1024 * 1024 && bytes.starts_with(b"\0asm\x0d\0\x01\0"),
         "expected bounded component bytes"
@@ -109,6 +113,12 @@ fn prepare_with_records(bytes: &[u8], records_enabled: bool) -> wasmtime::Result
     wasmtime_wasi_http::p2::add_only_http_to_linker_async(&mut linker)?;
     if records_enabled {
         records::devoption::app::records::add_to_linker::<
+            State,
+            wasmtime::component::HasSelf<State>,
+        >(&mut linker, |s| s)?;
+    }
+    if read_enabled {
+        records::devoption::app::record_lookup::add_to_linker::<
             State,
             wasmtime::component::HasSelf<State>,
         >(&mut linker, |s| s)?;
@@ -462,8 +472,8 @@ fn run_inner(
     );
     let mut bytes = Vec::new();
     file.take(4 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
-    let pre = if records.is_some() {
-        prepare_with_records(&bytes, true)?
+    let pre = if let Some(grant) = &records {
+        prepare_with_records(&bytes, true, grant.permits_read())?
     } else {
         prepare(&bytes)?
     };

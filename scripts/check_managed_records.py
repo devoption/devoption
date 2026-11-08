@@ -30,7 +30,7 @@ def run(*args, check=True, **kw):
                           text=True, timeout=60, **kw).stdout.strip()
 
 
-def check(pg_bin, worker, component, stateless_component, https_component=None):
+def check(pg_bin, worker, component, stateless_component, https_component=None, read_component=None):
     if sys.platform != 'linux' or os.geteuid() == 0:
         raise ValueError('Requires unprivileged user on a fresh disposable Linux systemd runner')
     if any(p.exists() or p.is_symlink() for p in (CONFIG, BROKER, WORKER, FIXTURE)):
@@ -138,6 +138,28 @@ def check(pg_bin, worker, component, stateless_component, https_component=None):
             assert request(key,'{"label":"managed proof"}')==(200,'replayed')
             assert sql('SELECT count(*) FROM app_records.entries')=='1'
             assert sql(f"SELECT count(*) FROM information_schema.role_table_grants WHERE grantee='{APP_USER}' AND privilege_type IN ('UPDATE','DELETE')")=='0'
+            if read_component is not None:
+                # A real component change and separately approved new grant must
+                # preserve the old app's rows through redeployment and recovery.
+                stage(read_component)
+                grant['allow_read'] = True
+                grant_source.write_text(json.dumps(grant))
+                run('sudo','-n','install','-m600',grant_source,grant_target)
+                read_release = promote()
+                assert read_release != release
+                current = broker('status')
+                saved = next(r for r in current['releases'] if r['release'] == read_release)
+                assert saved['records']['version'] == 2 and saved['records']['allow_read'] is True
+                broker('start',read_release,'ok records',current['fingerprint'],current['generation'])
+                read_key = key.replace('/append/','/record/')
+                expected = {'label':'managed proof','note':None}
+                code, payload = request(read_key)
+                assert code == 200 and json.loads(payload) == expected
+                broker('reconcile')
+                assert broker('status')['deployment']['observed'] == 'healthy'
+                assert json.loads(request(read_key)[1]) == expected
+                assert sql('SELECT count(*) FROM app_records.entries') == '1'
+                release = read_release
             if https_component is not None:
                 policy={'project':receipt['project'],'environment':'preview','secret':'SERVICE_API_KEY','revision':1,'endpoint':'https://example.com/events'}
                 packet={'policy':policy,'value':'synthetic-managed-https-proof-token'}
@@ -202,6 +224,7 @@ def check(pg_bin, worker, component, stateless_component, https_component=None):
             assert request('/healthz')==(200,'ok A')
             return {'managed_peer_postgres_write':True,'exact_retry':True,'sandbox_denials':True,
                     'worker_recovery':True,'grant_digest_revocation':True,'stateless_import_denied':True,
+                    'granted_read_redeployment_and_recovery':read_component is not None,
                     'return_to_saved_stateless':True,'managed_https_credentials':https_component is not None,
                     'database_row_retained':sql('SELECT count(*) FROM app_records.entries')=='1'}
         finally:
@@ -222,5 +245,6 @@ if __name__=='__main__':
     parser.add_argument('--component',type=Path,required=True)
     parser.add_argument('--stateless-component',type=Path,required=True)
     parser.add_argument('--https-component',type=Path)
+    parser.add_argument('--read-component',type=Path)
     args=parser.parse_args()
-    print(json.dumps(check(args.pg_bin.resolve(),args.worker.resolve(),args.component.resolve(),args.stateless_component.resolve(),args.https_component.resolve() if args.https_component else None),indent=2))
+    print(json.dumps(check(args.pg_bin.resolve(),args.worker.resolve(),args.component.resolve(),args.stateless_component.resolve(),args.https_component.resolve() if args.https_component else None,args.read_component.resolve() if args.read_component else None),indent=2))

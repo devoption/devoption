@@ -18,7 +18,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def check(pg_bin, worker, component):
+def check(pg_bin, worker, component, read_component=None):
     def run(args, **kw):
         return subprocess.run([str(x) for x in args], check=True, capture_output=True,
                               text=True, timeout=30, **kw).stdout.strip()
@@ -150,14 +150,68 @@ def check(pg_bin, worker, component):
             worker_start()
             assert request(key, payload) == (200, 'replayed')
             assert sql('SELECT count(*) FROM app_records.entries') == '2'
+            if read_component is not None:
+                worker_stop()
+                grant_path.write_text(json.dumps(grant))
+                denied = subprocess.run([str(worker), 'records-worker', str(read_component),
+                    str(port), 'validate', str(grant_path)], capture_output=True, timeout=15)
+                assert denied.returncode != 0, 'write-only grant linked the read interface'
+                component = read_component
+                grant['allow_read'] = True
+                worker_start()
+                read_key = key.replace('/append/', '/record/')
+                expected = {'label': 'generic proof', 'note': 'optional detail'}
+                def read_expected():
+                    status, body = request(read_key)
+                    assert status == 200, (status, body)
+                    assert json.loads(body) == expected
+                read_expected()
+                assert request('/record/not-a-uuid') == (422, 'invalid')
+                assert request('/record/00000000-0000-4000-8000-000000000000') == (404, 'not found')
+                # Corrupt/out-of-schema rows do not become partial data or "missing".
+                for stored in ("'{\"label\":\"private\",\"unknown\":\"hidden\"}'::jsonb",
+                               "jsonb_build_object('label',repeat('x',40000),'note',null)"):
+                    sql(f"UPDATE app_records.entries SET payload={stored} WHERE app_id='{grant['app_id']}' AND id='12345678-1234-4234-8234-123456789abc'")
+                    assert request(read_key) == (503, 'unavailable')
+                sql(f"UPDATE app_records.entries SET payload='{payload}'::jsonb WHERE app_id='{grant['app_id']}' AND id='12345678-1234-4234-8234-123456789abc'")
+                read_expected()
+                worker_stop(); worker_start(); read_expected()
+                pg_stop(); pg_start(); read_expected()
+                # A failed service identity/destination cannot fall back to another DB.
+                for field, bad in (('user', 'missing_record_role'), ('database', 'missing_record_db')):
+                    worker_stop(); original = grant[field]; grant[field] = bad; worker_start()
+                    assert request(read_key) == (503, 'unavailable')
+                    worker_stop(); grant[field] = original; worker_start(); read_expected()
+                locker = subprocess.Popen([str(pg_bin/'psql'), '-X', '-At', '-h', str(sockets),
+                    '-U', user, '-d', 'records_proof', '-c',
+                    'BEGIN; LOCK app_records.entries IN ACCESS EXCLUSIVE MODE; SELECT pg_sleep(10)'],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                try:
+                    deadline = time.monotonic()+3
+                    while not sql(lock_query):
+                        assert time.monotonic() < deadline
+                        time.sleep(.05)
+                    started = time.monotonic()
+                    assert request(read_key) == (503, 'unavailable')
+                    assert time.monotonic()-started < 3
+                    sql('SELECT pg_terminate_backend(pid) FROM pg_locks WHERE relation=\'app_records.entries\'::regclass AND mode=\'AccessExclusiveLock\' AND granted')
+                finally:
+                    locker.terminate(); locker.wait(timeout=5)
+                read_expected()
             # Different host-selected namespace cannot overwrite or replay app A.
             worker_stop()
             grant['app_id'] = 'fedcba9876543210fedcba9876543210'
             worker_start()
+            if read_component is not None:
+                assert request(read_key) == (404, 'not found')
             assert request(key, '{"label":"isolated app"}') == (201, 'created')
+            if read_component is not None:
+                assert json.loads(request(read_key)[1]) == {'label':'isolated app','note':None}
             assert sql('SELECT count(*) FROM app_records.entries') == '3'
             pg_stop()
             assert request(key, payload) == (503, 'unavailable')
+            if read_component is not None:
+                assert request(read_key) == (503, 'unavailable')
             pg_start('off')
             assert request(key, payload) == (503, 'unavailable')
             pg_stop()
@@ -186,6 +240,9 @@ def check(pg_bin, worker, component):
             digest_sql="SELECT md5(string_agg(app_id || ':' || collection || ':' || id || ':' || payload::text || ':' || created_at::text, E'\\n' ORDER BY app_id,collection,id)) FROM app_records.entries"
             restored=run([pg_bin/'psql','-X','-At','-h',sockets,'-U',user,'-d','records_restore','-c',digest_sql])
             assert restored == sql(digest_sql)
+            if read_component is not None:
+                worker_stop(); grant['app_id']='0123456789abcdef0123456789abcdef'
+                grant['database']='records_restore'; worker_start(); read_expected()
             return {'postgres': run([pg_bin/'postgres', '--version']),
                     'guest_to_postgres': True, 'exact_retry': True, 'conflict': True,
                     'host_validation': True, 'ungranted_import_denied': True,
@@ -193,7 +250,9 @@ def check(pg_bin, worker, component):
                     'worker_and_database_crash_restart': True, 'app_isolation': True,
                     'database_failure': True, 'unsafe_durability_refused': True,
                     'lost_http_acknowledgement': True, 'lock_timeout': True,
-                    'persistent_rate_and_storage_limits': True, 'backup_restore_exact_rows': True}
+                    'persistent_rate_and_storage_limits': True, 'backup_restore_exact_rows': True,
+                    'granted_guest_reads': read_component is not None,
+                    'read_identity_namespace_bounds_and_failure_refusal': read_component is not None}
         finally:
             worker_stop()
             if pg_started:
@@ -206,5 +265,7 @@ if __name__ == '__main__':
     parser.add_argument('--pg-bin', required=True, type=Path)
     parser.add_argument('--worker', required=True, type=Path)
     parser.add_argument('--component', required=True, type=Path)
+    parser.add_argument('--read-component', type=Path)
     args = parser.parse_args()
-    print(json.dumps(check(args.pg_bin.resolve(), args.worker.resolve(), args.component.resolve()), indent=2))
+    print(json.dumps(check(args.pg_bin.resolve(), args.worker.resolve(), args.component.resolve(),
+        args.read_component.resolve() if args.read_component else None), indent=2))

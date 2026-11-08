@@ -2,7 +2,10 @@
 use std::io::Write;
 use wasip2::http::types::{Fields, IncomingRequest, Method, OutgoingBody, OutgoingResponse, ResponseOutparam};
 
+#[cfg(not(feature = "record-reads"))]
 wit_bindgen::generate!({ path: "../../crates/devoption-runtime/wit", world: "record-imports" });
+#[cfg(feature = "record-reads")]
+wit_bindgen::generate!({ path: "../../crates/devoption-runtime/wit", world: "record-access-imports" });
 struct App;
 wasip2::http::proxy::export!(App);
 
@@ -10,6 +13,10 @@ impl wasip2::exports::http::incoming_handler::Guest for App {
     fn handle(request: IncomingRequest, output: ResponseOutparam) {
         use devoption::app::records::{append, WriteError, WriteOutcome};
         let path = request.path_with_query().unwrap_or_default();
+        #[cfg(feature = "record-reads")]
+        let mut record_payload: Option<String> = None;
+        #[cfg(not(feature = "record-reads"))]
+        let record_payload: Option<String> = None;
         let (status, content) = if matches!(request.method(), Method::Get) && path == "/denials" {
             use std::net::ToSocketAddrs;
             use wasip2::http::types::{OutgoingRequest, Scheme, ErrorCode};
@@ -48,15 +55,29 @@ impl wasip2::exports::http::incoming_handler::Guest for App {
                 Some(Err(WriteError::Denied)) => (503, "denied"),
                 _ => (422, "invalid"),
             }
+        } else if matches!(request.method(), Method::Get) && path.starts_with("/record/") {
+            #[cfg(feature = "record-reads")]
+            {
+                use devoption::app::record_lookup::{get, ReadError};
+                match get(&path[8..]) {
+                    Ok(Some(payload)) => { record_payload = Some(payload); (200, "record") },
+                    Ok(None) => (404, "not found"),
+                    Err(ReadError::Invalid) => (422, "invalid"),
+                    Err(ReadError::Denied) => (403, "denied"),
+                    Err(ReadError::Unavailable) => (503, "unavailable"),
+                }
+            }
+            #[cfg(not(feature = "record-reads"))]
+            { (404, "not found") }
         } else { (404, "not found") };
         let headers = Fields::new();
-        headers.set("content-type", &[b"text/plain".to_vec()]).unwrap();
+        headers.set("content-type", &[if record_payload.is_some() { b"application/json".to_vec() } else { b"text/plain".to_vec() }]).unwrap();
         headers.set("cache-control", &[b"no-store".to_vec()]).unwrap();
         let response = OutgoingResponse::new(headers);
         response.set_status_code(status).unwrap();
         let body = response.body().unwrap();
         ResponseOutparam::set(output, Ok(response));
-        { let mut stream = body.write().unwrap(); stream.write_all(content.as_bytes()).unwrap(); stream.flush().unwrap(); }
+        { let mut stream = body.write().unwrap(); stream.write_all(record_payload.as_deref().unwrap_or(content).as_bytes()).unwrap(); stream.flush().unwrap(); }
         OutgoingBody::finish(body, None).unwrap();
     }
 }

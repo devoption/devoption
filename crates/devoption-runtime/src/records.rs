@@ -6,9 +6,10 @@ use tokio_postgres::NoTls;
 
 wasmtime::component::bindgen!({
     path: "wit/records.wit",
-    world: "record-imports",
+    world: "record-access-imports",
     imports: { default: async },
 });
+pub use devoption::app::record_lookup::ReadError;
 pub use devoption::app::records::{WriteError, WriteOutcome};
 
 const MAX_PAYLOAD: usize = 24 * 1024;
@@ -17,6 +18,7 @@ const DB_DEADLINE: Duration = Duration::from_secs(2);
 // quota; no automatic deletion is used to make space for untrusted submissions.
 const MAX_RECORDS: i64 = 10_000;
 const NEW_PER_MINUTE: i64 = 20;
+const MAX_READ_BYTES: usize = 32 * 1024;
 
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -26,7 +28,16 @@ pub struct Grant {
     socket_dir: String,
     database: String,
     user: String,
+    #[serde(default)]
+    allow_read: bool,
     fields: BTreeMap<String, Field>,
+}
+
+struct Driver(tokio::task::JoinHandle<()>);
+impl Drop for Driver {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
 }
 
 #[derive(Clone, Deserialize)]
@@ -111,6 +122,9 @@ impl<'de> Deserialize<'de> for UniqueObject {
 }
 
 impl Grant {
+    pub(crate) fn permits_read(&self) -> bool {
+        self.allow_read
+    }
     pub fn load(path: &Path) -> wasmtime::Result<Self> {
         use std::io::Read;
         let file = std::fs::File::open(path)?;
@@ -155,7 +169,11 @@ impl Grant {
     }
 
     fn validate(&self, id: &str, input: &str) -> Result<Value, WriteError> {
-        if !uuid(id) || input.len() > MAX_PAYLOAD {
+        self.validate_bound(id, input, MAX_PAYLOAD)
+    }
+
+    fn validate_bound(&self, id: &str, input: &str, limit: usize) -> Result<Value, WriteError> {
+        if !uuid(id) || input.len() > limit {
             return Err(WriteError::Invalid);
         }
         let UniqueObject(fields) = serde_json::from_str(input).map_err(|_| WriteError::Invalid)?;
@@ -202,7 +220,7 @@ impl Grant {
             .unwrap_or(Err(WriteError::Unavailable))
     }
 
-    async fn persist(&self, id: &str, payload: Value) -> Result<WriteOutcome, WriteError> {
+    async fn connect(&self) -> Result<(tokio_postgres::Client, Driver), tokio_postgres::Error> {
         let mut config = tokio_postgres::Config::new();
         config
             .host_path(&self.socket_dir)
@@ -211,19 +229,55 @@ impl Grant {
             .connect_timeout(Duration::from_millis(500));
         // Local peer-authenticated Unix socket only. No DSN, password, environment
         // lookup or plaintext remote TCP fallback. No guest connection selection.
-        let (mut client, connection) = config
-            .connect(NoTls)
-            .await
-            .map_err(|_| WriteError::Unavailable)?;
-        struct Driver(tokio::task::JoinHandle<()>);
-        impl Drop for Driver {
-            fn drop(&mut self) {
-                self.0.abort();
-            }
-        }
-        let _driver = Driver(tokio::spawn(async move {
+        let (client, connection) = config.connect(NoTls).await?;
+        let driver = Driver(tokio::spawn(async move {
             let _ = connection.await;
         }));
+        Ok((client, driver))
+    }
+
+    pub async fn get(&self, id: &str) -> Result<Option<String>, ReadError> {
+        if !self.allow_read {
+            return Err(ReadError::Denied);
+        }
+        if !uuid(id) {
+            return Err(ReadError::Invalid);
+        }
+        tokio::time::timeout(DB_DEADLINE, self.lookup(id))
+            .await
+            .unwrap_or(Err(ReadError::Unavailable))
+    }
+
+    async fn lookup(&self, id: &str) -> Result<Option<String>, ReadError> {
+        let (mut client, _driver) = self.connect().await.map_err(|_| ReadError::Unavailable)?;
+        let work = async {
+            let tx = client.build_transaction().read_only(true).start().await?;
+            tx.batch_execute("SET LOCAL statement_timeout = '1000ms'; SET LOCAL lock_timeout = '500ms'").await?;
+            let row = tx.query_opt("SELECT CASE WHEN octet_length(payload::text) <= $4 THEN payload::text ELSE NULL END FROM app_records.entries WHERE app_id=$1 AND collection=$2 AND id=$3", &[&self.app_id, &self.collection, &id, &(MAX_READ_BYTES as i32)]).await?;
+            let result = match row {
+                None => Ok(None),
+                Some(row) => match row.get::<_, Option<String>>(0) {
+                    None => Err(ReadError::Unavailable),
+                    Some(raw) => {
+                        // Recheck the current field contract. No foreign/extra
+                        // fields, normalization of corrupt rows, or partial data.
+                        let parsed: Result<Value, _> = serde_json::from_str(&raw);
+                        match (self.validate_bound(id, &raw, MAX_READ_BYTES), parsed) {
+                            (Ok(normalized), Ok(stored)) if normalized == stored =>
+                                serde_json::to_string(&normalized).map(Some).map_err(|_| ReadError::Unavailable),
+                            _ => Err(ReadError::Unavailable),
+                        }
+                    }
+                },
+            };
+            tx.commit().await?;
+            Ok::<_, tokio_postgres::Error>(result)
+        }.await;
+        work.unwrap_or(Err(ReadError::Unavailable))
+    }
+
+    async fn persist(&self, id: &str, payload: Value) -> Result<WriteOutcome, WriteError> {
+        let (mut client, _driver) = self.connect().await.map_err(|_| WriteError::Unavailable)?;
         let work = async {
             let tx = client.transaction().await?;
             tx.batch_execute("SET LOCAL synchronous_commit = on; SET LOCAL statement_timeout = '1000ms'; SET LOCAL lock_timeout = '500ms'").await?;
@@ -264,6 +318,19 @@ impl devoption::app::records::Host for super::State {
         match &self.records {
             Some(grant) => grant.append(&id, &payload).await,
             None => Err(WriteError::Denied),
+        }
+    }
+}
+
+impl devoption::app::record_lookup::Host for super::State {
+    async fn get(&mut self, id: String) -> Result<Option<String>, ReadError> {
+        if self.record_call_used {
+            return Err(ReadError::Denied);
+        }
+        self.record_call_used = true;
+        match &self.records {
+            Some(grant) => grant.get(&id).await,
+            None => Err(ReadError::Denied),
         }
     }
 }
@@ -346,6 +413,11 @@ mod tests {
             grant().append(ID, r#"{"label":"hello"}"#).await,
             Err(WriteError::Unavailable)
         ));
+        let mut g = grant();
+        assert!(matches!(g.get(ID).await, Err(ReadError::Denied)));
+        g.allow_read = true;
+        assert!(matches!(g.get("invalid").await, Err(ReadError::Invalid)));
+        assert!(matches!(g.get(ID).await, Err(ReadError::Unavailable)));
     }
 
     #[tokio::test]
@@ -364,6 +436,22 @@ mod tests {
             state.append(ID.into(), "{}".into()).await,
             Err(WriteError::Invalid)
         ));
+        assert!(matches!(
+            state.append(ID.into(), r#"{"label":"hello"}"#.into()).await,
+            Err(WriteError::Denied)
+        ));
+        use devoption::app::record_lookup::Host as _;
+        state.record_call_used = false;
+        assert!(matches!(state.get(ID.into()).await, Err(ReadError::Denied)));
+        let mut readable = grant();
+        readable.allow_read = true;
+        state.records = Some(std::sync::Arc::new(readable));
+        state.record_call_used = false;
+        assert!(matches!(
+            state.get("invalid".into()).await,
+            Err(ReadError::Invalid)
+        ));
+        assert!(matches!(state.get(ID.into()).await, Err(ReadError::Denied)));
         assert!(matches!(
             state.append(ID.into(), r#"{"label":"hello"}"#.into()).await,
             Err(WriteError::Denied)

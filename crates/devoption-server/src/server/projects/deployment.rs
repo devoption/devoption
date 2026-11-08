@@ -543,6 +543,9 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
                         .and_then(|r| r["records"]["grant_sha256"].as_str())
                         .map(str::to_owned)
                 });
+                view.review_record_reads = state["releases"].as_array().and_then(|releases| {
+                    releases.iter().find(|r| r["release"] == review.release)
+                }).is_some_and(|r| r["records"]["version"] == 2 && r["records"]["allow_read"] == true);
                 if let Some(policy) = state["releases"]
                     .as_array()
                     .and_then(|releases| releases.iter().find(|r| r["release"] == review.release))

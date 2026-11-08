@@ -9,7 +9,8 @@ background execution or live integration is enabled by this document.
 
 The [HTTP worker](web-app-deployments.md#enforced-runtime-policy) creates a fresh
 bounded guest for each request. [App records](app-records.md) permit an optional
-durable append, but expose no guest read/update/claim operation.
+durable append and explicitly granted exact-ID lookup, but expose no
+update/claim operation or job scheduling.
 [Scoped HTTPS](app-https.md) permits one bounded POST per request with an exact
 approved secret revision and destination. It supplies neither a durable queue
 nor a retry loop. An HTTP handler that spawns a future or sleeps cannot establish
