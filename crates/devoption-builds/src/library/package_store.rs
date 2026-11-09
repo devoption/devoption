@@ -22,6 +22,12 @@ impl PackageStore {
     pub fn read(&self, coordinates: &Coordinates) -> Result<Option<CargoPackage>, Error> {
         self.0.read(coordinates)
     }
+    pub(crate) fn visit<E: From<Error>>(
+        &self,
+        visitor: impl FnMut(CargoPackage) -> Result<(), E>,
+    ) -> Result<(), E> {
+        self.0.visit(visitor)
+    }
     /// Operator-selected exact complete candidate only. Refuses partial/corrupt
     /// evidence and conflicts, retaining files for investigation. This completes
     /// a private storage write, never publication or a registry index update.

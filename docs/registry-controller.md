@@ -7,9 +7,10 @@ review/approval of retained-build staging and publication, status, project-scope
 index/archive acquisition and explicit interrupted-decision recovery over
 authenticated HTTP.
 
-This is a JSON control API. There is no new web
-page, candidate upload, automatic staging, Cargo `config.json`, complete
-sparse/Git registry index or build dependency acquisition yet. A configured index
+This is a control/acquisition API with JSON reviews and newline-delimited package
+index entries. There is no new web page, candidate upload, automatic staging,
+Cargo `config.json`, complete Cargo sparse/Git transport or build dependency
+acquisition yet. A configured index
 URL is an immutable namespace identity; enabling these controls does not serve
 that URL or make the platform a Cargo-compatible registry. Keep #385 and #383 open
 until verified materialization and actual platform-consumer builds are integrated.
@@ -166,6 +167,37 @@ Use the separate publication preparation/approval below before acquiring index
 or archive bytes through project grants. These controls still do not implement
 Cargo index aggregation or runner dependency materialization.
 
+## Complete project index entry
+
+`GET /projects/P/registry-index/PATH` returns one complete authorized package index
+entry with `Content-Type: application/x-ndjson`, `Cache-Control: no-store` and
+`X-Content-Type-Options: nosniff`. `PATH` is the canonical lowercase Cargo index
+path, for example `sh/ar/shared-tool`, `3/a/abc`, `2/ab` or `1/a`. It is a logical
+index selector, never a filesystem path. The registry identity comes exclusively
+from the configured private root. Names/path prefixes, underscore/hyphen aliases,
+uppercase paths, extra components and mismatched registry identities cannot be
+substituted. Unknown, noncanonical or wholly unauthorized entries return 404.
+
+The same configured-owner cookie, Host/Origin guards, registry/catalog admission,
+fresh catalog writer lease and root validation used by per-version reads apply.
+Members remain forbidden, and there is no anonymous or bearer fallback. This route
+requires neither execution configuration nor a CSRF header for a guarded read;
+recovery-only/unavailable policy or invalid storage returns 503. A complete entry
+is assembled before sending a response; no prefix is sent on refusal. It uses the
+[native policy's current per-version grants, yanks and bounds](package-publication-policy.md#project-reads-revocation-and-yanks).
+That includes a 1 MiB response limit and fail-closed acquisition at the event cap.
+Corrupt/unsafe store inventory or a missing included candidate refuses acquisition.
+
+The existing `/projects/P/registry/N/V/index` route still returns exactly one
+approved version. This new entry groups only the versions currently visible to
+`P`; staged and ungranted versions are absent. Revocation changes future replies
+and cannot retract a caller's already acquired bytes. There is no global package
+listing, automatic credential creation, `config.json` or upstream fallback.
+The configured sparse/Git index URL remains an immutable namespace identity;
+this project-cookie route does not make that URL an ordinary Cargo client
+endpoint. Complete dependency acquisition and verified offline materialization
+remain separate work.
+
 ## Endpoint contract
 
 `P` is a saved lowercase 32-hex project ID. `N`/`V` are exact supported Cargo
@@ -179,6 +211,7 @@ actual consuming project: even an owner session cannot bypass its explicit grant
 | `POST /projects/P/registry/N/V/prepare` | JSON action below; returns bounded review metadata and a fresh review nonce, without publication/access changes. |
 | `POST /projects/P/registry/N/V/approve` | Exactly the returned nonce as the plain body; consumes the matching prepared review once. |
 | `GET /projects/P/registry/N/V/index` | One authorized JSON index line with current yank flag; not an aggregated Cargo index service. |
+| `GET /projects/P/registry-index/PATH` | Complete project-authorized newline-delimited package index entry, with current yank flags. |
 | `GET /projects/P/registry/N/V/archive/CHECKSUM` | Exact-checksum authorized `.crate` bytes as an attachment. |
 | `POST /package-registry/recovery/prepare` | Empty plain body; fresh review of the complete pending decision in recovery-only mode. |
 | `POST /package-registry/recovery/approve` | Exactly that recovery nonce; completes only the reviewed original decision. |
@@ -251,10 +284,13 @@ The disposable Linux library checker additionally exercises real build-to-candid
 HTTP review/staging, retention contention and logout during body delivery, dirty
 source and changed catalog/receipt refusal, corrupt archive refusal, replay/restart
 invalidation, exact staging retry, separate publication approval/project grant
-and exact generated Cargo archive acquisition.
+and exact generated Cargo archive acquisition. It also verifies complete index
+entry headers/bytes, current yank state, reader revocation/regrant and restart.
+Native offline Cargo proofs use aggregated entries for two consumers, version
+updates, yanks and retained older-version builds.
 
-Remaining #385 work is approved Cargo index aggregation/serving, complete
-authorized dependency closure/archive/vendor verification, and service/runner wiring with two actual platform consumers,
+Remaining #385 work is Cargo transport/configuration, complete authorized dependency
+closure/archive/vendor verification, and service/runner wiring with two actual platform consumers,
 version updates and retained older builds. No installer/deployment, global
 publication, public DNS, production credentials or production access-policy changes were
 performed or authorized by implementing these controls.

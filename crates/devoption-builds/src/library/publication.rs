@@ -320,12 +320,7 @@ impl Publications {
     ) -> Result<Vec<u8>, Error> {
         let version = self.allowed(actor, project, catalog, coordinates)?;
         let package = checked_candidate(candidates, &version)?;
-        let mut line: Value =
-            serde_json::from_slice(package.index_line()).map_err(|_| Error::Integrity)?;
-        line["yanked"] = json!(version.yanked);
-        let mut bytes = serde_json::to_vec(&line).map_err(|_| Error::Integrity)?;
-        bytes.push(b'\n');
-        Ok(bytes)
+        index::line(&package, version.yanked)
     }
     /// Exact-checksum locked acquisition remains possible after a yank while
     /// access is still granted. A yank changes new resolution, not archive bytes.
@@ -371,13 +366,17 @@ fn checked_candidate(candidates: &PackageStore, version: &Version) -> Result<Car
     let package = candidates
         .read(&version.coordinates)?
         .ok_or(Error::Unavailable)?;
+    verify_candidate(&package, version)?;
+    Ok(package)
+}
+fn verify_candidate(package: &CargoPackage, version: &Version) -> Result<(), Error> {
     if Sha256::digest(&package.encode()) != version.candidate
         || package.source().project() != version.source.to_bytes()
         || package.source().repository() != version.repository.to_bytes()
     {
         return Err(Error::Integrity);
     }
-    Ok(package)
+    Ok(())
 }
 fn check_source(
     catalog: &Catalog,
@@ -623,6 +622,8 @@ impl Record for Event {
         })
     }
 }
+mod index;
+pub use index::MAX_INDEX_ENTRY_BYTES;
 mod recovery;
 pub use recovery::RecoveryReview;
 #[cfg(test)]

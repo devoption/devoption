@@ -203,6 +203,10 @@ enum Action {
     RecoveryPrepare,
     RecoveryApprove,
 }
+enum Target {
+    Version(Option<(String, String, String)>, Option<String>, Action),
+    IndexEntry(String, String),
+}
 pub(super) fn routes(projects: Projects) -> Router {
     let mut router = Router::new();
     for (suffix, action, write) in [
@@ -220,9 +224,7 @@ pub(super) fn routes(projects: Projects) -> Router {
                 handle(
                     p,
                     identity,
-                    Some((project, name, version)),
-                    None,
-                    action,
+                    Target::Version(Some((project, name, version)), None, action),
                     request,
                 )
             };
@@ -243,9 +245,11 @@ pub(super) fn routes(projects: Projects) -> Router {
                 handle(
                     p,
                     identity,
-                    Some((project, name, version)),
-                    Some(checksum),
-                    Action::Archive,
+                    Target::Version(
+                        Some((project, name, version)),
+                        Some(checksum),
+                        Action::Archive,
+                    ),
                     request,
                 )
             },
@@ -266,19 +270,28 @@ pub(super) fn routes(projects: Projects) -> Router {
             path,
             post(
                 move |Extension(identity): Extension<IdentityId>, request: Request| {
-                    handle(p, identity, None, None, action, request)
+                    handle(p, identity, Target::Version(None, None, action), request)
                 },
             ),
         );
     }
+    let p = projects.clone();
+    router = router.route(
+        "/projects/{project}/registry-index/{*path}",
+        get(
+            move |Extension(identity): Extension<IdentityId>,
+                  RoutePath((project, path)): RoutePath<(String, String)>,
+                  request: Request| {
+                handle(p, identity, Target::IndexEntry(project, path), request)
+            },
+        ),
+    );
     router.merge(ingestion::routes(projects))
 }
 async fn handle(
     projects: Projects,
     identity: IdentityId,
-    coordinates: Option<(String, String, String)>,
-    checksum: Option<String>,
-    action: Action,
+    target: Target,
     request: Request,
 ) -> axum::response::Response {
     if projects.owner != Some(identity) {
@@ -292,8 +305,12 @@ async fn handle(
     };
     let headers = request.headers().clone();
     let write = matches!(
-        action,
-        Action::Prepare | Action::Approve | Action::RecoveryPrepare | Action::RecoveryApprove
+        &target,
+        Target::Version(
+            _,
+            _,
+            Action::Prepare | Action::Approve | Action::RecoveryPrepare | Action::RecoveryApprove
+        )
     );
     let body = if write {
         match text_body(request, 8192).await {
@@ -337,7 +354,28 @@ async fn handle(
                 .load()
                 .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
                 .unwrap_or_default();
-            operate(&mut engine, &catalog, coordinates, checksum, action, &body)
+            match target {
+                Target::Version(coordinates, checksum, action) => {
+                    operate(&mut engine, &catalog, coordinates, checksum, action, &body)
+                }
+                Target::IndexEntry(project, path) => {
+                    let project = project_id(&project).ok_or(StatusCode::NOT_FOUND)?;
+                    let bytes = engine
+                        .policy
+                        .as_ref()
+                        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?
+                        .index_entry(
+                            engine.owner,
+                            project,
+                            &catalog,
+                            &engine.candidates,
+                            &engine.root.binding,
+                            &path,
+                        )
+                        .map_err(mapped)?;
+                    Ok((bytes, "application/x-ndjson", false))
+                }
+            }
         },
     )
     .await;

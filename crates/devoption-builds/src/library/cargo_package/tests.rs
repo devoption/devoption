@@ -353,14 +353,7 @@ fn success(output: Output) -> Vec<u8> {
 fn seed(root: &Path, package: &CargoPackage, index: &[u8], archive: &[u8]) {
     let path = root.join("hosted/index").join(package.index_path());
     fs::create_dir_all(path.parent().unwrap()).unwrap();
-    use std::fs::OpenOptions;
-    OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .unwrap()
-        .write_all(index)
-        .unwrap();
+    fs::write(path, index).unwrap();
     fs::write(
         root.join("hosted").join(format!(
             "{}-{}.crate",
@@ -441,7 +434,14 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
     for package in &packages[..2] {
         let coordinates = package.source().coordinates();
         let index = publication
-            .index_line(owner, consumers[0], &catalog, &store, coordinates)
+            .index_entry(
+                owner,
+                consumers[0],
+                &catalog,
+                &store,
+                coordinates.registry(),
+                package.index_path(),
+            )
             .unwrap();
         let archive = publication
             .archive(
@@ -528,7 +528,14 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         .approve(owner, &catalog, &store, review)
         .unwrap();
     let index = publication
-        .index_line(owner, consumers[0], &catalog, &store, coordinates)
+        .index_entry(
+            owner,
+            consumers[0],
+            &catalog,
+            &store,
+            coordinates.registry(),
+            package.index_path(),
+        )
         .unwrap();
     let archive = publication
         .archive(
@@ -570,20 +577,16 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
     publication
         .approve(owner, &catalog, &store, review)
         .unwrap();
-    let mut index = publication
-        .index_line(owner, consumers[0], &catalog, &store, coordinates)
+    let index = publication
+        .index_entry(
+            owner,
+            consumers[0],
+            &catalog,
+            &store,
+            coordinates.registry(),
+            packages[1].index_path(),
+        )
         .unwrap();
-    index.extend(
-        publication
-            .index_line(
-                owner,
-                consumers[0],
-                &catalog,
-                &store,
-                packages[2].source().coordinates(),
-            )
-            .unwrap(),
-    );
     fs::write(
         root.join("hosted/index").join(packages[1].index_path()),
         index,
@@ -676,7 +679,7 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
             .is_ok()
     );
     println!(
-        "DevOption-generated Cargo archives/indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
+        "DevOption-generated Cargo archives/aggregated indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
     );
 }
 

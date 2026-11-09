@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Aggregate approved Cargo versions into bounded project-authorized package index
+  entries with current grants and yank flags. Expose guarded owner HTTP reads,
+  refuse incomplete/corrupt results and namespace substitution, and stream candidate
+  validation without retaining all archives or rescanning the store per version
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Add owner-authenticated review and approval for staging a Cargo candidate from
   an exact successful retained library build. Recheck session, source, receipt,
   catalog, registry identity and retention before private immutable storage;

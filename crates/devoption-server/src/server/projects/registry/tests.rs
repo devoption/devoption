@@ -740,3 +740,75 @@ fn real_loopback_http_serves_only_approved_owner_project_artifacts() {
             .any(|w| w == f.package.archive())
     );
 }
+
+#[test]
+fn complete_project_index_uses_the_existing_authenticated_admission_and_live_grants() {
+    let f = Fixture::new();
+    let path = format!(
+        "/projects/{}/registry-index/{}",
+        hex(&f.consumer.to_bytes()),
+        f.package.index_path()
+    );
+    assert_eq!(f.send("GET", &path, "").0, StatusCode::NOT_FOUND);
+    let token = f.prepare(&format!(
+        "{{\"action\":\"publish\",\"readers\":[\"{}\"]}}",
+        hex(&f.consumer.to_bytes())
+    ));
+    assert_eq!(f.approve(&token), StatusCode::OK);
+    let (status, headers, bytes) = f.send("GET", &path, "");
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers[header::CONTENT_TYPE], "application/x-ndjson");
+    assert_eq!(headers[CACHE_CONTROL], "no-store");
+    assert_eq!(headers[header::X_CONTENT_TYPE_OPTIONS], "nosniff");
+    assert_eq!(bytes, f.send("GET", &f.url(f.consumer, "index"), "").2);
+    for tail in [
+        "config.json",
+        "shared-tool",
+        "sh/ar/Shared-Tool",
+        "sh/ar/shared_tool",
+        "sh/xx/shared-tool",
+        "sh/ar/unknown",
+        "sh/ar/shared-tool/extra",
+    ] {
+        let wrong = format!(
+            "/projects/{}/registry-index/{tail}",
+            hex(&f.consumer.to_bytes())
+        );
+        assert_eq!(f.send("GET", &wrong, "").0, StatusCode::NOT_FOUND, "{tail}");
+    }
+    let mut anonymous = f.request("GET", &path, "", false);
+    anonymous.headers_mut().remove("cookie");
+    assert_eq!(f.send_request(anonymous).0, StatusCode::SEE_OTHER);
+    assert_eq!(
+        f.send_request(f.request("GET", &path, "", true)).0,
+        StatusCode::FORBIDDEN
+    );
+    let guard = f.projects.gate.clone().try_lock_owned().unwrap();
+    assert_eq!(f.send("GET", &path, "").0, StatusCode::CONFLICT);
+    drop(guard);
+    let file = fs::read_dir(f.registry.join("candidates"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.extension().is_some_and(|e| e == "cargo"))
+        .unwrap();
+    let saved = fs::read(&file).unwrap();
+    fs::write(&file, b"corrupt candidate").unwrap();
+    let (status, _, body) = f.send("GET", &path, "");
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert!(!body.starts_with(b"{"));
+    fs::write(&file, saved).unwrap();
+    let token = f.prepare("{\"action\":\"yank\",\"yanked\":true}");
+    assert_eq!(f.approve(&token), StatusCode::OK);
+    let row: Value = serde_json::from_slice(&f.send("GET", &path, "").2).unwrap();
+    assert_eq!(row["yanked"], true);
+    let token = f.prepare("{\"action\":\"readers\",\"readers\":[]}");
+    assert_eq!(f.approve(&token), StatusCode::OK);
+    assert_eq!(f.send("GET", &path, "").0, StatusCode::NOT_FOUND);
+    let source_path = path.replace(&hex(&f.consumer.to_bytes()), &hex(&f.source.to_bytes()));
+    assert_eq!(f.send("GET", &source_path, "").0, StatusCode::OK);
+    f.projects.registry.as_ref().unwrap().blocking_lock().policy = None;
+    assert_eq!(
+        f.send("GET", &source_path, "").0,
+        StatusCode::SERVICE_UNAVAILABLE
+    );
+}
