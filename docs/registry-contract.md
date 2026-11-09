@@ -13,6 +13,10 @@ The separate [library source-staging API](library-source-staging.md) retains pri
 canonical source archives/provenance, without Cargo ingestion, serving or publication.
 The [Cargo generator](cargo-package-generation.md) creates candidate archive/index
 bytes from verified library plans, without registry mutation or publication.
+The [private candidate store](cargo-package-storage.md) retains them. A separate
+[owner-only publication/access policy](package-publication-policy.md) records
+installation-local decisions and gates byte acquisition; it is not wired into
+the controller, HTTP registry or runner.
 
 The crate is independent of the build/server crates. `devoption-builds` retains
 the complete request/materialization in plans, while production source checks

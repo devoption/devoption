@@ -1,5 +1,5 @@
 //! Shared descriptor-anchored immutable record storage. No publication/access grants.
-use super::staging::{Coordinates, Error, StageOutcome};
+use super::staging::{Error, StageOutcome};
 use rustix::{
     fs::{AtFlags, Dir, FlockOperation, Mode, OFlags, flock, linkat, openat, unlinkat},
     io::Errno,
@@ -16,16 +16,15 @@ const READ: OFlags = OFlags::RDONLY
     .union(OFlags::NONBLOCK)
     .union(OFlags::CLOEXEC);
 pub(crate) trait Record: PartialEq + Sized {
+    type Key: PartialEq;
     const LOCK: &'static str;
     const PENDING: &'static str;
     const SUFFIX: &'static str;
     const MAX_BYTES: usize;
-    fn coordinates(&self) -> &Coordinates;
+    fn coordinates(&self) -> &Self::Key;
     fn encode(&self) -> Vec<u8>;
     fn decode(bytes: &[u8]) -> Result<Self, Error>;
-    fn key_for(coordinates: &Coordinates) -> String {
-        coordinates.slot().trim_end_matches(".source").to_owned() + Self::SUFFIX
-    }
+    fn key_for(coordinates: &Self::Key) -> String;
     fn key(&self) -> String {
         Self::key_for(self.coordinates())
     }
@@ -81,6 +80,10 @@ impl<T: Record> RecordStore<T> {
             marker: std::marker::PhantomData,
         };
         Ok(store)
+    }
+    pub(crate) fn binding(&self) -> Result<[(u64, u64); 2], Error> {
+        self.check()?;
+        Ok([identity(&self.directory)?, identity(&self.lock)?])
     }
     fn check(&self) -> Result<(), Error> {
         if self.poisoned {
@@ -140,6 +143,12 @@ impl<T: Record> RecordStore<T> {
             names.push(name.to_owned());
         }
         Ok(names)
+    }
+    pub(crate) fn records(&self) -> Result<Vec<T>, Error> {
+        self.inventory()?
+            .iter()
+            .map(|name| self.load(name)?.ok_or(Error::Integrity))
+            .collect()
     }
     fn load(&self, name: &str) -> Result<Option<T>, Error> {
         self.load_links(name, 1)
@@ -249,7 +258,7 @@ impl<T: Record> RecordStore<T> {
     }
     /// None means only that these coordinates are absent. Rebound index identity,
     /// unsafe storage and corrupt bytes fail closed without a fallback lookup.
-    pub fn read(&self, coordinates: &Coordinates) -> Result<Option<T>, Error> {
+    pub fn read(&self, coordinates: &T::Key) -> Result<Option<T>, Error> {
         self.inventory()?;
         let source = self.load(&T::key_for(coordinates))?;
         if source

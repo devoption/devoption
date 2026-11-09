@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add a durable owner-only local Cargo publication/access policy with exact
+  candidate review, explicit consumer-project grants, immutable namespace ownership
+  and per-version yanks. Check authorization at index/archive acquisition and
+  prove fresh-resolution refusal plus retained locked builds after a yank.
+  Controller, registry serving and runner integration remain separate
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Retain generated Cargo archives, candidate index bytes and complete source
   provenance in a private immutable store. Add exact-candidate interrupted-write
   recovery and exercise reloaded artifacts with two offline Cargo consumers.

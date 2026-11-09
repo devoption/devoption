@@ -89,6 +89,9 @@ pub(in crate::library) fn helper_for(
     version: &str,
     addition: u32,
 ) -> CargoPackage {
+    CargoPackage::from_plan(destination, &helper_plan(version, addition)).unwrap()
+}
+fn helper_plan(version: &str, addition: u32) -> BuildPlan {
     let base = base();
     let rows = format!(
         "[[package]]\nname='private-base'\nversion='0.1.0'\nsource='{INDEX}'\nchecksum='{}'\n[[package]]\nname='itoa'\nversion='1.0.18'\nsource='registry+{PUBLIC_INDEX}'\nchecksum='{}'\n",
@@ -98,7 +101,41 @@ pub(in crate::library) fn helper_for(
     let code = format!(
         "pub fn label() -> String {{ let mut b = itoa::Buffer::new(); b.format(private_base::value()+{addition}).to_owned() }}\n"
     );
-    CargoPackage::from_plan(destination, &plan("shared-helper", version, "[dependencies]\nitoa={version='=1.0.18',default-features=false}\nprivate-base={version='=0.1.0',registry='team'}\n", "'itoa','private-base'", &rows, &code, None)).unwrap()
+    plan(
+        "shared-helper",
+        version,
+        "[dependencies]\nitoa={version='=1.0.18',default-features=false}\nprivate-base={version='=0.1.0',registry='team'}\n",
+        "'itoa','private-base'",
+        &rows,
+        &code,
+        None,
+    )
+}
+pub(in crate::library) fn publication_fixture() -> (devoption_projects::Catalog, [CargoPackage; 3])
+{
+    let (mut catalog, input) = crate::tests::fixture();
+    catalog.create_project("Second consumer").unwrap();
+    let plans = [
+        plan(
+            "private-base",
+            "0.1.0",
+            "",
+            "",
+            "",
+            "pub fn value() -> u32 { 42 }\n",
+            None,
+        ),
+        helper_plan("0.1.0", 0),
+        helper_plan("0.2.0", 1),
+    ];
+    let packages = plans.map(|plan| {
+        let mut details = plan.details().clone();
+        details.project = input.project;
+        details.repository = input.repository;
+        let plan = BuildPlan::validate(details, &catalog).unwrap();
+        CargoPackage::from_plan(binding(), &plan).unwrap()
+    });
+    (catalog, packages)
 }
 fn unpack(package: &CargoPackage) -> BTreeMap<String, Vec<u8>> {
     let mut tar = Vec::new();
@@ -313,7 +350,7 @@ fn success(output: Output) -> Vec<u8> {
     );
     output.stdout
 }
-fn seed(root: &Path, package: &CargoPackage) {
+fn seed(root: &Path, package: &CargoPackage, index: &[u8], archive: &[u8]) {
     let path = root.join("hosted/index").join(package.index_path());
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     use std::fs::OpenOptions;
@@ -322,7 +359,7 @@ fn seed(root: &Path, package: &CargoPackage) {
         .append(true)
         .open(path)
         .unwrap()
-        .write_all(package.index_line())
+        .write_all(index)
         .unwrap();
     fs::write(
         root.join("hosted").join(format!(
@@ -330,7 +367,7 @@ fn seed(root: &Path, package: &CargoPackage) {
             package.source().coordinates().name(),
             package.source().coordinates().version()
         )),
-        package.archive(),
+        archive,
     )
     .unwrap();
 }
@@ -357,20 +394,91 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
     let candidates = root.join("candidates");
     fs::create_dir(&candidates).unwrap();
     fs::set_permissions(&candidates, fs::Permissions::from_mode(0o700)).unwrap();
-    let packages = [base(), helper("0.1.0", 0), helper("0.2.0", 1)];
+    let (mut catalog, packages) = publication_fixture();
+    let ungranted = catalog.create_project("Ungrantable test consumer").unwrap();
+    let source = devoption_projects::ProjectId::from_bytes(packages[0].source().project());
+    let consumers: Vec<_> = catalog
+        .projects()
+        .iter()
+        .filter(|p| p.id() != source && p.id() != ungranted)
+        .map(|p| p.id())
+        .collect();
+    let owner = crate::approvals::OwnerId::from_bytes([1; 16]);
+    use crate::library::publication::{Change, Error as PolicyError, Publications};
+    let policy = root.join("policy");
+    fs::create_dir(&policy).unwrap();
+    fs::set_permissions(&policy, fs::Permissions::from_mode(0o700)).unwrap();
+    let mut publication = Publications::open(policy.to_str().unwrap(), owner).unwrap();
     let mut store = PackageStore::open(candidates.to_str().unwrap()).unwrap();
     for package in &packages {
         store.stage(package).unwrap();
     }
     drop(store);
     let store = PackageStore::open(candidates.to_str().unwrap()).unwrap();
-    for package in &packages {
-        seed(
-            &root,
-            &store.read(package.source().coordinates()).unwrap().unwrap(),
+    for package in &packages[..2] {
+        let coordinates = package.source().coordinates();
+        assert_eq!(
+            publication.index_line(owner, consumers[0], &catalog, &store, coordinates),
+            Err(PolicyError::Denied)
         );
+        let review = publication
+            .review(
+                owner,
+                &catalog,
+                &store,
+                coordinates,
+                Change::Publish {
+                    readers: consumers.clone(),
+                },
+            )
+            .unwrap();
+        publication
+            .approve(owner, &catalog, &store, review)
+            .unwrap();
     }
-    drop(store);
+    drop(publication);
+    let mut publication = Publications::open(policy.to_str().unwrap(), owner).unwrap();
+    for package in &packages[..2] {
+        let coordinates = package.source().coordinates();
+        let index = publication
+            .index_line(owner, consumers[0], &catalog, &store, coordinates)
+            .unwrap();
+        let archive = publication
+            .archive(
+                owner,
+                consumers[0],
+                &catalog,
+                &store,
+                coordinates,
+                package.archive_sha256(),
+            )
+            .unwrap();
+        assert_eq!(
+            publication
+                .archive(
+                    owner,
+                    consumers[1],
+                    &catalog,
+                    &store,
+                    coordinates,
+                    package.archive_sha256()
+                )
+                .unwrap(),
+            archive
+        );
+        assert_eq!(
+            publication.archive(
+                owner,
+                ungranted,
+                &catalog,
+                &store,
+                coordinates,
+                package.archive_sha256()
+            ),
+            Err(PolicyError::Denied)
+        );
+        seed(&root, package, &index, &archive);
+    }
     let first = app(&root, "consumer-one", "0.1.0");
     let second = app(&root, "consumer-two", "0.1.0");
     for (path, home) in [(&first, "first"), (&second, "second")] {
@@ -398,6 +506,41 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         );
     }
     let lock = fs::read(first.join("Cargo.lock")).unwrap();
+    // The update becomes available only after a fresh explicit owner review.
+    let package = &packages[2];
+    let coordinates = package.source().coordinates();
+    assert_eq!(
+        publication.index_line(owner, consumers[0], &catalog, &store, coordinates),
+        Err(PolicyError::Denied)
+    );
+    let review = publication
+        .review(
+            owner,
+            &catalog,
+            &store,
+            coordinates,
+            Change::Publish {
+                readers: consumers.clone(),
+            },
+        )
+        .unwrap();
+    publication
+        .approve(owner, &catalog, &store, review)
+        .unwrap();
+    let index = publication
+        .index_line(owner, consumers[0], &catalog, &store, coordinates)
+        .unwrap();
+    let archive = publication
+        .archive(
+            owner,
+            consumers[0],
+            &catalog,
+            &store,
+            coordinates,
+            package.archive_sha256(),
+        )
+        .unwrap();
+    seed(&root, package, &index, &archive);
     app(&root, "consumer-one", "0.2.0");
     success(cargo(
         &root,
@@ -414,6 +557,50 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         )),
         b"43 7\n"
     );
+    let coordinates = packages[1].source().coordinates();
+    let review = publication
+        .review(
+            owner,
+            &catalog,
+            &store,
+            coordinates,
+            Change::Yank { yanked: true },
+        )
+        .unwrap();
+    publication
+        .approve(owner, &catalog, &store, review)
+        .unwrap();
+    let mut index = publication
+        .index_line(owner, consumers[0], &catalog, &store, coordinates)
+        .unwrap();
+    index.extend(
+        publication
+            .index_line(
+                owner,
+                consumers[0],
+                &catalog,
+                &store,
+                packages[2].source().coordinates(),
+            )
+            .unwrap(),
+    );
+    fs::write(
+        root.join("hosted/index").join(packages[1].index_path()),
+        index,
+    )
+    .unwrap();
+    let fresh = app(&root, "new-yanked-consumer", "0.1.0");
+    assert!(
+        !cargo(
+            &root,
+            "new-yanked",
+            &fresh,
+            &["generate-lockfile", "--offline"]
+        )
+        .status
+        .success()
+    );
+    assert!(!fresh.join("Cargo.lock").exists());
     app(&root, "consumer-one", "0.1.0");
     fs::write(first.join("Cargo.lock"), lock).unwrap();
     assert_eq!(
@@ -451,7 +638,44 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
     for home in ["missing", "corrupt"] {
         assert!(!root.join(home).join("target/release/consumer-one").exists());
     }
+    let review = publication
+        .review(
+            owner,
+            &catalog,
+            &store,
+            coordinates,
+            Change::Readers {
+                readers: vec![consumers[1]],
+            },
+        )
+        .unwrap();
+    publication
+        .approve(owner, &catalog, &store, review)
+        .unwrap();
+    assert_eq!(
+        publication.archive(
+            owner,
+            consumers[0],
+            &catalog,
+            &store,
+            coordinates,
+            packages[1].archive_sha256()
+        ),
+        Err(PolicyError::Denied)
+    );
+    assert!(
+        publication
+            .archive(
+                owner,
+                consumers[1],
+                &catalog,
+                &store,
+                coordinates,
+                packages[1].archive_sha256()
+            )
+            .is_ok()
+    );
     println!(
-        "DevOption-generated Cargo archives/indexes: two consumers, mixed registry closure, exact update, old-version rebuild and fresh-cache missing/corrupt refusal passed."
+        "DevOption-generated Cargo archives/indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
     );
 }

@@ -125,9 +125,14 @@ older lock in a fresh cache and refuses missing/corrupt dependencies. This prove
 compatibility of retained bytes, not authorization or consumption through the
 running platform. No package is published to an installation or external registry.
 
-Remaining #385 work includes approved publication, owner/project visibility and
-read/write authorization, registry serving/index aggregation, published yank and
-recovery semantics, complete verified dependency/vendor materialization and
+The separate [local publication policy](package-publication-policy.md) now
+records explicit owner approval, project readers and yanks, and checks those
+decisions before returning retained index/archive bytes. It does not make staged
+candidates automatically available.
+
+Remaining #385 work includes authenticated publication/access service integration,
+registry serving/index aggregation, policy-ledger recovery, complete verified
+dependency/vendor materialization and
 service/runner integration. Keep #385 and parent #383 open until those outcomes
 are implemented and demonstrated. Global distribution, real credentials and
 production installation/publication require separate explicit authorization.
