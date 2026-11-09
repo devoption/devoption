@@ -18,6 +18,9 @@ index line. Each versioned binary record retains:
   source digest, registry binding, exact package name/version and archive digest.
 - The generated `.crate` bytes and actual SHA-256, index-relative path and exact
   newline-terminated candidate index bytes.
+- For candidates generated through `History::library_candidate`, the successful
+  attempt ID and exact build receipt (at most 16 KiB), bound to source identity,
+  source archive bytes, package/version and `LibraryBuildV1` policy.
 - Length framing and an outer SHA-256 covering the entire record.
 
 Decoding checks lengths before allocation, the source record's own integrity,
@@ -25,7 +28,14 @@ the Cargo archive checksum against the index, exact name/version, canonical inde
 path and JSON encoding, empty feature metadata and `yanked=false`. No extraction,
 network access or Cargo execution occurs. Checksums detect corruption; they are
 not signatures or protection against the trusted OS owner. A source-plan binding
-is not proof of an approved/successful build or authorization to publish.
+is not proof of an approved/successful build or authorization to publish. Optional
+build evidence is revalidated against retained source provenance when decoding;
+it is not independent proof against OS-owner tampering. Original plan-only
+`DVCARGO1` records retain their exact encoding. Build-bound candidates use
+`DVCARGO2`; old readers fail closed on this format, so upgrade readers before
+staging it. Neither record kind can replace the other at an occupied version,
+even when Cargo archive/index bytes match. A later successful attempt or changed
+receipt also conflicts; exact retries of the original candidate remain idempotent.
 
 The version slot uses the existing [source staging](library-source-staging.md)
 coordinate identity: logical registry ID, case-folded package name with underscores
@@ -62,7 +72,8 @@ All cooperating accessors must use the API; the OS owner and local filesystem
 are trusted. No network-filesystem locking/durability guarantee is claimed.
 
 A store retains at most 128 records. Each record is bounded by two 4 MiB archives,
-a 256 KiB index line and 8192 bytes of framing/provenance allowance. The source
+a 256 KiB index line, 8192 bytes of source framing/provenance allowance,
+and at most 16 KiB plus 20 framing bytes for successful-build evidence. The source
 archive has its own tighter existing bounds. Inventory validation decodes one
 record at a time. Capacity refusal retains existing versions and still allows
 an exact retry; there is no automatic retention eviction. Operators must size
@@ -79,7 +90,8 @@ The source-only record format and source-store refusal behavior remain unchanged
 
 An operator/trusted adapter can call `PackageStore::recover(path, &expected)` only
 after selecting the exact complete `CargoPackage` intended for that directory.
-Recreate it from the same verified source and registry binding, or retain that
+Recreate it from the same verified source and registry binding (and the same
+retained attempt and exact receipt for build-bound candidates), or retain that
 value outside the interrupted process. This is an explicit private storage
 completion decision, not publication approval. No automatic startup recovery is
 performed and no credentials are needed or created.

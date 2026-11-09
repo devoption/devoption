@@ -47,6 +47,32 @@ and bindings produce identical archive/index bytes with this implementation and
 lockfile. Future compressor/format changes must preserve already retained version
 bytes; regenerating metadata is not permission to replace a version.
 
+## Successful retained build candidates
+
+`History::library_candidate(attempt, work_root, destination, source_snapshot)`
+connects generation to a successful retained `LibraryBuildV1` attempt. The caller
+must authorize the source project/attempt and destination, validate current catalog
+selection and hold the execution configuration's retention lock throughout the
+operation. The snapshot must come from verified source capture, not an imported
+archive. This API performs no source checkout, work allocation or Cargo execution.
+
+Unknown, unsuccessful, pruned, legacy and application attempts return no candidate.
+Unsafe, changed or corrupt retained artifacts fail closed using the same
+[download validation](library-builds.md) as library packages. The selected snapshot
+must match the attempt's source digest and Git revision, and its canonical source
+archive must equal the retained `source.tar` byte for byte. Receipt package name
+and version must match the snapshot as well as its job, project, repository,
+revision, source/archive digests, size, format and build policy. No fallback to
+plan-only generation occurs on failure.
+
+The resulting candidate owns the exact bounded receipt and attempt ID, accessible
+through `build_provenance()`. The [candidate store](cargo-package-storage.md)
+preserves that evidence independently of later build retention. It remains a local
+record of verified history, not a signed attestation, publication approval or
+consumer access grant. `CargoPackage::from_plan` continues to produce candidates
+without successful-build evidence; its contract and artifact bytes are unchanged.
+There is no implicit promotion between these two candidate kinds.
+
 ## Candidate index metadata
 
 The adapter returns an index-relative path and a newline-terminated JSON line
@@ -101,7 +127,7 @@ Cargo archives/index lines with exact-candidate interrupted-write recovery.
 The [local publication policy](package-publication-policy.md) separately records
 owner approval, scoped project readers and yanks before returning candidate
 archive/index bytes. The [owner-only controller](registry-controller.md) can now review, approve and
-acquire existing staged candidates. Remaining #385 work includes build-output
-ingestion and Cargo registry index aggregation, complete verified dependency/vendor
+acquire existing staged candidates. Remaining #385 work includes authenticated build-to-candidate staging controls
+and Cargo registry index aggregation, complete verified dependency/vendor
 materialization, service/runner integration and actual platform consumers. Installation-local and
 globally reachable distribution still need separate implementation and evidence.

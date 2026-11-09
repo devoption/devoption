@@ -679,3 +679,14 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         "DevOption-generated Cargo archives/indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
     );
 }
+
+#[test]
+fn unbuilt_candidate_codec_remains_version_one_and_byte_stable() {
+    let package = base();
+    assert!(package.build_provenance().is_none());
+    let encoded = package.encode();
+    assert_eq!(&encoded[..8], b"DVCARGO1");
+    let decoded = CargoPackage::decode(&encoded).unwrap();
+    assert!(decoded == package);
+    assert_eq!(decoded.encode(), encoded);
+}

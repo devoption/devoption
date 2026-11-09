@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Generate Cargo candidates from exact successful retained library attempts,
+  verifying source/archive/receipt bindings and preserving build provenance in
+  immutable versioned candidate records. Retain plan-only record compatibility
+  and refuse provenance substitution without allocating or executing more work
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Add explicit private registry-directory startup and owner-only HTTP controls
   for staged Cargo publication review/approval, status, project-granted downloads
   and interrupted-decision recovery. Enforce existing session/Origin/CSRF guards,

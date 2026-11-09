@@ -79,12 +79,24 @@ pub struct StagedSource {
 impl StagedSource {
     pub fn from_plan(registry: HostedRegistry, plan: &BuildPlan) -> Result<Self, Error> {
         let input = plan.details();
-        let source = &input.source;
+        Self::from_source(
+            registry,
+            input.project.to_bytes(),
+            input.repository.to_bytes(),
+            &input.source,
+        )
+    }
+    pub(crate) fn from_source(
+        registry: HostedRegistry,
+        project: [u8; 16],
+        repository: [u8; 16],
+        source: &crate::source_snapshot::SourceSnapshot,
+    ) -> Result<Self, Error> {
         let archive = source_package(source).map_err(|_| Error::Invalid)?;
         Ok(Self {
             coordinates: Coordinates::new(registry, source.package(), source.version())?,
-            project: input.project.to_bytes(),
-            repository: input.repository.to_bytes(),
+            project,
+            repository,
             commit: source.commit().into(),
             source: source.sha256(),
             archive_sha256: Sha256::digest(&archive),
