@@ -98,8 +98,10 @@ OS network-isolation proof or project-authorization test.
 
 The [private candidate store](cargo-package-storage.md) now retains generated
 Cargo archives/index lines with exact-candidate interrupted-write recovery.
-Remaining #385 work includes approved registry ingestion/index aggregation,
-publication review/approval, visibility/read/write authorization, version/yank
-and recovery semantics, complete verified dependency/vendor materialization,
+The [local publication policy](package-publication-policy.md) separately records
+owner approval, scoped project readers and yanks before returning candidate
+archive/index bytes. Remaining #385 work includes authenticated controller and
+registry ingestion/index aggregation, policy-ledger recovery, complete verified
+dependency/vendor materialization,
 service/runner integration and actual platform consumers. Installation-local and
 globally reachable distribution still need separate implementation and evidence.

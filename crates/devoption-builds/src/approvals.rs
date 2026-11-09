@@ -27,6 +27,9 @@ impl OwnerId {
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
+    pub(crate) const fn bytes(self) -> [u8; 16] {
+        self.0
+    }
 }
 
 /// Opaque process-local reference. Clones refer to the same single-use record.

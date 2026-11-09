@@ -19,6 +19,7 @@ not extracting or publishing the platform's internal `devoption-ui` crate.
 | Library source staging | A trusted-adapter API privately retains immutable source archives and exact registry/version/source provenance, with conflict and corruption refusal. It is not connected to the service; see [source staging](library-source-staging.md). |
 | Cargo package generation | A trusted-adapter API generates deterministic `.crate` bytes and candidate index lines from verified library plans; a native offline two-consumer fixture uses those generated artifacts. No publication or serving occurs; see [Cargo generation](cargo-package-generation.md). |
 | Cargo candidate storage | A trusted-adapter API privately retains exact generated archives, candidate index lines and source provenance, with immutable versions and explicit complete-write recovery. It is not connected to the service; see [candidate storage](cargo-package-storage.md). |
+| Local package policy | A trusted-adapter ledger records owner approval, exact consumer-project grants and yanks, and gates index/archive bytes. Controller/runner integration is pending; see [publication policy](package-publication-policy.md). |
 | Cross-project or global package distribution | No hosted registry ingestion/index service, package publication, authenticated registry download or automatic dependency-update workflow exists. Service callers still reject path, Git and custom registry dependencies. |
 | Other package ecosystems | No npm or general package build/publication pipeline is implemented. |
 
@@ -91,8 +92,9 @@ Cross-project package consumption remains outstanding.
    now use the same lifecycle. Registry ingestion remains the next separate step.
 2. [#385: Verified cross-project distribution](https://github.com/devoption/devoption/issues/385).
    Private generated package/index storage and explicit hosted identity APIs are
-   implemented as trusted adapters. Complete service integration,
-   access/visibility and publication policy, complete verified offline dependency
+   implemented as trusted adapters. An owner-only local publication/access/yank
+   policy now gates artifact reads. Complete authenticated service integration,
+   approved index aggregation, ledger recovery and verified offline dependency
    materialization, and two independent consumers with version-update and
    older-version reproducibility checks. Installation-local availability and
    globally reachable distribution must be demonstrated separately.

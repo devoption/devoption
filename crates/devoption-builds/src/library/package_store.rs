@@ -30,10 +30,14 @@ impl PackageStore {
     }
 }
 impl Record for CargoPackage {
+    type Key = Coordinates;
     const LOCK: &'static str = ".cargo-candidates.lock";
     const PENDING: &'static str = ".cargo-candidates.pending";
     const SUFFIX: &'static str = ".cargo";
     const MAX_BYTES: usize = 2 * MAX_PACKAGE_BYTES + MAX_INDEX_LINE_BYTES + 8192;
+    fn key_for(coordinates: &Coordinates) -> String {
+        coordinates.slot().trim_end_matches(".source").to_owned() + Self::SUFFIX
+    }
     fn coordinates(&self) -> &Coordinates {
         self.source().coordinates()
     }

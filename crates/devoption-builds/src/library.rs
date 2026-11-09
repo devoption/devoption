@@ -5,6 +5,7 @@ use std::io;
 
 pub mod cargo_package;
 pub mod package_store;
+pub mod publication;
 mod record_store;
 pub mod staging;
 

@@ -254,10 +254,14 @@ impl SourceStore {
     }
 }
 impl super::record_store::Record for StagedSource {
+    type Key = Coordinates;
     const LOCK: &'static str = LOCK;
     const PENDING: &'static str = PENDING;
     const SUFFIX: &'static str = ".source";
     const MAX_BYTES: usize = MAX_RECORD_BYTES;
+    fn key_for(coordinates: &Coordinates) -> String {
+        coordinates.slot().trim_end_matches(".source").to_owned() + Self::SUFFIX
+    }
     fn coordinates(&self) -> &Coordinates {
         &self.coordinates
     }
