@@ -122,6 +122,61 @@ rechecking retained candidate integrity. It grants no consumer access and fails
 visibly for missing or corrupt state. Use these observations to distinguish a
 committed action from an uncertain reply before preparing another review.
 
+## Exact locked archive acquisition
+
+`Publications::locked_archives` is a trusted native adapter for the complete
+registry-package set in a verified `SourceSnapshot`. The caller authenticates the
+configured owner, selects the actual consumer project, captures its fresh registered
+source and serializes current catalog/registry observations. The API does not
+perform repository selection, source checkout, network access, filesystem writes,
+decompression, Cargo execution or build approval.
+
+Public archives must be supplied explicitly as `PublicArchive` inputs with exact
+locked metadata. Extra, duplicate, non-public or mismatched inputs are refused.
+Every public archive must be nonempty and match its admitted source-lock checksum.
+Every hosted archive comes exclusively from a currently approved, exact candidate
+with that consumer's own reader grant and a current source-project/repository
+association. Granting a helper never grants its transitive dependencies. Namespace
+IDs, configured index URLs, exact name/version and checksum all remain distinct;
+public bytes cannot substitute for a missing, corrupt or unauthorized hosted node,
+even when public and hosted packages have identical names and versions.
+
+The source lock is inspected again with its exact hosted bindings. Its admitted
+outgoing package edges preserve origin, full version and checksum. For every
+hosted package, those edges must equal the published generated index's normal,
+nonoptional, untargeted exact dependencies, including their registry origin.
+Merely including a dependency elsewhere in the flat lock package set is
+insufficient. SemVer build metadata is ignored only when matching exact version
+requirements, as in source admission; locked full versions/checksums stay exact.
+
+Acquisition returns a `LockedArchives` value only after every requested archive
+has been verified. It owns unchanged archive bytes and current exact-version
+index metadata for hosted packages in canonical request order. There is no partial
+result or fallback. A common per-archive bound is 8 MiB; the existing 4 MiB hosted
+candidate archive limit is unchanged. Raw archives plus captured hosted index
+lines are limited to 32 MiB in total. Existing store integrity and policy event-cap
+refusals still apply. Empty lock sets are supported and reject extra inputs.
+
+The fingerprint binds consumer project, source snapshot and manifest/lock identity,
+provider/hosted-registry mappings, policy head, archive identities/bytes and hosted
+index bytes. Current catalog equality is retained separately. The value is a
+captured observation, not a transferable read grant. `revalidate_archives` requires
+the fresh source/catalog and reacquires the entire set under current policy;
+source, catalog, policy-head, candidate, grant or metadata changes invalidate the
+old view. A yank preserves exact old-lock archive acquisition while changing the
+captured index flag/fingerprint. Copied bytes cannot be retracted after revocation.
+
+This API verifies the complete **admitted lock archive set**, and hosted index
+edges, rather than the contents of arbitrary public package manifests or an
+extracted vendor tree. Gzip/tar structure, expanded-file limits, actual manifest
+semantics, vendor checksum files and physical materialization remain separate
+verification work. It intentionally returns no `CargoMaterialization` descriptor
+and implements no provider claiming a verified vendor bundle. The controller and
+runner are not wired to this API yet; current service source callers still deny
+hosted dependencies. The explicit offline Cargo fixture acquires and revalidates
+these archive sets before building two disposable native consumers, an update and
+an older locked version; that is not actual platform-consumer execution.
+
 ## Ledger, bounds and failure behavior
 
 The private descriptor-anchored engine is shared with source/candidate staging,
@@ -250,7 +305,8 @@ isolation, a running registry or platform-hosted/WASIp2 consumer acceptance.
 The [opt-in controller](registry-controller.md) now supplies authenticated staged
 candidate staging/review/acquisition/recovery controls and complete project-filtered
 per-package index entries. Remaining #385 work includes Cargo transport/configuration,
-complete verified dependency/vendor materialization and service/runner wiring
+public-package manifest/archive-structure and physical vendor verification,
+complete dependency materialization and service/runner wiring
 with actual platform consumers. Installing, globally serving or publishing real
 packages, production credentials and access-policy changes require separate
 explicit authorization. Public/global distribution is never inferred from local

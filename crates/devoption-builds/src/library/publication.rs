@@ -622,6 +622,7 @@ impl Record for Event {
         })
     }
 }
+pub mod dependencies;
 mod index;
 pub use index::MAX_INDEX_ENTRY_BYTES;
 mod recovery;

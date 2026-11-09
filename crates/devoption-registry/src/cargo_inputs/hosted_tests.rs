@@ -264,3 +264,26 @@ fn provider_cannot_reuse_materialization_for_a_changed_registry_binding_set() {
         Some(crate::Error::MismatchedRequest)
     );
 }
+
+#[test]
+fn inspected_edges_preserve_exact_transitive_origins_and_checksums() {
+    let inputs =
+        inspect_with_registries(manifest().as_bytes(), locked().as_bytes(), &bindings()).unwrap();
+    let helper = inputs
+        .package_dependencies()
+        .iter()
+        .find(|p| p.package().name == "helper")
+        .unwrap();
+    assert_eq!(helper.dependencies().len(), 1);
+    let child = &helper.dependencies()[0];
+    assert_eq!(child.name, "shared");
+    assert!(matches!(&child.origin, CargoOrigin::DevOption(id) if id.as_str() == "team"));
+    assert!(child.archive_sha256 == Sha256::from_hex(&"3".repeat(64)).unwrap());
+    assert!(
+        inputs
+            .package_dependencies()
+            .iter()
+            .filter(|p| p.package().name == "shared")
+            .all(|p| p.dependencies().is_empty())
+    );
+}

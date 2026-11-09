@@ -26,7 +26,7 @@ fn checksum(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn plan(
+pub(in crate::library) fn plan(
     name: &str,
     version: &str,
     dependencies: &str,
@@ -372,6 +372,97 @@ fn app(root: &Path, name: &str, version: &str) -> PathBuf {
     path
 }
 
+fn seed_locked_archives(
+    policy: &crate::library::publication::Publications,
+    project: devoption_projects::ProjectId,
+    catalog: &devoption_projects::Catalog,
+    store: &crate::library::package_store::PackageStore,
+    app: &Path,
+    root: &Path,
+    packages: &[CargoPackage],
+) {
+    use crate::library::publication::dependencies::PublicArchive;
+    use devoption_registry::CargoOrigin;
+    let manifest = fs::read(app.join("Cargo.toml")).unwrap();
+    let lock = fs::read(app.join("Cargo.lock")).unwrap();
+    let main = fs::read(app.join("src/main.rs")).unwrap();
+    let snapshot = ProofFixture::with_files(&[
+        ("Cargo.toml", &manifest),
+        ("Cargo.lock", &lock),
+        ("src/main.rs", &main),
+    ])
+    .verify_with_registries(&bindings())
+    .unwrap();
+    let public: Vec<_> = snapshot
+        .request()
+        .packages()
+        .iter()
+        .filter(|p| p.origin == CargoOrigin::CratesIo)
+        .map(|package| PublicArchive {
+            package,
+            bytes: ARCHIVE,
+        })
+        .collect();
+    let acquired = policy
+        .locked_archives(
+            crate::approvals::OwnerId::from_bytes([1; 16]),
+            project,
+            catalog,
+            store,
+            &snapshot,
+            &public,
+        )
+        .unwrap();
+    policy
+        .revalidate_archives(
+            crate::approvals::OwnerId::from_bytes([1; 16]),
+            catalog,
+            store,
+            &snapshot,
+            &acquired,
+        )
+        .unwrap();
+    assert_eq!(
+        acquired.archives().len(),
+        snapshot.request().packages().len()
+    );
+    for archive in acquired.archives() {
+        match &archive.package().origin {
+            CargoOrigin::CratesIo => fs::write(
+                root.join("public").join(format!(
+                    "{}-{}.crate",
+                    archive.package().name,
+                    archive.package().version
+                )),
+                archive.bytes(),
+            )
+            .unwrap(),
+            CargoOrigin::DevOption(id) => {
+                let template = packages
+                    .iter()
+                    .find(|p| {
+                        p.source().coordinates().registry().id() == id
+                            && p.source().coordinates().name() == archive.package().name
+                            && p.source().coordinates().version() == archive.package().version
+                    })
+                    .unwrap();
+                let entry = policy
+                    .index_entry(
+                        crate::approvals::OwnerId::from_bytes([1; 16]),
+                        project,
+                        catalog,
+                        store,
+                        template.source().coordinates().registry(),
+                        template.index_path(),
+                    )
+                    .unwrap();
+                assert!(archive.index_line().is_some());
+                seed(root, template, &entry, archive.bytes());
+            }
+        }
+    }
+}
+
 #[test]
 #[ignore = "explicit trusted Cargo consumers of DevOption-generated packages; no registry service"]
 fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
@@ -495,6 +586,19 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         )
         .unwrap();
         assert_eq!(request.dependency_count(), 3);
+        seed_locked_archives(
+            &publication,
+            if path == &first {
+                consumers[0]
+            } else {
+                consumers[1]
+            },
+            &catalog,
+            &store,
+            path,
+            &root,
+            &packages,
+        );
         assert_eq!(
             success(cargo(
                 &root,
@@ -555,6 +659,15 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         &first,
         &["generate-lockfile", "--offline"],
     ));
+    seed_locked_archives(
+        &publication,
+        consumers[0],
+        &catalog,
+        &store,
+        &first,
+        &root,
+        &packages,
+    );
     assert_eq!(
         success(cargo(
             &root,
@@ -606,6 +719,15 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
     assert!(!fresh.join("Cargo.lock").exists());
     app(&root, "consumer-one", "0.1.0");
     fs::write(first.join("Cargo.lock"), lock).unwrap();
+    seed_locked_archives(
+        &publication,
+        consumers[0],
+        &catalog,
+        &store,
+        &first,
+        &root,
+        &packages,
+    );
     assert_eq!(
         success(cargo(
             &root,
@@ -679,7 +801,7 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
             .is_ok()
     );
     println!(
-        "DevOption-generated Cargo archives/aggregated indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
+        "DevOption-generated Cargo locked-archive acquisition/aggregated indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
     );
 }
 

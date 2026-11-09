@@ -129,7 +129,10 @@ owner approval, scoped project readers and yanks before returning candidate
 archive/index bytes, including complete project-authorized per-package index
 entries. The [owner-only controller](registry-controller.md) can now review, approve and
 stage successful retained-build candidates and acquire separately approved packages.
-The offline Cargo fixture consumes those aggregated entries. Remaining #385 work
+The offline Cargo fixture consumes those aggregated entries and now acquires and
+freshly revalidates complete admitted archive sets through the
+[locked-archive policy adapter](package-publication-policy.md#exact-locked-archive-acquisition)
+before its two consumers, update and older-lock rebuild. Remaining #385 work
 includes Cargo transport/configuration, complete verified dependency/vendor
 materialization, service/runner integration and actual platform consumers. Installation-local and
 globally reachable distribution still need separate implementation and evidence.

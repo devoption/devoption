@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Acquire complete admitted Cargo lock archive sets through a native owner policy
+  adapter, verifying every checksum, hosted transitive grant and published index
+  edge without public fallback. Preserve exact registry origins, payload bounds,
+  immutable captured bytes and fresh source/catalog/policy revalidation; retain
+  validated lock edges for this comparison without claiming vendor verification
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Aggregate approved Cargo versions into bounded project-authorized package index
   entries with current grants and yank flags. Expose guarded owner HTTP reads,
   refuse incomplete/corrupt results and namespace substitution, and stream candidate
