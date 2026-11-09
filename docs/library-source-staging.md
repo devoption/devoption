@@ -78,8 +78,9 @@ Any failure after pending-file creation poisons the handle and preserves remaini
 evidence. A crash can leave a partial pending record, or a complete final record
 with a pending hard link. Reopening refuses pending/unsafe state. Do not blindly
 delete pending files or retry through another writer: explicit inspection/recovery
-must establish the intended version and durability before reuse. Automated
-recovery remains part of #385. The OS owner and local filesystem are trusted;
+must establish the intended version and durability before reuse. Source-store recovery remains manual. The separate
+[Cargo candidate store](cargo-package-storage.md) offers explicit exact-candidate
+completion; that operation does not open or repair source-store records. The OS owner and local filesystem are trusted;
 checksums are corruption checks, not signatures or protection against that owner.
 No network filesystem durability/locking guarantee is claimed.
 
@@ -95,7 +96,8 @@ destination. No workload or package publication is required by these tests.
 
 This implements source-package staging and private metadata lookup. A separate
 [Cargo generator](cargo-package-generation.md) produces normalized archive and
-candidate index bytes from source plans; it does not persist them here. Staging does not
+candidate index bytes from source plans; the separate [Cargo candidate
+store](cargo-package-storage.md) retains those bytes. Source staging does not
 implement Cargo archive ingestion or an index service, public/private
 visibility grants, registry authentication/serving, publication approval,
 yank/recovery policy, dependency closure verification, offline runner integration,

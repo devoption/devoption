@@ -66,7 +66,7 @@ fn plan(
     input.rust_version = "1.99.0".into();
     BuildPlan::validate(input, &catalog).unwrap()
 }
-fn base() -> CargoPackage {
+pub(in crate::library) fn base() -> CargoPackage {
     CargoPackage::from_plan(
         binding(),
         &plan(
@@ -81,10 +81,14 @@ fn base() -> CargoPackage {
     )
     .unwrap()
 }
-fn helper(version: &str, addition: u32) -> CargoPackage {
+pub(in crate::library) fn helper(version: &str, addition: u32) -> CargoPackage {
     helper_for(binding(), version, addition)
 }
-fn helper_for(destination: HostedRegistry, version: &str, addition: u32) -> CargoPackage {
+pub(in crate::library) fn helper_for(
+    destination: HostedRegistry,
+    version: &str,
+    addition: u32,
+) -> CargoPackage {
     let base = base();
     let rows = format!(
         "[[package]]\nname='private-base'\nversion='0.1.0'\nsource='{INDEX}'\nchecksum='{}'\n[[package]]\nname='itoa'\nversion='1.0.18'\nsource='registry+{PUBLIC_INDEX}'\nchecksum='{}'\n",
@@ -346,9 +350,27 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
     fs::create_dir_all(root.join("public/index/it/oa")).unwrap();
     fs::write(root.join("public/index/it/oa/itoa"), INDEX_ENTRY).unwrap();
     fs::write(root.join("public/itoa-1.0.18.crate"), ARCHIVE).unwrap();
-    seed(&root, &base());
-    seed(&root, &helper("0.1.0", 0));
-    seed(&root, &helper("0.2.0", 1));
+    // Consumers receive bytes reloaded from the durable candidate store, never
+    // directly from in-memory generation. This is still a private test seed.
+    use crate::library::package_store::PackageStore;
+    use std::os::unix::fs::PermissionsExt;
+    let candidates = root.join("candidates");
+    fs::create_dir(&candidates).unwrap();
+    fs::set_permissions(&candidates, fs::Permissions::from_mode(0o700)).unwrap();
+    let packages = [base(), helper("0.1.0", 0), helper("0.2.0", 1)];
+    let mut store = PackageStore::open(candidates.to_str().unwrap()).unwrap();
+    for package in &packages {
+        store.stage(package).unwrap();
+    }
+    drop(store);
+    let store = PackageStore::open(candidates.to_str().unwrap()).unwrap();
+    for package in &packages {
+        seed(
+            &root,
+            &store.read(package.source().coordinates()).unwrap().unwrap(),
+        );
+    }
+    drop(store);
     let first = app(&root, "consumer-one", "0.1.0");
     let second = app(&root, "consumer-two", "0.1.0");
     for (path, home) in [(&first, "first"), (&second, "second")] {

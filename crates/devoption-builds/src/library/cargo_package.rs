@@ -135,14 +135,84 @@ impl CargoPackage {
             return Err(invalid());
         }
         let name = source.package().to_ascii_lowercase();
-        let index_path = match name.len() {
-            1 => format!("1/{name}"),
-            2 => format!("2/{name}"),
-            3 => format!("3/{}/{name}", &name[..1]),
-            _ => format!("{}/{}/{name}", &name[..2], &name[2..4]),
-        };
+        let index_path = index_location(&name);
         Ok(Self {
             source: staged,
+            archive,
+            sha256,
+            index_path,
+            index_line,
+        })
+    }
+    pub(super) fn encode(&self) -> Vec<u8> {
+        let mut out = b"DVCARGO1".to_vec();
+        for bytes in [
+            self.source.encode().as_slice(),
+            self.archive.as_slice(),
+            self.index_path.as_bytes(),
+            self.index_line.as_slice(),
+        ] {
+            out.extend((bytes.len() as u32).to_be_bytes());
+            out.extend(bytes);
+        }
+        out.extend(Sha256::digest(&out).bytes());
+        out
+    }
+    pub(super) fn decode(bytes: &[u8]) -> Result<Self, super::staging::Error> {
+        use super::{record_store::Record, staging::Error};
+        if bytes.len() < 40 || bytes.len() > <Self as Record>::MAX_BYTES {
+            return Err(Error::Invalid);
+        }
+        let (body, digest) = bytes.split_at(bytes.len() - 32);
+        if Sha256::digest(body).bytes() != digest {
+            return Err(Error::Integrity);
+        }
+        if &body[..8] != b"DVCARGO1" {
+            return Err(Error::Invalid);
+        }
+        let mut rest = &body[8..];
+        fn field<'a>(rest: &mut &'a [u8], max: usize) -> Result<&'a [u8], Error> {
+            if rest.len() < 4 {
+                return Err(Error::Invalid);
+            }
+            let n = u32::from_be_bytes(rest[..4].try_into().map_err(|_| Error::Invalid)?) as usize;
+            if n == 0 || n > max || n > rest.len() - 4 {
+                return Err(Error::Invalid);
+            }
+            let value = &rest[4..4 + n];
+            *rest = &rest[4 + n..];
+            Ok(value)
+        }
+        let source = StagedSource::decode(field(&mut rest, MAX_PACKAGE_BYTES + 4096)?)?;
+        let archive = field(&mut rest, MAX_PACKAGE_BYTES)?.to_vec();
+        let index_path = std::str::from_utf8(field(&mut rest, 512)?)
+            .map_err(|_| Error::Invalid)?
+            .to_owned();
+        let index_line = field(&mut rest, MAX_INDEX_LINE_BYTES)?.to_vec();
+        if !rest.is_empty() {
+            return Err(Error::Invalid);
+        }
+        let sha256 = Sha256::digest(&archive);
+        let line: serde_json::Value =
+            serde_json::from_slice(&index_line).map_err(|_| Error::Invalid)?;
+        let mut canonical = serde_json::to_vec(&line).map_err(|_| Error::Invalid)?;
+        canonical.push(b'\n');
+        let coordinates = source.coordinates();
+        let name = coordinates.name().to_ascii_lowercase();
+        if index_path != index_location(&name)
+            || canonical != index_line
+            || line.as_object().map(|o| o.len()) != Some(6)
+            || line["name"] != coordinates.name()
+            || line["vers"] != coordinates.version()
+            || line["cksum"] != hex(sha256)
+            || line["features"] != json!({})
+            || line["yanked"] != false
+            || !line["deps"].is_array()
+        {
+            return Err(Error::Integrity);
+        }
+        Ok(Self {
+            source,
             archive,
             sha256,
             index_path,
@@ -165,9 +235,20 @@ impl CargoPackage {
         &self.index_line
     }
 }
+fn index_location(name: &str) -> String {
+    match name.len() {
+        1 => format!("1/{name}"),
+        2 => format!("2/{name}"),
+        3 => format!("3/{}/{name}", &name[..1]),
+        _ => format!("{}/{}/{name}", &name[..2], &name[2..4]),
+    }
+}
+fn hex(value: Sha256) -> String {
+    value.bytes().iter().map(|b| format!("{b:02x}")).collect()
+}
 fn invalid() -> io::Error {
     io::Error::other("unsupported or oversized Cargo source package")
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;
