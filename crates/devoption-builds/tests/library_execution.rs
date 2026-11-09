@@ -208,10 +208,97 @@ fn approved_library_build_test_package_and_failures() {
     );
     assert!(!archive.parent().unwrap().join("component.wasm").exists());
     fs::copy(&archive, base.join("verified-source.tar")).unwrap();
+    // Turn the real completed broker attempt into a durable private candidate.
+    // No new workload or publication is authorized by this conversion.
+    let candidate = {
+        let _retention = fixture.config.retention_lock().unwrap();
+        let attempt = fixture
+            .history
+            .load()
+            .unwrap()
+            .into_iter()
+            .find(|r| matches!(r.state(), State::Succeeded(_)))
+            .unwrap()
+            .id();
+        let destination = devoption_registry::HostedRegistry::new(
+            devoption_registry::RegistryId::new("team").unwrap(),
+            "sparse+https://packages.example.test/index/",
+        )
+        .unwrap();
+        fixture
+            .history
+            .library_candidate(
+                attempt,
+                fixture.config.work_root(),
+                destination,
+                &source_before,
+            )
+            .unwrap()
+            .unwrap()
+    };
+    assert_eq!(
+        candidate.build_provenance().unwrap().receipt(),
+        fs::read(archive.parent().unwrap().join("receipt.toml")).unwrap()
+    );
+    let candidate_path = base.join("candidates");
+    fs::create_dir(&candidate_path).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(&candidate_path, fs::Permissions::from_mode(0o700)).unwrap();
+    let mut candidates = devoption_builds::library::package_store::PackageStore::open(
+        candidate_path.to_str().unwrap(),
+    )
+    .unwrap();
+    candidates.stage(&candidate).unwrap();
+    drop(candidates);
+    let mut candidates = devoption_builds::library::package_store::PackageStore::open(
+        candidate_path.to_str().unwrap(),
+    )
+    .unwrap();
+    assert!(
+        candidates
+            .read(candidate.source().coordinates())
+            .unwrap()
+            .unwrap()
+            == candidate
+    );
+
     fixture.commit("pub fn answer() -> u32 { 43 }\n");
     let (state, second) = fixture.run(false, false);
     assert!(matches!(state, State::Succeeded(_)), "{state:?}");
     assert_ne!(fs::read(second).unwrap(), fs::read(archive).unwrap());
+    {
+        let _retention = fixture.config.retention_lock().unwrap();
+        let attempt = fixture
+            .history
+            .load()
+            .unwrap()
+            .into_iter()
+            .find(|r| r.commit() == fixture.capture().commit())
+            .unwrap()
+            .id();
+        let updated = fixture
+            .history
+            .library_candidate(
+                attempt,
+                fixture.config.work_root(),
+                candidate.source().coordinates().registry().clone(),
+                &fixture.capture(),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            candidates.stage(&updated).err(),
+            Some(devoption_builds::library::staging::Error::Conflict)
+        );
+        assert!(
+            candidates
+                .read(candidate.source().coordinates())
+                .unwrap()
+                .unwrap()
+                == candidate
+        );
+    }
+
     let (state, artifact) = fixture.run(true, false);
     assert_eq!(state, State::Failed(Failure::Preparation));
     assert!(!artifact.exists());
@@ -232,7 +319,23 @@ fn approved_library_build_test_package_and_failures() {
             .iter()
             .all(|r| !matches!(r.state(), State::Queued | State::Running))
     );
+    for record in fixture.history.load().unwrap() {
+        if !matches!(record.state(), State::Succeeded(_)) {
+            assert!(
+                fixture
+                    .history
+                    .library_candidate(
+                        record.id(),
+                        fixture.config.work_root(),
+                        candidate.source().coordinates().registry().clone(),
+                        &source_before
+                    )
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
     println!(
-        "Library native build/unit tests/WASIp2, exact source archive, revision change, stale review, failed tests and cancellation passed."
+        "Library native build/unit tests/WASIp2, exact source archive and build-bound Cargo candidate, immutable version conflict, revision change, stale review, failed tests and cancellation passed."
     );
 }

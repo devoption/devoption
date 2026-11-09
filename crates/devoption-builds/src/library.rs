@@ -3,6 +3,7 @@ use crate::source_snapshot::SourceSnapshot;
 use devoption_registry::cargo_inputs::SourceTarget;
 use std::io;
 
+pub mod build_provenance;
 pub mod cargo_package;
 pub mod package_store;
 pub mod publication;

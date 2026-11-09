@@ -65,8 +65,10 @@ devoption serve --data-dir /absolute/owner-data --package-registry-dir /absolute
 This combines with existing repository/history, project-secret, runner and
 app-deployment options when those capabilities are independently configured. It
 adds no execution, provider or publication authority to a candidate. The current
-candidate producer remains the trusted `CargoPackage::from_plan`/`PackageStore`
-API; successful library builds/downloads are not automatically ingested here.
+candidate producers are the trusted plan-only generator and the
+[successful retained-build adapter](cargo-package-generation.md#successful-retained-build-candidates),
+followed by `PackageStore::stage`. These native APIs do not ingest successful
+library builds/downloads through this controller or enable automatic staging.
 
 Root/config bytes and retained directory identities are rechecked on each
 admitted operation. Changed configuration, replaced roots/children, unsafe files

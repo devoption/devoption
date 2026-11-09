@@ -55,7 +55,12 @@ impl History {
         if identity(&artifact)?.0 != identity(&root)?.0 {
             return Err(Error::Unsafe);
         }
-        let receipt = read_child(&artifact, "receipt.toml", self.uid, 16384)?;
+        let receipt = read_child(
+            &artifact,
+            "receipt.toml",
+            self.uid,
+            crate::library::build_provenance::MAX_RECEIPT_BYTES,
+        )?;
         let table: toml::Table = std::str::from_utf8(&receipt)
             .map_err(|_| Error::Corrupt)?
             .parse()
@@ -77,8 +82,48 @@ impl History {
         self.check_storage()?;
         Ok(Some(LibraryPackage { source, receipt }))
     }
+
+    /// Generate a candidate only from an intact successful retained library build
+    /// and the exact verified source snapshot. The caller must authorize access,
+    /// validate the current catalog selection and hold the retention lock throughout.
+    /// Does not allocate work, execute, stage, publish or grant consumer access.
+    pub fn library_candidate(
+        &self,
+        id: JobId,
+        work: &Path,
+        destination: devoption_registry::HostedRegistry,
+        source: &crate::source_snapshot::SourceSnapshot,
+    ) -> Result<Option<crate::library::cargo_package::CargoPackage>, Error> {
+        let Some(retained) = self.library_package(id, work)? else {
+            return Ok(None);
+        };
+        let record = self
+            .load()?
+            .into_iter()
+            .find(|r| r.id == id)
+            .ok_or(Error::Changed)?;
+        if record.commit != source.commit()
+            || record.source != *source.sha256().bytes()
+            || crate::library::source_package(source).map_err(|_| Error::Corrupt)?
+                != retained.source
+        {
+            return Err(Error::Changed);
+        }
+        let mut package = crate::library::cargo_package::CargoPackage::from_source(
+            destination,
+            record.project,
+            record.repository,
+            source,
+        )
+        .map_err(|_| Error::Corrupt)?;
+        package
+            .bind_build(id, retained.receipt)
+            .map_err(|_| Error::Corrupt)?;
+        Ok(Some(package))
+    }
 }
 
+#[cfg(test)]
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -87,70 +132,20 @@ fn validate_receipt(
     record: &Record,
     metadata: &ArtifactMetadata,
 ) -> Result<(), Error> {
-    let keys = [
-        "version",
-        "job",
-        "project",
-        "repository",
-        "commit",
-        "source_sha256",
-        "review_sha256",
-        "artifact_sha256",
-        "artifact_bytes",
-        "artifact",
-        "toolchain_sha256",
-        "dependency_sha256",
-        "configuration_sha256",
-        "build_policy",
-        "target",
-        "package",
-        "package_version",
-        "package_format",
-    ];
-    if table.len() != keys.len()
-        || keys.iter().any(|k| !table.contains_key(*k))
-        || table["version"].as_integer() != Some(2)
-        || table["artifact_bytes"]
-            .as_integer()
-            .and_then(|n| u64::try_from(n).ok())
-            != Some(metadata.bytes())
-    {
-        return Err(Error::Corrupt);
-    }
-    for (key, expected) in [
-        ("job", hex(&record.id.to_bytes())),
-        ("project", hex(&record.project)),
-        ("repository", hex(&record.repository)),
-        ("commit", record.commit.clone()),
-        ("source_sha256", hex(&record.source)),
-        ("artifact_sha256", hex(metadata.sha256().bytes())),
-        ("artifact", "source.tar".into()),
-        ("target", "native+wasm32-wasip2".into()),
-        ("package_format", "ustar-source-v1".into()),
-    ] {
-        if table[key].as_str() != Some(expected.as_str()) {
-            return Err(Error::Corrupt);
-        }
-    }
-    for key in [
-        "review_sha256",
-        "toolchain_sha256",
-        "dependency_sha256",
-        "configuration_sha256",
-    ] {
-        Sha256::from_hex(table[key].as_str().ok_or(Error::Corrupt)?).map_err(|_| Error::Corrupt)?;
-    }
-    for key in ["package", "package_version"] {
-        let value = table[key].as_str().ok_or(Error::Corrupt)?;
-        if value.is_empty()
-            || value.len() > 128
-            || !value.is_ascii()
-            || value.bytes().any(|b| b.is_ascii_control())
-        {
-            return Err(Error::Corrupt);
-        }
-    }
-    Ok(())
+    crate::library::build_provenance::validate(
+        table,
+        crate::library::build_provenance::Binding {
+            attempt: record.id,
+            project: record.project,
+            repository: record.repository,
+            commit: &record.commit,
+            source: &record.source,
+            artifact: *metadata.sha256(),
+            artifact_bytes: metadata.bytes(),
+            package: None,
+        },
+    )
+    .map_err(|_| Error::Corrupt)
 }
 
 fn read_child(parent: &File, name: &str, uid: u32, max: usize) -> Result<Vec<u8>, Error> {
@@ -188,6 +183,7 @@ mod tests {
         id: JobId,
         receipt: Vec<u8>,
         source: Vec<u8>,
+        snapshot: crate::source_snapshot::SourceSnapshot,
     }
     fn private(path: &Path) {
         fs::create_dir(path).unwrap();
@@ -204,18 +200,29 @@ mod tests {
             private(&base.join("history"));
             private(&base.join("work"));
             let mut history = History::open(base.join("history").to_str().unwrap()).unwrap();
-            let mut job = history.queue(crate::review_context::tests::plan()).unwrap();
+            let snapshot = crate::source_snapshot::tests::ProofFixture::library("rlib")
+                .verify()
+                .unwrap();
+            let (catalog, mut input) = crate::tests::fixture();
+            input.commit = snapshot.commit().into();
+            input.dependencies = devoption_registry::CargoMaterialization::new(
+                snapshot.request().clone(),
+                Sha256::digest(b"fixture vendor metadata"),
+                1,
+            );
+            input.package = snapshot.package().into();
+            input.binary = "ExampleService".into();
+            input.source = snapshot.clone();
+            input.rust_version = "1.99.0".into();
+            let mut job = history
+                .queue(BuildPlan::validate(input, &catalog).unwrap())
+                .unwrap();
             let work = base.join("work");
             let directory = work.join("ab".repeat(16));
             private(&directory);
             private(&directory.join("artifact"));
             history.bind_work(job.id(), &work, &directory).unwrap();
-            let source = crate::library::source_package(
-                &crate::source_snapshot::tests::ProofFixture::library("rlib")
-                    .verify()
-                    .unwrap(),
-            )
-            .unwrap();
+            let source = crate::library::source_package(&snapshot).unwrap();
             let metadata =
                 ArtifactMetadata::new(Sha256::digest(&source), source.len() as u64).unwrap();
             job.apply(RunnerEvent::observed(&job, State::Running))
@@ -239,7 +246,7 @@ mod tests {
                 ("artifact", "source.tar".into()),
                 ("target", "native+wasm32-wasip2".into()),
                 ("package_format", "ustar-source-v1".into()),
-                ("package", "fixture".into()),
+                ("package", snapshot.package().into()),
                 ("package_version", "0.1.0".into()),
                 ("build_policy", "LibraryBuildV1".into()),
                 ("toolchain_sha256", "12".repeat(32)),
@@ -275,11 +282,171 @@ mod tests {
                 id: job.id(),
                 receipt,
                 source,
+                snapshot,
             }
         }
         fn read(&self) -> Result<Option<LibraryPackage>, Error> {
             self.history.library_package(self.id, &self.work)
         }
+    }
+    fn destination() -> devoption_registry::HostedRegistry {
+        devoption_registry::HostedRegistry::new(
+            devoption_registry::RegistryId::new("team").unwrap(),
+            "sparse+https://packages.example.test/index/",
+        )
+        .unwrap()
+    }
+    #[test]
+    fn successful_candidate_preserves_build_evidence_across_storage_and_conflicts() {
+        use crate::library::{package_store::PackageStore, staging::StageOutcome};
+        let f = Fixture::new();
+        let candidate = f
+            .history
+            .library_candidate(f.id, &f.work, destination(), &f.snapshot)
+            .unwrap()
+            .unwrap();
+        let proof = candidate.build_provenance().unwrap();
+        assert_eq!(proof.attempt(), f.id);
+        assert_eq!(proof.receipt(), f.receipt);
+        assert_eq!(candidate.source().archive(), f.source);
+        let records = f.history.load().unwrap();
+        assert_eq!(records.len(), 1); // generation never queues another workload
+        let store_path = f.work.join("candidates");
+        private(&store_path);
+        let path = store_path.to_str().unwrap();
+        let mut store = PackageStore::open(path).unwrap();
+        assert_eq!(store.stage(&candidate), Ok(StageOutcome::Stored));
+        assert_eq!(store.stage(&candidate), Ok(StageOutcome::AlreadyPresent));
+        drop(store);
+        let mut store = PackageStore::open(path).unwrap();
+        assert!(
+            store
+                .read(candidate.source().coordinates())
+                .unwrap()
+                .unwrap()
+                == candidate
+        );
+        let mut changed = candidate.clone();
+        let receipt = String::from_utf8(f.receipt.clone())
+            .unwrap()
+            .replace(&"12".repeat(32), &"13".repeat(32));
+        changed.bind_build(f.id, receipt.into_bytes()).unwrap();
+        assert_eq!(
+            store.stage(&changed).err(),
+            Some(crate::library::staging::Error::Conflict)
+        );
+        // A successful candidate remains self-contained after build retention.
+        fs::remove_file(f.artifact.join("receipt.toml")).unwrap();
+        assert!(
+            store
+                .read(candidate.source().coordinates())
+                .unwrap()
+                .unwrap()
+                == candidate
+        );
+        assert!(
+            f.history
+                .library_candidate(f.id, &f.work, destination(), &f.snapshot)
+                .is_err()
+        );
+    }
+    #[test]
+    fn stored_build_receipt_substitution_is_refused_even_with_recomputed_record_digest() {
+        use crate::library::package_store::PackageStore;
+        let f = Fixture::new();
+        let candidate = f
+            .history
+            .library_candidate(f.id, &f.work, destination(), &f.snapshot)
+            .unwrap()
+            .unwrap();
+        let store_path = f.work.join("candidates");
+        private(&store_path);
+        let mut store = PackageStore::open(store_path.to_str().unwrap()).unwrap();
+        store.stage(&candidate).unwrap();
+        let file = fs::read_dir(&store_path)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .find(|p| p.extension().is_some_and(|e| e == "cargo"))
+            .unwrap();
+        let original = fs::read(&file).unwrap();
+        assert_eq!(&original[..8], b"DVCARGO2");
+        for key in [
+            "job",
+            "project",
+            "repository",
+            "commit",
+            "source_sha256",
+            "artifact_sha256",
+            "package",
+            "package_version",
+            "build_policy",
+            "target",
+            "package_format",
+        ] {
+            let mut changed = original[..original.len() - 32].to_vec();
+            let needle = format!("{key} = ");
+            let start = changed
+                .windows(needle.len())
+                .rposition(|s| s == needle.as_bytes())
+                .unwrap()
+                + needle.len()
+                + 1;
+            changed[start] = if changed[start] == b'0' { b'1' } else { b'0' };
+            changed.extend(Sha256::digest(&changed).bytes());
+            write(&file, &changed);
+            assert!(
+                store.read(candidate.source().coordinates()).is_err(),
+                "{key}"
+            );
+        }
+        write(&file, &original);
+        assert!(
+            store
+                .read(candidate.source().coordinates())
+                .unwrap()
+                .unwrap()
+                == candidate
+        );
+    }
+    #[test]
+    fn candidate_refuses_mismatched_source_package_and_unavailable_builds() {
+        let f = Fixture::new();
+        let wrong = crate::source_snapshot::tests::ProofFixture::new()
+            .verify()
+            .unwrap();
+        assert!(
+            f.history
+                .library_candidate(f.id, &f.work, destination(), &wrong)
+                .is_err()
+        );
+        assert!(
+            f.history
+                .library_candidate(
+                    JobId::from_bytes([0; 16]),
+                    &f.work,
+                    destination(),
+                    &f.snapshot
+                )
+                .unwrap()
+                .is_none()
+        );
+        let receipt = String::from_utf8(f.receipt.clone()).unwrap();
+        let wrong_package = receipt
+            .lines()
+            .map(|line| {
+                if line.starts_with("package =") {
+                    "package = \"other\"\n".to_owned()
+                } else {
+                    format!("{line}\n")
+                }
+            })
+            .collect::<String>();
+        write(&f.artifact.join("receipt.toml"), wrong_package.as_bytes());
+        assert!(
+            f.history
+                .library_candidate(f.id, &f.work, destination(), &f.snapshot)
+                .is_err()
+        );
     }
     #[test]
     fn retained_package_is_owned_and_bound_to_success_and_exact_receipt() {

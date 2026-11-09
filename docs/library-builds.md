@@ -140,7 +140,9 @@ and passwordless fixture sudo, as in existing build acceptance. The ordinary CI
 bundle suite runs it; never run it against an existing installation.
 
 The checker covers native compilation/unit tests, WASIp2 compilation, exact
-source preservation/archive bytes and receipt, a second revision, stale review
+source preservation/archive bytes and receipt, native generation/staging/reopen of
+a Cargo candidate from the successful retained build with its exact receipt,
+refusal to overwrite that version from a second successful revision, stale review
 refusal, failing unit tests, running cancellation and queued-job interruption
 recovery. Python independently reads the archive and compares every file against
 the selected fixture, then builds/runs a separate native consumer and compiles it

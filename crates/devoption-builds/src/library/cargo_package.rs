@@ -12,8 +12,9 @@ use std::{
 const PUBLIC_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
 pub const MAX_INDEX_LINE_BYTES: usize = 256 * 1024;
 
-/// Owned archive/index bytes bound to source-stage provenance. This neither
-/// attests build success nor authorizes publication, serving or execution.
+/// Owned archive/index bytes bound to source-stage provenance. `from_plan` does
+/// not attest build success; History may attach verified retained-build evidence.
+/// Neither path authorizes publication, serving or execution.
 /// No Debug implementation exposes private metadata, code or registry endpoints.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CargoPackage {
@@ -22,11 +23,26 @@ pub struct CargoPackage {
     sha256: Sha256,
     index_path: String,
     index_line: Vec<u8>,
+    provenance: Option<super::build_provenance::BuildProvenance>,
 }
 impl CargoPackage {
     pub fn from_plan(destination: HostedRegistry, plan: &BuildPlan) -> io::Result<Self> {
-        let staged = StagedSource::from_plan(destination.clone(), plan).map_err(|_| invalid())?;
-        let source = &plan.details().source;
+        let input = plan.details();
+        Self::from_source(
+            destination,
+            input.project.to_bytes(),
+            input.repository.to_bytes(),
+            &input.source,
+        )
+    }
+    pub(crate) fn from_source(
+        destination: HostedRegistry,
+        project: [u8; 16],
+        repository: [u8; 16],
+        source: &crate::source_snapshot::SourceSnapshot,
+    ) -> io::Result<Self> {
+        let staged = StagedSource::from_source(destination.clone(), project, repository, source)
+            .map_err(|_| invalid())?;
         if source.files().iter().any(|file| {
             [
                 "Cargo.toml.orig",
@@ -142,10 +158,16 @@ impl CargoPackage {
             sha256,
             index_path,
             index_line,
+            provenance: None,
         })
     }
     pub(super) fn encode(&self) -> Vec<u8> {
-        let mut out = b"DVCARGO1".to_vec();
+        let mut out = if self.provenance.is_some() {
+            b"DVCARGO2"
+        } else {
+            b"DVCARGO1"
+        }
+        .to_vec();
         for bytes in [
             self.source.encode().as_slice(),
             self.archive.as_slice(),
@@ -154,6 +176,11 @@ impl CargoPackage {
         ] {
             out.extend((bytes.len() as u32).to_be_bytes());
             out.extend(bytes);
+        }
+        if let Some(provenance) = &self.provenance {
+            out.extend(provenance.attempt().to_bytes());
+            out.extend((provenance.receipt().len() as u32).to_be_bytes());
+            out.extend(provenance.receipt());
         }
         out.extend(Sha256::digest(&out).bytes());
         out
@@ -167,7 +194,8 @@ impl CargoPackage {
         if Sha256::digest(body).bytes() != digest {
             return Err(Error::Integrity);
         }
-        if &body[..8] != b"DVCARGO1" {
+        let built = &body[..8] == b"DVCARGO2";
+        if !built && &body[..8] != b"DVCARGO1" {
             return Err(Error::Invalid);
         }
         let mut rest = &body[8..];
@@ -189,6 +217,21 @@ impl CargoPackage {
             .map_err(|_| Error::Invalid)?
             .to_owned();
         let index_line = field(&mut rest, MAX_INDEX_LINE_BYTES)?.to_vec();
+        let provenance = if built {
+            if rest.len() < 16 {
+                return Err(Error::Invalid);
+            }
+            let attempt =
+                crate::jobs::JobId::from_bytes(rest[..16].try_into().map_err(|_| Error::Invalid)?);
+            rest = &rest[16..];
+            let receipt = field(&mut rest, super::build_provenance::MAX_RECEIPT_BYTES)?.to_vec();
+            Some(
+                super::build_provenance::BuildProvenance::new(attempt, receipt, &source)
+                    .map_err(|_| Error::Integrity)?,
+            )
+        } else {
+            None
+        };
         if !rest.is_empty() {
             return Err(Error::Invalid);
         }
@@ -217,7 +260,23 @@ impl CargoPackage {
             sha256,
             index_path,
             index_line,
+            provenance,
         })
+    }
+    /// Captured retained-build evidence, not publication or execution authority.
+    pub fn build_provenance(&self) -> Option<&super::build_provenance::BuildProvenance> {
+        self.provenance.as_ref()
+    }
+    pub(crate) fn bind_build(
+        &mut self,
+        attempt: crate::jobs::JobId,
+        receipt: Vec<u8>,
+    ) -> io::Result<()> {
+        self.provenance = Some(
+            super::build_provenance::BuildProvenance::new(attempt, receipt, &self.source)
+                .map_err(|_| invalid())?,
+        );
+        Ok(())
     }
     pub fn source(&self) -> &StagedSource {
         &self.source
