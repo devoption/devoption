@@ -121,11 +121,63 @@ reviews. The native API does not supply HTTP rate/concurrency controls.
 Events use the existing sync/pending/nonreplacement-link/directory-sync commit
 sequence. A partial or uncertain append blocks subsequent ledger reads, including
 after restart; it never becomes an empty registry or inferred approval. Preserve
-pending evidence. This policy API intentionally exposes no automatic/in-place
-ledger recovery or pending-file deletion operation yet. Candidate-store recovery
-does not repair policy decisions. Keep registry access disabled during inspection
-until a separately implemented and reviewed ledger-recovery procedure resolves
-its exact approved decision. That remaining recovery integration stays in #385.
+pending evidence. Candidate-store recovery does not repair policy decisions.
+There is no automatic startup repair, pending-file discard or ledger reset.
+
+### Fresh review of an interrupted decision
+
+The trusted owner adapter can explicitly complete a **complete** pending policy
+record with `Publications::review_recovery`, followed by
+`Publications::approve_recovery`. Close ordinary ledger handles first; inspection
+and approval each acquire the same nonblocking exclusive ledger lock. Recovery
+is a new owner decision to complete the exact pending action, not an inference
+that its original approval or a saved UI token remains valid.
+
+Inspection validates the entire committed prefix and the pending event's exact
+sequence, previous hash, configured owner, action and candidate fingerprint.
+It rechecks retained candidate bytes, source project/repository association and
+all reader projects against the freshly supplied catalog. A pending publication,
+reader grant, revocation or yank must still be a valid next transition. A pending
+hard-linked final record is excluded from the committed prefix only after its
+inode and bytes match the pending name. No record is changed during preparation.
+
+The opaque non-cloneable `RecoveryReview` exposes `decision()` for the exact
+candidate, proposed change, sequence and remaining capacity, and
+`final_link_present()` for the observed commit boundary. Its five-minute lifetime
+starts at this fresh inspection. It binds the full catalog, exact pending event,
+prior ledger head, directory/lock identity, pending inode and link state. It
+cannot be converted into a normal publication approval or serialized as authority.
+The adapter must show the exact action, including any grants/revocations and
+capacity consequences, and authenticate a new explicit owner confirmation.
+
+Approval reopens and revalidates all observations under the exclusive lock and
+holds that same lock through completion. It syncs a complete pending file,
+creates the final link without replacement if needed, syncs the directory,
+removes only the matching pending name and syncs again. If the final link already
+exists, it must be the same inode with exactly two links. Recovery preserves the
+original event, action, sequence, candidate bytes and ledger prefix; it does not
+append a replacement decision or reset capacity. A pending revocation therefore
+completes that revocation instead of exposing the older reader set. Completing
+the last event still leaves acquisition blocked by the full-capacity rule.
+
+Wrong owner, stale/expired review, changed catalog/candidate, copied ledger,
+replaced pending inode, changed link state, invalid transition, partial/corrupt
+record, unknown reader, broken prefix, independent occupied destination or unsafe
+storage refuses recovery and retains evidence. If the complete candidate store
+itself needs recovery, resolve that separate exact-candidate operation first;
+there is no fetch/regeneration fallback in policy recovery. Partial evidence and
+conflicts need separate inspection; no generic deletion/repair API is supplied.
+
+Approval consumes its review even on failure. If recovery itself is interrupted,
+a complete pending record can receive another fresh recovery review. If the
+pending name is already absent, do not infer success or retry a stale approval:
+ordinary `Publications::open` and owner `status` must establish the actual decision
+and verified candidate. Fresh catalog loading, authenticated owner input and
+bounded request/concurrency controls remain duties of the future service adapter.
+The ledger lock serializes policy writes only: the adapter must also hold its
+catalog/authorization gates through approval and acquisition, preventing a supplied
+catalog snapshot from racing with an access or project change.
+This native API neither enables a controller endpoint nor restores policy backups.
 
 The OS owner and local filesystem are trusted. Hashes detect corruption and broken
 chains; they do not prevent an administrator from deleting/rolling back the entire
@@ -142,7 +194,13 @@ default-private/project grants and revocation, stale/expired/cross-ledger review
 immutable versions and namespaces, yanks/unyanks and locked checksums, restart,
 corruption/gaps/pending evidence, missing candidates and full event capacity.
 Existing source/candidate safety and interrupted-write tests cover the shared
-engine. Compile-fail coverage prevents constructing a review outside the module.
+engine. Compile-fail coverage prevents constructing normal/recovery reviews
+outside their modules. Recovery tests cover both complete commit boundaries,
+publication/grants/revocation/yanks, stale/changed/unsafe evidence, current catalog
+and candidate refusal, lock ownership and full-capacity preservation. A disposable
+child exits without Rust writer cleanup before/after the final link; its parent
+performs a fresh owner recovery review and verifies that a revoked reader stays
+denied. These are process/fault-injection checks, not power-loss evidence.
 
 The explicit trusted Cargo fixture now passes generated artifacts through both
 candidate and publication APIs before seeding disposable offline sources:
@@ -161,7 +219,7 @@ This is policy/Cargo compatibility evidence, not browser authentication, OS netw
 isolation, a running registry or platform-hosted/WASIp2 consumer acceptance.
 
 Remaining #385 work includes authenticated controller review/actions and scoped
-acquisition, approved index aggregation/serving, explicit ledger recovery,
+acquisition and recovery controls, approved index aggregation/serving,
 complete verified dependency/vendor materialization and service/runner wiring
 with actual platform consumers. Installing, globally serving or publishing real
 packages, production credentials and access-policy changes require separate

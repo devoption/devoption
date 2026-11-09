@@ -101,7 +101,6 @@ Cargo archives/index lines with exact-candidate interrupted-write recovery.
 The [local publication policy](package-publication-policy.md) separately records
 owner approval, scoped project readers and yanks before returning candidate
 archive/index bytes. Remaining #385 work includes authenticated controller and
-registry ingestion/index aggregation, policy-ledger recovery, complete verified
-dependency/vendor materialization,
-service/runner integration and actual platform consumers. Installation-local and
+registry ingestion/index aggregation, complete verified dependency/vendor
+materialization, service/runner integration and actual platform consumers. Installation-local and
 globally reachable distribution still need separate implementation and evidence.
