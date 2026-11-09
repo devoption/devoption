@@ -158,6 +158,25 @@ impl<T: Record> RecordStore<T> {
             .map(|name| self.load(name)?.ok_or(Error::Integrity))
             .collect()
     }
+    /// Validate inventory once, then visit bounded records without retaining all
+    /// archive bytes or repeating the full inventory scan for each selection.
+    pub(crate) fn visit<E: From<Error>>(
+        &self,
+        mut visitor: impl FnMut(T) -> Result<(), E>,
+    ) -> Result<(), E> {
+        for name in self.inventory().map_err(E::from)? {
+            self.check().map_err(E::from)?;
+            let record = self
+                .load(&name)
+                .map_err(E::from)?
+                .ok_or_else(|| E::from(Error::Integrity))?;
+            if record.key() != name {
+                return Err(E::from(Error::Integrity));
+            }
+            visitor(record)?;
+        }
+        self.check().map_err(E::from)
+    }
     fn load(&self, name: &str) -> Result<Option<T>, Error> {
         self.load_links(name, 1)
     }

@@ -274,6 +274,23 @@ def check(binary, root, fixture):
         assert status == 200
         checksum = json.loads(line)['cksum']
         assert checksum == review['archive_sha256']
+        entry_url = f'/projects/{other.decode()}/registry-index/re/us/reusable-fixture'
+        status, headers, entry = request('GET', entry_url)
+        assert status == 200 and entry == line
+        assert headers['content-type'] == 'application/x-ndjson'
+        assert headers['cache-control'] == 'no-store'
+        assert headers['x-content-type-options'] == 'nosniff'
+        assert request('GET', entry_url, authenticated=False)[0] == 303
+        assert request('GET', entry_url.replace('re/us/', 'wrong/'))[0] == 404
+        _, data = mutate(package_registry + '/prepare', json.dumps({'action': 'yank', 'yanked': True}), expected=200)
+        mutate(package_registry + '/approve', json.loads(data)['review_token'], expected=200)
+        assert json.loads(request('GET', entry_url)[2])['yanked'] is True
+        _, data = mutate(package_registry + '/prepare', json.dumps({'action': 'readers', 'readers': []}), expected=200)
+        mutate(package_registry + '/approve', json.loads(data)['review_token'], expected=200)
+        assert request('GET', entry_url)[0] == 404
+        _, data = mutate(package_registry + '/prepare', json.dumps({'action': 'readers', 'readers': [other.decode()]}), expected=200)
+        mutate(package_registry + '/approve', json.loads(data)['review_token'], expected=200)
+        assert json.loads(request('GET', entry_url)[2])['yanked'] is True
         download = consumer_registry + '/archive/' + checksum
         status, _, cargo_archive = request('GET', download)
         assert status == 200 and hashlib.sha256(cargo_archive).hexdigest() == checksum
@@ -286,8 +303,9 @@ def check(binary, root, fixture):
         assert request('GET', package_url + '/receipt')[2] == receipt_bytes
         mutate(staging + '/approve', restart_review['review_token'], expected=409)
         assert request('GET', download)[2] == cargo_archive
+        assert json.loads(request('GET', entry_url)[2])['yanked'] is True
         (root / 'verified-source.tar').write_bytes(package)
-        print('Authenticated HTTP library build and candidate staging: exact review/receipt, source and catalog revalidation, corruption/replay/CSRF refusal, private staging, separate publication/project grant, exact archive acquisition and restart passed.', flush=True)
+        print('Authenticated HTTP library build and candidate staging: exact review/receipt, source and catalog revalidation, corruption/replay/CSRF refusal, private staging, separate publication/project grant, complete project index with live yanks/revocation, exact archive acquisition and restart passed.', flush=True)
     finally:
         stop()
         log.close()

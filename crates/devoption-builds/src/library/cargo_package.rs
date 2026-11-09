@@ -294,7 +294,7 @@ impl CargoPackage {
         &self.index_line
     }
 }
-fn index_location(name: &str) -> String {
+pub(super) fn index_location(name: &str) -> String {
     match name.len() {
         1 => format!("1/{name}"),
         2 => format!("2/{name}"),

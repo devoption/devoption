@@ -90,6 +90,32 @@ calls even if it fetched metadata earlier. It cannot retract bytes already
 acquired or cached. Runners must still receive only freshly authorized, verified
 materializations; this API does not police a caller's existing local cache.
 
+`index_entry` returns a complete newline-delimited Cargo index entry for one
+canonical lowercase index path and exact registry binding, filtered to the
+requesting project's currently approved versions. Staged/unpublished versions
+and versions granted only to other projects are omitted. Yanked versions remain
+present with their current flag so previously locked builds can still acquire
+their unchanged archives. A reader revocation immediately removes that version
+from subsequent entries. If no versions remain, unknown and unauthorized requests
+share denial. Case/path/hyphen-underscore aliases and registry URL rebinding do
+not select a different namespace.
+
+Entries use deterministic lexical version ordering; Cargo evaluates SemVer and
+requirements independently of line order. Every included version rechecks source
+association and the full retained candidate fingerprint. A missing included
+candidate or corrupt/unsafe store inventory refuses the whole response, including
+when corruption is in a hidden or unpublished candidate. No valid prefix or stale
+metadata escapes. Whole entries are limited to 1 MiB, and the existing event limit
+also disables this acquisition path. Internal streaming retains only approved
+index rows plus one candidate at a time after validating the store inventory,
+avoiding repeated full-store scans or retaining every archive in memory.
+
+The caller must still authenticate the owner and serialize fresh catalog/policy
+observations. An index entry is neither a transferable archive credential nor a
+complete dependency closure, materialized vendor bundle or Cargo transport setup.
+The [controller contract](registry-controller.md#complete-project-index-entry)
+defines its opt-in authenticated HTTP acquisition route.
+
 The owner-only `status` observation reports exact coordinates, source revision and
 fingerprint, archive checksum/size, readers, yank flag and event budget after
 rechecking retained candidate integrity. It grants no consumer access and fails
@@ -222,9 +248,9 @@ This is policy/Cargo compatibility evidence, not browser authentication, OS netw
 isolation, a running registry or platform-hosted/WASIp2 consumer acceptance.
 
 The [opt-in controller](registry-controller.md) now supplies authenticated staged
-candidate review/acquisition/recovery controls. Remaining #385 work includes
-successful-build ingestion, approved Cargo index aggregation/serving, complete
-verified dependency/vendor materialization and service/runner wiring
+candidate staging/review/acquisition/recovery controls and complete project-filtered
+per-package index entries. Remaining #385 work includes Cargo transport/configuration,
+complete verified dependency/vendor materialization and service/runner wiring
 with actual platform consumers. Installing, globally serving or publishing real
 packages, production credentials and access-policy changes require separate
 explicit authorization. Public/global distribution is never inferred from local

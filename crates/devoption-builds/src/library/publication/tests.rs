@@ -557,6 +557,18 @@ fn append_capacity_blocks_acquisition_without_freezing_an_irrevocable_reader_set
         Some(Error::Capacity)
     );
     assert_eq!(f.archive(f.first, 0), Err(Error::Capacity));
+    let package = &f.packages[0];
+    assert_eq!(
+        f.policy.index_entry(
+            OWNER,
+            f.first,
+            &f.catalog,
+            &f.candidates,
+            package.source().coordinates().registry(),
+            package.index_path()
+        ),
+        Err(Error::Capacity)
+    );
     assert_eq!(f.archive(f.second, 0), Err(Error::Capacity));
     let status = f
         .policy
