@@ -14,8 +14,17 @@ pub struct RecoveryReview {
     review: Review,
     linked: bool,
     pending_inode: (u64, u64),
+    registries: Vec<HostedRegistry>,
 }
 impl RecoveryReview {
+    /// Structural scope check for a controller configured for one binding.
+    /// All committed-prefix and pending-decision bindings must match.
+    pub fn check_registry(&self, binding: &HostedRegistry) -> Result<(), Error> {
+        if self.registries.iter().any(|r| r != binding) {
+            return Err(Error::Conflict);
+        }
+        Ok(())
+    }
     pub fn decision(&self) -> &Review {
         &self.review
     }
@@ -125,6 +134,12 @@ fn prepare(
     {
         return Err(Error::Integrity);
     }
+    let registries = state
+        .versions
+        .iter()
+        .map(|v| v.coordinates.registry().clone())
+        .chain(std::iter::once(event.coordinates.registry().clone()))
+        .collect();
     let mut versions = state.versions;
     apply(&mut versions, &event)?;
     Ok(RecoveryReview {
@@ -138,6 +153,7 @@ fn prepare(
         },
         linked: pending.linked,
         pending_inode: pending.inode,
+        registries,
     })
 }
 

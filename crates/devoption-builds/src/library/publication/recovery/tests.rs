@@ -462,3 +462,31 @@ fn completing_the_last_event_preserves_capacity_denial_instead_of_resetting_the_
     assert!(status.yanked);
     assert_eq!(f.archive(f.first, 0), Err(Error::Capacity));
 }
+
+#[test]
+fn controller_binding_check_includes_the_committed_prefix_not_just_the_pending_target() {
+    let f = Interrupted::new(0, false);
+    let expected = f.event.coordinates.registry().clone();
+    let mut prefix = f.event.clone();
+    prefix.coordinates = Coordinates::new(
+        HostedRegistry::new(
+            RegistryId::new("other").unwrap(),
+            "sparse+https://other.example.test/index/",
+        )
+        .unwrap(),
+        prefix.coordinates.name(),
+        prefix.coordinates.version(),
+    )
+    .unwrap();
+    let mut pending = f.event.clone();
+    pending.sequence = 1;
+    pending.previous = Sha256::digest(&prefix.encode());
+    let path = std::path::Path::new(&f.path).join(prefix.key());
+    fs::write(&path, prefix.encode()).unwrap();
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(f.pending(), pending.encode()).unwrap();
+    let review = f.review();
+    assert!(review.decision().coordinates().registry() == &expected);
+    assert_eq!(review.check_registry(&expected), Err(Error::Conflict));
+    assert!(f.pending().exists());
+}

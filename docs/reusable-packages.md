@@ -18,9 +18,9 @@ not extracting or publishing the platform's internal `devoption-ui` crate.
 | Library build/test/package jobs | The trusted-adapter `LibraryBuildV1` API compiles natively, runs inline library unit tests, compiles for WASIp2 and saves a verified-source archive. The project interface selects this profile from captured source and provides verified local archive/receipt downloads; see [library builds](library-builds.md). |
 | Library source staging | A trusted-adapter API privately retains immutable source archives and exact registry/version/source provenance, with conflict and corruption refusal. It is not connected to the service; see [source staging](library-source-staging.md). |
 | Cargo package generation | A trusted-adapter API generates deterministic `.crate` bytes and candidate index lines from verified library plans; a native offline two-consumer fixture uses those generated artifacts. No publication or serving occurs; see [Cargo generation](cargo-package-generation.md). |
-| Cargo candidate storage | A trusted-adapter API privately retains exact generated archives, candidate index lines and source provenance, with immutable versions and explicit complete-write recovery. It is not connected to the service; see [candidate storage](cargo-package-storage.md). |
-| Local package policy | A trusted-adapter ledger records owner approval, exact consumer-project grants and yanks, gates index/archive bytes and explicitly recovers complete interrupted decisions after fresh owner review. Controller/runner integration is pending; see [publication policy](package-publication-policy.md). |
-| Cross-project or global package distribution | No hosted registry ingestion/index service, package publication, authenticated registry download or automatic dependency-update workflow exists. Service callers still reject path, Git and custom registry dependencies. |
+| Cargo candidate storage | A trusted-adapter API privately retains exact generated archives, candidate index lines and source provenance, with immutable versions and explicit complete-write recovery. The opt-in controller can use staged candidates; see [candidate storage](cargo-package-storage.md). |
+| Local package policy | A trusted-adapter ledger records owner approval, exact consumer-project grants and yanks, gates index/archive bytes and explicitly recovers complete interrupted decisions after fresh owner review. An opt-in owner-only JSON controller exposes these controls; runner integration is pending. See [controller controls](registry-controller.md) and [publication policy](package-publication-policy.md). |
+| Cross-project or global package distribution | No build-output ingestion, complete Cargo index service or automatic dependency-update workflow exists. Authenticated control/download APIs cover staged candidates only. Build source callers still reject path, Git and custom registry dependencies. |
 | Other package ecosystems | No npm or general package build/publication pipeline is implemented. |
 
 The implementation references are [Cargo admission](cargo-inputs.md),
@@ -93,8 +93,7 @@ Cross-project package consumption remains outstanding.
 2. [#385: Verified cross-project distribution](https://github.com/devoption/devoption/issues/385).
    Private generated package/index storage and explicit hosted identity APIs are
    implemented as trusted adapters. An owner-only local publication/access/yank
-   policy now gates artifact reads. Complete authenticated service integration,
-   approved index aggregation and verified offline dependency
+   policy now gates artifact reads. Complete build-output ingestion, approved Cargo index aggregation and verified offline dependency
    materialization, and two independent consumers with version-update and
    older-version reproducibility checks. Installation-local availability and
    globally reachable distribution must be demonstrated separately.

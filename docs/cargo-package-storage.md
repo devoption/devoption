@@ -3,8 +3,9 @@
 `devoption_builds::library::package_store::PackageStore` retains generated Cargo
 archives and their candidate index lines under
 [#385](https://github.com/devoption/devoption/issues/385). This Unix trusted-adapter
-API performs private staging only. The controller, CLI, installer and runner do
-not open it, and it neither publishes nor serves a package. Installation-local
+API performs private staging only. The [owner-only controller](registry-controller.md) can explicitly open an
+operator-selected store; the installer and runner do not populate or enable it.
+The store itself neither publishes nor serves a package. Installation-local
 staging does not establish availability to other projects or external machines.
 
 ## Exact version records
@@ -130,8 +131,8 @@ records explicit owner approval, project readers and yanks, and checks those
 decisions before returning retained index/archive bytes. It does not make staged
 candidates automatically available.
 
-Remaining #385 work includes authenticated publication/access service integration,
-registry serving/index aggregation, complete verified dependency/vendor
+Remaining #385 work includes successful-build candidate ingestion, complete
+Cargo registry serving/index aggregation, complete verified dependency/vendor
 materialization and service/runner integration. Native policy recovery is
 documented in the [publication policy](package-publication-policy.md#fresh-review-of-an-interrupted-decision). Keep #385 and parent #383 open until those outcomes
 are implemented and demonstrated. Global distribution, real credentials and

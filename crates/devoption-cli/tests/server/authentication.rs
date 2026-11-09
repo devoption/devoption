@@ -28,6 +28,8 @@ mod pages;
 mod profile;
 #[path = "authentication/projects.rs"]
 mod projects;
+#[path = "authentication/registry.rs"]
+mod registry;
 #[path = "authentication/repositories.rs"]
 mod repositories;
 

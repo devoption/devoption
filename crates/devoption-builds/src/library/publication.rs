@@ -136,6 +136,19 @@ impl Publications {
         result.state()?;
         Ok(result)
     }
+    /// Startup-only structural check for a controller configured to host exactly
+    /// one registry binding. This does not authenticate a caller or grant access.
+    pub fn check_registry(&self, binding: &HostedRegistry) -> Result<(), Error> {
+        if self
+            .state()?
+            .versions
+            .iter()
+            .any(|v| v.coordinates.registry() != binding)
+        {
+            return Err(Error::Conflict);
+        }
+        Ok(())
+    }
     fn actor(&self, actor: OwnerId) -> Result<(), Error> {
         if actor == self.owner {
             Ok(())

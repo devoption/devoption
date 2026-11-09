@@ -10,7 +10,7 @@ mod source_check;
 const HELP: &str = "DevOption — software factory foundation
 
 Usage: devoption [--help | --version]
-       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--project-secrets-key-file ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--app-deployment enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
+       devoption serve [--port PORT] [--public-origin HTTPS_ORIGIN] [--data-dir ABSOLUTE_PATH] [--project-secrets-key-file ABSOLUTE_PATH] [--package-registry-dir ABSOLUTE_PATH] [--build-history-dir ABSOLUTE_PATH] [--build-execution enabled] [--app-deployment enabled] [--repository-root ABSOLUTE_PATH | --managed-repository-root ABSOLUTE_PATH]
        devoption setup --data-dir ABSOLUTE_PATH
        devoption check-source --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH --project 32HEX --repository 32HEX
        devoption recover-repositories --data-dir ABSOLUTE_PATH --repository-root ABSOLUTE_PATH [--approve-device-rebind 64HEX]
@@ -24,6 +24,7 @@ Usage: devoption [--help | --version]
   --port PORT   Override the port (0 chooses a free port)
   --public-origin  Serve one canonical https://DNS_NAME through a local TLS proxy; requires an existing owner
   --project-secrets-key-file  Enable encrypted project secret management using an existing protected 32-byte key (Unix)
+  --package-registry-dir  Enable owner-only registry controls over an existing private registry root (Unix)
   --data-dir    Validate and retain an existing private owner-data directory (Unix)
   --app-deployment     Explicitly enable installed Linux app runtime (value: enabled)
   --build-execution    Explicitly enable installed Linux build runner (value: enabled)
@@ -123,9 +124,27 @@ fn main() -> ExitCode {
         execution_enabled,
         deployment_enabled,
         project_secrets_key_file,
+        package_registry_directory,
     }) = options
     {
-        let result = if let Some(key_file) = project_secrets_key_file {
+        let result = if let Some(directory) = package_registry_directory {
+            devoption_server::run_with_package_registry(
+                port,
+                data_directory.as_deref().expect("validated owner"),
+                managed_repository_root
+                    .as_deref()
+                    .or(repository_root.as_deref()),
+                managed_repository_root.is_some(),
+                build_history_directory.as_deref(),
+                public_origin,
+                devoption_server::RegistryOptions {
+                    directory: &directory,
+                    project_secrets_key_file: project_secrets_key_file.as_deref(),
+                    build_execution: execution_enabled,
+                    app_deployment: deployment_enabled,
+                },
+            )
+        } else if let Some(key_file) = project_secrets_key_file {
             devoption_server::run_with_project_secrets(
                 port,
                 data_directory.as_deref().expect("validated owner"),
@@ -218,6 +237,7 @@ fn main() -> ExitCode {
 }
 
 struct ServeOptions {
+    package_registry_directory: Option<PathBuf>,
     project_secrets_key_file: Option<PathBuf>,
     port: u16,
     data_directory: Option<PathBuf>,
@@ -230,6 +250,7 @@ struct ServeOptions {
 }
 
 fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
+    let mut package_registry_directory = None;
     let mut project_secrets_key_file = None;
     let mut public_origin = None;
     let mut execution_enabled = false;
@@ -258,6 +279,12 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
             public_origin = Some(devoption_server::PublicOrigin::parse(
                 value.to_str().ok_or("public origin must be UTF-8")?,
             )?);
+        } else if flag == "--package-registry-dir" && package_registry_directory.is_none() {
+            let path = PathBuf::from(value);
+            if !path.is_absolute() {
+                return Err("package registry requires an absolute path");
+            }
+            package_registry_directory = Some(path);
         } else if flag == "--data-dir" && data_directory.is_none() {
             let path = PathBuf::from(value);
             if !path.is_absolute() {
@@ -301,6 +328,9 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
     if build_history_directory.is_some() && data_directory.is_none() {
         return Err("build history requires --data-dir with an existing configured owner");
     }
+    if package_registry_directory.is_some() && data_directory.is_none() {
+        return Err("package registry requires --data-dir with an existing owner");
+    }
     if project_secrets_key_file.is_some() && data_directory.is_none() {
         return Err("project secrets require --data-dir with an existing configured owner");
     }
@@ -318,6 +348,7 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
         return Err("build execution requires owner, repository and history directories");
     }
     Ok(ServeOptions {
+        package_registry_directory,
         project_secrets_key_file,
         deployment_enabled,
         execution_enabled,
@@ -408,5 +439,47 @@ mod project_secrets_options_tests {
         );
         assert!(!selected.execution_enabled);
         assert!(!selected.deployment_enabled);
+    }
+}
+
+#[cfg(test)]
+mod package_registry_options_tests {
+    use super::*;
+    #[test]
+    fn registry_requires_one_absolute_root_and_owner_storage() {
+        let parse = |args: Vec<&str>| {
+            serve_options(&args.into_iter().map(OsString::from).collect::<Vec<_>>())
+        };
+        for args in [
+            vec!["--package-registry-dir", "relative", "--data-dir", "/owner"],
+            vec!["--package-registry-dir", "/registry"],
+            vec![
+                "--package-registry-dir",
+                "/one",
+                "--package-registry-dir",
+                "/two",
+                "--data-dir",
+                "/owner",
+            ],
+        ] {
+            assert!(parse(args).is_err());
+        }
+        let options = parse(vec![
+            "--data-dir",
+            "/owner",
+            "--package-registry-dir",
+            "/registry",
+        ])
+        .unwrap();
+        assert_eq!(
+            options.package_registry_directory,
+            Some(PathBuf::from("/registry"))
+        );
+        assert!(
+            parse(vec!["--data-dir", "/owner"])
+                .unwrap()
+                .package_registry_directory
+                .is_none()
+        );
     }
 }
