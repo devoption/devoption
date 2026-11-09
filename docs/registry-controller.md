@@ -3,11 +3,12 @@
 The opt-in controller adapter connects existing staged Cargo candidates to the
 [local publication/access policy](package-publication-policy.md) under
 [#385](https://github.com/devoption/devoption/issues/385). It implements owner
-review/approval, status, project-scoped index/archive acquisition and explicit
-interrupted-decision recovery over authenticated HTTP.
+review/approval of retained-build staging and publication, status, project-scoped
+index/archive acquisition and explicit interrupted-decision recovery over
+authenticated HTTP.
 
-This is a JSON control API over already staged candidates. There is no new web
-page, candidate upload, build-to-candidate promotion, Cargo `config.json`, complete
+This is a JSON control API. There is no new web
+page, candidate upload, automatic staging, Cargo `config.json`, complete
 sparse/Git registry index or build dependency acquisition yet. A configured index
 URL is an immutable namespace identity; enabling these controls does not serve
 that URL or make the platform a Cargo-compatible registry. Keep #385 and #383 open
@@ -67,8 +68,10 @@ app-deployment options when those capabilities are independently configured. It
 adds no execution, provider or publication authority to a candidate. The current
 candidate producers are the trusted plan-only generator and the
 [successful retained-build adapter](cargo-package-generation.md#successful-retained-build-candidates),
-followed by `PackageStore::stage`. These native APIs do not ingest successful
-library builds/downloads through this controller or enable automatic staging.
+followed by `PackageStore::stage`. With repository, history and execution
+capabilities configured, the explicit staging endpoints below can generate and
+stage a candidate from a successful retained library build. They do not execute
+another build, publish a package or automatically ingest completed attempts.
 
 Root/config bytes and retained directory identities are rechecked on each
 admitted operation. Changed configuration, replaced roots/children, unsafe files
@@ -90,8 +93,9 @@ reads, CORS permissions or credentials injected into a source/build environment.
 
 One controller operation runs at a time; contention returns 409 rather than
 queuing work with stale authority. Mutation bodies have the existing five-second
-read bound and an 8192-byte limit. Use `Content-Type: text/plain` (or the existing
-`text/plain;charset=UTF-8` form); structured request/response values are JSON.
+read bound and an 8192-byte limit (32 bytes for build-candidate staging). Use
+`Content-Type: text/plain` (or the existing `text/plain;charset=UTF-8` form);
+structured request/response values are JSON.
 Other media types/encodings are refused. Session/CSRF is rechecked after body
 receipt and lock acquisition, immediately before filesystem admission. A logout
 or rotation during body delivery cannot authorize the operation. An already
@@ -105,6 +109,62 @@ work runs in a blocking worker, retaining those guards even if HTTP disconnects.
 The native byte/count limits apply, but no OS-filesystem latency guarantee is
 claimed. The OS owner/local filesystem remain trusted; this is not protection
 against an administrator replacing or rolling back all private state.
+
+## Successful-build candidate staging
+
+Both endpoints require the configured owner, live session/CSRF, private registry
+root, registered repository root, history and enabled execution configuration.
+Publication controls remain usable without execution; staging returns 503 when
+its additional capabilities are absent or the policy is recovery-only.
+
+| Endpoint | Body / result |
+| --- | --- |
+| `POST /projects/P/builds/attempts/A/registry/prepare` | Empty plain body; returns exact candidate review metadata and a fresh nonce. No candidate write occurs. |
+| `POST /projects/P/builds/attempts/A/registry/approve` | Exactly the returned nonce as the plain body; revalidates and stages only that candidate. |
+
+`P` and `A` are lowercase 32-character project/attempt IDs. There are no supplied
+archive bytes, registry URLs, names, versions, actor IDs or reader grants. The
+selected registry comes exclusively from the private root configuration; package
+identity and provenance come from the verified successful build and source.
+The review reports `change.action=stage`, attempt, registry/index identity,
+package/version, source project/repository/revision, source and source-archive
+checksums, Cargo archive checksum/size, index-line checksum and exact receipt
+checksum. It never returns source or receipt bytes in the review.
+
+The registered checkout must still be clean at the attempt's exact revision.
+The controller performs no reset, checkout, fetch or source reconstruction.
+To stage an older attempt, first select its exact clean revision separately;
+already-staged versions remain available independently of later checkout changes
+and build retention. The [native adapter](cargo-package-generation.md#successful-retained-build-candidates)
+refuses unavailable, pruned, unsuccessful, non-library, corrupt or mismatched
+retained artifacts. The controller additionally requires the attempt's current
+project/repository association. No plan-only fallback occurs.
+
+Staging takes nonblocking execution, history and registry mutexes in that order,
+then the catalog gate/writer lease and execution retention lock. An active or
+blocked runner or any contention returns 409. These guards remain held through
+source capture, retained-artifact validation and candidate storage. Session/CSRF
+and root identity/configuration are also rechecked after source/artifact reads,
+before saving a review or writing the candidate. Expiry is rechecked after those
+reads. Current catalog equality and exact regenerated candidate equality are
+required at approval, including the full receipt and attempt provenance.
+
+A staging review shares the one five-minute, single-use pending slot with
+publication and recovery reviews. New preparations replace it. An admitted
+approval attempt consumes it even when its token, project, attempt or operation
+does not match; expired reviews and restart also invalidate it. Rejected request
+authentication, transport-body or lock admission does not consume a pending review.
+An admitted preparation clears the slot even if its selection/body is invalid. No nonce
+is stored on disk. A successful response is `{"staged":true,"already_present":false}`;
+exact retry after a new review returns `already_present=true`. Occupied versions
+with changed source, build receipt or provenance return 409 without replacement.
+A storage failure preserves uncertain evidence for exact native candidate-store
+recovery; this endpoint does not discard or automatically recover it.
+
+Private staging grants no reader access and records no publication decision.
+Use the separate publication preparation/approval below before acquiring index
+or archive bytes through project grants. These controls still do not implement
+Cargo index aggregation or runner dependency materialization.
 
 ## Endpoint contract
 
@@ -187,9 +247,14 @@ disablement, opted-in controls and unsafe configuration refusal before listening
 All use synthetic identities/source and disposable private directories. Native
 Cargo consumer proofs remain separate; these tests do not run platform consumers.
 
-Remaining #385 work is successful-build candidate production/ingestion, approved
-Cargo index aggregation/serving, complete authorized dependency closure/archive/
-vendor verification, and service/runner wiring with two actual platform consumers,
+The disposable Linux library checker additionally exercises real build-to-candidate
+HTTP review/staging, retention contention and logout during body delivery, dirty
+source and changed catalog/receipt refusal, corrupt archive refusal, replay/restart
+invalidation, exact staging retry, separate publication approval/project grant
+and exact generated Cargo archive acquisition.
+
+Remaining #385 work is approved Cargo index aggregation/serving, complete
+authorized dependency closure/archive/vendor verification, and service/runner wiring with two actual platform consumers,
 version updates and retained older builds. No installer/deployment, global
-publication, public DNS, production credentials or access-policy changes were
+publication, public DNS, production credentials or production access-policy changes were
 performed or authorized by implementing these controls.

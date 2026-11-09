@@ -154,3 +154,9 @@ pages, explicit approval, invalid-token/replay and missing-CSRF refusal, saved
 archive/receipt download, cross-project refusal, corrupt archive refusal and
 package access after controller restart. Renderer captures are explicitly
 synthetic UI evidence; the Linux checker supplies execution/HTTP evidence.
+
+With an explicitly configured private registry root, the controller can also
+[review and stage a candidate](registry-controller.md#successful-build-candidate-staging)
+from a successful retained attempt at its exact clean registered revision. Staging
+preserves the exact receipt and source provenance without executing another job.
+Publication/project reader grants require their own review and approval.

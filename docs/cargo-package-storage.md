@@ -4,7 +4,8 @@
 archives and their candidate index lines under
 [#385](https://github.com/devoption/devoption/issues/385). This Unix trusted-adapter
 API performs private staging only. The [owner-only controller](registry-controller.md) can explicitly open an
-operator-selected store; the installer and runner do not populate or enable it.
+operator-selected store and explicitly stage successful retained-build candidates
+after owner review; the installer and runner do not automatically populate or enable it.
 The store itself neither publishes nor serves a package. Installation-local
 staging does not establish availability to other projects or external machines.
 

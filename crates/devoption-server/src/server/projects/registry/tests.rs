@@ -20,7 +20,7 @@ use tower::ServiceExt;
 const TOKEN: [u8; TOKEN_BYTES] = [0xab; TOKEN_BYTES];
 const CSRF: [u8; CSRF_TOKEN_BYTES] = [0xef; CSRF_TOKEN_BYTES];
 const MEMBER_TOKEN: [u8; TOKEN_BYTES] = [0xcd; TOKEN_BYTES];
-fn private(path: &Path) {
+pub(super) fn private(path: &Path) {
     fs::create_dir_all(path).unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
 }
@@ -50,20 +50,20 @@ fn git(path: &Path, args: &[&str]) -> String {
     );
     String::from_utf8(output.stdout).unwrap().trim().into()
 }
-struct Fixture {
+pub(super) struct Fixture {
     _temp: tempfile::TempDir,
-    registry: PathBuf,
+    pub(super) registry: PathBuf,
     data: PathBuf,
-    projects: Projects,
+    pub(super) projects: Projects,
     slot: SharedSession,
     app: Router,
-    package: CargoPackage,
-    source: ProjectId,
-    consumer: ProjectId,
+    pub(super) package: CargoPackage,
+    pub(super) source: ProjectId,
+    pub(super) consumer: ProjectId,
     owner: IdentityId,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let temp = tempfile::tempdir().unwrap();
         let base = temp.path().canonicalize().unwrap();
         let data = base.join("data");
@@ -223,7 +223,7 @@ impl Fixture {
             hex(&project.to_bytes())
         )
     }
-    fn request(&self, method: &str, url: &str, body: &str, member: bool) -> Request {
+    pub(super) fn request(&self, method: &str, url: &str, body: &str, member: bool) -> Request {
         Request::builder()
             .method(method)
             .uri(url)
@@ -244,7 +244,10 @@ impl Fixture {
             .body(Body::from(body.to_owned()))
             .unwrap()
     }
-    fn send_request(&self, request: Request) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
+    pub(super) fn send_request(
+        &self,
+        request: Request,
+    ) -> (StatusCode, axum::http::HeaderMap, Vec<u8>) {
         tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()

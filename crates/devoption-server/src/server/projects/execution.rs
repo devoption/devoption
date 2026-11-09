@@ -25,6 +25,9 @@ pub(super) struct Engine {
     blocked: bool,
 }
 impl Engine {
+    pub(super) fn staging_available(&self) -> bool {
+        self.active.is_none() && !self.blocked
+    }
     pub(super) fn new(config: Configuration, owner: IdentityId) -> Self {
         Self {
             config,
