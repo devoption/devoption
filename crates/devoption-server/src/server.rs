@@ -215,6 +215,53 @@ pub fn run_with_project_secrets(
         Capabilities {
             execution,
             key: Some(secrets.key_file),
+            registry: None,
+        },
+    )
+}
+
+/// Explicit existing registry-root opt-in, preserving other selected capabilities.
+pub struct RegistryOptions<'a> {
+    pub directory: &'a Path,
+    pub project_secrets_key_file: Option<&'a Path>,
+    pub build_execution: bool,
+    pub app_deployment: bool,
+}
+pub fn run_with_package_registry(
+    port: u16,
+    data: &Path,
+    repositories: Option<&Path>,
+    managed: bool,
+    history: Option<&Path>,
+    origin: Option<PublicOrigin>,
+    options: RegistryOptions<'_>,
+) -> io::Result<()> {
+    if (managed && repositories.is_none())
+        || (options.app_deployment && !options.build_execution)
+        || (options.build_execution && (repositories.is_none() || history.is_none()))
+    {
+        return Err(io::Error::other(
+            "invalid package registry startup capabilities",
+        ));
+    }
+    let execution = if options.app_deployment {
+        ExecutionMode::Deployments
+    } else if options.build_execution {
+        ExecutionMode::Builds
+    } else {
+        ExecutionMode::Disabled
+    };
+    run_with_roots(
+        port,
+        Some(data),
+        repositories,
+        managed,
+        history,
+        origin,
+        Capabilities {
+            execution,
+            key: options.project_secrets_key_file,
+            registry: Some(options.directory),
         },
     )
 }
@@ -222,12 +269,14 @@ pub fn run_with_project_secrets(
 struct Capabilities<'a> {
     execution: ExecutionMode,
     key: Option<&'a Path>,
+    registry: Option<&'a Path>,
 }
 impl From<ExecutionMode> for Capabilities<'_> {
     fn from(execution: ExecutionMode) -> Self {
         Self {
             execution,
             key: None,
+            registry: None,
         }
     }
 }
@@ -241,7 +290,11 @@ fn run_with_roots(
     public_origin: Option<PublicOrigin>,
     capabilities: Capabilities<'_>,
 ) -> io::Result<()> {
-    let Capabilities { execution, key } = capabilities;
+    let Capabilities {
+        execution,
+        key,
+        registry,
+    } = capabilities;
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
     // no enrollment permission; only an already-present owner can sign in.
@@ -365,7 +418,9 @@ fn run_with_roots(
             repository_root.ok_or_else(|| io::Error::other("builds require repository storage"))?,
             history_directory.ok_or_else(|| io::Error::other("builds require history storage"))?,
         )?;
-        config.stop_previous()?;
+        if registry.is_none() {
+            config.stop_previous()?;
+        }
         let identity =
             owner_identity.ok_or_else(|| io::Error::other("builds require an existing owner"))?;
         projects = Some(
@@ -378,6 +433,30 @@ fn run_with_roots(
     #[cfg(not(unix))]
     if execution != ExecutionMode::Disabled {
         return Err(io::Error::other("build execution requires Linux"));
+    }
+    #[cfg(unix)]
+    if let Some(path) = registry {
+        let selected = projects
+            .as_mut()
+            .ok_or_else(|| io::Error::other("package registry requires an existing owner"))?;
+        let mut forbidden: Vec<std::path::PathBuf> =
+            [data_directory, repository_root, history_directory]
+                .into_iter()
+                .flatten()
+                .map(Path::to_path_buf)
+                .collect();
+        forbidden.extend(selected.registry_input_roots()?);
+        let owner = selected
+            .owner
+            .ok_or_else(|| io::Error::other("package registry requires an existing owner"))?;
+        let engine =
+            projects::registry::Engine::open(path, owner, &selected.directory, &forbidden)?;
+        selected.stop_previous_build_for_registry()?;
+        selected.registry = Some(Arc::new(tokio::sync::Mutex::new(engine)));
+    }
+    #[cfg(not(unix))]
+    if registry.is_some() {
+        return Err(io::Error::other("package registry requires Unix"));
     }
     #[cfg(unix)]
     let mcp_config = owner_store
@@ -449,7 +528,10 @@ fn run_with_roots(
             let overview_projects = projects.clone();
             #[cfg(unix)]
             let project_routes = projects
-                .map(projects::routes)
+                .map(|mut projects| {
+                    projects.registry_session = Some(session.clone());
+                    projects::routes(projects)
+                })
                 .unwrap_or_default()
                 .merge(profile.map(profile::routes).unwrap_or_default());
             #[cfg(not(unix))]

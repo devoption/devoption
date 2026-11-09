@@ -591,6 +591,7 @@ dependencies = [
  "chacha20poly1305",
  "devoption-builds",
  "devoption-projects",
+ "devoption-registry",
  "devoption-ui",
  "getrandom 0.4.3",
  "http-body",

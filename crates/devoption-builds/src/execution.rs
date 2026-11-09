@@ -201,6 +201,10 @@ impl Configuration {
         }
         Ok(())
     }
+    /// Roots that must remain disjoint from private controller registry storage.
+    pub fn input_roots(&self) -> [&Path; 3] {
+        [&self.work, &self.vendor, &self.toolchain]
+    }
     pub fn work_root(&self) -> &Path {
         &self.work
     }

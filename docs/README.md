@@ -72,6 +72,7 @@ applications; project-specific roles remain planned.
 - [Cargo package and candidate index generation](cargo-package-generation.md)
 - [Private Cargo candidate storage and recovery](cargo-package-storage.md)
 - [Installation-local package approval and access policy](package-publication-policy.md)
+- [Opt-in owner registry controller controls](registry-controller.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)

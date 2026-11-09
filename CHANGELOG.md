@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add explicit private registry-directory startup and owner-only HTTP controls
+  for staged Cargo publication review/approval, status, project-granted downloads
+  and interrupted-decision recovery. Enforce existing session/Origin/CSRF guards,
+  bounded admission and current catalog serialization without enabling a public
+  Cargo registry or build dependency materialization
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Recover complete interrupted Cargo publication/access decisions only after a
   fresh owner review bound to current catalog, candidate, ledger and pending-file
   identity. Preserve event history, reader revocations, yanks and capacity while

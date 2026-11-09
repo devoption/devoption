@@ -22,6 +22,7 @@ pub(super) mod history;
 mod managed;
 mod packages;
 mod pages;
+pub(super) mod registry;
 pub(super) mod retention;
 mod secrets;
 
@@ -33,6 +34,8 @@ mod startup_tests;
 #[derive(Clone)]
 pub(super) struct Projects {
     pub(super) owner: Option<IdentityId>,
+    pub(super) registry: Option<Arc<Mutex<registry::Engine>>>,
+    pub(super) registry_session: Option<SharedSession>,
     pub(super) directory: Arc<CatalogDirectory>,
     secrets: Option<Arc<Mutex<crate::project_secrets::Store>>>,
     pub(super) deployment: Option<Arc<Mutex<deployment::Engine>>>,
@@ -45,6 +48,29 @@ pub(super) struct Projects {
 }
 
 impl Projects {
+    pub(super) fn stop_previous_build_for_registry(&self) -> io::Result<()> {
+        if let Some(engine) = &self.execution {
+            engine
+                .try_lock()
+                .map_err(|_| io::Error::other("build configuration unavailable"))?
+                .config
+                .stop_previous()?;
+        }
+        Ok(())
+    }
+    pub(super) fn registry_input_roots(&self) -> io::Result<Vec<std::path::PathBuf>> {
+        match &self.execution {
+            Some(engine) => Ok(engine
+                .try_lock()
+                .map_err(|_| io::Error::other("build configuration unavailable"))?
+                .config
+                .input_roots()
+                .into_iter()
+                .map(Path::to_path_buf)
+                .collect()),
+            None => Ok(Vec::new()),
+        }
+    }
     pub(super) fn enable_secrets(
         &mut self,
         store: crate::project_secrets::Store,
@@ -139,6 +165,8 @@ impl Projects {
                 .map(|record| record.identity()),
             directory: Arc::new(directory),
             secrets: None,
+            registry: None,
+            registry_session: None,
             history: None,
             execution: None,
             deployment: None,
@@ -231,6 +259,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         .merge(deployment::routes(projects.clone()))
         .merge(history::routes(projects.clone()))
         .merge(packages::routes(projects.clone()))
+        .merge(registry::routes(projects.clone()))
         .merge(creation)
         .route(
             "/projects/{project}/name",

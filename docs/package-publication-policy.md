@@ -6,15 +6,16 @@ owner-only trusted-adapter policy for exact generated Cargo candidates under
 publication, project-reader and per-version yank decisions in a separate durable
 ledger and checks that policy before returning index lines or archive bytes.
 
-This is an installation-local Rust API. No controller route, CLI command,
-installer or build runner opens this ledger yet. There is no anonymous/public
-registry, HTTP authentication endpoint, credential issuance or upstream fallback.
-The caller must authenticate the installation owner, select the actual consumer
-project and freshly load its catalog. `OwnerId` and `ProjectId` are references,
-not credentials: taking them from a request body/header does not authenticate a
-caller. Existing browser authentication is not wired into this API. Members and
-per-member registry roles are outside this owner-only profile. Keep #385 and
-parent #383 open until service and consumer integration is delivered.
+This is an installation-local Rust API with an explicit opt-in
+[owner controller adapter](registry-controller.md) for staged candidates. It does
+not enable itself, supply candidate ingestion from builds, or wire build runners.
+There is no anonymous/public Cargo registry, credential issuance or upstream
+fallback. Native callers must authenticate the installation owner, select the
+actual consumer project and freshly load/serialize its catalog. `OwnerId` and
+`ProjectId` are references, not credentials. The controller derives the owner
+from the existing session and enforces project grants; it accepts no client actor
+or registry identity. Members and per-member registry roles remain outside this
+owner-only profile. Keep #385 and #383 open for remaining consumer integration.
 
 ## Review and approval
 
@@ -46,8 +47,9 @@ candidate fingerprint and full proposed action. Approval rechecks those inputs
 and current candidate bytes before appending. A changed catalog (even an unrelated
 rename), another intervening policy change, another ledger, expired review or
 wrong owner refuses the action. Reviews cannot be serialized across a restart.
-A trusted HTTP adapter will also need its own request limits, Origin/CSRF checks
-and current authenticated session before it can safely call these methods.
+The [controller adapter](registry-controller.md) supplies bounded request
+admission, Host/Origin/CSRF/session checks and current catalog serialization for
+these methods. Other adapters must provide equivalent boundaries.
 
 ## Immutable versions and namespace ownership
 
@@ -115,7 +117,7 @@ versioned JSON and an outer SHA-256 bind each event, including its sequence,
 previous-event digest, owner, exact coordinates, complete candidate fingerprint,
 source project/repository and operation. Opening/reading reconstructs state from
 the entire contiguous chain and rejects invalid transitions. Review retains one
-bounded candidate and catalog; a future service adapter must bound concurrent
+bounded candidate and catalog; a service adapter must bound concurrent
 reviews. The native API does not supply HTTP rate/concurrency controls.
 
 Events use the existing sync/pending/nonreplacement-link/directory-sync commit
@@ -173,11 +175,12 @@ a complete pending record can receive another fresh recovery review. If the
 pending name is already absent, do not infer success or retry a stale approval:
 ordinary `Publications::open` and owner `status` must establish the actual decision
 and verified candidate. Fresh catalog loading, authenticated owner input and
-bounded request/concurrency controls remain duties of the future service adapter.
+bounded request/concurrency controls remain duties of the service adapter.
 The ledger lock serializes policy writes only: the adapter must also hold its
 catalog/authorization gates through approval and acquisition, preventing a supplied
 catalog snapshot from racing with an access or project change.
-This native API neither enables a controller endpoint nor restores policy backups.
+The native API itself neither enables controller endpoints nor restores policy
+backups; controller opt-in and constraints are documented separately.
 
 The OS owner and local filesystem are trusted. Hashes detect corruption and broken
 chains; they do not prevent an administrator from deleting/rolling back the entire
@@ -218,9 +221,10 @@ synthetic disposable fixture state; no real package or registry is published.
 This is policy/Cargo compatibility evidence, not browser authentication, OS network
 isolation, a running registry or platform-hosted/WASIp2 consumer acceptance.
 
-Remaining #385 work includes authenticated controller review/actions and scoped
-acquisition and recovery controls, approved index aggregation/serving,
-complete verified dependency/vendor materialization and service/runner wiring
+The [opt-in controller](registry-controller.md) now supplies authenticated staged
+candidate review/acquisition/recovery controls. Remaining #385 work includes
+successful-build ingestion, approved Cargo index aggregation/serving, complete
+verified dependency/vendor materialization and service/runner wiring
 with actual platform consumers. Installing, globally serving or publishing real
 packages, production credentials and access-policy changes require separate
 explicit authorization. Public/global distribution is never inferred from local
