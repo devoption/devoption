@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Recover complete interrupted Cargo publication/access decisions only after a
+  fresh owner review bound to current catalog, candidate, ledger and pending-file
+  identity. Preserve event history, reader revocations, yanks and capacity while
+  retaining partial/conflicting evidence without automatic repair or reset
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Add a durable owner-only local Cargo publication/access policy with exact
   candidate review, explicit consumer-project grants, immutable namespace ownership
   and per-version yanks. Check authorization at index/archive acquisition and

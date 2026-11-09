@@ -29,6 +29,14 @@ pub(crate) trait Record: PartialEq + Sized {
         Self::key_for(self.coordinates())
     }
 }
+/// Inspection is returned with an exclusively locked handle. The prefix excludes
+/// a pending record's final hard link, if one already exists.
+pub(crate) struct Pending<T> {
+    pub record: T,
+    pub prefix: Vec<T>,
+    pub linked: bool,
+    pub inode: (u64, u64),
+}
 /// Exclusive descriptor-anchored staging store in an existing private directory.
 /// The OS owner and local filesystem are trusted. No directory creation, repair,
 /// deletion API, publication, registry serving, project grants or network I/O.
@@ -179,6 +187,63 @@ impl<T: Record> RecordStore<T> {
         }
         T::decode(&bytes).map(Some)
     }
+    pub(crate) fn open_pending(path: &str) -> Result<(Self, Pending<T>), Error> {
+        let store = Self::open_locked(path)?;
+        store.check_storage()?;
+        let pending = File::from(
+            openat(&store.directory, T::PENDING, READ, Mode::empty())
+                .map_err(|_| Error::Uncertain)?,
+        );
+        let links = pending.metadata().map_err(|_| Error::Unavailable)?.nlink();
+        if ![1, 2].contains(&links) {
+            return Err(Error::Unsafe);
+        }
+        let record = store
+            .load_links(T::PENDING, links)?
+            .ok_or(Error::Uncertain)?;
+        let key = record.key();
+        let names = store.inventory_with(Some((&key, links)))?;
+        if links == 1 {
+            if store.load(&key)?.is_some() {
+                return Err(Error::Conflict);
+            }
+            if names.len() >= MAX_RECORDS {
+                return Err(Error::Capacity);
+            }
+        } else {
+            let final_file = File::from(
+                openat(&store.directory, key.as_str(), READ, Mode::empty())
+                    .map_err(|_| Error::Uncertain)?,
+            );
+            if identity(&final_file)? != identity(&pending)?
+                || store.load_links(&key, 2)?.as_ref() != Some(&record)
+            {
+                return Err(Error::Integrity);
+            }
+        }
+        let prefix = names
+            .into_iter()
+            .filter(|name| *name != key)
+            .map(|name| store.load(&name)?.ok_or(Error::Integrity))
+            .collect::<Result<Vec<_>, _>>()?;
+        let current = File::from(
+            openat(&store.directory, T::PENDING, READ, Mode::empty())
+                .map_err(|_| Error::Uncertain)?,
+        );
+        let inode = identity(&pending)?;
+        if identity(&current)? != inode {
+            return Err(Error::Unsafe);
+        }
+        Ok((
+            store,
+            Pending {
+                record,
+                prefix,
+                linked: links == 2,
+                inode,
+            },
+        ))
+    }
     /// Explicit recovery accepts only the exact complete candidate. No partial
     /// record deletion, conflict replacement or new candidate creation occurs.
     pub(crate) fn recover(path: &str, expected: &T) -> Result<StageOutcome, Error> {
@@ -186,7 +251,14 @@ impl<T: Record> RecordStore<T> {
         if T::decode(&expected.encode())? != *expected {
             return Err(Error::Invalid);
         }
-        let store = Self::open_locked(path)?;
+        Self::open_locked(path)?.complete_recovery(expected)
+    }
+    /// Keep the caller's exclusive lock through validation and completion.
+    pub(crate) fn complete_recovery(self, expected: &T) -> Result<StageOutcome, Error> {
+        if T::decode(&expected.encode())? != *expected {
+            return Err(Error::Invalid);
+        }
+        let store = self;
         store.check_storage()?;
         let key = expected.key();
         let pending = match openat(&store.directory, T::PENDING, READ, Mode::empty()) {

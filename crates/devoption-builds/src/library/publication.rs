@@ -144,23 +144,7 @@ impl Publications {
         }
     }
     fn state(&self) -> Result<State, Error> {
-        let mut events = self.store.records()?;
-        events.sort_by_key(|e| e.sequence);
-        let mut state = State {
-            events: Vec::new(),
-            versions: Vec::new(),
-        };
-        for event in events {
-            if event.sequence != state.events.len() as u64
-                || event.previous != state.head()
-                || event.owner != self.owner
-            {
-                return Err(Error::Integrity);
-            }
-            apply(&mut state.versions, &event).map_err(|_| Error::Integrity)?;
-            state.events.push(event);
-        }
-        Ok(state)
+        state_from(self.store.records()?, self.owner)
     }
     /// Preparation reads the exact retained candidate and checks current catalog
     /// scope; it does not publish. A review binds the entire supplied catalog,
@@ -350,6 +334,26 @@ impl Publications {
         Ok(package.archive().to_vec())
     }
 }
+fn state_from(events: Vec<Event>, owner: OwnerId) -> Result<State, Error> {
+    let mut events = events;
+    events.sort_by_key(|e| e.sequence);
+    let mut state = State {
+        events: Vec::new(),
+        versions: Vec::new(),
+    };
+    for event in events {
+        if event.sequence != state.events.len() as u64
+            || event.previous != state.head()
+            || event.owner != owner
+        {
+            return Err(Error::Integrity);
+        }
+        apply(&mut state.versions, &event).map_err(|_| Error::Integrity)?;
+        state.events.push(event);
+    }
+    Ok(state)
+}
+
 fn checked_candidate(candidates: &PackageStore, version: &Version) -> Result<CargoPackage, Error> {
     let package = candidates
         .read(&version.coordinates)?
@@ -606,5 +610,7 @@ impl Record for Event {
         })
     }
 }
+mod recovery;
+pub use recovery::RecoveryReview;
 #[cfg(test)]
 mod tests;

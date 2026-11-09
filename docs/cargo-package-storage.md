@@ -131,8 +131,8 @@ decisions before returning retained index/archive bytes. It does not make staged
 candidates automatically available.
 
 Remaining #385 work includes authenticated publication/access service integration,
-registry serving/index aggregation, policy-ledger recovery, complete verified
-dependency/vendor materialization and
-service/runner integration. Keep #385 and parent #383 open until those outcomes
+registry serving/index aggregation, complete verified dependency/vendor
+materialization and service/runner integration. Native policy recovery is
+documented in the [publication policy](package-publication-policy.md#fresh-review-of-an-interrupted-decision). Keep #385 and parent #383 open until those outcomes
 are implemented and demonstrated. Global distribution, real credentials and
 production installation/publication require separate explicit authorization.

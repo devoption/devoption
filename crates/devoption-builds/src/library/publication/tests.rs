@@ -1,21 +1,21 @@
 use super::*;
 use crate::library::cargo_package::tests::publication_fixture;
 use std::{fs, os::unix::fs::PermissionsExt};
-const OWNER: OwnerId = OwnerId::from_bytes([1; 16]);
-const OTHER: OwnerId = OwnerId::from_bytes([2; 16]);
-struct Fixture {
-    _root: tempfile::TempDir,
-    path: String,
-    candidates: PackageStore,
-    policy: Publications,
-    catalog: Catalog,
-    packages: [CargoPackage; 3],
-    source: ProjectId,
-    first: ProjectId,
-    second: ProjectId,
+pub(super) const OWNER: OwnerId = OwnerId::from_bytes([1; 16]);
+pub(super) const OTHER: OwnerId = OwnerId::from_bytes([2; 16]);
+pub(super) struct Fixture {
+    pub(super) _root: tempfile::TempDir,
+    pub(super) path: String,
+    pub(super) candidates: PackageStore,
+    pub(super) policy: Publications,
+    pub(super) catalog: Catalog,
+    pub(super) packages: [CargoPackage; 3],
+    pub(super) source: ProjectId,
+    pub(super) first: ProjectId,
+    pub(super) second: ProjectId,
 }
 impl Fixture {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
         let rootpath = root.path().canonicalize().unwrap();
         for dir in ["candidates", "policy"] {
@@ -48,7 +48,7 @@ impl Fixture {
             second: projects[1],
         }
     }
-    fn review(&self, at: usize, change: Change) -> Review {
+    pub(super) fn review(&self, at: usize, change: Change) -> Review {
         self.policy
             .review(
                 OWNER,
@@ -59,13 +59,13 @@ impl Fixture {
             )
             .unwrap()
     }
-    fn change(&mut self, at: usize, change: Change) {
+    pub(super) fn change(&mut self, at: usize, change: Change) {
         let review = self.review(at, change);
         self.policy
             .approve(OWNER, &self.catalog, &self.candidates, review)
             .unwrap();
     }
-    fn line(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
+    pub(super) fn line(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
         self.policy.index_line(
             OWNER,
             project,
@@ -74,7 +74,7 @@ impl Fixture {
             self.packages[at].source().coordinates(),
         )
     }
-    fn archive(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
+    pub(super) fn archive(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
         self.policy.archive(
             OWNER,
             project,
