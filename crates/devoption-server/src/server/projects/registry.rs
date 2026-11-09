@@ -14,6 +14,7 @@ use devoption_registry::{HostedRegistry, RegistryId, Sha256};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
+mod ingestion;
 mod storage;
 use storage::Root;
 
@@ -27,6 +28,7 @@ pub(in crate::server) struct Engine {
 enum Decision {
     Normal(Review),
     Recovery(RecoveryReview),
+    Ingestion(Box<ingestion::Review>),
 }
 struct Pending {
     token: String,
@@ -112,6 +114,7 @@ impl Engine {
         let (review, linked) = match &decision {
             Decision::Normal(r) => (r, None),
             Decision::Recovery(r) => (r.decision(), Some(r.final_link_present())),
+            Decision::Ingestion(_) => return Err(StatusCode::CONFLICT),
         };
         let candidate = review.candidate();
         let source = candidate.source();
@@ -268,7 +271,7 @@ pub(super) fn routes(projects: Projects) -> Router {
             ),
         );
     }
-    router
+    router.merge(ingestion::routes(projects))
 }
 async fn handle(
     projects: Projects,

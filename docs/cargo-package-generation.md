@@ -127,7 +127,7 @@ Cargo archives/index lines with exact-candidate interrupted-write recovery.
 The [local publication policy](package-publication-policy.md) separately records
 owner approval, scoped project readers and yanks before returning candidate
 archive/index bytes. The [owner-only controller](registry-controller.md) can now review, approve and
-acquire existing staged candidates. Remaining #385 work includes authenticated build-to-candidate staging controls
-and Cargo registry index aggregation, complete verified dependency/vendor
+stage successful retained-build candidates and acquire separately approved packages.
+Remaining #385 work includes Cargo registry index aggregation, complete verified dependency/vendor
 materialization, service/runner integration and actual platform consumers. Installation-local and
 globally reachable distribution still need separate implementation and evidence.

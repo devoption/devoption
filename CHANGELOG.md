@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Add owner-authenticated review and approval for staging a Cargo candidate from
+  an exact successful retained library build. Recheck session, source, receipt,
+  catalog, registry identity and retention before private immutable storage;
+  keep publication and project-reader grants separately approved
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Generate Cargo candidates from exact successful retained library attempts,
   verifying source/archive/receipt bindings and preserving build provenance in
   immutable versioned candidate records. Retain plan-only record compatibility
