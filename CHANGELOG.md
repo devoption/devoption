@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Retain generated Cargo archives, candidate index bytes and complete source
+  provenance in a private immutable store. Add exact-candidate interrupted-write
+  recovery and exercise reloaded artifacts with two offline Cargo consumers.
+  Publication, access controls and running-platform consumption remain separate
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Add explicitly granted durable JSON deliveries with PostgreSQL admission,
   expiring/fenced leases, bounded scheduling/retries, independent host-owned HTTPS
   dispatch and operator status/cancellation. Preserve operation identity across

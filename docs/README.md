@@ -70,6 +70,7 @@ applications; project-specific roles remain planned.
 - [Hosted Cargo input bindings and namespace proof](hosted-cargo-inputs.md)
 - [Immutable library source staging](library-source-staging.md)
 - [Cargo package and candidate index generation](cargo-package-generation.md)
+- [Private Cargo candidate storage and recovery](cargo-package-storage.md)
 - [Registry contract](registry-contract.md), [Cargo inputs](cargo-inputs.md) and [source proofs](cargo-source-proof.md)
 - [Complete immutable source snapshots](source-snapshots.md)
 - [Artifact handoff](artifact-handoff.md)

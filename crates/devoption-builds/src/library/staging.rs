@@ -4,28 +4,15 @@ use crate::BuildPlan;
 use devoption_registry::{
     CargoDependencyRequest, CargoOrigin, HostedRegistry, LockedPackage, RegistryId, Sha256,
 };
-use rustix::{
-    fs::{AtFlags, Dir, FlockOperation, Mode, OFlags, flock, linkat, openat, unlinkat},
-    io::Errno,
-    process::geteuid,
-};
-use std::{
-    fmt,
-    fs::File,
-    io::{Read, Write},
-    os::unix::fs::MetadataExt,
-};
+use std::fmt;
+#[cfg(test)]
+use std::{fs::File, io::Write, os::unix::fs::MetadataExt};
 
 const MAGIC: &[u8] = b"DVSTAGE1";
 const LOCK: &str = ".source-stage.lock";
 const PENDING: &str = ".source-stage.pending";
 const MAX_RECORD_BYTES: usize = MAX_PACKAGE_BYTES + 4096;
-pub const MAX_STAGED_PACKAGES: usize = 128;
-const READ: OFlags = OFlags::RDONLY
-    .union(OFlags::NOFOLLOW)
-    .union(OFlags::NONBLOCK)
-    .union(OFlags::CLOEXEC);
-
+pub const MAX_STAGED_PACKAGES: usize = super::record_store::MAX_RECORDS;
 /// Logical destination and exact source version. Names differing only in case or
 /// hyphen/underscore, and versions differing only in build metadata, share a slot.
 #[derive(Clone, PartialEq, Eq)]
@@ -63,7 +50,7 @@ impl Coordinates {
     pub fn version(&self) -> &str {
         &self.version
     }
-    fn slot(&self) -> String {
+    pub(crate) fn slot(&self) -> String {
         let mut bytes = Vec::new();
         for value in [
             self.registry.id().as_str(),
@@ -128,7 +115,7 @@ impl StagedSource {
     pub fn archive_bytes(&self) -> u64 {
         self.archive.len() as u64
     }
-    fn encode(&self) -> Vec<u8> {
+    pub(super) fn encode(&self) -> Vec<u8> {
         let mut out = MAGIC.to_vec();
         for value in [
             self.coordinates.registry.id().as_str(),
@@ -148,7 +135,7 @@ impl StagedSource {
         out.extend(Sha256::digest(&out).bytes());
         out
     }
-    fn decode(bytes: &[u8]) -> Result<Self, Error> {
+    pub(super) fn decode(bytes: &[u8]) -> Result<Self, Error> {
         if bytes.len() < 40 || bytes.len() > MAX_RECORD_BYTES {
             return Err(Error::Invalid);
         }
@@ -240,241 +227,46 @@ pub enum StageOutcome {
     AlreadyPresent,
 }
 
-/// Exclusive descriptor-anchored staging store in an existing private directory.
-/// The OS owner and local filesystem are trusted. No directory creation, repair,
-/// deletion API, publication, registry serving, project grants or network I/O.
-pub struct SourceStore {
-    directory: File,
-    lock: File,
-    poisoned: bool,
-}
-impl Drop for SourceStore {
-    fn drop(&mut self) {
-        let _ = flock(&self.lock, FlockOperation::Unlock);
-    }
-}
+/// Private source-only store. Existing source record format and refusal semantics
+/// remain unchanged; Cargo candidates use a separate directory and record domain.
+pub struct SourceStore(super::record_store::RecordStore<StagedSource>);
 impl SourceStore {
     pub fn open(path: &str) -> Result<Self, Error> {
-        let directory = crate::history::directory(path).map_err(|_| Error::Unsafe)?;
-        directory_valid(&directory)?;
-        let lock = File::from(
-            openat(
-                &directory,
-                LOCK,
-                OFlags::RDWR
-                    | OFlags::CREATE
-                    | OFlags::NOFOLLOW
-                    | OFlags::NONBLOCK
-                    | OFlags::CLOEXEC,
-                Mode::RUSR | Mode::WUSR,
-            )
-            .map_err(|_| Error::Unavailable)?,
-        );
-        file_valid(&lock, 0)?;
-        flock(&lock, FlockOperation::NonBlockingLockExclusive).map_err(|e| {
-            if e == Errno::WOULDBLOCK {
-                Error::Busy
-            } else {
-                Error::Unavailable
-            }
-        })?;
-        let store = Self {
-            directory,
-            lock,
-            poisoned: false,
-        };
-        store.inventory()?;
-        Ok(store)
+        super::record_store::RecordStore::open(path).map(Self)
     }
-    fn check(&self) -> Result<(), Error> {
-        if self.poisoned {
-            return Err(Error::Uncertain);
-        }
-        self.check_storage()
-    }
-    fn check_storage(&self) -> Result<(), Error> {
-        directory_valid(&self.directory)?;
-        file_valid(&self.lock, 0)?;
-        let current = File::from(
-            openat(&self.directory, LOCK, READ, Mode::empty()).map_err(|_| Error::Unsafe)?,
-        );
-        file_valid(&current, 0)?;
-        if identity(&current)? != identity(&self.lock)? {
-            return Err(Error::Unsafe);
-        }
-        Ok(())
-    }
-    fn inventory(&self) -> Result<Vec<String>, Error> {
-        self.check()?;
-        let mut names = Vec::new();
-        for entry in Dir::read_from(&self.directory).map_err(|_| Error::Unavailable)? {
-            let entry = entry.map_err(|_| Error::Unavailable)?;
-            let name = entry.file_name().to_str().map_err(|_| Error::Unsafe)?;
-            if matches!(name, "." | "..") || name == LOCK {
-                continue;
-            }
-            if name == PENDING {
-                return Err(Error::Uncertain);
-            }
-            if name.len() != 71
-                || !name.ends_with(".source")
-                || !name.as_bytes()[..64]
-                    .iter()
-                    .copied()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-            {
-                return Err(Error::Unsafe);
-            }
-            if names.len() >= MAX_STAGED_PACKAGES {
-                return Err(Error::Capacity);
-            }
-            let package = self.load(name)?.ok_or(Error::Integrity)?;
-            if package.coordinates.slot() != name {
-                return Err(Error::Integrity);
-            }
-            names.push(name.to_owned());
-        }
-        Ok(names)
-    }
-    fn load(&self, name: &str) -> Result<Option<StagedSource>, Error> {
-        let mut file = match openat(&self.directory, name, READ, Mode::empty()) {
-            Ok(fd) => File::from(fd),
-            Err(Errno::NOENT) => return Ok(None),
-            Err(_) => return Err(Error::Unsafe),
-        };
-        file_valid(&file, MAX_RECORD_BYTES as u64)?;
-        let before = file.metadata().map_err(|_| Error::Unavailable)?;
-        let mut bytes = Vec::new();
-        (&mut file)
-            .take(MAX_RECORD_BYTES as u64 + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|_| Error::Unavailable)?;
-        file_valid(&file, MAX_RECORD_BYTES as u64)?;
-        let after = file.metadata().map_err(|_| Error::Unavailable)?;
-        if before.len() != after.len()
-            || before.mtime() != after.mtime()
-            || before.mtime_nsec() != after.mtime_nsec()
-            || before.ctime() != after.ctime()
-            || before.ctime_nsec() != after.ctime_nsec()
-            || bytes.len() as u64 != after.len()
-        {
-            return Err(Error::Integrity);
-        }
-        StagedSource::decode(&bytes).map(Some)
-    }
-    /// None means only that these coordinates are absent. Rebound index identity,
-    /// unsafe storage and corrupt bytes fail closed without a fallback lookup.
     pub fn read(&self, coordinates: &Coordinates) -> Result<Option<StagedSource>, Error> {
-        self.inventory()?;
-        let source = self.load(&coordinates.slot())?;
-        if source
-            .as_ref()
-            .is_some_and(|p| p.coordinates != *coordinates)
-        {
-            return Err(Error::Conflict);
-        }
-        Ok(source)
+        self.0.read(coordinates)
     }
-    /// Identical retry is idempotent; every changed byte or provenance at an
-    /// occupied version conflicts. An interrupted write blocks further use.
     pub fn stage(&mut self, source: &StagedSource) -> Result<StageOutcome, Error> {
-        self.stage_using(source, |file, bytes| file.write_all(bytes))
+        self.0.stage(source)
     }
+    #[cfg(test)]
     fn stage_using(
         &mut self,
         source: &StagedSource,
         write: impl FnOnce(&mut File, &[u8]) -> std::io::Result<()>,
     ) -> Result<StageOutcome, Error> {
-        let inventory = self.inventory()?;
-        let name = source.coordinates.slot();
-        if let Some(existing) = self.load(&name)? {
-            return if existing == *source {
-                Ok(StageOutcome::AlreadyPresent)
-            } else {
-                Err(Error::Conflict)
-            };
-        }
-        if inventory.len() >= MAX_STAGED_PACKAGES {
-            return Err(Error::Capacity);
-        }
-        let bytes = source.encode();
-        // Revalidate even internally generated records before the first mutation.
-        if StagedSource::decode(&bytes)? != *source {
-            return Err(Error::Invalid);
-        }
-        let mut file = File::from(
-            openat(
-                &self.directory,
-                PENDING,
-                OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::CLOEXEC,
-                Mode::RUSR | Mode::WUSR,
-            )
-            .map_err(|_| Error::Uncertain)?,
-        );
-        self.poisoned = true;
-        // Preserve the pending record on every failure. No implicit repair/retry.
-        write(&mut file, &bytes).map_err(|_| Error::Uncertain)?;
-        file.sync_all().map_err(|_| Error::Uncertain)?;
-        file_valid(&file, MAX_RECORD_BYTES as u64).map_err(|_| Error::Uncertain)?;
-        self.check_storage().map_err(|_| Error::Uncertain)?;
-        if self.load(PENDING).map_err(|_| Error::Uncertain)?.as_ref() != Some(source) {
-            return Err(Error::Uncertain);
-        }
-        let pending = File::from(
-            openat(&self.directory, PENDING, READ, Mode::empty()).map_err(|_| Error::Uncertain)?,
-        );
-        if identity(&pending).map_err(|_| Error::Uncertain)?
-            != identity(&file).map_err(|_| Error::Uncertain)?
-        {
-            return Err(Error::Uncertain);
-        }
-        // Hard-link creation is atomic and never replaces an occupied destination.
-        linkat(
-            &self.directory,
-            PENDING,
-            &self.directory,
-            name.as_str(),
-            AtFlags::empty(),
-        )
-        .map_err(|_| Error::Uncertain)?;
-        self.directory.sync_all().map_err(|_| Error::Uncertain)?;
-        unlinkat(&self.directory, PENDING, AtFlags::empty()).map_err(|_| Error::Uncertain)?;
-        self.directory.sync_all().map_err(|_| Error::Uncertain)?;
-        self.check_storage().map_err(|_| Error::Uncertain)?;
-        if self.load(&name).map_err(|_| Error::Uncertain)?.as_ref() != Some(source) {
-            return Err(Error::Uncertain);
-        }
-        self.poisoned = false;
-        Ok(StageOutcome::Stored)
+        self.0.stage_using(source, write)
+    }
+    #[cfg(test)]
+    fn inventory(&self) -> Result<Vec<String>, Error> {
+        self.0.inventory()
     }
 }
-fn directory_valid(file: &File) -> Result<(), Error> {
-    let m = file.metadata().map_err(|_| Error::Unavailable)?;
-    if geteuid().as_raw() == 0
-        || !m.is_dir()
-        || m.uid() != geteuid().as_raw()
-        || m.mode() & 0o7777 != 0o700
-        || m.nlink() == 0
-    {
-        return Err(Error::Unsafe);
+impl super::record_store::Record for StagedSource {
+    const LOCK: &'static str = LOCK;
+    const PENDING: &'static str = PENDING;
+    const SUFFIX: &'static str = ".source";
+    const MAX_BYTES: usize = MAX_RECORD_BYTES;
+    fn coordinates(&self) -> &Coordinates {
+        &self.coordinates
     }
-    Ok(())
-}
-fn file_valid(file: &File, max: u64) -> Result<(), Error> {
-    let m = file.metadata().map_err(|_| Error::Unavailable)?;
-    if !m.is_file()
-        || m.uid() != geteuid().as_raw()
-        || m.nlink() != 1
-        || m.mode() & 0o7777 != 0o600
-        || m.len() > max
-    {
-        return Err(Error::Unsafe);
+    fn encode(&self) -> Vec<u8> {
+        self.encode()
     }
-    Ok(())
-}
-fn identity(file: &File) -> Result<(u64, u64), Error> {
-    let m = file.metadata().map_err(|_| Error::Unavailable)?;
-    Ok((m.dev(), m.ino()))
+    fn decode(bytes: &[u8]) -> Result<Self, Error> {
+        Self::decode(bytes)
+    }
 }
 
 /// Fixed diagnostics never include a package, registry URL, path or source bytes.
@@ -492,14 +284,14 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
-            Self::Invalid => "unsupported staged source record",
-            Self::Unsafe => "source staging storage is unsafe",
-            Self::Busy => "source staging storage is busy",
-            Self::Unavailable => "source staging storage is unavailable",
-            Self::Integrity => "staged source integrity check failed",
-            Self::Conflict => "staged source version is already bound differently",
-            Self::Capacity => "source staging capacity exceeded",
-            Self::Uncertain => "source staging requires explicit interrupted-write inspection",
+            Self::Invalid => "unsupported staged library record",
+            Self::Unsafe => "library staging storage is unsafe",
+            Self::Busy => "library staging storage is busy",
+            Self::Unavailable => "library staging storage is unavailable",
+            Self::Integrity => "staged library integrity check failed",
+            Self::Conflict => "staged library version is already bound differently",
+            Self::Capacity => "library staging capacity exceeded",
+            Self::Uncertain => "library staging requires explicit interrupted-write inspection",
         })
     }
 }

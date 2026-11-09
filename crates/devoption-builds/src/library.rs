@@ -4,6 +4,8 @@ use devoption_registry::cargo_inputs::SourceTarget;
 use std::io;
 
 pub mod cargo_package;
+pub mod package_store;
+mod record_store;
 pub mod staging;
 
 pub(crate) const COMPLETION: &[u8] = b"devoption-library-build-v1\n";
