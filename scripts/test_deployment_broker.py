@@ -252,6 +252,26 @@ class DeploymentTests(unittest.TestCase):
         self.assertNotIn('records',broker.load_release(self.config,release))
         self.assertFalse((self.config['state']/release/'records.json').exists())
 
+    def test_durable_delivery_policy_is_explicit_and_preserves_prior_grant_versions(self):
+        self.record_binding()
+        legacy=self.promote()
+        policy={'project':self.receipt['project'],'environment':'preview','secret':'SERVICE_API_KEY',
+                'revision':1,'endpoint':'https://api.example.test/events','receiver_dedup_seconds':172800}
+        for change in ({'project':'f'*32},{'receiver_dedup_seconds':1},{'receiver_dedup_seconds':True},{'endpoint':'http://api.example.test/events'},{'value':'must-not-be-here'}):
+            with self.assertRaises(ValueError):broker.delivery_policy({'app_id':self.receipt['project'],'jobs':policy|change})
+        self.config['records']['grant']['jobs']=policy
+        self.config['records']['bytes']=broker.canonical(self.config['records']['grant'])
+        queued=self.promote()
+        saved=broker.load_release(self.config,queued)
+        self.assertEqual(saved['records']['version'],3)
+        self.assertIs(saved['records']['allow_read'],False)
+        self.assertEqual(saved['records']['jobs'],policy)
+        self.assertNotEqual(legacy,queued)
+        self.assertEqual(broker.load_release(self.config,legacy)['records']['version'],1)
+        self.config['records']['grant']['jobs']['revision']=2
+        self.config['records']['bytes']=broker.canonical(self.config['records']['grant'])
+        with self.assertRaises(ValueError):broker.check_record_release(self.config,saved)
+
 
     def test_stateless_dispatch_and_recovery_never_wait_for_credential_input(self):
         release=self.promote()

@@ -20,6 +20,7 @@ pub struct DeploymentView {
     pub review: Option<(String, String, String, String)>,
     pub review_records: Option<String>,
     pub review_record_reads: bool,
+    pub review_jobs: Option<String>,
     pub review_https: Option<String>,
 }
 pub struct ReleaseView {
@@ -170,6 +171,12 @@ mod tests {
         assert!(page.contains("Approval includes this read access."));
         assert!(page.contains("read a record by its exact ID"));
         assert!(!page.contains("It cannot read, update, delete or run SQL."));
+        view.review_jobs = Some("<queued endpoint>".into());
+        let page = content(&project, &view);
+        assert!(page.contains("&lt;queued endpoint&gt;"));
+        assert!(
+            page.contains("Approval includes enqueue access; it does not start the dispatcher.")
+        );
     }
 
     fn sample_release(id: &str, commit: &str) -> ReleaseView {
@@ -256,6 +263,10 @@ mod tests {
             )),
             review_records: Some("34".repeat(32)),
             review_record_reads: true,
+            review_jobs: Some(
+                "preview · SERVICE_API_KEY revision 1 → POST https://api.example.test/events · receiver deduplication 172800s"
+                    .into(),
+            ),
             review_https: Some(
                 "preview · SERVICE_API_KEY revision 1 → POST https://api.example.test/events"
                     .into(),
@@ -285,6 +296,7 @@ mod tests {
             view.ingress = ingress;
             view.review = review;
             view.review_records = None;
+            view.review_jobs = None;
             view.review_https = None;
             view.review.as_mut().unwrap().2 = "ok sample-site".into();
             view.status =

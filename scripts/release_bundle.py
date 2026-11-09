@@ -172,7 +172,9 @@ def probe(binary, version):
 def probe_runtime(binary, version):
     environment = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
     for flag, expected in (("--version", f"devoption-runtime {version}\n".encode()),
-                           ("--help", b"Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n")):
+                           ("--help", b"Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n"
+                            b"       devoption-runtime job-worker GRANT CREDENTIAL\n"
+                            b"       devoption-runtime jobs GRANT status|cancel [ID]\n")):
         result = subprocess.run([str(binary), flag], env=environment, check=True,
                                 capture_output=True, timeout=10)
         if result.stdout != expected or result.stderr:

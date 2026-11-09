@@ -545,7 +545,10 @@ pub(super) async fn show(projects: Projects, project: ProjectId) -> axum::respon
                 });
                 view.review_record_reads = state["releases"].as_array().and_then(|releases| {
                     releases.iter().find(|r| r["release"] == review.release)
-                }).is_some_and(|r| r["records"]["version"] == 2 && r["records"]["allow_read"] == true);
+                }).is_some_and(|r| (r["records"]["version"] == 2 || r["records"]["version"] == 3) && r["records"]["allow_read"] == true);
+                if let Some(policy)=state["releases"].as_array().and_then(|r|r.iter().find(|r|r["release"]==review.release)).map(|r|&r["records"]["jobs"]).filter(|p|!p.is_null()) {
+                    view.review_jobs=Some(format!("{} · {} revision {} → POST {} · receiver deduplication {}s",field(policy,"environment")?,field(policy,"secret")?,policy["revision"],field(policy,"endpoint")?,policy["receiver_dedup_seconds"]));
+                }
                 if let Some(policy) = state["releases"]
                     .as_array()
                     .and_then(|releases| releases.iter().find(|r| r["release"] == review.release))

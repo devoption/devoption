@@ -23,17 +23,19 @@ const MAX_READ_BYTES: usize = 32 * 1024;
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Grant {
-    app_id: String,
+    pub(crate) app_id: String,
     collection: String,
     socket_dir: String,
     database: String,
     user: String,
     #[serde(default)]
     allow_read: bool,
+    #[serde(default)]
+    pub(crate) jobs: Option<crate::jobs::Policy>,
     fields: BTreeMap<String, Field>,
 }
 
-struct Driver(tokio::task::JoinHandle<()>);
+pub(crate) struct Driver(tokio::task::JoinHandle<()>);
 impl Drop for Driver {
     fn drop(&mut self) {
         self.0.abort();
@@ -57,7 +59,7 @@ fn identifier(s: &str, max: usize) -> bool {
     !s.is_empty() && s.len() <= max && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
 
-fn uuid(s: &str) -> bool {
+pub(crate) fn uuid(s: &str) -> bool {
     s.len() == 36
         && s.bytes().enumerate().all(|(i, b)| {
             if [8, 13, 18, 23].contains(&i) {
@@ -134,8 +136,12 @@ impl Grant {
         );
         let mut bytes = Vec::new();
         file.take(32769).read_to_end(&mut bytes)?;
+        Self::from_bytes(&bytes)
+    }
+    pub(crate) fn from_bytes(bytes: &[u8]) -> wasmtime::Result<Self> {
+        wasmtime::ensure!(bytes.len() <= 32768, "invalid record grant");
         // Never echo configuration or serde diagnostics (which may quote values).
-        let grant: Self = serde_json::from_slice(&bytes)
+        let grant: Self = serde_json::from_slice(bytes)
             .map_err(|_| wasmtime::format_err!("invalid record grant"))?;
         wasmtime::ensure!(grant.valid(), "invalid record grant");
         Ok(grant)
@@ -152,6 +158,7 @@ impl Grant {
             && identifier(&self.user, 63)
             && Path::new(&self.socket_dir).is_absolute()
             && self.socket_dir.len() <= 80
+            && self.jobs.as_ref().is_none_or(|p| p.valid(&self.app_id))
             && !self.fields.is_empty()
             && self.fields.len() <= 16
             && self.fields.iter().all(|(k, f)| {
@@ -220,7 +227,9 @@ impl Grant {
             .unwrap_or(Err(WriteError::Unavailable))
     }
 
-    async fn connect(&self) -> Result<(tokio_postgres::Client, Driver), tokio_postgres::Error> {
+    pub(crate) async fn connect(
+        &self,
+    ) -> Result<(tokio_postgres::Client, Driver), tokio_postgres::Error> {
         let mut config = tokio_postgres::Config::new();
         config
             .host_path(&self.socket_dir)

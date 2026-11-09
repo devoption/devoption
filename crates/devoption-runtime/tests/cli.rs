@@ -10,7 +10,7 @@ fn packaged_worker_identity_and_help_match_the_platform_version() {
         ),
         (
             "--help",
-            "Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n".into(),
+            "Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n       devoption-runtime job-worker GRANT CREDENTIAL\n       devoption-runtime jobs GRANT status|cancel [ID]\n".into(),
         ),
     ] {
         let output = Command::new(binary).env_clear().arg(flag).output().unwrap();

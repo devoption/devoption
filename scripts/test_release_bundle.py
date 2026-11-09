@@ -20,6 +20,22 @@ from test_release_plan import Fixture, ROOT
 
 
 class BundleTests(Fixture):
+    def test_runtime_probe_requires_complete_job_command_help(self):
+        from subprocess import CompletedProcess
+        help_output = (b"Usage: devoption-runtime app-worker COMPONENT PORT serve|validate\n"
+                       b"       devoption-runtime job-worker GRANT CREDENTIAL\n"
+                       b"       devoption-runtime jobs GRANT status|cancel [ID]\n")
+        for output in (help_output, help_output.splitlines(keepends=True)[0]):
+            with self.subTest(complete=output == help_output), patch(
+                    'release_bundle.subprocess.run', side_effect=[
+                        CompletedProcess([], 0, f'devoption-runtime {self.version}\n'.encode(), b''),
+                        CompletedProcess([], 0, output, b'')]):
+                if output == help_output:
+                    probe_runtime(self.runtime, self.version)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'version/help differs'):
+                        probe_runtime(self.runtime, self.version)
+
     def test_runtime_family_direct_pins_and_locked_versions_stay_aligned(self):
         dependencies = tomllib.loads((ROOT / 'crates/devoption-runtime/Cargo.toml').read_text())['dependencies']
         locked = tomllib.loads((ROOT / 'Cargo.lock').read_text())['package']

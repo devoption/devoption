@@ -59,7 +59,8 @@ the host schema; extra fields and changed values are not silently filtered or
 normalized. PostgreSQL's JSON rendering/optional-field overhead explains the
 larger read bound relative to the 24 KiB input bound.
 
-One database operation total (append **or** lookup) is permitted per guest
+One database operation total (append, lookup or separately granted
+[durable enqueue](durable-deliveries.md)) is permitted per guest
 request, including invalid/failed attempts. Apps needing read-after-write use a
 later request. The host grant is app/collection scoped, not member scoped: apps
 must authenticate readers and enforce their own per-record/member authorization
@@ -107,6 +108,10 @@ deliverability and does not accept internationalized/quoted mailboxes.
 `allow_read` is an optional boolean, never a truthy string or number. No change to
 the existing SQL schema is required to enable reads. Review existing stored values
 and application authorization before granting access to an existing collection.
+An optional `jobs` object grants the separate delivery interface and uses release
+policy version 3; its schema, role permissions and lifecycle are owned by the
+[durable delivery contract](durable-deliveries.md). Ordinary record grants enable
+neither jobs nor a dispatcher.
 
 PostgreSQL access uses fixed parameterized INSERT, replay comparison and optionally
 exact-ID lookup, scoped by the configured app/collection. The host never receives

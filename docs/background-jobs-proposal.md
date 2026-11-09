@@ -1,9 +1,11 @@
 # Proposed durable app jobs
 
-Status: **proposal for [#296](https://github.com/devoption/devoption/issues/296)**,
-not an accepted runtime contract or implemented capability. Review this design
-before adding a job interface, schema or executable mode. No queue, dispatcher,
-background execution or live integration is enabled by this document.
+Status: **historical broader proposal for [#296](https://github.com/devoption/devoption/issues/296)**.
+The accepted first implementation is the narrower [durable HTTPS relay](durable-deliveries.md):
+saved JSON plus a separate operator-enabled host dispatcher. Its current bounds,
+custody and evidence are authoritative there. The Wasm job export, atomic business
+write/outbox, automated release-bound dispatcher and richer owner observations
+below remain prospective. This proposal itself activates no workload or integration.
 
 ## Current boundary and proposed first slice
 
