@@ -57,13 +57,14 @@ immutable bytes and expected package checksums;
 hashing a serialized Rust struct or trusting a mutable cache directory is insufficient.
 
 The [locked-archive policy adapter](package-publication-policy.md#exact-locked-archive-acquisition)
-now owns a complete admitted source-lock archive set with current hosted-project
-authorization, source/registry/checksum bindings, hosted index-edge checks and
-fresh-policy revalidation. Public archives remain explicit supplied bytes. This
-is separate from `CargoRegistryProvider`: it returns no materialization descriptor
-and does not claim verified archive contents, a physical vendor tree or runner
-integration. The adapter's fingerprint must never be substituted for a verified
-vendor-bundle digest.
+owns a complete admitted source-lock archive set with current hosted-project
+authorization, source/registry/checksum bindings and fresh-policy revalidation.
+The separate [vendor-bundle producer](cargo-vendor-bundles.md) verifies supported
+archive/manifest contents and owns actual canonical `DVVENDOR1` bytes. It implements
+`CargoRegistryProvider` for its exact captured request, with a descriptor bound to
+those bytes. This is distinct from the worker's existing physical directory-tree
+digest. Atomic publication, physical-tree verification and runner integration are
+still required; matching metadata alone is not execution authority.
 
 ## Source identity and bounds
 

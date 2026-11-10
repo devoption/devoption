@@ -166,16 +166,16 @@ source, catalog, policy-head, candidate, grant or metadata changes invalidate th
 old view. A yank preserves exact old-lock archive acquisition while changing the
 captured index flag/fingerprint. Copied bytes cannot be retracted after revocation.
 
-This API verifies the complete **admitted lock archive set**, and hosted index
-edges, rather than the contents of arbitrary public package manifests or an
-extracted vendor tree. Gzip/tar structure, expanded-file limits, actual manifest
-semantics, vendor checksum files and physical materialization remain separate
-verification work. It intentionally returns no `CargoMaterialization` descriptor
-and implements no provider claiming a verified vendor bundle. The controller and
-runner are not wired to this API yet; current service source callers still deny
-hosted dependencies. The explicit offline Cargo fixture acquires and revalidates
-these archive sets before building two disposable native consumers, an update and
-an older locked version; that is not actual platform-consumer execution.
+This acquisition API verifies the complete **admitted lock archive set** and hosted
+index edges. The separate [vendor-bundle adapter](cargo-vendor-bundles.md) now checks
+gzip/tar content, actual package manifests under an explicit bounded profile,
+expanded files and generated vendor checksums before returning owned canonical
+vendor bytes and a matching materialization descriptor. Locked acquisition itself
+still returns no `CargoMaterialization` and performs no decompression or writes.
+Physical publication/reverification and installed controller/worker integration
+remain. The explicit offline fixture uses the new vendor bytes for two native
+consumers, an update and an older locked version; this is not actual platform
+consumer acceptance.
 
 ## Ledger, bounds and failure behavior
 
@@ -305,8 +305,7 @@ isolation, a running registry or platform-hosted/WASIp2 consumer acceptance.
 The [opt-in controller](registry-controller.md) now supplies authenticated staged
 candidate staging/review/acquisition/recovery controls and complete project-filtered
 per-package index entries. Remaining #385 work includes Cargo transport/configuration,
-public-package manifest/archive-structure and physical vendor verification,
-complete dependency materialization and service/runner wiring
+physical vendor publication/reverification and service/runner wiring
 with actual platform consumers. Installing, globally serving or publishing real
 packages, production credentials and access-policy changes require separate
 explicit authorization. Public/global distribution is never inferred from local

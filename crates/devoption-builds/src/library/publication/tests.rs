@@ -1,21 +1,21 @@
 use super::*;
 use crate::library::cargo_package::tests::publication_fixture;
 use std::{fs, os::unix::fs::PermissionsExt};
-pub(super) const OWNER: OwnerId = OwnerId::from_bytes([1; 16]);
-pub(super) const OTHER: OwnerId = OwnerId::from_bytes([2; 16]);
-pub(super) struct Fixture {
-    pub(super) _root: tempfile::TempDir,
-    pub(super) path: String,
-    pub(super) candidates: PackageStore,
-    pub(super) policy: Publications,
-    pub(super) catalog: Catalog,
-    pub(super) packages: [CargoPackage; 3],
-    pub(super) source: ProjectId,
-    pub(super) first: ProjectId,
-    pub(super) second: ProjectId,
+pub(in crate::library) const OWNER: OwnerId = OwnerId::from_bytes([1; 16]);
+pub(in crate::library) const OTHER: OwnerId = OwnerId::from_bytes([2; 16]);
+pub(in crate::library) struct Fixture {
+    pub(in crate::library) _root: tempfile::TempDir,
+    pub(in crate::library) path: String,
+    pub(in crate::library) candidates: PackageStore,
+    pub(in crate::library) policy: Publications,
+    pub(in crate::library) catalog: Catalog,
+    pub(in crate::library) packages: [CargoPackage; 3],
+    pub(in crate::library) source: ProjectId,
+    pub(in crate::library) first: ProjectId,
+    pub(in crate::library) second: ProjectId,
 }
 impl Fixture {
-    pub(super) fn new() -> Self {
+    pub(in crate::library) fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
         let rootpath = root.path().canonicalize().unwrap();
         for dir in ["candidates", "policy"] {
@@ -48,7 +48,7 @@ impl Fixture {
             second: projects[1],
         }
     }
-    pub(super) fn review(&self, at: usize, change: Change) -> Review {
+    pub(in crate::library) fn review(&self, at: usize, change: Change) -> Review {
         self.policy
             .review(
                 OWNER,
@@ -59,13 +59,13 @@ impl Fixture {
             )
             .unwrap()
     }
-    pub(super) fn change(&mut self, at: usize, change: Change) {
+    pub(in crate::library) fn change(&mut self, at: usize, change: Change) {
         let review = self.review(at, change);
         self.policy
             .approve(OWNER, &self.catalog, &self.candidates, review)
             .unwrap();
     }
-    pub(super) fn line(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
+    pub(in crate::library) fn line(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
         self.policy.index_line(
             OWNER,
             project,
@@ -74,7 +74,11 @@ impl Fixture {
             self.packages[at].source().coordinates(),
         )
     }
-    pub(super) fn archive(&self, project: ProjectId, at: usize) -> Result<Vec<u8>, Error> {
+    pub(in crate::library) fn archive(
+        &self,
+        project: ProjectId,
+        at: usize,
+    ) -> Result<Vec<u8>, Error> {
         self.policy.archive(
             OWNER,
             project,

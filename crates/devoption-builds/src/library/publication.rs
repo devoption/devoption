@@ -628,4 +628,4 @@ pub use index::MAX_INDEX_ENTRY_BYTES;
 mod recovery;
 pub use recovery::RecoveryReview;
 #[cfg(test)]
-mod tests;
+pub(in crate::library) mod tests;

@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 flate2 = { version = "=1.1.11", default-features = false, features = ["rust_backend"] }
+semver = "=1.0.28"
 serde_json = "=1.0.154"
 toml = { version = "=1.1.8", default-features = false, features = ["parse", "serde", "std"] }
 devoption-projects = { path = "../devoption-projects" }
