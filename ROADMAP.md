@@ -160,10 +160,10 @@ Once the single-server path is usable, extend the platform around it:
   acquisition and storage, private and public package registries, and controlled
   upstream proxy/cache services. Preserve package origin and integrity, apply
   publishing and access policies, and keep dependency credentials out of builds.
-  Registry hosting, proxy fetching and package publication are intentions, not
-  current services. The [reusable-package assessment](docs/reusable-packages.md)
-  records the source-admission prerequisite and remaining library build and
-  cross-project distribution work under [#383](https://github.com/devoption/devoption/issues/383).
+  Public registry hosting and proxy fetching remain planned. The opt-in private
+  [reusable-package workflow](docs/reusable-packages.md) supports approved library
+  builds, immutable publication/project grants and offline consumer builds under
+  [#383](https://github.com/devoption/devoption/issues/383).
 - **Teams and access.** Extend shared workspace membership with project roles,
   scoped service access and shared audit history. Apply those permissions
   consistently to source, pipelines, packages, deployments and MCP.

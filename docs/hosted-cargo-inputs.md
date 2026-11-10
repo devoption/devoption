@@ -116,10 +116,9 @@ actual dependency manifests or archives and grants no access. The
 uses those edges to compare hosted index dependencies before returning an exact
 currently authorized archive set.
 
-#385 also has private [source staging](library-source-staging.md),
-[Cargo generation/storage](cargo-package-storage.md), and authenticated
-[staging/publication/index controls](registry-controller.md). Complete physical
-vendor verification/materialization and service/runner integration with actual
-platform consumers remain open. Current service source callers still use empty
-hosted bindings; native APIs and disposable Cargo proofs do not enable automatic
-acquisition or global distribution.
+The installed controller now selects its independently configured hosted binding
+for source preparation/capture and uses current [publication/project policy](registry-controller.md)
+and [verified attempt-local vendor inputs](cargo-vendor-bundles.md) for explicit
+consumer build review/approval. The disposable installed-worker acceptance is
+separate from this native Cargo proof. These capabilities provide private
+installation-local builds, not global Cargo transport or anonymous distribution.

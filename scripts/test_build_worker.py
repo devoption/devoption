@@ -129,5 +129,41 @@ class CompilerSequenceTests(unittest.TestCase):
         self.assertEqual(failure.exception.code, 124)
 
 
+
+class DependencyConfigurationTests(unittest.TestCase):
+    def test_direct_offline_sources_and_no_config_legacy_inputs(self):
+        from build_worker import dependency_config, selected_dependency_config
+        valid = ('[source.crates-io]\nreplace-with="public"\n[source.public]\ndirectory="/vendor/public"\n'
+                 '[registries.team]\nindex="sparse+https://packages.example.test/index/"\n'
+                 '[source.team]\nregistry="sparse+https://packages.example.test/index/"\nreplace-with="private"\n'
+                 '[source.private]\ndirectory="/vendor/team"\n').encode()
+        self.assertEqual(dependency_config(valid),valid.decode())
+        self.assertEqual(dependency_config(b''),'')
+        with tempfile.TemporaryDirectory() as root:
+            self.assertIn('directory="/vendor"',selected_dependency_config(Path(root)))
+        for bad in (valid+b'[env]\nTOKEN="secret"\n', valid.replace(b'/vendor/public',b'/vendor/../other'),
+                    valid.replace(b'replace-with="private"',b'replace-with="team"'),
+                    valid.replace(b'https://packages',b'https://user:password@packages'),
+                    valid.replace(b'directory="/vendor/team"',b'git="https://example.test"'),b'x'*65537):
+            with self.subTest(data=bad[:100]),self.assertRaises(WorkerFailure):
+                dependency_config(bad)
+
+    def test_attempt_vendor_never_uses_legacy_inputs_for_unsafe_existing_state(self):
+        from build_broker import selected_vendor
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root).resolve();token='01'*16
+            job=root/token;job.mkdir();candidate=job/'dependencies'
+            config={'work':str(root),'vendor':str(root/'legacy'),'uid':os.geteuid()}
+            self.assertEqual(selected_vendor(config,token),root/'legacy')
+            candidate.mkdir(mode=0o700)
+            with self.assertRaises(FileNotFoundError):selected_vendor(config,token)
+            configfile=candidate/'cargo-config.toml';configfile.write_text('');configfile.chmod(0o644)
+            self.assertEqual(selected_vendor(config,token),candidate)
+            configfile.chmod(0o666)
+            with self.assertRaises(RuntimeError):selected_vendor(config,token)
+            configfile.unlink();candidate.rmdir();candidate.symlink_to(root,target_is_directory=True)
+            with self.assertRaises(RuntimeError):selected_vendor(config,token)
+
+
 if __name__ == '__main__':
     unittest.main()

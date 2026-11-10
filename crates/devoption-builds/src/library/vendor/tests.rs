@@ -452,3 +452,24 @@ fn empty_dependency_set_has_an_exact_nonempty_canonical_bundle() {
     assert_eq!(inputs.bundle_bytes(), b"DVVENDOR1\0\0\0\0");
     assert_eq!(inputs.materialization().bundle_bytes(), 13);
 }
+
+pub(crate) fn attempt_fixture() -> VendorInputs {
+    let mut f = Fixture::new();
+    grant(&mut f, 0);
+    grant(&mut f, 1);
+    let source = source(&f, 1, false);
+    let captured = f
+        .policy
+        .locked_archives(
+            OWNER,
+            f.first,
+            &f.catalog,
+            &f.candidates,
+            &source,
+            &[public(&source)],
+        )
+        .unwrap();
+    f.policy
+        .vendor_inputs(OWNER, &f.catalog, &f.candidates, &source, &captured)
+        .unwrap()
+}

@@ -9,11 +9,12 @@ authenticated HTTP.
 
 This is a control/acquisition API with JSON reviews and newline-delimited package
 index entries. There is no new web page, candidate upload, automatic staging,
-Cargo `config.json`, complete Cargo sparse/Git transport or build dependency
-acquisition yet. A configured index
+Cargo `config.json` or complete Cargo sparse/Git transport. Build dependency
+acquisition uses the existing authenticated build review/approval path described
+in [verified vendor inputs](cargo-vendor-bundles.md). A configured index
 URL is an immutable namespace identity; enabling these controls does not serve
-that URL or make the platform a Cargo-compatible registry. Keep #385 and #383 open
-until verified materialization and actual platform-consumer builds are integrated.
+that URL or make the platform a Cargo-compatible registry. The installed runner consumes verified attempt-local inputs; the configured URL
+continues to identify the namespace rather than a publicly reachable service.
 
 ## Explicit startup and private storage
 
@@ -302,3 +303,26 @@ closure/archive/vendor verification, and service/runner wiring with two actual p
 version updates and retained older builds. No installer/deployment, global
 publication, public DNS, production credentials or production access-policy changes were
 performed or authorized by implementing these controls.
+
+## Consumer builds
+
+With the installed Linux runner enabled, register each consumer checkout in its
+own project, commit its supported manifest and exact v4 lockfile with the explicit
+configured registry name/origin, and grant that project read access through a
+separate publication approval. Use the existing build prepare/review/approve
+controls. No Cargo credentials or network access are given to the worker.
+
+Every preparation and approval checks the current source, catalog and package
+policy; a grant change or unavailable/corrupt archive invalidates a pending review.
+The complete verified vendor tree is private to that attempt and is checked again
+before execution. A new immutable version requires its own library build, staging
+and publication approvals. Update the consumer's committed manifest/lockfile and
+prepare a new review to use it. Retained old locks remain rebuildable while their
+exact candidates and reader grants remain available; yanks do not erase them.
+
+If the lock includes public packages, pre-provide exact checksum-matching archives
+in optional `public-archives/NAME-VERSION.crate`: the directory must be owned by the
+controller UID with mode `0700`; each regular, single-linked, nonsymlink archive
+must have that owner and mode `0600`. Reads are bounded at 8 MiB per archive and
+32 MiB total, before the stricter verified vendor/manifest profile applies. The
+controller never creates this optional directory or fetches missing archives.

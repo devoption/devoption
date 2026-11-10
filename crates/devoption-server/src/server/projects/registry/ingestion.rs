@@ -169,13 +169,14 @@ impl Selection<'_> {
             .map_err(|_| StatusCode::NOT_FOUND)?;
         // No reset/fetch/checkout: staging an older attempt needs its exact clean
         // registered revision. The package then remains independent of that checkout.
-        let source = registered::capture(
+        let source = registered::capture_with_registries(
             catalog,
             project,
             repository,
             root,
             record.commit(),
             devoption_builds::execution::registry(),
+            &engine.bindings()?,
         )
         .map_err(|_| StatusCode::CONFLICT)?;
         let package = history

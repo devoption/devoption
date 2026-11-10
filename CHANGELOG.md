@@ -7,6 +7,18 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Connect existing authenticated build review/approval to current project package
+  grants, exact archives and verified attempt-local offline vendor inputs. Mount
+  them read-only in the installed worker, recheck policy/bytes at approval and
+  admission, and exercise two independent consumers, version updates, old locks
+  and missing/corrupt/revoked/tampered-input refusal in disposable acceptance
+  ([#385](https://github.com/devoption/devoption/issues/385),
+  [#383](https://github.com/devoption/devoption/issues/383)).
+
+- Allow the bundle installation job time for compilation, setup and its existing
+  bounded VM acceptance test, preserving failures and the required validation gate
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Verify bounded gzip/tar contents and supported Cargo dependency manifests before
   producing deterministic vendor bundles with exact per-file/archive checksums,
   disjoint registry sources and a descriptor bound to actual owned bytes. Refuse

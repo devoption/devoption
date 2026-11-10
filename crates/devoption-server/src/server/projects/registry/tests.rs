@@ -812,3 +812,117 @@ fn complete_project_index_uses_the_existing_authenticated_admission_and_live_gra
         StatusCode::SERVICE_UNAVAILABLE
     );
 }
+
+#[test]
+fn consumer_dependency_review_reacquires_current_policy_and_exact_archives() {
+    let f = Fixture::new();
+    let root = f.registry.parent().unwrap().join("repositories");
+    let tree = root.join("consumer");
+    private(&tree.join("src"));
+    fs::write(tree.join("Cargo.toml"),"[package]\nname='consumer'\nversion='0.1.0'\nedition='2024'\nbuild=false\n[lib]\nname='consumer'\ncrate-type=['cdylib']\n[dependencies]\nshared-tool={version='=0.1.0',registry='team'}\n").unwrap();
+    fs::write(tree.join("Cargo.lock"),format!("version=4\n[[package]]\nname='consumer'\nversion='0.1.0'\ndependencies=['shared-tool']\n[[package]]\nname='shared-tool'\nversion='0.1.0'\nsource='sparse+https://packages.example.test/index/'\nchecksum='{}'\n",hex(f.package.archive_sha256().bytes()))).unwrap();
+    fs::write(
+        tree.join("src/lib.rs"),
+        "pub fn answer()->u32 {shared_tool::value()}\n",
+    )
+    .unwrap();
+    git(&tree, &["init", "-b", "main"]);
+    git(&tree, &["add", "--all"]);
+    git(&tree, &["commit", "-m", "fixture"]);
+    let root = PermittedRoot::open_absolute(&root).unwrap();
+    let repository = f
+        .projects
+        .directory
+        .writer()
+        .unwrap()
+        .attach_repository(f.consumer, &root, Path::new("consumer"))
+        .unwrap();
+    let catalog = f.projects.directory.load().unwrap().unwrap();
+    let engine = f.projects.registry.as_ref().unwrap();
+    let source = registered::capture_with_registries(
+        &catalog,
+        f.consumer,
+        repository,
+        &root,
+        &git(&tree, &["rev-parse", "HEAD"]),
+        devoption_builds::execution::registry(),
+        &engine.blocking_lock().bindings().unwrap(),
+    )
+    .unwrap();
+    assert!(
+        engine
+            .blocking_lock()
+            .prepare_dependencies(&catalog, f.consumer, &source)
+            .is_err()
+    );
+    f.publish();
+    let prepared = engine
+        .blocking_lock()
+        .prepare_dependencies(&catalog, f.consumer, &source)
+        .unwrap();
+    engine
+        .blocking_lock()
+        .revalidate_dependencies(&catalog, f.consumer, &source, &prepared)
+        .unwrap();
+    assert!(
+        prepared
+            .vendor
+            .files()
+            .any(|file| file.path().ends_with("src/lib.rs"))
+    );
+    let candidate = fs::read_dir(f.registry.join("candidates"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.extension().is_some_and(|s| s == "cargo"))
+        .unwrap();
+    let bytes = fs::read(&candidate).unwrap();
+    fs::write(&candidate, b"corrupt").unwrap();
+    assert!(
+        engine
+            .blocking_lock()
+            .revalidate_dependencies(&catalog, f.consumer, &source, &prepared)
+            .is_err()
+    );
+    fs::write(&candidate, bytes).unwrap();
+    let token = f.prepare("{\"action\":\"readers\",\"readers\":[]}");
+    assert_eq!(f.approve(&token), StatusCode::OK);
+    assert!(
+        engine
+            .blocking_lock()
+            .revalidate_dependencies(&catalog, f.consumer, &source, &prepared)
+            .is_err()
+    );
+}
+
+#[test]
+fn operator_public_archives_are_bounded_private_and_not_symlinked() {
+    let f = Fixture::new();
+    let engine = f.projects.registry.as_ref().unwrap().blocking_lock();
+    let request = devoption_registry::CargoDependencyRequest::new(
+        RegistryId::new("prepared").unwrap(),
+        Sha256::digest(b"manifest"),
+        Sha256::digest(b"lock"),
+        vec![devoption_registry::LockedPackage {
+            origin: devoption_registry::CargoOrigin::CratesIo,
+            name: "fixture".into(),
+            version: "0.1.0".into(),
+            archive_sha256: Sha256::digest(b"archive"),
+        }],
+    )
+    .unwrap();
+    assert!(engine.root.public_archives(&request).is_err());
+    let dir = f.registry.join("public-archives");
+    private(&dir);
+    let path = dir.join("fixture-0.1.0.crate");
+    fs::write(&path, b"archive").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(
+        engine.root.public_archives(&request).unwrap(),
+        vec![b"archive".to_vec()]
+    );
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(engine.root.public_archives(&request).is_err());
+    fs::remove_file(&path).unwrap();
+    symlink("/dev/null", &path).unwrap();
+    assert!(engine.root.public_archives(&request).is_err());
+}

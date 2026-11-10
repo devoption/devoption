@@ -305,4 +305,4 @@ fn safe_path(path: &str) -> Result<(), Error> {
     Ok(())
 }
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

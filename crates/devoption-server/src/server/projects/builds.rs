@@ -9,12 +9,15 @@ pub(super) fn routes(projects: Projects) -> Router {
         let ids = ids.ok().and_then(|RoutePath((p, r))| Some((project_id(&p)?, RepositoryId::from_hex(&r)?)));
         let Some((project, repository)) = ids else { return missing(); };
         let root = projects.root.clone();
+        let bindings=if let Some(registry)=&projects.registry {
+            match registry.lock().await.bindings() {Ok(bindings)=>bindings,Err(_)=>return (StatusCode::SERVICE_UNAVAILABLE,[(CACHE_CONTROL,"no-store")],"Registry configuration unavailable.").into_response()}
+        } else {devoption_registry::HostedRegistries::default()};
         let execution_available = projects.execution.is_some();
         let loaded = projects.access(move |directory| {
             let catalog = directory.load()?.unwrap_or_default();
             let record = catalog.projects().iter().find(|p| p.id() == project).ok_or(Error::UnknownProject)?;
             if !record.repositories().contains(&repository) { return Err(Error::UnknownRepository); }
-            let result = root.as_ref().ok_or(Error::CheckoutRequired).and_then(|root| preparation::inspect(&catalog, project, repository, root));
+            let result = root.as_ref().ok_or(Error::CheckoutRequired).and_then(|root| preparation::inspect_with_registries(&catalog, project, repository, root,&bindings));
             Ok((catalog, result))
         }).await;
         let (catalog, result) = match loaded {

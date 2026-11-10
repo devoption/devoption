@@ -79,7 +79,8 @@ jobs:
     if: needs.selection.outputs.installation == 'true'
     name: Installation (${{ matrix.suite }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # The bundle VM has its own 15-minute limit after compilation and setup.
+    timeout-minutes: ${{ matrix.suite == 'bundle' && 30 || 15 }}
     strategy:
       fail-fast: false
       matrix:
