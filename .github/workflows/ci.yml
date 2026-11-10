@@ -176,7 +176,8 @@ jobs:
         run: python3 scripts/check_app_installation.py --prepare "$RUNNER_TEMP/app-install-inputs" --binary target/release/devoption --runtime target/release/devoption-runtime --caddy-archive "$RUNNER_TEMP/devoption-proxy-test/caddy.tar.gz"
       - name: Install private VM acceptance tools
         if: matrix.suite != 'records'
-        timeout-minutes: 3
+        # Include package configuration after bounded mirror downloads/retries.
+        timeout-minutes: 5
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=60 update
           sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=60 install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso

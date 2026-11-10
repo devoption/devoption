@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Give bounded CI VM-tool setup five minutes so slow package downloads leave
+  time for installation and KVM access setup, preserving all validation gates
+  ([#405](https://github.com/devoption/devoption/issues/405)).
+
 - Connect existing authenticated build review/approval to current project package
   grants, exact archives and verified attempt-local offline vendor inputs. Mount
   them read-only in the installed worker, recheck policy/bytes at approval and
