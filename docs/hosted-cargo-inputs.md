@@ -108,11 +108,18 @@ to an installation or public registry. This is a Cargo/metadata proof, not a
 platform-hosted consumer acceptance test, OS network-isolation proof, access-control
 acceptance or evidence of globally reachable distribution.
 
-#385 now also has a private [source-package staging API](library-source-staging.md),
-separate from Cargo registry archives and serving. It remains open for Cargo
-package ingestion/storage/index metadata, explicit
-promotion/publication policy, project access and version/yank/recovery behavior,
-verified runner materialization and two consumers through the actual platform.
-The separate [Cargo generator](cargo-package-generation.md) now produces candidate
-archive/index bytes and proves native offline consumption of those artifacts,
-without implementing the registry service or platform integration.
+`InspectedInputs::package_dependencies()` additionally exposes each registry node's
+validated outgoing lock edges, preserving full origin/version/checksum identities
+in canonical package order. This reports supplied lock claims; it does not verify
+actual dependency manifests or archives and grants no access. The
+[locked-archive policy adapter](package-publication-policy.md#exact-locked-archive-acquisition)
+uses those edges to compare hosted index dependencies before returning an exact
+currently authorized archive set.
+
+#385 also has private [source staging](library-source-staging.md),
+[Cargo generation/storage](cargo-package-storage.md), and authenticated
+[staging/publication/index controls](registry-controller.md). Complete physical
+vendor verification/materialization and service/runner integration with actual
+platform consumers remain open. Current service source callers still use empty
+hosted bindings; native APIs and disposable Cargo proofs do not enable automatic
+acquisition or global distribution.

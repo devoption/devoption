@@ -45,6 +45,22 @@ impl SourceTarget {
     }
 }
 
+/// Exact outgoing lock edges for one registry package, preserving origin and
+/// archive checksums. These are validated lock claims, not archive verification.
+/// No Debug implementation exposes private package metadata.
+pub struct LockedDependencies {
+    package: LockedPackage,
+    dependencies: Vec<LockedPackage>,
+}
+impl LockedDependencies {
+    pub fn package(&self) -> &LockedPackage {
+        &self.package
+    }
+    pub fn dependencies(&self) -> &[LockedPackage] {
+        &self.dependencies
+    }
+}
+
 /// Internally consistent supplied inputs, without a provider or source proof.
 /// No Debug implementation prints package metadata implicitly.
 pub struct InspectedInputs {
@@ -52,11 +68,15 @@ pub struct InspectedInputs {
     version: String,
     hashes: InputHashes,
     packages: Vec<LockedPackage>,
+    edges: Vec<LockedDependencies>,
     target: SourceTarget,
     hosted_registries: HostedRegistries,
 }
 
 impl InspectedInputs {
+    pub fn package_dependencies(&self) -> &[LockedDependencies] {
+        &self.edges
+    }
     pub fn target(&self) -> &SourceTarget {
         &self.target
     }
@@ -334,11 +354,45 @@ fn inspect_expected(
         return Err(Error::DependencyMismatch);
     }
     check_graph(root, &edges)?;
+    let locked_node = |i: usize| {
+        packages
+            .iter()
+            .find(|p| {
+                p.name == nodes[i].name
+                    && p.version == nodes[i].version
+                    && Some(&p.origin) == nodes[i].origin.as_ref()
+            })
+            .cloned()
+            .ok_or(Error::InvalidGraph)
+    };
+    let package_edges = packages
+        .iter()
+        .map(|package| {
+            let at = nodes
+                .iter()
+                .position(|n| {
+                    n.name == package.name
+                        && n.version == package.version
+                        && n.origin.as_ref() == Some(&package.origin)
+                })
+                .ok_or(Error::InvalidGraph)?;
+            let mut dependencies = edges[at]
+                .iter()
+                .map(|&i| locked_node(i))
+                .collect::<Result<Vec<_>, _>>()?;
+            dependencies.sort_by(crate::compare_coordinates);
+            Ok(LockedDependencies {
+                package: package.clone(),
+                dependencies,
+            })
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
     Ok(InspectedInputs {
         package: root_name.into(),
         version: root_version.into(),
         hashes: actual,
         packages,
+        edges: package_edges,
         target,
         hosted_registries: registries.clone(),
     })
