@@ -311,6 +311,13 @@ fn cargo(root: &Path, home: &str, app: &Path, args: &[&str]) -> Output {
     fs::create_dir_all(home.join("home")).unwrap();
     fs::create_dir_all(home.join("tmp")).unwrap();
     fs::write(home.join("cargo/config.toml"), format!("[registries.team]\nindex='{INDEX}'\n[source.team]\nregistry='{INDEX}'\nreplace-with='hosted-seed'\n[source.hosted-seed]\nlocal-registry='{}'\n[source.crates-io]\nreplace-with='public-seed'\n[source.public-seed]\nlocal-registry='{}'\n", root.join("hosted").display(),root.join("public").display())).unwrap();
+    let vendor_config = root.join(format!(
+        "vendor-config-{}.toml",
+        app.file_name().unwrap().to_str().unwrap()
+    ));
+    if args.contains(&"--locked") && vendor_config.exists() {
+        fs::copy(vendor_config, home.join("cargo/config.toml")).unwrap();
+    }
     let mut command = if cfg!(target_os = "linux") {
         let mut c = Command::new("/usr/bin/timeout");
         c.args(["--kill-after=5s", "60s"]);
@@ -461,6 +468,49 @@ fn seed_locked_archives(
             }
         }
     }
+    let inputs = policy
+        .vendor_inputs(
+            crate::approvals::OwnerId::from_bytes([1; 16]),
+            catalog,
+            store,
+            &snapshot,
+            &acquired,
+        )
+        .unwrap();
+    inputs
+        .revalidate(
+            policy,
+            crate::approvals::OwnerId::from_bytes([1; 16]),
+            catalog,
+            store,
+            &snapshot,
+            &acquired,
+        )
+        .unwrap();
+    assert!(Sha256::digest(inputs.bundle_bytes()) == inputs.materialization().bundle_sha256());
+    let vendor = root.join("vendor").join(app.file_name().unwrap());
+    if vendor.exists() {
+        fs::remove_dir_all(&vendor).unwrap();
+    }
+    fs::create_dir_all(&vendor).unwrap();
+    for source in inputs.sources() {
+        fs::create_dir_all(vendor.join(source.directory())).unwrap();
+    }
+    for file in inputs.files() {
+        let target = vendor.join(file.path());
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, file.bytes()).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&target, fs::Permissions::from_mode(file.mode().into())).unwrap();
+    }
+    fs::write(
+        root.join(format!(
+            "vendor-config-{}.toml",
+            app.file_name().unwrap().to_str().unwrap()
+        )),
+        inputs.cargo_config(&vendor).unwrap(),
+    )
+    .unwrap();
 }
 
 #[test]
@@ -737,6 +787,19 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         )),
         b"42 7\n"
     );
+    let vendor_source = fs::read_dir(root.join("vendor/consumer-one"))
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| {
+            p.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("hosted-")
+        })
+        .unwrap()
+        .join("private-base-0.1.0/src/lib.rs");
+    fs::remove_file(&vendor_source).unwrap();
     let archive = root.join("hosted/private-base-0.1.0.crate");
     fs::remove_file(&archive).unwrap();
     assert!(
@@ -750,6 +813,7 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
         .success()
     );
     fs::write(&archive, b"corrupt archive").unwrap();
+    fs::write(&vendor_source, b"corrupt vendor source").unwrap();
     assert!(
         !cargo(
             &root,
@@ -801,7 +865,7 @@ fn generated_cargo_packages_build_two_consumers_and_retain_older_versions() {
             .is_ok()
     );
     println!(
-        "DevOption-generated Cargo locked-archive acquisition/aggregated indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
+        "DevOption-generated Cargo verified vendor bundles/locked archives/aggregated indexes: reviewed publication and project access, two consumers, mixed registry closure, exact update, yanked fresh-resolution refusal, old locked-version rebuild and fresh-cache missing/corrupt refusal passed."
     );
 }
 

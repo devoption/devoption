@@ -379,4 +379,4 @@ fn fingerprint(value: &LockedArchives) -> Sha256 {
 }
 
 #[cfg(test)]
-mod tests;
+pub(in crate::library) mod tests;

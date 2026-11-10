@@ -9,7 +9,7 @@ const INDEX: &str = "sparse+https://packages.example.test/index/";
 fn checksum(bytes: &[u8]) -> String {
     super::super::hex(Sha256::digest(bytes).bytes())
 }
-fn source(f: &Fixture, helper: usize, bad_edges: bool) -> SourceSnapshot {
+pub(in crate::library) fn source(f: &Fixture, helper: usize, bad_edges: bool) -> SourceSnapshot {
     let version = f.packages[helper].source().coordinates().version();
     let direct = if bad_edges {
         "'shared-helper','private-base','itoa'"
@@ -48,7 +48,7 @@ fn source(f: &Fixture, helper: usize, bad_edges: bool) -> SourceSnapshot {
     )
     .unwrap()
 }
-fn public(source: &SourceSnapshot) -> PublicArchive<'_> {
+pub(in crate::library) fn public(source: &SourceSnapshot) -> PublicArchive<'_> {
     PublicArchive {
         package: source
             .request()
@@ -59,7 +59,7 @@ fn public(source: &SourceSnapshot) -> PublicArchive<'_> {
         bytes: ARCHIVE,
     }
 }
-fn grant(f: &mut Fixture, at: usize) {
+pub(in crate::library) fn grant(f: &mut Fixture, at: usize) {
     f.change(
         at,
         Change::Publish {
@@ -382,6 +382,17 @@ fn identical_public_and_hosted_coordinates_require_separate_exact_archives_and_g
     assert!(same[0].package().origin != same[1].package().origin);
     assert!(same[0].package().archive_sha256 != same[1].package().archive_sha256);
     assert!(same[0].bytes() != same[1].bytes());
+    let vendor = f
+        .policy
+        .vendor_inputs(OWNER, &f.catalog, &f.candidates, &source, &result)
+        .unwrap();
+    let manifests: Vec<_> = vendor
+        .files()
+        .filter(|p| p.path().ends_with("/itoa-1.0.18/Cargo.toml"))
+        .collect();
+    assert_eq!(manifests.len(), 2);
+    assert!(manifests.iter().any(|p| p.path().starts_with("public/")));
+    assert!(manifests.iter().any(|p| p.path().starts_with("hosted-")));
 }
 
 #[test]

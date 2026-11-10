@@ -132,7 +132,9 @@ stage successful retained-build candidates and acquire separately approved packa
 The offline Cargo fixture consumes those aggregated entries and now acquires and
 freshly revalidates complete admitted archive sets through the
 [locked-archive policy adapter](package-publication-policy.md#exact-locked-archive-acquisition)
-before its two consumers, update and older-lock rebuild. Remaining #385 work
+before its two consumers, update and older-lock rebuild. Those builds now consume
+[verified vendor bundles](cargo-vendor-bundles.md) through disjoint directory
+sources, including fresh-cache source deletion/corruption refusal. Remaining #385 work
 includes Cargo transport/configuration, complete verified dependency/vendor
 materialization, service/runner integration and actual platform consumers. Installation-local and
 globally reachable distribution still need separate implementation and evidence.

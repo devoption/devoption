@@ -292,8 +292,10 @@ updates, yanks and retained older-version builds.
 The native [locked-archive adapter](package-publication-policy.md#exact-locked-archive-acquisition)
 can now verify and acquire complete admitted source-lock archive sets with hosted
 edge/grant checks and fresh-policy revalidation. These HTTP controls do not yet
-expose that operation or wire it to the runner. Archive-content/public-manifest
-and physical vendor verification remain separate work.
+expose that operation or wire it to the runner. The native [vendor-bundle producer](cargo-vendor-bundles.md) additionally verifies
+archive contents and a bounded public/hosted manifest profile and generates exact
+vendor files/checksums. Physical publication/reverification and worker use remain
+separate work.
 
 Remaining #385 work is Cargo transport/configuration, complete authorized dependency
 closure/archive/vendor verification, and service/runner wiring with two actual platform consumers,

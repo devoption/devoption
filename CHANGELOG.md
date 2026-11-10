@@ -7,6 +7,13 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Verify bounded gzip/tar contents and supported Cargo dependency manifests before
+  producing deterministic vendor bundles with exact per-file/archive checksums,
+  disjoint registry sources and a descriptor bound to actual owned bytes. Refuse
+  unsafe paths, unsupported executable/feature semantics and incomplete graphs;
+  retain fresh-policy checks without enabling physical publication or worker use
+  ([#385](https://github.com/devoption/devoption/issues/385)).
+
 - Acquire complete admitted Cargo lock archive sets through a native owner policy
   adapter, verifying every checksum, hosted transitive grant and published index
   edge without public fallback. Preserve exact registry origins, payload bounds,

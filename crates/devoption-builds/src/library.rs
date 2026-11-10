@@ -9,6 +9,7 @@ pub mod package_store;
 pub mod publication;
 mod record_store;
 pub mod staging;
+pub mod vendor;
 
 pub(crate) const COMPLETION: &[u8] = b"devoption-library-build-v1\n";
 pub const MAX_PACKAGE_BYTES: usize = 4 * 1024 * 1024;
