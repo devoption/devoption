@@ -14,12 +14,14 @@ type Admission = (
     OwnerId,
     Approvals,
     Arc<AtomicBool>,
+    Option<tokio::sync::OwnedMutexGuard<super::registry::Engine>>,
 );
 
 pub(super) struct Engine {
     pub(super) config: Configuration,
     owner: OwnerId,
     pending: Option<Review>,
+    dependencies: Option<super::registry::builds::Prepared>,
     active: Option<(ProjectId, RepositoryId)>,
     cancel: Arc<AtomicBool>,
     blocked: bool,
@@ -33,6 +35,7 @@ impl Engine {
             config,
             owner: OwnerId::from_bytes(owner.to_bytes()),
             pending: None,
+            dependencies: None,
             active: None,
             cancel: Arc::new(AtomicBool::new(false)),
             blocked: false,
@@ -241,6 +244,7 @@ async fn action(
     let Some((project, repository)) = ids(p, r) else {
         return failure(StatusCode::NOT_FOUND);
     };
+    let headers = request.headers().clone();
     let body = match text_body(request, 32).await {
         Ok(body) => body,
         Err(status) => return failure(status),
@@ -266,12 +270,35 @@ async fn action(
         return failure(StatusCode::CONFLICT);
     }
     let mut history_guard = history.clone().lock_owned().await;
+    let registry_guard = match projects.registry.clone() {
+        Some(registry) => match registry.try_lock_owned() {
+            Ok(guard) => Some(guard),
+            Err(_) => return failure(StatusCode::CONFLICT),
+        },
+        None => None,
+    };
     let catalog_guard = projects.gate.clone().lock_owned().await;
     let cleanup_projects = projects.clone();
     let result = tokio::task::spawn_blocking(move || -> Result<Option<Admission>, StatusCode> {
         let _catalog_guard = catalog_guard;
-        let catalog = projects
+        if registry_guard.is_some()
+            && projects
+                .registry_session
+                .as_ref()
+                .and_then(|session| crate::browser_session::authenticate(&headers, session))
+                != projects.owner
+        {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+        let writer = projects
             .directory
+            .writer()
+            .map_err(|_| StatusCode::CONFLICT)?;
+        let _retention = engine_guard
+            .config
+            .retention_lock()
+            .map_err(|_| StatusCode::CONFLICT)?;
+        let catalog = writer
             .load()
             .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
             .unwrap_or_default();
@@ -279,13 +306,19 @@ async fn action(
             .source_inputs(project, repository, &root)
             .map_err(|_| StatusCode::CONFLICT)?;
         let commit = observed.status.commit.ok_or(StatusCode::CONFLICT)?;
-        let source = registered::capture(
+        let bindings = registry_guard
+            .as_ref()
+            .map(|registry| registry.bindings())
+            .transpose()?
+            .unwrap_or_default();
+        let source = registered::capture_with_registries(
             &catalog,
             project,
             repository,
             &root,
             &commit,
             devoption_builds::execution::registry(),
+            &bindings,
         )
         .map_err(|_| StatusCode::CONFLICT)?;
         if approve {
@@ -303,7 +336,30 @@ async fn action(
             {
                 return Err(StatusCode::CONFLICT);
             }
+            review
+                .verify_dependency_inputs()
+                .map_err(|_| StatusCode::CONFLICT)?;
+            if let Some(registry) = &registry_guard {
+                registry.revalidate_dependencies(
+                    &catalog,
+                    project,
+                    &source,
+                    engine_guard
+                        .dependencies
+                        .as_ref()
+                        .ok_or(StatusCode::CONFLICT)?,
+                )?;
+                if projects
+                    .registry_session
+                    .as_ref()
+                    .and_then(|session| crate::browser_session::authenticate(&headers, session))
+                    != projects.owner
+                {
+                    return Err(StatusCode::UNAUTHORIZED);
+                }
+            }
             let review = engine_guard.pending.take().expect("checked pending");
+            engine_guard.dependencies = None;
             engine_guard.active = Some((project, repository));
             engine_guard.cancel = Arc::new(AtomicBool::new(false));
             Ok(Some((
@@ -315,6 +371,7 @@ async fn action(
                 // moved out exactly once and can never be submitted again.
                 Approvals::default(),
                 engine_guard.cancel.clone(),
+                registry_guard,
             )))
         } else {
             if let Some(previous) = engine_guard.pending.take() {
@@ -322,30 +379,48 @@ async fn action(
                     .discard(&mut history_guard)
                     .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
             }
-            let prepare = if source.target().is_library() {
-                devoption_builds::execution::prepare_library
+            engine_guard.dependencies = None;
+            let dependencies = registry_guard
+                .as_ref()
+                .map(|registry| registry.prepare_dependencies(&catalog, project, &source))
+                .transpose()?;
+            let review = if let Some(prepared) = &dependencies {
+                devoption_builds::execution::prepare_with_vendor(
+                    &engine_guard.config,
+                    &catalog,
+                    project,
+                    repository,
+                    source,
+                    &mut history_guard,
+                    prepared.vendor.clone(),
+                )
             } else {
-                devoption_builds::execution::prepare
-            };
-            let review = prepare(
-                &engine_guard.config,
-                &catalog,
-                project,
-                repository,
-                source,
-                &mut history_guard,
-            )
+                let prepare = if source.target().is_library() {
+                    devoption_builds::execution::prepare_library
+                } else {
+                    devoption_builds::execution::prepare
+                };
+                prepare(
+                    &engine_guard.config,
+                    &catalog,
+                    project,
+                    repository,
+                    source,
+                    &mut history_guard,
+                )
+            }
             .map_err(|e| {
                 eprintln!("Build preparation failed: {e}");
                 StatusCode::CONFLICT
             })?;
+            engine_guard.dependencies = dependencies;
             engine_guard.pending = Some(review);
             Ok(None)
         }
     })
     .await;
     match result {
-        Ok(Ok(Some((review, source, owner, approvals, cancel)))) => {
+        Ok(Ok(Some((review, source, owner, approvals, cancel, mut registry_guard)))) => {
             tokio::task::spawn_blocking(move || {
                 let result = devoption_builds::execution::execute(
                     review,
@@ -354,10 +429,14 @@ async fn action(
                     &approvals,
                     cancel,
                     |job, output| {
+                        if matches!(job.state(), devoption_builds::jobs::State::Running) {
+                            registry_guard.take();
+                        }
                         let mut history = history.blocking_lock();
                         history.checkpoint(job, output).map_err(io::Error::other)
                     },
                 );
+                drop(registry_guard);
                 let mut engine = engine.blocking_lock();
                 let mut history = history.blocking_lock();
                 let _gate = cleanup_projects.gate.blocking_lock();

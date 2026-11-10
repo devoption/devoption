@@ -14,6 +14,7 @@ use devoption_registry::{HostedRegistry, RegistryId, Sha256};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
+pub(super) mod builds;
 mod ingestion;
 mod storage;
 use storage::Root;

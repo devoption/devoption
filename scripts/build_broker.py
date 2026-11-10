@@ -27,6 +27,25 @@ def protected_file(path):
         raise RuntimeError('unsafe installed build configuration')
 
 
+def selected_vendor(config, token):
+    """Only the fixed child of this attempt can override installed legacy inputs."""
+    candidate = Path(config['work']) / token / 'dependencies'
+    try:
+        meta = candidate.lstat()
+    except FileNotFoundError:
+        return Path(config['vendor'])
+    if (not stat.S_ISDIR(meta.st_mode) or meta.st_uid != config['uid']
+            or stat.S_IMODE(meta.st_mode) != 0o700
+            or candidate.resolve(strict=True) != candidate):
+        raise RuntimeError('invalid attempt dependency inputs')
+    metadata = (candidate / 'cargo-config.toml').lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != config['uid']
+            or stat.S_IMODE(metadata.st_mode) != 0o644 or metadata.st_nlink != 1
+            or metadata.st_size > 65536):
+        raise RuntimeError('invalid attempt dependency configuration')
+    return candidate
+
+
 def main():
     if os.geteuid() != 0:
         raise RuntimeError('installed broker requires root')
@@ -57,6 +76,7 @@ def main():
     source = Path(config['work']) / sys.argv[2] / 'source'
     if source.resolve(strict=True) != source or not source.is_dir():
         raise RuntimeError('invalid build source')
+    vendor = selected_vendor(config, sys.argv[2])
     properties = [
         f'User={uid}', 'PrivateNetwork=yes', 'RestrictAddressFamilies=',
         'MemoryMax=536870912', 'MemorySwapMax=0', 'TasksMax=64', 'CPUQuota=100%',
@@ -69,7 +89,7 @@ def main():
         '/job/target:rw,size=134217728,mode=1777,nosuid,nodev',
         f'InaccessiblePaths=-{config["owner_data"]} -{config["repositories"]} -{config["history"]} -{config["work"]} -/run/user',
         f'BindReadOnlyPaths={config["toolchain"]}:/toolchain {source}:/source '
-        f'{config["vendor"]}:/vendor {WORKER}:/worker.py',
+        f'{vendor}:/vendor {WORKER}:/worker.py',
     ]
     # Config paths are operator-selected, with no systemd list/specifier syntax.
     for key in ('work', 'owner_data', 'repositories', 'history', 'toolchain', 'vendor'):

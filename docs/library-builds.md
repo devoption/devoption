@@ -7,8 +7,8 @@ inputs, immutable review, single-use approval, persisted job state/output,
 cancellation and complete-unit cleanup. Signed-in workspace users can prepare and approve
 library builds through project Builds, then download a retained source archive
 and receipt from the successful attempt. [Package distribution](reusable-packages.md)
-remains separate; this does not publish a crate or enable cross-project registry
-consumption.
+uses a separate explicit staging/publication/project-grant workflow. A library
+build alone does not publish a crate or authorize a consumer.
 
 ## Use the project interface
 

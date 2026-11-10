@@ -187,7 +187,7 @@ impl Root {
             let entry = entry.map_err(|_| ())?;
             if !matches!(
                 entry.file_name().to_str().map_err(|_| ())?,
-                "." | ".." | "config.toml" | "candidates" | "policy"
+                "." | ".." | "config.toml" | "candidates" | "policy" | "public-archives"
             ) {
                 return Err(());
             }
@@ -201,5 +201,82 @@ impl Root {
             }
         }
         Ok(())
+    }
+}
+
+impl Root {
+    /// Explicit operator-provided public bytes; never fetch or substitute namespaces.
+    pub(super) fn public_archives(
+        &self,
+        request: &devoption_registry::CargoDependencyRequest,
+    ) -> Result<Vec<Vec<u8>>, ()> {
+        use devoption_registry::CargoOrigin;
+        self.verify()?;
+        let packages: Vec<_> = request
+            .packages()
+            .iter()
+            .filter(|p| p.origin == CargoOrigin::CratesIo)
+            .collect();
+        if packages.is_empty() {
+            return Ok(Vec::new());
+        }
+        let child = || {
+            openat(&self.directory, "public-archives", DIR, Mode::empty())
+                .map(File::from)
+                .map_err(|_| ())
+        };
+        let directory = child()?;
+        private_directory(&directory)?;
+        let mut total = 0usize;
+        let mut archives = Vec::new();
+        for package in packages {
+            let name = format!("{}-{}.crate", package.name, package.version);
+            if name.contains('/') || name.contains('\\') {
+                return Err(());
+            }
+            let mut file = File::from(
+                openat(
+                    &directory,
+                    name.as_str(),
+                    OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+                    Mode::empty(),
+                )
+                .map_err(|_| ())?,
+            );
+            let before = file.metadata().map_err(|_| ())?;
+            if !before.is_file()
+                || before.uid() != geteuid().as_raw()
+                || before.mode() & 0o7777 != 0o600
+                || before.nlink() != 1
+                || before.len() > 8 * 1024 * 1024
+            {
+                return Err(());
+            }
+            let mut bytes = Vec::new();
+            (&mut file)
+                .take(8 * 1024 * 1024 + 1)
+                .read_to_end(&mut bytes)
+                .map_err(|_| ())?;
+            let after = file.metadata().map_err(|_| ())?;
+            if bytes.len() as u64 != before.len()
+                || before.len() != after.len()
+                || before.mtime() != after.mtime()
+                || before.mtime_nsec() != after.mtime_nsec()
+                || before.ctime() != after.ctime()
+                || before.ctime_nsec() != after.ctime_nsec()
+            {
+                return Err(());
+            }
+            total = total.checked_add(bytes.len()).ok_or(())?;
+            if total > 32 * 1024 * 1024 {
+                return Err(());
+            }
+            archives.push(bytes);
+        }
+        if identity(&child()?)? != identity(&directory)? {
+            return Err(());
+        }
+        self.verify()?;
+        Ok(archives)
     }
 }

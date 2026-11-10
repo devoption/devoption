@@ -1,4 +1,5 @@
 //! Opt-in Linux build integration. Operator-installed broker is the OS boundary.
+mod attempt_vendor;
 mod inputs;
 use crate::{
     BuildPlan, EnvironmentEntry, Limits, PlanInput,
@@ -277,6 +278,7 @@ pub struct Review {
     token: String,
     created: Instant,
     staged_digest: Sha256,
+    vendor: Option<attempt_vendor::Staged>,
 }
 impl Review {
     pub fn matches_binding(&self, bytes: &[u8]) -> bool {
@@ -290,6 +292,13 @@ impl Review {
     }
     pub fn expired(&self) -> bool {
         self.created.elapsed() >= Duration::from_secs(300)
+    }
+    /// Recheck owned dependency bytes before accepting approval; execute repeats it.
+    pub fn verify_dependency_inputs(&self) -> io::Result<()> {
+        if let Some(vendor) = &self.vendor {
+            vendor.verify()?;
+        }
+        Ok(())
     }
     pub fn discard(mut self, history: &mut History) -> io::Result<()> {
         self.job.cancel_queued().map_err(io::Error::other)?;
@@ -314,7 +323,7 @@ pub fn prepare(
             "app execution requires a Wasm HTTP library",
         ));
     }
-    prepare_profile(config, catalog, project, repository, source, history)
+    prepare_profile(config, catalog, project, repository, source, history, None)
 }
 
 /// Trusted adapter entry point, separate from the app UI. Calling prepare grants
@@ -328,9 +337,35 @@ pub fn prepare_library(
     history: &mut History,
 ) -> io::Result<Review> {
     crate::library::source_package(&source)?;
-    prepare_profile(config, catalog, project, repository, source, history)
+    prepare_profile(config, catalog, project, repository, source, history, None)
 }
 
+/// Verified attempt-local inputs for the existing isolated library/app profiles.
+pub fn prepare_with_vendor(
+    config: &Configuration,
+    catalog: &Catalog,
+    project: ProjectId,
+    repository: RepositoryId,
+    source: SourceSnapshot,
+    history: &mut History,
+    vendor: Arc<crate::library::vendor::VendorInputs>,
+) -> io::Result<Review> {
+    if vendor.materialization().request() != source.request() {
+        return Err(error());
+    }
+    if source.target().is_library() {
+        crate::library::source_package(&source)?;
+    }
+    prepare_profile(
+        config,
+        catalog,
+        project,
+        repository,
+        source,
+        history,
+        Some(vendor),
+    )
+}
 fn prepare_profile(
     config: &Configuration,
     catalog: &Catalog,
@@ -338,9 +373,10 @@ fn prepare_profile(
     repository: RepositoryId,
     source: SourceSnapshot,
     history: &mut History,
+    vendor: Option<Arc<crate::library::vendor::VendorInputs>>,
 ) -> io::Result<Review> {
     config.revalidate()?;
-    if source.request().lockfile_sha256() != config.lock_hash {
+    if vendor.is_none() && source.request().lockfile_sha256() != config.lock_hash {
         return Err(io::Error::other(
             "source lockfile does not match prepared dependencies",
         ));
@@ -391,6 +427,17 @@ fn prepare_profile(
             output.write_all(file.bytes())?;
             output.sync_all()?;
         }
+        let staged_vendor = vendor
+            .as_ref()
+            .map(|v| attempt_vendor::Staged::create(&directory, v.clone()))
+            .transpose()?;
+        let configuration = if let Some(staged) = &staged_vendor {
+            let mut bytes = config.digest.bytes().to_vec();
+            bytes.extend(staged.binding()?.bytes());
+            Sha256::digest(&bytes)
+        } else {
+            config.digest
+        };
         let environment = [
             ("PATH", "/toolchain/bin:/usr/bin"),
             ("RUSTC", "/toolchain/bin/rustc"),
@@ -411,11 +458,16 @@ fn prepare_profile(
             value: value.into(),
         })
         .collect();
-        let dependency = CargoMaterialization::new(
-            source.request().clone(),
-            config.vendor_hash,
-            inputs::describe_tree(&config.vendor)?.1,
-        );
+        let dependency = if let Some(vendor) = &vendor {
+            vendor.materialization().clone()
+        } else {
+            CargoMaterialization::new(
+                source.request().clone(),
+                config.vendor_hash,
+                inputs::describe_tree(&config.vendor)?.1,
+            )
+        };
+        let dependency_digest = dependency.bundle_sha256();
         let package = source.package().to_owned();
         let binary = match source.target() {
             devoption_registry::cargo_inputs::SourceTarget::Cdylib { name }
@@ -472,8 +524,8 @@ fn prepare_profile(
                 toolchain_manifest: config.toolchain_hash,
                 catalog_binding: Sha256::digest(&binding),
                 source_snapshot: plan.details().source.sha256(),
-                dependency_bundle: config.vendor_hash,
-                configuration: config.digest,
+                dependency_bundle: dependency_digest,
+                configuration,
                 execution_uid: config.uid,
                 directories,
             },
@@ -491,6 +543,7 @@ fn prepare_profile(
             token,
             created: Instant::now(),
             staged_digest: inputs::digest_tree(&directory.join("source"))?,
+            vendor: staged_vendor,
         })
     })();
     if result.is_err() {
@@ -515,6 +568,9 @@ pub fn execute(
             return Err(io::Error::other("build review expired or source changed"));
         }
         review.configuration.revalidate()?;
+        if let Some(vendor) = &review.vendor {
+            vendor.verify()?;
+        }
         if inputs::digest_tree(&review.directory.join("source"))? != review.staged_digest {
             return Err(error());
         }

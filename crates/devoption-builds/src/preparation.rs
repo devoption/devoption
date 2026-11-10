@@ -53,6 +53,23 @@ pub fn inspect(
     repository: RepositoryId,
     root: &PermittedRoot,
 ) -> Result<Preparation, Error> {
+    inspect_with_registries(
+        catalog,
+        project,
+        repository,
+        root,
+        &devoption_registry::HostedRegistries::default(),
+    )
+}
+
+/// Registry identities come only from independently selected controller configuration.
+pub fn inspect_with_registries(
+    catalog: &Catalog,
+    project: ProjectId,
+    repository: RepositoryId,
+    root: &PermittedRoot,
+    registries: &devoption_registry::HostedRegistries,
+) -> Result<Preparation, Error> {
     let source = catalog.source_inputs(project, repository, root)?;
     let mut checks = vec![Check {
         label: "Commit",
@@ -78,20 +95,22 @@ pub fn inspect(
     });
     let mut cargo_checks = Vec::new();
     let cargo = match (text(&source.files[0].1), text(&source.files[1].1)) {
-        (Some(manifest), Some(lockfile)) => match cargo_inputs::inspect(manifest, lockfile) {
-            Ok(cargo) => {
-                cargo_checks.push(Check { label: "Cargo inputs", outcome: Outcome::Passed, detail: "The standalone manifest and version-4 lockfile are internally consistent. Dependency archives have not been acquired or verified.".into() });
-                Some(cargo)
+        (Some(manifest), Some(lockfile)) => {
+            match cargo_inputs::inspect_with_registries(manifest, lockfile, registries) {
+                Ok(cargo) => {
+                    cargo_checks.push(Check { label: "Cargo inputs", outcome: Outcome::Passed, detail: "The standalone manifest and version-4 lockfile are internally consistent. Dependency archives have not been acquired or verified.".into() });
+                    Some(cargo)
+                }
+                Err(error) => {
+                    cargo_checks.push(Check {
+                        label: "Cargo inputs",
+                        outcome: Outcome::ChangesNeeded,
+                        detail: format!("{} See the supported source format below.", error),
+                    });
+                    None
+                }
             }
-            Err(error) => {
-                cargo_checks.push(Check {
-                    label: "Cargo inputs",
-                    outcome: Outcome::ChangesNeeded,
-                    detail: format!("{} See the supported source format below.", error),
-                });
-                None
-            }
-        },
+        }
         _ => {
             cargo_checks.push(Check { label: "Cargo inputs", outcome: Outcome::ChangesNeeded, detail: "Both Cargo.toml and Cargo.lock must be readable before their consistency can be checked.".into() });
             None

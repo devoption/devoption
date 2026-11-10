@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import tomllib
+from urllib.parse import urlsplit
 
 LIMIT = 1048576
 ARTIFACT_LIMIT = 4194304
@@ -142,6 +143,62 @@ def run_compilers(commands, environment, source_directory='/source'):
     return True
 
 
+def dependency_config(data):
+    """Accept only direct offline source replacements emitted by the controller."""
+    try:
+        if len(data) > 65536:
+            raise ValueError('configuration limit')
+        value = tomllib.loads(data.decode('utf-8'))
+        if set(value) - {'source', 'registries'}:
+            raise ValueError('unsupported configuration')
+        sources, registries = value.get('source', {}), value.get('registries', {})
+        if not isinstance(sources, dict) or not isinstance(registries, dict) or len(sources) > 66:
+            raise ValueError('unsupported sources')
+        directories = set()
+        for name, source in sources.items():
+            if not re.fullmatch(r'[a-zA-Z0-9_-]{1,128}', name) or not isinstance(source, dict):
+                raise ValueError('unsupported source')
+            if set(source) == {'directory'}:
+                directory = source['directory']
+                if not isinstance(directory, str) or not re.fullmatch(r'/vendor/[a-zA-Z0-9_-]+', directory):
+                    raise ValueError('unsupported directory')
+                if directory in directories:
+                    raise ValueError('duplicate directory')
+                directories.add(directory)
+            else:
+                if set(source) != ({'replace-with'} if name == 'crates-io' else {'registry', 'replace-with'}):
+                    raise ValueError('unsupported replacement')
+                replacement = sources.get(source['replace-with'])
+                if not isinstance(replacement, dict) or set(replacement) != {'directory'}:
+                    raise ValueError('replacement must terminate at a directory')
+                if name != 'crates-io':
+                    index = source['registry']
+                    parsed = urlsplit(index.removeprefix('sparse+'))
+                    if (parsed.scheme != 'https' or not parsed.hostname or parsed.username
+                            or parsed.password or parsed.query or parsed.fragment
+                            or registries.get(name) != {'index': index}):
+                        raise ValueError('unsupported registry')
+        if set(registries) != {n for n,s in sources.items() if 'registry' in s}:
+            raise ValueError('unbound registry')
+        return data.decode('utf-8')
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        raise WorkerFailure(126, 'compiler dependency configuration rejected') from None
+
+
+def selected_dependency_config(vendor=Path('/vendor')):
+    path = vendor / 'cargo-config.toml'
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return ('[source.crates-io]\nreplace-with="prepared"\n'
+                '[source.prepared]\ndirectory="/vendor"\n')
+    with os.fdopen(descriptor, 'rb') as source:
+        metadata = os.fstat(source.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > 65536:
+            raise WorkerFailure(126, 'compiler dependency configuration rejected')
+        return dependency_config(source.read(65537))
+
+
 def main():
     if os.geteuid() == 0:
         raise RuntimeError("worker requires an unprivileged identity")
@@ -175,9 +232,7 @@ def main():
     root = Path('/job')
     for name in ('home', 'cargo', 'tmp', 'target'):
         (root / name).mkdir(mode=0o700, exist_ok=True)
-    (root / 'cargo/config.toml').write_text(
-        '[source.crates-io]\nreplace-with="prepared"\n'
-        '[source.prepared]\ndirectory="/vendor"\n')
+    (root / 'cargo/config.toml').write_text(selected_dependency_config())
     environment = {
         'PATH': '/toolchain/bin:/usr/bin', 'RUSTC': '/toolchain/bin/rustc',
         'HOME': '/job/home', 'CARGO_HOME': '/job/cargo',

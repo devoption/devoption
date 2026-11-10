@@ -76,8 +76,7 @@ in lexical path order: big-endian u32 path length, ASCII path bytes, big-endian 
 mode (`0644`), big-endian u64 content length and exact content bytes. Empty inputs
 produce the 13-byte header/count. Total encoded size is bounded by 64 MiB payload
 plus at most `16384 * (512 + 14) + 13` bytes of framing/path data. Source bucket
-metadata is derived from the exact request's public/hosted bindings; an eventual
-publisher must also create those declared empty source directories.
+metadata is derived from the exact request's public/hosted bindings; the attempt adapter also creates those declared empty source directories.
 
 `cargo_config(root)` generates source replacement for a trusted absolute ASCII
 vendor mount, with no upstream fallback or credentials. Registry aliases and
@@ -91,7 +90,7 @@ source/catalog/policy before a later handoff. Revocation invalidates future use;
 already acquired bytes cannot be retracted. Current policy does not authorize a
 caller to reset a persistent store or overwrite an installation.
 
-## Validation and remaining integration
+## Attempt-local worker integration and validation
 
 Unit tests cover archive checksums/termination/CRC, traversal, reserved paths,
 special/extended entries, collisions, expansion/count limits, actual manifest
@@ -106,9 +105,40 @@ refusal after deletion/corruption of a vendored source file. Fresh yank resoluti
 is still checked through the approved index; directory sources preserve the
 already selected lock and do not implement a registry's resolution/yank service.
 
-This establishes owned, verified vendor-bundle bytes and native Cargo compatibility.
-Atomic descriptor-anchored disk publication/reopen/recovery, physical-tree
-reverification, installed controller/worker wiring and two actual platform
-consumers remain. No existing installation or production runtime accepts or
-publishes this format automatically. Keep #385 and #383 open until that integration
-and its acceptance evidence are complete.
+With both the installed Linux runner and the explicit registry root enabled,
+existing build preparation acquires the entire source lock through current
+publication/project-reader policy. Public archives, when required, must already
+be supplied by the operator as private `public-archives/NAME-VERSION.crate` files
+under that root; no download or public fallback occurs. The adapter rechecks the
+selected root, exact source/catalog, policy head, raw archives and vendor graph.
+
+Preparation exclusively creates `ATTEMPT/dependencies` through directory
+descriptors, writes only verified files and a generated `cargo-config.toml`, syncs
+them, and verifies the complete inventory, directory identities, modes and bytes.
+Directory count is bounded at 16384. The review's dependency digest covers actual
+bundle bytes; its configuration digest additionally binds the source-replacement
+configuration and physical directory identities. Approval reacquires current
+policy and public/hosted archive bytes and rechecks the physical inputs. Execution
+repeats physical verification before consuming approval. Policy operations in the
+same controller remain serialized through worker admission.
+
+The broker derives this fixed child from the existing attempt token and mounts
+it read-only at `/vendor`. The worker accepts only direct directory-source
+replacement configuration with explicit matching registry identities; Cargo stays
+locked, offline, uncredentialed and inside the existing isolation/resource policy.
+When registry support is disabled, the existing installed global vendor and
+lockfile configuration remains the build path. Missing, corrupt or unauthorized
+configured-registry inputs fail; they do not select that legacy path.
+
+Inputs belong to the attempt and follow existing history/retention cleanup. They
+are never a shared persistent vendor store: a restart forgets pending reviews,
+and a later preparation reacquires and verifies everything into a new attempt.
+No persistent publication, reopen/recovery protocol or separate vendor cache is
+needed for this lifecycle. Operator writes to controller-owned storage remain
+trusted external changes; this is not isolation from the installing owner.
+
+The disposable Linux acceptance extends the installed authenticated controller
+and broker path with one built/staged/explicitly published library, two separately
+registered WASIp2 consumers, an explicitly published update, an older-lock rebuild,
+and missing/corrupt/revoked/staged-tamper refusal. It uses synthetic fixture data;
+it authorizes no production configuration, real publication or deployment.

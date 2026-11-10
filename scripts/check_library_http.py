@@ -304,8 +304,131 @@ def check(binary, root, fixture):
         mutate(staging + '/approve', restart_review['review_token'], expected=409)
         assert request('GET', download)[2] == cargo_archive
         assert json.loads(request('GET', entry_url)[2])['yanked'] is True
+        check_consumers(root, source, project, other.decode(), base, registry, checksum, request, mutate)
         (root / 'verified-source.tar').write_bytes(package)
         print('Authenticated HTTP library build and candidate staging: exact review/receipt, source and catalog revalidation, corruption/replay/CSRF refusal, private staging, separate publication/project grant, complete project index with live yanks/revocation, exact archive acquisition and restart passed.', flush=True)
     finally:
         stop()
         log.close()
+
+
+def check_consumers(root, library, publisher, first, library_base, registry, checksum, request, mutate):
+    """The real installed controller and worker, with no public network registry."""
+    def commit(path):
+        for args in (('add', '--all'), ('commit', '-qm', 'Disposable consumer acceptance')):
+            run('git', '-C', path, '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
+                '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', *args)
+
+    def decide(version, action):
+        endpoint=f'/projects/{publisher}/registry/reusable-fixture/{version}'
+        _,data=mutate(endpoint+'/prepare',json.dumps(action),expected=200)
+        mutate(endpoint+'/approve',json.loads(data)['review_token'],expected=200)
+
+    projects=set(re.findall(rb'href="/projects/([0-9a-f]{32})"',request('GET','/projects')[2]))
+    mutate('/projects','Second independent consumer')
+    second,=set(re.findall(rb'href="/projects/([0-9a-f]{32})"',request('GET','/projects')[2]))-projects
+    second=second.decode()
+    readers=[first,second]
+    decide('0.1.0',{'action':'readers','readers':readers})
+    consumers=[]
+    def inputs(path,name,version,digest):
+        (path/'Cargo.toml').write_text(
+            f'[package]\nname="{name}"\nversion="0.1.0"\nedition="2024"\nbuild=false\n'
+            f'[lib]\nname="{name.replace("-","_")}"\ncrate-type=["cdylib"]\n'
+            f'[dependencies]\nreusable-fixture={{version="={version}",registry="team"}}\n')
+        (path/'Cargo.lock').write_text(
+            f'version=4\n[[package]]\nname="{name}"\nversion="0.1.0"\ndependencies=["reusable-fixture"]\n'
+            f'[[package]]\nname="reusable-fixture"\nversion="{version}"\n'
+            f'source="sparse+https://packages.example.test/index/"\nchecksum="{digest}"\n')
+    for index,project in enumerate(readers):
+        name=f'consumer-{index+1}';path=root/'repositories'/name
+        (path/'src').mkdir(parents=True)
+        (path/'src/lib.rs').write_text('#[unsafe(no_mangle)]\npub extern "C" fn answer()->u32 { reusable_fixture::answer() }\n')
+        inputs(path,name,'0.1.0',checksum)
+        run('git','-C',path,'init','-q');commit(path)
+        mutate(f'/projects/{project}/repositories',name)
+        history=f'/projects/{project}/builds'
+        repository,=set(re.findall(rb'/builds/([0-9a-f]{32})/run',request('GET',history)[2]))
+        consumers.append((project,path,name,history+'/'+repository.decode()))
+
+    def prepare(base):
+        mutate(base+'/prepare')
+        page=request('GET',base+'/run')[2]
+        return re.search(rb'data-build-action="approve" data-token="([0-9a-f]{32})"',page)[1].decode()
+
+    def build(project,base,token=None):
+        token=token or prepare(base)
+        mutate(base+'/approve',token,expected=202)
+        deadline=time.monotonic()+75
+        while True:
+            receipts=[p for p in (root/'jobs'/token/'artifact').glob('receipt.toml')]
+            if receipts:
+                receipt=tomllib.loads(receipts[0].read_text())
+                assert receipt['project']==project
+                artifact=receipts[0].with_name(receipt['artifact']).read_bytes()
+                assert receipt['artifact_sha256']==hashlib.sha256(artifact).hexdigest()
+                detail=request('GET',f'/projects/{project}/builds/attempts/'+receipt['job'])[2]
+                if b'>Succeeded<' in detail:
+                    # Read the review after completion so supervision can release its active slot.
+                    request('GET',base+'/run')
+                    return receipt,artifact
+            if time.monotonic()>deadline:
+                raise TimeoutError('Installed consumer/library build: '+request('GET',f'/projects/{project}/builds')[2].decode(errors='replace')[-8192:])
+            time.sleep(.2)
+
+    initial=[]
+    for project,path,name,base in consumers:
+        receipt,artifact=build(project,base)
+        assert artifact.startswith(b'\0asm\x0d\0\x01\0')
+        initial.append(receipt)
+    assert initial[0]['source_sha256']!=initial[1]['source_sha256']
+    assert initial[0]['dependency_sha256']==initial[1]['dependency_sha256'] # same exact dependency bytes, independent sources/attempts
+
+    # Every refusal happens in preparation/approval, without creating a worker artifact.
+    project,path,name,base=consumers[0]
+    token=prepare(base)
+    staged=root/'jobs'/token/'dependencies'
+    file=next(p for p in staged.rglob('lib.rs') if p.is_file())
+    original=file.read_bytes();file.write_bytes(b'corrupt staged input')
+    mutate(base+'/approve',token,expected=409)
+    file.write_bytes(original)
+    assert not (root/'jobs'/token/'artifact/component.wasm').exists()
+    token=prepare(base)
+    decide('0.1.0',{'action':'readers','readers':[second]})
+    mutate(base+'/approve',token,expected=409)
+    mutate(base+'/prepare',expected=409)
+    assert not (root/'jobs'/token/'artifact/component.wasm').exists()
+    decide('0.1.0',{'action':'readers','readers':readers})
+    candidate,=list((registry/'candidates').glob('*.cargo'))
+    original=candidate.read_bytes()
+    candidate.write_bytes(b'corrupt candidate')
+    mutate(base+'/prepare',expected=409)
+    candidate.write_bytes(original)
+    moved=root/'temporarily-missing.cargo';candidate.rename(moved)
+    try:mutate(base+'/prepare',expected=409)
+    finally:moved.rename(candidate)
+
+    # Build, stage and explicitly publish a new immutable version through the same HTTP path.
+    manifest=library/'Cargo.toml';lock=library/'Cargo.lock'
+    manifest.write_text(manifest.read_text().replace('0.1.0','0.2.0'))
+    lock.write_text(lock.read_text().replace('0.1.0','0.2.0'))
+    source=library/'src/lib.rs';source.write_text(source.read_text().replace('42','43'))
+    commit(library)
+    receipt,_=build(publisher,library_base)
+    staging=f'/projects/{publisher}/builds/attempts/{receipt["job"]}/registry'
+    _,data=mutate(staging+'/prepare',expected=200)
+    review=json.loads(data)
+    mutate(staging+'/approve',review['review_token'],expected=200)
+    decide('0.2.0',{'action':'publish','readers':readers})
+    _,_,line=request('GET',f'/projects/{first}/registry/reusable-fixture/0.2.0/index')
+    updated=json.loads(line)['cksum']
+    project,path,name,base=consumers[0]
+    inputs(path,name,'0.2.0',updated);commit(path)
+    update_receipt,updated_artifact=build(project,base)
+    assert updated_artifact.startswith(b'\0asm\x0d\0\x01\0')
+    assert update_receipt['dependency_sha256']!=initial[0]['dependency_sha256']
+    project,path,name,base=consumers[1]
+    retained,_=build(project,base)
+    assert retained['commit']==initial[1]['commit']
+    assert retained['dependency_sha256']==initial[1]['dependency_sha256']
+    print('Installed platform: one library, two independent WASIp2 consumers, explicit version update, retained old lock rebuild, and missing/corrupt/unauthorized/staged-tamper refusal without upstream fallback passed.',flush=True)
