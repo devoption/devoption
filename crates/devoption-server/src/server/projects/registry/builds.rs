@@ -36,7 +36,10 @@ impl Engine {
         let bytes = self
             .root
             .public_archives(source.request())
-            .map_err(|_| StatusCode::CONFLICT)?;
+            .map_err(|_| {
+                eprintln!("Registry dependency preparation: public archives unavailable or checksum mismatch; verify operator-supplied archives against the committed lockfile.");
+                StatusCode::CONFLICT
+            })?;
         let public: Vec<_> = source
             .request()
             .packages()
@@ -54,11 +57,17 @@ impl Engine {
                 source,
                 &public,
             )
-            .map_err(|_| StatusCode::CONFLICT)?;
+            .map_err(|error| {
+                eprintln!("Registry dependency preparation: {error}; check current publication, consumer reader grants and committed source, then prepare a fresh review.");
+                StatusCode::CONFLICT
+            })?;
         let vendor = Arc::new(
             policy
                 .vendor_inputs(self.owner, catalog, &self.candidates, source, &captured)
-                .map_err(|_| StatusCode::CONFLICT)?,
+                .map_err(|error| {
+                    eprintln!("Registry dependency preparation: {error}; verify archive integrity, complete lock edges and the supported manifest or pinned WASIp2 closure policy (docs/cargo-vendor-bundles.md).");
+                    StatusCode::CONFLICT
+                })?,
         );
         self.root
             .verify()
