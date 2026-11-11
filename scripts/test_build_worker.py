@@ -131,6 +131,20 @@ class CompilerSequenceTests(unittest.TestCase):
 
 
 class DependencyConfigurationTests(unittest.TestCase):
+    def test_non_string_registry_values_have_the_configuration_rejection_code(self):
+        from build_worker import dependency_config
+        for value in ('42', '1.5', 'true', '[]', '{}',
+                      '1979-05-27', '07:32:00', '1979-05-27T07:32:00Z'):
+            config = (f'[source.team]\nregistry={value}\nreplace-with="private"\n'
+                      '[source.private]\ndirectory="/vendor/team"\n'
+                      f'[registries.team]\nindex={value}\n').encode()
+            with self.subTest(value=value):
+                with self.assertRaises(WorkerFailure) as failure:
+                    dependency_config(config)
+                self.assertEqual(failure.exception.code, 126)
+                self.assertEqual(str(failure.exception),
+                                 'compiler dependency configuration rejected')
+
     def test_direct_offline_sources_and_no_config_legacy_inputs(self):
         from build_worker import dependency_config, selected_dependency_config
         valid = ('[source.crates-io]\nreplace-with="public"\n[source.public]\ndirectory="/vendor/public"\n'

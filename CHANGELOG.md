@@ -12,6 +12,10 @@ Entries describe implemented changes, not the roadmap.
   dependencies and adding sanitized diagnostics and mixed-graph acceptance
   ([#425](https://github.com/devoption/devoption/issues/425)).
 
+- Reject non-string Cargo registry values with the build worker's configuration
+  error and exit code 126 instead of an unexpected worker failure
+  ([#423](https://github.com/devoption/devoption/issues/423)).
+
 - Map first-release acceptance criteria to existing candidate evidence and
   remaining review, validation and owner decisions; refresh the read-only
   repository security-settings snapshot
