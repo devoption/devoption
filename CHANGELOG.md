@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Map first-release acceptance criteria to existing candidate evidence and
+  remaining review, validation and owner decisions; refresh the read-only
+  repository security-settings snapshot
+  ([#21](https://github.com/devoption/devoption/issues/21)).
+
 - Give bounded CI VM-tool setup five minutes so slow package downloads leave
   time for installation and KVM access setup, preserving all validation gates
   ([#405](https://github.com/devoption/devoption/issues/405)).

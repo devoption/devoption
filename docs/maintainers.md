@@ -34,7 +34,13 @@ A read-only GitHub API check on 2026-10-17 (America/New_York) under
 The values came from `GET /repos/devoption/devoption`,
 `GET /repos/devoption/devoption/private-vulnerability-reporting`,
 `GET /repos/devoption/devoption/actions/permissions` and
-`GET /repos/devoption/devoption/actions/permissions/workflow`. These are snapshots,
+`GET /repos/devoption/devoption/actions/permissions/workflow`. A read-only refresh
+on 2026-11-11 under [#21](https://github.com/devoption/devoption/issues/21)
+confirmed every table entry unchanged, with secret scanning and push protection
+enabled and Dependabot security updates enabled and unpaused. The branch
+protection endpoint also confirmed the main-branch requirements above unchanged.
+External-contributor workflow approval policy was not verified in this refresh.
+These are snapshots,
 not continuous enforcement or evidence that no secrets exist. This reconciliation
 changed no setting and does not establish when or by whom they were enabled.
 
