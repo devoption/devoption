@@ -173,6 +173,8 @@ def dependency_config(data):
                     raise ValueError('replacement must terminate at a directory')
                 if name != 'crates-io':
                     index = source['registry']
+                    if not isinstance(index, str):
+                        raise ValueError('unsupported registry')
                     parsed = urlsplit(index.removeprefix('sparse+'))
                     if (parsed.scheme != 'https' or not parsed.hostname or parsed.username
                             or parsed.password or parsed.query or parsed.fragment
