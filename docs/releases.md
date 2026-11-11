@@ -16,6 +16,10 @@ Exact-version signed-packet installer acceptance and the owner release gate rema
 [#21](https://github.com/devoption/devoption/issues/21). Preparation and source CI
 are not publication approval; the promotion stop remains enabled.
 
+The [first-release acceptance map](first-release-evidence.md) binds #21's
+requirements to existing reports, distinguishes the retained packet from later
+main changes, and records the remaining evidence and owner decisions.
+
 ## Delivery status against the six issues
 
 [#259](https://github.com/devoption/devoption/issues/259) is the umbrella, with

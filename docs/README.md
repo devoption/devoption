@@ -38,6 +38,7 @@ applications; project-specific roles remain planned.
 - [Overview design concept](design/352-overview/README.md) — proposed image, not implemented UI
 - [Contribution guide](../CONTRIBUTING.md) and [maintainer checklist](maintainers.md)
 - [Release process and approval gates](releases.md)
+- [First-release evidence, blockers and owner decision](first-release-evidence.md)
 - [Local platform bundle candidates and remaining trust gates](release-bundles.md)
 - [Opt-in authenticated bundle provenance and verification](bundle-provenance.md)
 - [Reviewed candidate reservations and immutable retry rules](release-candidates.md)
