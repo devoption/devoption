@@ -160,3 +160,15 @@ With an explicitly configured private registry root, the controller can also
 from a successful retained attempt at its exact clean registered revision. Staging
 preserves the exact receipt and source provenance without executing another job.
 Publication/project reader grants require their own review and approval.
+
+The same guarded installed acceptance also builds the public static-site example
+with a registry-enabled controller, first with public dependencies and then with
+the published dependency-free library used by its HTTP handler. Both components
+undergo runtime validation and health/routing/exact-asset HTTP checks. The fixture
+checks archive mutation after review, stale source reviews and revoked mixed-graph
+grants. It uses the committed public archive fixtures; the worker stays offline.
+See the [supported closure policy](cargo-vendor-bundles.md#pinned-public-wasip2-closure).
+For a before-fix reproduction using an unpatched controller binary, set
+`DEVOPTION_EXPECT_WASIP2_REFUSAL=1` on the disposable acceptance command: the
+public static-site preparation must return 409, while library-only consumers
+still build. This mode is a reproduction, not a successful WASIp2 acceptance.

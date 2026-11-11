@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Support the exact checksum-pinned public WASIp2 static-site dependency closure
+  in registry-aware offline preparation, retaining restricted semantics for other
+  dependencies and adding sanitized diagnostics and mixed-graph acceptance
+  ([#425](https://github.com/devoption/devoption/issues/425)).
+
 - Map first-release acceptance criteria to existing candidate evidence and
   remaining review, validation and owner decisions; refresh the read-only
   repository security-settings snapshot

@@ -18,7 +18,7 @@ padding and complete zero-block termination. Concatenated/trailing gzip data,
 truncation, links, devices, FIFOs, sparse files, GNU extension fields/long-name
 records and PAX extensions are refused. No general-purpose extraction occurs.
 
-Relative paths are bounded ASCII names with letters, digits, `.`, `_`, `-`, `+`
+Relative paths are bounded ASCII names with letters, digits, `.`, `_`, `-`, `+`, `@`
 and `/`, at most 240 bytes and 24 components. Absolute, empty, dot/parent,
 backslash and control paths, duplicate/case-colliding names and file/directory
 collisions are refused. `.git`, `.cargo` and `.cargo-checksum.json` components are
@@ -44,6 +44,44 @@ targets are not built when the package is used as a dependency. Broader Cargo
 feature/target/build-script semantics require another explicit profile, not a
 partial verification claim or automatic fallback. Projection does not prove that
 Rust code compiles or that arbitrary package metadata is accepted by Cargo.
+
+## Pinned public WASIp2 closure
+
+Registry-enabled preparation also supports the exact public closure committed in
+`examples/static-site/Cargo.lock` under [#425](https://github.com/devoption/devoption/issues/425):
+wasip2 `1.0.1+wasi-0.2.4` → wit-bindgen `0.46.0` → bitflags `2.13.2`.
+The independent SHA-256 allowlist in `library/vendor/wasip2.rs` authenticates every
+byte of each complete upstream archive, including manifests, sources, build
+script and allocator. Lock checksums must match those pins and the actual bytes;
+name/version alone never grants the exception. Public coordinates cannot be
+replaced by hosted coordinates. Outgoing lock edges must match this exact chain;
+bitflags has no outgoing edges. All archive/path/resource checks still apply.
+
+wasip2's default features select std and forward bitflags to wit-bindgen, whose
+default features are disabled by wasip2. Only its optional bitflags edge is
+admitted. The pinned wit-bindgen build script copies and links its included
+`src/rt/libwit_bindgen_cabi.a` canonical-ABI allocator on wasm32; it has no build
+dependencies. Direct root dependencies on public wit-bindgen and incoming edges
+from any package other than pinned wasip2 are refused, preventing default macro
+or async activation hidden by an incomplete supplied lock. Root feature requests
+remain unsupported. Inactive optional declarations and feature definitions in
+these authenticated manifests grant no permission to acquire extra packages.
+The included `wasi-cli@0.2.0.wasm` is an inert archive member; `@` is accepted in
+safe relative paths without relaxing traversal, special-file or collision checks.
+
+Other dependencies retain the restricted manifest profile above. New versions,
+features, target dependencies, proc macros or build scripts need a separately
+reviewed policy change; there is no permissive fallback. The public fixture
+archives and attribution are documented in
+[`wasip2-closure/README.md`](../crates/devoption-builds/tests/fixtures/wasip2-closure/README.md).
+
+Preparation still returns HTTP 409 on rejected registry inputs. Controller logs
+provide fixed, sanitized stage diagnostics: verify operator public archives
+against the committed lock; check current publications, reader grants and source;
+or inspect the supported manifest/closure policy and complete lock edges.
+Messages include no package coordinates, project IDs, private paths or source bytes.
+Restore the valid inputs or grants and prepare a fresh review; an earlier approval
+cannot bypass these checks. No upstream network fallback is attempted.
 
 ## Projection, identity and bounds
 
@@ -142,3 +180,16 @@ and broker path with one built/staged/explicitly published library, two separate
 registered WASIp2 consumers, an explicitly published update, an older-lock rebuild,
 and missing/corrupt/revoked/staged-tamper refusal. It uses synthetic fixture data;
 it authorizes no production configuration, real publication or deployment.
+
+
+The #425 regression was exercised on a local disposable Ubuntu 24.04 arm64 VM.
+With the main-branch vendor validator, the public static-site returned HTTP 409
+before compilation, while the library-only acceptance passed. With the pinned
+closure policy, public-only and mixed published-library static-site builds passed
+the ordinary authenticated owner review/approval path, component runtime
+validation, health/routing and exact CSS/JavaScript HTTP checks. Changed public
+archives after review, stale committed-source reviews and revoked mixed-consumer
+grants remained rejected. Existing library publication, independent consumers,
+version update, retained older lock and staged-input corruption checks passed.
+This is disposable installation evidence, not a production rollout or a general
+Cargo feature/build-script compatibility claim.

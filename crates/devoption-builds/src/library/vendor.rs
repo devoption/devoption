@@ -12,6 +12,7 @@ use std::{
 };
 mod archive;
 mod manifest;
+mod wasip2;
 pub const MAX_PACKAGE_TAR_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_PACKAGE_ENTRIES: usize = 8192;
 pub const MAX_VENDOR_TAR_BYTES: usize = 64 * 1024 * 1024;
@@ -202,6 +203,7 @@ fn verify(source: &SourceSnapshot, captured: &LockedArchives) -> Result<VendorIn
         request.hosted_registries(),
     )
     .map_err(|_| Error::Integrity)?;
+    wasip2::context(source_file("Cargo.toml")?, graph.package_dependencies())?;
     let mut sources = vec![VendorSource {
         origin: CargoOrigin::CratesIo,
         binding: None,
@@ -228,7 +230,11 @@ fn verify(source: &SourceSnapshot, captured: &LockedArchives) -> Result<VendorIn
             .iter()
             .find(|e| e.package() == package)
             .ok_or(Error::Integrity)?;
-        manifest::check(&files, package, edges.dependencies(), request)?;
+        // The exception authenticates the entire public archive, not only its
+        // name or manifest. All other packages retain the restricted profile.
+        if !wasip2::check(archive.bytes(), package, edges.dependencies())? {
+            manifest::check(&files, package, edges.dependencies(), request)?;
+        }
         let hashes: BTreeMap<_, _> = files
             .iter()
             .map(|(p, b)| (p.clone(), hex(Sha256::digest(b))))
@@ -294,7 +300,7 @@ fn safe_path(path: &str) -> Result<(), Error> {
         || path.len() > 240
         || !path
             .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"._-+/".contains(&b))
+            .all(|b| b.is_ascii_alphanumeric() || b"._-+@/".contains(&b))
         || path.split('/').count() > 24
         || path
             .split('/')

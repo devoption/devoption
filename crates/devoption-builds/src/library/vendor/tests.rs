@@ -473,3 +473,126 @@ pub(crate) fn attempt_fixture() -> VendorInputs {
         .vendor_inputs(OWNER, &f.catalog, &f.candidates, &source, &captured)
         .unwrap()
 }
+
+#[test]
+fn public_static_site_closure_is_pinned_without_relaxing_the_generic_profile() {
+    use crate::library::publication::dependencies::PublicArchive;
+    use crate::source_snapshot::tests::ProofFixture;
+    let archives: [&[u8]; 3] = [
+        include_bytes!("../../../tests/fixtures/wasip2-closure/wasip2-1.0.1+wasi-0.2.4.crate"),
+        include_bytes!("../../../tests/fixtures/wasip2-closure/wit-bindgen-0.46.0.crate"),
+        include_bytes!("../../../tests/fixtures/wasip2-closure/bitflags-2.13.2.crate"),
+    ];
+    let manifest = include_bytes!("../../../../../examples/static-site/Cargo.toml");
+    let lock = include_bytes!("../../../../../examples/static-site/Cargo.lock");
+    let source = ProofFixture::with_files(&[
+        ("Cargo.toml", manifest),
+        ("Cargo.lock", lock),
+        ("src/lib.rs", b"pub fn fixture() {}"),
+    ])
+    .verify()
+    .unwrap();
+    let graph = devoption_registry::cargo_inputs::inspect(manifest, lock).unwrap();
+    let f = Fixture::new();
+    let mut public = Vec::new();
+    for bytes in archives {
+        let package = source
+            .request()
+            .packages()
+            .iter()
+            .find(|p| p.archive_sha256 == Sha256::digest(bytes))
+            .unwrap();
+        let edges = graph
+            .package_dependencies()
+            .iter()
+            .find(|e| e.package() == package)
+            .unwrap();
+        let files = archive::read(bytes, package, &mut { MAX_VENDOR_TAR_BYTES }).unwrap();
+        // Reproduce the restrictive validator's failure on the real upstream
+        // manifests; the new exception does not alter that general policy.
+        assert!(manifest::check(&files, package, edges.dependencies(), source.request()).is_err());
+        assert_eq!(
+            wasip2::check(bytes, package, edges.dependencies()),
+            Ok(true)
+        );
+        let mut changed = bytes.to_vec();
+        changed[0] ^= 1;
+        assert_eq!(
+            wasip2::check(&changed, package, edges.dependencies()),
+            Err(Error::Integrity)
+        );
+        let mut identity = package.clone();
+        identity.archive_sha256 = Sha256::digest(&changed);
+        assert_eq!(
+            wasip2::check(&changed, &identity, edges.dependencies()),
+            Err(Error::Integrity)
+        );
+        identity = package.clone();
+        identity.origin =
+            CargoOrigin::DevOption(devoption_registry::RegistryId::new("team").unwrap());
+        assert_eq!(
+            wasip2::check(bytes, &identity, edges.dependencies()),
+            Ok(false)
+        );
+        identity = package.clone();
+        identity.version = "9.9.9".into();
+        assert_eq!(
+            wasip2::check(bytes, &identity, edges.dependencies()),
+            Ok(false)
+        );
+        let wrong_edges = if edges.dependencies().is_empty() {
+            vec![package.clone()]
+        } else {
+            vec![]
+        };
+        assert_eq!(
+            wasip2::check(bytes, package, &wrong_edges),
+            Err(Error::Invalid)
+        );
+        public.push(PublicArchive { package, bytes });
+    }
+    assert_eq!(
+        wasip2::context(
+            b"[dependencies]\nwit-bindgen='=0.46.0'",
+            graph.package_dependencies()
+        ),
+        Err(Error::Invalid)
+    );
+    let manifest_text = std::str::from_utf8(manifest).unwrap();
+    let lock_text = std::str::from_utf8(lock).unwrap();
+    let wrapper_manifest = format!("{manifest_text}\nwrapper='=1.0.0'\n");
+    let wrapper_lock = lock_text.replace(" \"wasip2\",", " \"wasip2\",\n \"wrapper\",")
+        + "\n[[package]]\nname='wrapper'\nversion='1.0.0'\nsource='registry+https://github.com/rust-lang/crates.io-index'\nchecksum='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\ndependencies=['wit-bindgen']\n";
+    let wrapper_graph = devoption_registry::cargo_inputs::inspect(
+        wrapper_manifest.as_bytes(),
+        wrapper_lock.as_bytes(),
+    )
+    .unwrap();
+    assert_eq!(
+        wasip2::context(
+            wrapper_manifest.as_bytes(),
+            wrapper_graph.package_dependencies()
+        ),
+        Err(Error::Invalid)
+    );
+    let captured = f
+        .policy
+        .locked_archives(OWNER, f.first, &f.catalog, &f.candidates, &source, &public)
+        .unwrap();
+    let inputs = f
+        .policy
+        .vendor_inputs(OWNER, &f.catalog, &f.candidates, &source, &captured)
+        .unwrap();
+    assert_eq!(
+        inputs
+            .files()
+            .filter(|f| f.path().ends_with("/.cargo-checksum.json"))
+            .count(),
+        3
+    );
+    assert!(
+        inputs
+            .files()
+            .any(|f| f.path().ends_with("/src/rt/libwit_bindgen_cabi.a"))
+    );
+}
