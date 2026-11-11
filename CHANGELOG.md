@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Support the exact checksum-pinned public WASIp2 static-site dependency closure
+  in registry-aware offline preparation, retaining restricted semantics for other
+  dependencies and adding sanitized diagnostics and mixed-graph acceptance
+  ([#425](https://github.com/devoption/devoption/issues/425)).
+
 - Reject non-string Cargo registry values with the build worker's configuration
   error and exit code 126 instead of an unexpected worker failure
   ([#423](https://github.com/devoption/devoption/issues/423)).

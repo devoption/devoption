@@ -13,7 +13,7 @@ from check_bundle_installer import enroll
 from check_named_web_app import run
 
 
-def check(binary, root, fixture):
+def check(binary, root, fixture, repository_root):
     source = root / 'repositories/library'
     (source / 'src/lib.rs').write_bytes((fixture / 'src/lib.rs').read_bytes())
     run('git', '-C', source, '-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false',
@@ -304,7 +304,7 @@ def check(binary, root, fixture):
         mutate(staging + '/approve', restart_review['review_token'], expected=409)
         assert request('GET', download)[2] == cargo_archive
         assert json.loads(request('GET', entry_url)[2])['yanked'] is True
-        check_consumers(root, source, project, other.decode(), base, registry, checksum, request, mutate)
+        check_consumers(root, source, project, other.decode(), base, registry, checksum, request, mutate, repository_root, binary)
         (root / 'verified-source.tar').write_bytes(package)
         print('Authenticated HTTP library build and candidate staging: exact review/receipt, source and catalog revalidation, corruption/replay/CSRF refusal, private staging, separate publication/project grant, complete project index with live yanks/revocation, exact archive acquisition and restart passed.', flush=True)
     finally:
@@ -312,7 +312,7 @@ def check(binary, root, fixture):
         log.close()
 
 
-def check_consumers(root, library, publisher, first, library_base, registry, checksum, request, mutate):
+def check_consumers(root, library, publisher, first, library_base, registry, checksum, request, mutate, repository_root, binary):
     """The real installed controller and worker, with no public network registry."""
     def commit(path):
         for args in (('add', '--all'), ('commit', '-qm', 'Disposable consumer acceptance')):
@@ -383,6 +383,10 @@ def check_consumers(root, library, publisher, first, library_base, registry, che
         initial.append(receipt)
     assert initial[0]['source_sha256']!=initial[1]['source_sha256']
     assert initial[0]['dependency_sha256']==initial[1]['dependency_sha256'] # same exact dependency bytes, independent sources/attempts
+
+    from check_registry_wasip2 import check as check_wasip2
+    check_wasip2(repository_root, binary, root, registry, checksum, request, mutate, commit,
+                 prepare, build, decide, readers)
 
     # Every refusal happens in preparation/approval, without creating a worker artifact.
     project,path,name,base=consumers[0]
