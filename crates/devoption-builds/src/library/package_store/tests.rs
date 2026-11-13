@@ -374,3 +374,21 @@ fn recovery_after_abrupt_process_exit() {
         );
     }
 }
+
+#[test]
+fn final_hard_link_without_pending_marker_is_still_unsafe() {
+    let temp = directory();
+    let package = base();
+    let mut store = open(&temp);
+    store.stage(&package).unwrap();
+    drop(store);
+    let outside = directory();
+    fs::hard_link(
+        temp.path().join(key(&package)),
+        outside.path().join("alias"),
+    )
+    .unwrap();
+    assert_eq!(PackageStore::open(&path(&temp)).err(), Some(Error::Unsafe));
+    assert!(temp.path().join(key(&package)).exists());
+    assert!(outside.path().join("alias").exists());
+}

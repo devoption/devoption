@@ -141,14 +141,19 @@ impl<T: Record> RecordStore<T> {
             if names.len() >= MAX_RECORDS {
                 return Err(Error::Capacity);
             }
+            names.push(name.to_owned());
+        }
+        // A pending write may already have its final hard link. Detect its
+        // marker before loading records: directory iteration order is arbitrary,
+        // and ordinary loads correctly reject that final inode's two links.
+        for name in &names {
             let links = recovery
                 .filter(|(key, _)| *key == name)
                 .map_or(1, |(_, links)| links);
             let package = self.load_links(name, links)?.ok_or(Error::Integrity)?;
-            if package.key() != name {
+            if package.key() != *name {
                 return Err(Error::Integrity);
             }
-            names.push(name.to_owned());
         }
         Ok(names)
     }
