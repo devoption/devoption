@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Recover poisoned advisory runtime telemetry locks so health probes, request
+  tracking and periodic snapshots can continue while preserving observations
+  ([#410](https://github.com/devoption/devoption/issues/410)).
+
 - Reuse publication dependency archive size limits when reading registry storage,
   keeping per-archive and total bounds consistent
   ([#422](https://github.com/devoption/devoption/issues/422)).

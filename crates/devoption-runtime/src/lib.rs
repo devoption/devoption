@@ -362,10 +362,8 @@ async fn connection(
                 .extensions_mut()
                 .remove::<telemetry::ActivityCookie>();
             if !probe && (navigation || cookie.is_some()) {
-                let (id, new) = telemetry
-                    .lock()
-                    .expect("telemetry lock")
-                    .visitor(cookie.as_ref().map(|c| c.0.as_str()));
+                let (id, new) =
+                    telemetry::lock(&telemetry).visitor(cookie.as_ref().map(|c| c.0.as_str()));
                 visitor = Some(id);
                 fresh = new;
             }
@@ -377,7 +375,7 @@ async fn connection(
             }
         }
     };
-    telemetry.lock().expect("telemetry lock").record(
+    telemetry::lock(&telemetry).record(
         telemetry::now(),
         started.elapsed().as_millis().min(u64::MAX as u128) as u64,
         response.status().is_server_error(),
