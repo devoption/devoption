@@ -1,8 +1,8 @@
 use super::*;
 use devoption_projects::{CatalogStore, worktree::PermittedRoot};
 use devoption_registry::{
-    CargoDependencyRequest, CargoMaterialization, CargoOrigin, CargoRegistryProvider,
-    LockedPackage, RegistryId, Sha256, prepare_dependencies,
+    CargoDependencyRequest, CargoMaterialization, CargoRegistryProvider, LockedPackage, RegistryId,
+    Sha256, prepare_dependencies,
 };
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
@@ -225,10 +225,7 @@ fn source_binding_rejects_mismatched_request_and_retains_bundle_identity() {
         .unwrap(),
     ];
     for change in [
-        (|p: &mut LockedPackage| {
-            p.origin = CargoOrigin::DevOption(RegistryId::new("private").unwrap())
-        }) as fn(&mut LockedPackage),
-        |p| p.name = "other-package".into(),
+        (|p: &mut LockedPackage| p.name = "other-package".into()) as fn(&mut LockedPackage),
         |p| p.version = "2.0.0".into(),
         |p| p.archive_sha256 = digest(98),
     ] {

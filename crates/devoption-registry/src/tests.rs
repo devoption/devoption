@@ -48,6 +48,23 @@ fn requests_own_their_metadata_and_order_does_not_change_identity() {
     assert!(original.lockfile_sha256() == digest(2));
     assert!(original.manifest_sha256() == digest(4));
     assert!(request(Vec::new()).packages().is_empty());
+    assert!(original.hosted_registries().bindings().is_empty());
+}
+
+#[test]
+fn unbound_constructor_refuses_hosted_only_and_mixed_package_sets() {
+    let mut hosted = package("hosted");
+    hosted.origin = CargoOrigin::DevOption(registry("team"));
+    for packages in [
+        vec![hosted.clone()],
+        vec![package("public"), hosted.clone()],
+        vec![hosted, package("public")],
+    ] {
+        assert_eq!(
+            CargoDependencyRequest::new(registry("local"), digest(4), digest(2), packages).err(),
+            Some(Error::Denied)
+        );
+    }
 }
 
 #[test]
@@ -182,8 +199,8 @@ fn original_registry_identity_prevents_private_public_package_confusion() {
     let mut other_version = public.clone();
     other_version.version = "2.0.0".into();
     assert_eq!(
-        request(vec![public.clone(), hosted, other_hosted, other_version])
-            .packages()
+        canonical_packages(vec![public.clone(), hosted, other_hosted, other_version])
+            .unwrap()
             .len(),
         4
     );
@@ -261,10 +278,13 @@ fn provider_must_return_the_exact_request_with_no_origin_or_checksum_substitutio
             archive_sha256: digest(99),
             ..package("expected")
         }),
-        changed(LockedPackage {
-            origin: CargoOrigin::DevOption(registry("private")),
-            ..package("expected")
-        }),
+        {
+            // Model a faulty provider response internally; the public constructor
+            // now refuses this unbound origin before a request can be returned.
+            let mut forged = expected.clone();
+            forged.packages[0].origin = CargoOrigin::DevOption(registry("private"));
+            forged
+        },
     ];
     for returned in variants {
         let provider = FixtureProvider {

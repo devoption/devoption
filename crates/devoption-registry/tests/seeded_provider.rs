@@ -1,5 +1,6 @@
 use devoption_registry::{
-    CargoDependencyRequest, CargoOrigin, Error, RegistryId, Sha256, cargo_inputs,
+    CargoDependencyRequest, Error, HostedRegistries, HostedRegistry, RegistryId, Sha256,
+    cargo_inputs,
     seeded::{MAX_SEED_BYTES, SeededCargoProvider},
 };
 
@@ -91,15 +92,9 @@ fn changed_request_identity_cannot_reuse_a_verified_bundle() {
 #[test]
 fn seed_profile_refuses_empty_multiple_and_private_packages() {
     let expected = request();
-    let mut private = expected.packages()[0].clone();
-    private.origin = CargoOrigin::DevOption(RegistryId::new("private").unwrap());
     let mut second = expected.packages()[0].clone();
     second.name = "another-package".into();
-    for packages in [
-        vec![],
-        vec![private],
-        vec![expected.packages()[0].clone(), second],
-    ] {
+    for packages in [vec![], vec![expected.packages()[0].clone(), second]] {
         let unsupported = CargoDependencyRequest::new(
             expected.registry().clone(),
             expected.manifest_sha256(),
@@ -112,4 +107,33 @@ fn seed_profile_refuses_empty_multiple_and_private_packages() {
             Some(Error::UnsupportedSeed)
         );
     }
+    // A hosted request must enter through admission with a matching binding.
+    let index = "sparse+https://packages.example.test/index/";
+    let manifest = std::str::from_utf8(MANIFEST).unwrap().replace(
+        "itoa = \"=1.0.18\"",
+        "itoa = { version = '=1.0.18', registry = 'private' }",
+    );
+    let lock = std::str::from_utf8(LOCK).unwrap().replace(
+        "registry+https://github.com/rust-lang/crates.io-index",
+        index,
+    );
+    let bindings = HostedRegistries::new(vec![
+        HostedRegistry::new(RegistryId::new("private").unwrap(), index).unwrap(),
+    ])
+    .unwrap();
+    let private = cargo_inputs::validate_with_registries(
+        expected.registry().clone(),
+        manifest.as_bytes(),
+        lock.as_bytes(),
+        cargo_inputs::InputHashes {
+            manifest: Sha256::digest(manifest.as_bytes()),
+            lockfile: Sha256::digest(lock.as_bytes()),
+        },
+        &bindings,
+    )
+    .unwrap();
+    assert_eq!(
+        SeededCargoProvider::new(private, ARCHIVE).err(),
+        Some(Error::UnsupportedSeed)
+    );
 }

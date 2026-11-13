@@ -5,6 +5,9 @@ namespace-aware Cargo input admission and source proofs. It does not add a
 registry service or enable hosted packages in the running platform. Existing
 `inspect`, `validate`, root proof, snapshot verification and registered capture
 entry points use an empty hosted-binding set and continue to refuse hosted sources.
+`CargoDependencyRequest::new` likewise accepts only crates.io package origins and
+returns `Error::Denied` for any hosted origin. Callers with hosted packages must
+use `cargo_inputs::validate_with_registries` with explicit matching bindings.
 The existing [library build/download workflow](library-builds.md) remains the
 implemented user-facing path.
 
