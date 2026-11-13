@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Reject hosted package origins in dependency requests constructed without hosted
+  registry bindings; retain explicit binding-aware Cargo input admission
+  ([#415](https://github.com/devoption/devoption/issues/415)).
+
 - Detect interrupted candidate writes before validating final records, so Linux
   directory ordering cannot hide the pending marker behind a hard-link refusal
   ([#432](https://github.com/devoption/devoption/issues/432)).

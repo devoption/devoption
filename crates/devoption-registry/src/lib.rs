@@ -109,6 +109,9 @@ pub struct CargoDependencyRequest {
 }
 
 impl CargoDependencyRequest {
+    /// Construct a crates.io-only request without hosted registry bindings.
+    /// Hosted origins require `cargo_inputs::validate_with_registries` so their
+    /// exact manifest and lockfile sources are checked against explicit bindings.
     pub fn new(
         registry: RegistryId,
         manifest_sha256: Sha256,
@@ -116,6 +119,12 @@ impl CargoDependencyRequest {
         packages: Vec<LockedPackage>,
     ) -> Result<Self, Error> {
         let packages = canonical_packages(packages)?;
+        if packages
+            .iter()
+            .any(|package| matches!(package.origin, CargoOrigin::DevOption(_)))
+        {
+            return Err(Error::Denied);
+        }
         Ok(Self {
             registry,
             manifest_sha256,

@@ -23,12 +23,14 @@ pub struct Coordinates {
 }
 impl Coordinates {
     pub fn new(registry: HostedRegistry, name: &str, version: &str) -> Result<Self, Error> {
+        // Use the unbound constructor only to validate name/version syntax.
+        // The actual hosted destination remains in `registry` below.
         CargoDependencyRequest::new(
             registry.id().clone(),
             Sha256::digest(b""),
             Sha256::digest(b""),
             vec![LockedPackage {
-                origin: CargoOrigin::DevOption(registry.id().clone()),
+                origin: CargoOrigin::CratesIo,
                 name: name.into(),
                 version: version.into(),
                 archive_sha256: Sha256::digest(b""),
