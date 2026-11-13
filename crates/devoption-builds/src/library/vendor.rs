@@ -10,7 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::{Component, Path},
 };
-mod archive;
+pub(in crate::library) mod archive;
 mod manifest;
 mod wasip2;
 pub const MAX_PACKAGE_TAR_BYTES: usize = 16 * 1024 * 1024;

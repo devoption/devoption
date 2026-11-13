@@ -7,6 +7,15 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Detect interrupted candidate writes before validating final records, so Linux
+  directory ordering cannot hide the pending marker behind a hard-link refusal
+  ([#432](https://github.com/devoption/devoption/issues/432)).
+
+- Verify stored Cargo candidate index paths and complete metadata byte for byte
+  against the retained archive, refusing altered dependency entries even when the
+  record checksum has been recomputed
+  ([#419](https://github.com/devoption/devoption/issues/419)).
+
 - Recover poisoned advisory runtime telemetry locks so health probes, request
   tracking and periodic snapshots can continue while preserving observations
   ([#410](https://github.com/devoption/devoption/issues/410)).
