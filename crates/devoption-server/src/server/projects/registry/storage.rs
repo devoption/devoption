@@ -1,6 +1,9 @@
 //! Existing operator-selected root only. No credentials, directories or policy
 //! decisions are created here. Native stores may create their own private locks.
 use super::*;
+use devoption_builds::library::publication::dependencies::{
+    MAX_DEPENDENCY_ARCHIVE_BYTES, MAX_LOCKED_ARCHIVE_BYTES,
+};
 use devoption_projects::worktree::PermittedRoot;
 use rustix::{
     fs::{Mode, OFlags, open, openat},
@@ -248,13 +251,13 @@ impl Root {
                 || before.uid() != geteuid().as_raw()
                 || before.mode() & 0o7777 != 0o600
                 || before.nlink() != 1
-                || before.len() > 8 * 1024 * 1024
+                || before.len() > MAX_DEPENDENCY_ARCHIVE_BYTES as u64
             {
                 return Err(());
             }
             let mut bytes = Vec::new();
             (&mut file)
-                .take(8 * 1024 * 1024 + 1)
+                .take(MAX_DEPENDENCY_ARCHIVE_BYTES as u64 + 1)
                 .read_to_end(&mut bytes)
                 .map_err(|_| ())?;
             let after = file.metadata().map_err(|_| ())?;
@@ -268,7 +271,7 @@ impl Root {
                 return Err(());
             }
             total = total.checked_add(bytes.len()).ok_or(())?;
-            if total > 32 * 1024 * 1024 {
+            if total > MAX_LOCKED_ARCHIVE_BYTES {
                 return Err(());
             }
             archives.push(bytes);

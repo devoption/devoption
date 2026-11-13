@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Reuse publication dependency archive size limits when reading registry storage,
+  keeping per-archive and total bounds consistent
+  ([#422](https://github.com/devoption/devoption/issues/422)).
+
 - Support the exact checksum-pinned public WASIp2 static-site dependency closure
   in registry-aware offline preparation, retaining restricted semantics for other
   dependencies and adding sanitized diagnostics and mixed-graph acceptance
