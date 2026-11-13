@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
     hash::BuildHasher,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, MutexGuard},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -150,6 +150,14 @@ impl Telemetry {
         serde_json::json!({"version":1,"invocation":invocation,"started":self.started,"updated":at,"active":self.visitors.len(),"overflow":at < self.overflow_until,"buckets":self.buckets.values().collect::<Vec<_>>()})
     }
 }
+/// Telemetry is advisory: a poisoned lock must not take down request handling
+/// or the periodic snapshot writer. Preserve the observations already collected.
+pub(crate) fn lock(telemetry: &Mutex<Telemetry>) -> MutexGuard<'_, Telemetry> {
+    telemetry
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 pub(crate) fn start() -> Arc<Mutex<Telemetry>> {
     let telemetry = Arc::new(Mutex::new(Telemetry::new()));
     let shared = telemetry.clone();
@@ -157,10 +165,7 @@ pub(crate) fn start() -> Arc<Mutex<Telemetry>> {
         loop {
             let at = now();
             let invocation = std::env::var("INVOCATION_ID").unwrap_or_default();
-            let value = shared
-                .lock()
-                .expect("telemetry lock")
-                .snapshot(at, &invocation);
+            let value = lock(&shared).snapshot(at, &invocation);
             if let Some(directory) = std::env::var_os("RUNTIME_DIRECTORY") {
                 let directory = std::path::PathBuf::from(directory);
                 // Only the host's preconfigured runtime directory, never a guest path.
@@ -191,6 +196,41 @@ pub(crate) fn start() -> Arc<Mutex<Telemetry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn poisoned_lock_preserves_observations_and_allows_tracking_and_snapshots() {
+        let telemetry = Mutex::new(Telemetry::new());
+        lock(&telemetry).record(1000, 20, false, Some(Outcome::GuestResponse), None);
+        let panic = std::panic::catch_unwind(|| {
+            let _guard = telemetry.lock().unwrap();
+            panic!("simulated telemetry panic");
+        });
+        assert!(panic.is_err());
+        assert!(telemetry.is_poisoned());
+
+        let (visitor, fresh) = lock(&telemetry).visitor(None);
+        assert!(fresh);
+        lock(&telemetry).record(
+            1001,
+            42,
+            true,
+            Some(Outcome::InvocationFailed),
+            Some(visitor.clone()),
+        );
+        let before = lock(&telemetry).snapshot(1002, "worker");
+        assert_eq!(before["active"], 1);
+        assert_eq!(before["buckets"][0]["requests"], 2);
+        assert_eq!(before["buckets"][0]["errors"], 1);
+        assert_eq!(before["buckets"][0]["outcomes"]["guest_response"], 1);
+        assert_eq!(before["buckets"][0]["outcomes"]["invocation_failed"], 1);
+        assert!(!before.to_string().contains(&visitor));
+
+        // Successful and failed health probes still leave observations untouched.
+        for error in [false, true] {
+            lock(&telemetry).record(1002, 5000, error, None, Some(visitor.clone()));
+        }
+        assert_eq!(lock(&telemetry).snapshot(1002, "worker"), before);
+    }
+
     #[test]
     fn outcome_counts_preserve_totals_exclude_probes_and_expire_with_buckets() {
         let mut t = Telemetry::new();

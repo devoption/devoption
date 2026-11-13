@@ -103,9 +103,12 @@ The authenticated [operational Overview](using-devoption.md#operational-overview
 combines fresh catalog associations, saved build history, and read-only broker
 runtime summaries. The Wasm worker publishes bounded aggregate telemetry in its
 existing host runtime directory; invocation binding and freshness checks prevent
-old workers from supplying current coverage. No observation grants workload or
-approval authority. The optional [MCP adapter](mcp.md) uses those read-only
-observations alongside bounded catalog/history readers. Its OAuth bearer boundary
+old workers from supplying current coverage. Telemetry is advisory: request tracking
+and periodic snapshots recover poisoned telemetry locks, preserving collected
+observations so lock poisoning alone does not interrupt health responses.
+No observation grants workload or approval authority. The optional
+[MCP adapter](mcp.md) uses those read-only observations alongside bounded
+catalog/history readers. Its OAuth bearer boundary
 is separate from browser mutations, with explicit browser consent, current account
 checks, expiring revocable grants, and private audit writes. Security scans remain
 unimplemented.
