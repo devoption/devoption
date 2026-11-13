@@ -3,7 +3,7 @@ use super::*;
 use flate2::bufread::GzDecoder;
 use std::io::Read;
 
-pub(super) fn read(
+pub(in crate::library) fn read(
     bytes: &[u8],
     package: &LockedPackage,
     remaining: &mut usize,

@@ -81,7 +81,6 @@ impl CargoPackage {
             quote(edition)?,
             quote(&source.package().replace('-', "_"))?
         );
-        let mut dependencies = Vec::new();
         if let Some(entries) = manifest.get("dependencies").and_then(toml::Value::as_table) {
             // Explicit sort independent of TOML map backend/configuration.
             let ordered: BTreeMap<_, _> = entries.iter().collect();
@@ -123,7 +122,6 @@ impl CargoPackage {
                     defaults,
                     quote(index)?
                 );
-                dependencies.push(json!({"name":name,"req":version,"features":[],"optional":false,"default_features":defaults,"target":null,"kind":"normal","registry":if index == destination.index() { None } else { Some(index) }}));
             }
         }
         let mut files: BTreeMap<&str, &[u8]> = source
@@ -144,12 +142,11 @@ impl CargoPackage {
             return Err(invalid());
         }
         let sha256 = Sha256::digest(&archive);
-        let checksum: String = sha256.bytes().iter().map(|b| format!("{b:02x}")).collect();
-        let mut index_line = serde_json::to_vec(&json!({"name":source.package(),"vers":source.version(),"deps":dependencies,"cksum":checksum,"features":{},"yanked":false})).map_err(|_| invalid())?;
-        index_line.push(b'\n');
-        if index_line.len() > MAX_INDEX_LINE_BYTES {
-            return Err(invalid());
-        }
+        let index_line = index_metadata(
+            &staged,
+            sha256,
+            &toml::from_str(&normalized).map_err(|_| invalid())?,
+        )?;
         let name = source.package().to_ascii_lowercase();
         let index_path = index_location(&name);
         Ok(Self {
@@ -236,21 +233,25 @@ impl CargoPackage {
             return Err(Error::Invalid);
         }
         let sha256 = Sha256::digest(&archive);
-        let line: serde_json::Value =
-            serde_json::from_slice(&index_line).map_err(|_| Error::Invalid)?;
-        let mut canonical = serde_json::to_vec(&line).map_err(|_| Error::Invalid)?;
-        canonical.push(b'\n');
         let coordinates = source.coordinates();
-        let name = coordinates.name().to_ascii_lowercase();
-        if index_path != index_location(&name)
-            || canonical != index_line
-            || line.as_object().map(|o| o.len()) != Some(6)
-            || line["name"] != coordinates.name()
-            || line["vers"] != coordinates.version()
-            || line["cksum"] != hex(sha256)
-            || line["features"] != json!({})
-            || line["yanked"] != false
-            || !line["deps"].is_array()
+        let package = devoption_registry::LockedPackage {
+            origin: devoption_registry::CargoOrigin::DevOption(coordinates.registry().id().clone()),
+            name: coordinates.name().into(),
+            version: coordinates.version().into(),
+            archive_sha256: sha256,
+        };
+        // Reuse the bounded in-memory archive reader; never extract stored bytes.
+        let mut remaining = MAX_PACKAGE_BYTES;
+        let files = super::vendor::archive::read(&archive, &package, &mut remaining)
+            .map_err(|_| Error::Integrity)?;
+        let manifest: toml::Table =
+            std::str::from_utf8(files.get("Cargo.toml").ok_or(Error::Integrity)?)
+                .map_err(|_| Error::Integrity)?
+                .parse()
+                .map_err(|_| Error::Integrity)?;
+        let expected = index_metadata(&source, sha256, &manifest).map_err(|_| Error::Integrity)?;
+        if index_path != index_location(&coordinates.name().to_ascii_lowercase())
+            || index_line != expected
         {
             return Err(Error::Integrity);
         }
@@ -302,8 +303,54 @@ pub(super) fn index_location(name: &str) -> String {
         _ => format!("{}/{}/{name}", &name[..2], &name[2..4]),
     }
 }
-fn hex(value: Sha256) -> String {
-    value.bytes().iter().map(|b| format!("{b:02x}")).collect()
+// Both generation and decoding derive the exact index bytes from the packaged
+// normalized manifest, including destination-relative dependency namespaces.
+fn index_metadata(
+    source: &StagedSource,
+    sha256: Sha256,
+    manifest: &toml::Table,
+) -> io::Result<Vec<u8>> {
+    let coordinates = source.coordinates();
+    let package = manifest
+        .get("package")
+        .and_then(toml::Value::as_table)
+        .ok_or_else(invalid)?;
+    if package.get("name").and_then(toml::Value::as_str) != Some(coordinates.name())
+        || package.get("version").and_then(toml::Value::as_str) != Some(coordinates.version())
+    {
+        return Err(invalid());
+    }
+    let mut dependencies = Vec::new();
+    if let Some(value) = manifest.get("dependencies") {
+        let entries = value.as_table().ok_or_else(invalid)?;
+        let ordered: BTreeMap<_, _> = entries.iter().collect();
+        for (name, value) in ordered {
+            let fields = value.as_table().ok_or_else(invalid)?;
+            if fields.len() != 3 {
+                return Err(invalid());
+            }
+            let version = fields
+                .get("version")
+                .and_then(toml::Value::as_str)
+                .ok_or_else(invalid)?;
+            let defaults = fields
+                .get("default-features")
+                .and_then(toml::Value::as_bool)
+                .ok_or_else(invalid)?;
+            let index = fields
+                .get("registry-index")
+                .and_then(toml::Value::as_str)
+                .ok_or_else(invalid)?;
+            dependencies.push(json!({"name":name,"req":version,"features":[],"optional":false,"default_features":defaults,"target":null,"kind":"normal","registry":if index == coordinates.registry().index() { None } else { Some(index) }}));
+        }
+    }
+    let checksum: String = sha256.bytes().iter().map(|b| format!("{b:02x}")).collect();
+    let mut line = serde_json::to_vec(&json!({"name":coordinates.name(),"vers":coordinates.version(),"deps":dependencies,"cksum":checksum,"features":{},"yanked":false})).map_err(|_| invalid())?;
+    line.push(b'\n');
+    if line.len() > MAX_INDEX_LINE_BYTES {
+        return Err(invalid());
+    }
+    Ok(line)
 }
 fn invalid() -> io::Error {
     io::Error::other("unsupported or oversized Cargo source package")

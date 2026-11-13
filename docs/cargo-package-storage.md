@@ -25,10 +25,14 @@ index line. Each versioned binary record retains:
 - Length framing and an outer SHA-256 covering the entire record.
 
 Decoding checks lengths before allocation, the source record's own integrity,
-the Cargo archive checksum against the index, exact name/version, canonical index
-path and JSON encoding, empty feature metadata and `yanked=false`. No extraction,
-network access or Cargo execution occurs. Checksums detect corruption; they are
-not signatures or protection against the trusted OS owner. A source-plan binding
+the Cargo archive checksum, and the exact index path and line regenerated from
+the archive's normalized manifest using the same metadata routine as generation.
+This binds every direct dependency field (including registry, requirement and
+default features), ordering, name/version, empty feature metadata and
+`yanked=false` byte for byte. The shared bounded gzip/tar reader inspects regular
+files in memory, with a 4 MiB expanded limit; malformed or oversized archives are
+refused. No disk extraction, network access or Cargo execution occurs. Checksums
+detect corruption; they are not signatures or protection against the trusted OS owner. A source-plan binding
 is not proof of an approved/successful build or authorization to publish. Optional
 build evidence is revalidated against retained source provenance when decoding;
 it is not independent proof against OS-owner tampering. Original plan-only

@@ -879,3 +879,96 @@ fn unbuilt_candidate_codec_remains_version_one_and_byte_stable() {
     assert!(decoded == package);
     assert_eq!(decoded.encode(), encoded);
 }
+
+#[test]
+fn decoder_rejects_dependency_metadata_edits_with_valid_record_checksums() {
+    use super::super::staging::Error;
+    // Exercise both null (same destination) and explicit hosted registry fields.
+    for package in [
+        helper("0.1.0", 0),
+        helper_for(
+            HostedRegistry::new(
+                RegistryId::new("other").unwrap(),
+                "sparse+https://other.example.test/index/",
+            )
+            .unwrap(),
+            "0.1.0",
+            0,
+        ),
+    ] {
+        assert!(CargoPackage::decode(&package.encode()).unwrap() == package);
+        let original: serde_json::Value = serde_json::from_slice(package.index_line()).unwrap();
+        let mut edits = Vec::new();
+        for (field, value) in [
+            ("name", json!("different-package")),
+            ("req", json!("=99.0.0")),
+            ("features", json!(["extra"])),
+            ("optional", json!(true)),
+            ("default_features", json!(true)),
+            ("target", json!("cfg(unix)")),
+            ("kind", json!("build")),
+            ("registry", json!(INDEX)),
+        ] {
+            let mut row = original.clone();
+            row["deps"][0][field] = value;
+            edits.push(row);
+        }
+        let mut row = original.clone();
+        row["deps"][1]["registry"] = json!(PUBLIC_INDEX);
+        edits.push(row);
+        let mut row = original.clone();
+        row["deps"] = json!([]);
+        edits.push(row);
+        let mut row = original.clone();
+        row["deps"].as_array_mut().unwrap().reverse();
+        edits.push(row);
+        let mut row = original.clone();
+        row["deps"]
+            .as_array_mut()
+            .unwrap()
+            .push(original["deps"][0].clone());
+        edits.push(row);
+        for row in edits {
+            let mut changed = package.clone();
+            changed.index_line = serde_json::to_vec(&row).unwrap();
+            changed.index_line.push(b'\n');
+            // encode recomputes the complete record checksum: refusal must be
+            // based on archive/index disagreement, not accidental corruption.
+            assert_eq!(
+                CargoPackage::decode(&changed.encode()).err(),
+                Some(Error::Integrity)
+            );
+        }
+    }
+}
+
+#[test]
+fn decoder_rejects_injected_dependencies_in_dependency_free_package() {
+    let mut package = base();
+    let mut row: serde_json::Value = serde_json::from_slice(package.index_line()).unwrap();
+    row["deps"] = json!([{"name":"injected","req":"=1.0.0","features":[],"optional":false,"default_features":true,"target":null,"kind":"normal","registry":null}]);
+    package.index_line = serde_json::to_vec(&row).unwrap();
+    package.index_line.push(b'\n');
+    assert_eq!(
+        CargoPackage::decode(&package.encode()).err(),
+        Some(super::super::staging::Error::Integrity)
+    );
+}
+
+#[test]
+fn decoder_bounds_archive_inspection_even_with_matching_index_checksums() {
+    for expanded in [b"not a tar".to_vec(), vec![0; MAX_PACKAGE_BYTES + 512]] {
+        let mut package = base();
+        let mut encoder = GzBuilder::new().write(Vec::new(), Compression::new(6));
+        encoder.write_all(&expanded).unwrap();
+        package.archive = encoder.finish().unwrap();
+        let mut row: serde_json::Value = serde_json::from_slice(package.index_line()).unwrap();
+        row["cksum"] = json!(checksum(&package.archive));
+        package.index_line = serde_json::to_vec(&row).unwrap();
+        package.index_line.push(b'\n');
+        assert_eq!(
+            CargoPackage::decode(&package.encode()).err(),
+            Some(super::super::staging::Error::Integrity)
+        );
+    }
+}
