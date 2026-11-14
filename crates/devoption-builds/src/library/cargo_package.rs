@@ -68,8 +68,11 @@ impl CargoPackage {
         let manifest: toml::Table =
             toml::from_str(std::str::from_utf8(original).map_err(|_| invalid())?)
                 .map_err(|_| invalid())?;
-        let edition = manifest["package"]["edition"]
-            .as_str()
+        let edition = manifest
+            .get("package")
+            .and_then(toml::Value::as_table)
+            .and_then(|package| package.get("edition"))
+            .and_then(toml::Value::as_str)
             .ok_or_else(invalid)?;
         // All interpolated source values are already constrained by source admission;
         // quote through JSON for canonical ASCII TOML string escaping.
