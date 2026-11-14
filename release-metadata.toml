@@ -1,6 +1,6 @@
-# Reviewed statements for preview.3 preparation; this is not publication approval.
+# Reviewed statements for preview.4 preparation; this is not publication approval.
 schema_version = 2
-version = "0.1.0-preview.3"
+version = "0.1.0-preview.4"
 channel = "preview"
 platforms = ["ubuntu-24.04-amd64"]
 
@@ -9,7 +9,7 @@ installation = "fresh-only"
 upgrade_from = []
 data_schema = 1
 configuration_schema = 1
-data = "Fresh installation only. This preview adds shared workspace accounts and operational telemetry; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state."
+data = "Fresh installation only. This preview includes shared workspace accounts, operational telemetry, authenticated read-only MCP and approved library/package workflows; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state."
 configuration = "Dedicated Ubuntu 24.04 amd64 with explicitly reviewed owner, repository, build and app configuration. Existing source, custom, base-bundle and app-capable installations are not approved upgrade sources for this preview; no automatic configuration conversion is provided."
 
 [migration]
@@ -18,7 +18,7 @@ instructions = "No migration runs for a fresh installation. Migration of existin
 
 [recovery]
 binary_rollback = false
-instructions = "No cross-version rollback or upgrade recovery path is declared for preview.3. Preserve the prior installation and its verified packets/backups before a separately approved transition; replacing only executables is not recovery. The earlier preview.1-to-preview.2 base-bundle acceptance does not establish preview.3 compatibility."
+instructions = "No cross-version rollback or upgrade recovery path is declared for preview.4. Preserve the prior installation and its verified packets/backups before a separately approved transition; replacing only executables is not recovery. The earlier preview.1-to-preview.2 base-bundle acceptance does not establish preview.4 compatibility."
 
 [support]
 status = "development-preview"
@@ -26,7 +26,7 @@ warnings = [
   "Trusted single-node Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.",
   "Workspace members share all projects and configured capabilities; project-specific roles and read-only membership are unavailable.",
   "Monitoring covers the DevOption Wasm worker, not separate native backends or external proxy traffic. Active users are per-app anonymous browser estimates; telemetry history resets on worker restart.",
-  "Security scanning and MCP access are not implemented. External harnesses are the intended MCP clients; DevOption does not host agents.",
-  "Preview.3 signed-packet installation acceptance and the issue #21 release gate remain pending. Source-built CI and earlier retained preview packets do not replace validation of this candidate.",
+  "Security scanning remains unimplemented. Optional authenticated read-only MCP requires explicit client registration and user consent; grants are revocable and reset on restart. External harnesses are clients; DevOption does not host agents.",
+  "Preview.4 signed-packet installation acceptance and the issue #21 release gate remain pending. Source-built CI and earlier retained preview packets do not replace validation of this candidate.",
   "Unattended upgrades, automatic publication, stable promotion and DigitalOcean image distribution remain unavailable. No production-readiness claim is made."
 ]

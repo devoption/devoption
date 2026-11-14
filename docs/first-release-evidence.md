@@ -14,8 +14,10 @@ identifies source `dbe5a5c890d03806fbe6bd4cbe0e02e34ca4caf0`, its exact archive,
 proof and transport digests, and `publication_eligible: false`.
 [Signing/readback](bundle-provenance.md#preview3-signing-and-independent-readback)
 and [unpublished retention](release-reconciliation.md#preview3-retention) are
-recorded for that packet. They do not cover subsequent main changes, even while
-the workspace version still reads `0.1.0-preview.3`.
+recorded for that packet. They do not cover subsequent main changes.
+The prepared source version is now
+`0.1.0-preview.4`; its exact-source release check, signing, reservation and
+unpublished retention remain pending.
 
 Choose the source revision before collecting release acceptance. Either assess
 the unchanged retained packet using its own source, notes and support contract,

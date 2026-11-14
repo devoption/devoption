@@ -5,7 +5,13 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+## [0.1.0-preview.4] - 2026-11-14
+
 ### Changed
+
+- Prepare preview.4 with reviewed fresh-install-only support metadata and updated
+  authenticated read-only MCP limitations
+  ([#435](https://github.com/devoption/devoption/issues/435)).
 
 - Return a validation error instead of panicking when Cargo package generation
   encounters a missing or malformed package edition
@@ -265,6 +271,25 @@ Entries describe implemented changes, not the roadmap.
   eligibility. Retain the original ZIP under its reserved tag and unpublished draft,
   with workflow readback and a separate local download/proof/archive verification
   ([#357](https://github.com/devoption/devoption/issues/357)).
+
+<!-- devoption-release-metadata:start -->
+### Release compatibility and support
+
+- Preview version: `0.1.0-preview.4`; supported platform: Ubuntu 24.04 amd64.
+- Installation: fresh only. Upgrades from earlier platform versions are unsupported.
+- Data compatibility: Fresh installation only. This preview includes shared workspace accounts, operational telemetry, authenticated read-only MCP and approved library/package workflows; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state.
+- Configuration compatibility: Dedicated Ubuntu 24.04 amd64 with explicitly reviewed owner, repository, build and app configuration. Existing source, custom, base-bundle and app-capable installations are not approved upgrade sources for this preview; no automatic configuration conversion is provided.
+- Migration: none implemented. No migration runs for a fresh installation. Migration of existing accounts, sessions, catalogs, build history, secrets or deployment state requires a separate reviewed compatibility and recovery contract.
+- Binary rollback: unsupported. No cross-version rollback or upgrade recovery path is declared for preview.4. Preserve the prior installation and its verified packets/backups before a separately approved transition; replacing only executables is not recovery. The earlier preview.1-to-preview.2 base-bundle acceptance does not establish preview.4 compatibility.
+- Support status: development preview.
+- Warning: Trusted single-node Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.
+- Warning: Workspace members share all projects and configured capabilities; project-specific roles and read-only membership are unavailable.
+- Warning: Monitoring covers the DevOption Wasm worker, not separate native backends or external proxy traffic. Active users are per-app anonymous browser estimates; telemetry history resets on worker restart.
+- Warning: Security scanning remains unimplemented. Optional authenticated read-only MCP requires explicit client registration and user consent; grants are revocable and reset on restart. External harnesses are clients; DevOption does not host agents.
+- Warning: Preview.4 signed-packet installation acceptance and the issue #21 release gate remain pending. Source-built CI and earlier retained preview packets do not replace validation of this candidate.
+- Warning: Unattended upgrades, automatic publication, stable promotion and DigitalOcean image distribution remain unavailable. No production-readiness claim is made.
+- Metadata SHA-256: `611a118525eb8a31d79b8c51a9eead26dcc8a8768ebd812d48967a4a44408e61` (metadata identity, not artifact provenance).
+<!-- devoption-release-metadata:end -->
 
 ## [0.1.0-preview.3] - 2026-10-31
 
