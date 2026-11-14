@@ -5,8 +5,10 @@ produces a reviewable preview version/changelog proposal and can optionally
 [create a bot-owned draft release PR](release-prs.md). Default proposal mode does not merge, tag,
 create GitHub releases, distribute bundles or upload to a registry. The existing
 [release approval process](releases.md) and #21 remain applicable. There is still
-no published product release; the prepared source version is `0.1.0-preview.3`.
+no published product release; the prepared source version is `0.1.0-preview.4`.
 Its schema-2 metadata declares fresh installation only, without an upgrade source.
+Preview.4 has no signed packet or retained validation draft yet; existing
+preview.3 evidence remains bound to the earlier candidate.
 Signed-packet installer acceptance and the owner publication gate remain pending; see the
 [current release status](releases.md). Earlier preview.1-to-preview.2 acceptance
 does not establish this version's compatibility.

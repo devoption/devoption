@@ -1,10 +1,10 @@
 # Preparing a release
 
 There is no published product release. The prepared source version is
-`0.1.0-preview.3`, with reviewed fresh-install-only metadata. It includes the
-operational Overview and monitoring, shared workspace accounts, and the current
-trusted app workflow. No prior preview is declared as a supported upgrade source
-for this version; see [release metadata](release-metadata.md).
+`0.1.0-preview.4`, with reviewed fresh-install-only metadata. It includes the
+operational Overview and monitoring, shared workspace accounts, authenticated
+read-only MCP, and the current trusted app and library/package workflows.
+No prior preview is declared as a supported upgrade source for this version; see [release metadata](release-metadata.md).
 
 Preview.1 and preview.2 remain immutable signed validation packets in the
 [candidate catalog](release-candidates.md), with unpublished retained drafts and
@@ -12,7 +12,10 @@ Preview.1 and preview.2 remain immutable signed validation packets in the
 [base-upgrade/reboot acceptance](bundle-upgrade-acceptance.md) does not establish
 preview.3 compatibility. Preview.3 now has [signed-candidate and readback evidence](bundle-provenance.md#preview3-signing-and-independent-readback).
 Its original ZIP also has [verified unpublished draft retention](release-reconciliation.md#preview3-retention).
-Exact-version signed-packet installer acceptance and the owner release gate remain under
+Preview.4 is source preparation only: no signed packet, reservation, tag or
+unpublished validation draft has been created for it. Preview.3 evidence remains
+bound to that earlier packet. Exact-version signed-packet installer acceptance
+and the owner release gate remain under
 [#21](https://github.com/devoption/devoption/issues/21). Preparation and source CI
 are not publication approval; the promotion stop remains enabled.
 
