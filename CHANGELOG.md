@@ -5,6 +5,12 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Fixed
+
+- Bind stored Cargo package files and generated manifests to their retained staged
+  source, refusing coordinated archive/index edits with recomputed checksums
+  ([#437](https://github.com/devoption/devoption/issues/437)).
+
 ## [0.1.0-preview.4] - 2026-11-14
 
 ### Changed

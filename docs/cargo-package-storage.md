@@ -24,14 +24,24 @@ index line. Each versioned binary record retains:
   source archive bytes, package/version and `LibraryBuildV1` policy.
 - Length framing and an outer SHA-256 covering the entire record.
 
-Decoding checks lengths before allocation, the source record's own integrity,
-the Cargo archive checksum, and the exact index path and line regenerated from
-the archive's normalized manifest using the same metadata routine as generation.
+Decoding checks lengths before allocation and the source record's own integrity.
+It reverses the two generated manifest changes and requires the complete canonical
+source tar to match the retained staged archive byte for byte. Added, missing or
+changed files (including `Cargo.toml.orig` and `Cargo.lock`) are refused. The
+normalized `Cargo.toml` is regenerated from those retained inputs using the same
+routine as generation; exact hosted dependency index URLs come from their direct
+edges in the retained lockfile. The exact index path and complete index line are
+then checked against the verified normalized manifest and actual Cargo archive
+checksum. Coordinated archive/index edits are refused even with a recomputed
+record checksum.
+
 This binds every direct dependency field (including registry, requirement and
 default features), ordering, name/version, empty feature metadata and
 `yanked=false` byte for byte. The shared bounded gzip/tar reader inspects regular
 files in memory, with a 4 MiB expanded limit; malformed or oversized archives are
-refused. No disk extraction, network access or Cargo execution occurs. Checksums
+refused. Validation reconstructs one bounded source tar in memory, without
+recompressing the Cargo archive. No disk extraction, network access or Cargo
+execution occurs. Checksums
 detect corruption; they are not signatures or protection against the trusted OS owner. A source-plan binding
 is not proof of an approved/successful build or authorization to publish. Optional
 build evidence is revalidated against retained source provenance when decoding;
