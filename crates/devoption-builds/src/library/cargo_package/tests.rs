@@ -972,3 +972,104 @@ fn decoder_bounds_archive_inspection_even_with_matching_index_checksums() {
         );
     }
 }
+
+#[test]
+fn decoder_rejects_coordinated_archive_and_index_edits() {
+    let package = helper("0.1.0", 0);
+    let root = "shared-helper-0.1.0/";
+    let original: BTreeMap<String, Vec<u8>> = unpack(&package)
+        .into_iter()
+        .map(|(path, bytes)| (path.strip_prefix(root).unwrap().to_owned(), bytes))
+        .collect();
+    for edit in [
+        "code",
+        "added",
+        "removed",
+        "original",
+        "requirement",
+        "defaults",
+        "registry",
+        "edition",
+        "build",
+        "path",
+    ] {
+        let mut files = original.clone();
+        match edit {
+            "code" => {
+                files.insert("src/lib.rs".into(), b"pub fn changed() {}\n".to_vec());
+            }
+            "added" => {
+                files.insert("src/extra.rs".into(), b"// injected\n".to_vec());
+            }
+            "removed" => {
+                files.remove("src/lib.rs");
+            }
+            "original" => {
+                files
+                    .get_mut("Cargo.toml.orig")
+                    .unwrap()
+                    .extend(b"\n# changed\n");
+            }
+            _ => {
+                let manifest = std::str::from_utf8(&files["Cargo.toml"]).unwrap();
+                let (from, to) = match edit {
+                    "requirement" => ("=1.0.18", "=99.0.0"),
+                    "defaults" => ("default-features=false", "default-features=true"),
+                    "registry" => (INDEX, "sparse+https://changed.example.test/index/"),
+                    "edition" => ("edition=\"2024\"", "edition=\"2021\""),
+                    "build" => ("build=false", "build=true"),
+                    "path" => ("src/lib.rs", "src/other.rs"),
+                    _ => unreachable!(),
+                };
+                assert!(manifest.contains(from), "{edit}");
+                files.insert("Cargo.toml".into(), manifest.replace(from, to).into_bytes());
+            }
+        }
+        let mut changed = package.clone();
+        let tar = source_tar(
+            "shared-helper",
+            "0.1.0",
+            files
+                .iter()
+                .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
+        )
+        .unwrap();
+        let mut encoder = GzBuilder::new()
+            .mtime(0)
+            .operating_system(255)
+            .write(Vec::new(), Compression::new(6));
+        encoder.write_all(&tar).unwrap();
+        changed.archive = encoder.finish().unwrap();
+        changed.sha256 = Sha256::digest(&changed.archive);
+        let manifest = std::str::from_utf8(&files["Cargo.toml"])
+            .unwrap()
+            .parse()
+            .unwrap();
+        changed.index_line = index_metadata(&changed.source, changed.sha256, &manifest).unwrap();
+        // Archive, index and outer digest agree; only the source binding detects this.
+        assert_eq!(
+            CargoPackage::decode(&changed.encode()).err(),
+            Some(super::super::staging::Error::Integrity),
+            "{edit}"
+        );
+    }
+}
+
+#[test]
+fn decoder_uses_source_qualified_direct_lock_edges() {
+    let rows = format!(
+        "[[package]]\nname='private-base'\nversion='0.1.0'\nsource='{INDEX}'\nchecksum='{}'\n\
+         [[package]]\nname='private-base'\nversion='0.1.0'\nsource='registry+{PUBLIC_INDEX}'\nchecksum='{}'\n\
+         [[package]]\nname='bridge'\nversion='0.1.0'\nsource='registry+{PUBLIC_INDEX}'\nchecksum='{}'\ndependencies=['private-base 0.1.0 (registry+{PUBLIC_INDEX})']\n",
+        checksum(b"hosted"),
+        checksum(b"public"),
+        checksum(b"bridge"),
+    );
+    let package = CargoPackage::from_plan(binding(), &plan(
+        "qualified-helper", "0.1.0",
+        "[dependencies]\nprivate-base={version='=0.1.0',registry='team'}\nbridge={version='=0.1.0',default-features=false}\n",
+        &format!("'private-base 0.1.0 ({INDEX})','bridge'"),
+        &rows, "pub fn value() {}\n", None,
+    )).unwrap();
+    assert!(CargoPackage::decode(&package.encode()).unwrap() == package);
+}
