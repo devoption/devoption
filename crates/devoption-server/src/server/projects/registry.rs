@@ -14,6 +14,7 @@ use devoption_registry::{HostedRegistry, RegistryId, Sha256};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
+use subtle::ConstantTimeEq;
 pub(super) mod builds;
 mod ingestion;
 mod storage;
@@ -458,7 +459,7 @@ fn operate(
         }
         Action::Approve | Action::RecoveryApprove => {
             let pending = engine.pending.take().ok_or(StatusCode::CONFLICT)?;
-            if body != pending.token.as_str()
+            if !bool::from(body.as_bytes().ct_eq(pending.token.as_bytes()))
                 || pending.project != coordinates.as_ref().map(|(p, _)| *p)
                 || pending.coordinates.as_ref() != coordinates.as_ref().map(|(_, c)| c)
             {
