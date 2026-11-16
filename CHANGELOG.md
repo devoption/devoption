@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Compare publication, recovery and ingestion review tokens in constant time for
+  equal-length inputs while preserving single-use rejection behavior
+  ([#420](https://github.com/devoption/devoption/issues/420)).
+
 - Bind stored Cargo package files and generated manifests to their retained staged
   source, refusing coordinated archive/index edits with recomputed checksums
   ([#437](https://github.com/devoption/devoption/issues/437)).

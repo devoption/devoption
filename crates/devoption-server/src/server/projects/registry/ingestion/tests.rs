@@ -67,7 +67,7 @@ fn stage_reviews_are_single_use_bound_to_attempt_project_action_and_expiry() {
             attempt: selected.attempt,
         })),
     };
-    for change in 0..5 {
+    for change in 0..8 {
         let mut p = pending();
         match change {
             0 => p.token = "wrong".into(),
@@ -79,6 +79,9 @@ fn stage_reviews_are_single_use_bound_to_attempt_project_action_and_expiry() {
                 };
                 r.attempt = JobId::from_bytes([2; 16]);
             }
+            5 => p.token = "bb".to_owned() + &"ab".repeat(15),
+            6 => p.token = "ab".repeat(15) + "aa",
+            7 => p.token.clear(),
             _ => {
                 let Decision::Ingestion(r) = &mut p.decision else {
                     unreachable!()

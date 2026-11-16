@@ -378,6 +378,31 @@ fn guarded_review_approval_status_project_download_and_yank_flow() {
 }
 
 #[test]
+fn mismatched_review_tokens_are_rejected_and_consumed() {
+    let f = Fixture::new();
+    for change in 0..4 {
+        let token = f.prepare("{\"action\":\"publish\",\"readers\":[]}");
+        let mut invalid = token.clone();
+        match change {
+            0 => invalid.clear(),
+            1 => invalid.push('a'),
+            _ => {
+                let index = if change == 2 { 0 } else { token.len() - 1 };
+                let replacement = if &token[index..index + 1] == "a" {
+                    "b"
+                } else {
+                    "a"
+                };
+                invalid.replace_range(index..index + 1, replacement);
+            }
+        }
+        assert_eq!(f.approve(&invalid), StatusCode::CONFLICT);
+        assert_eq!(f.approve(&token), StatusCode::CONFLICT);
+    }
+    f.publish();
+}
+
+#[test]
 fn owner_session_origin_csrf_member_and_forged_claims_are_checked_before_registry_access() {
     let f = Fixture::new();
     let path = f.url(f.source, "prepare");

@@ -206,7 +206,7 @@ impl Selection<'_> {
             // Every approval attempt consumes the review, including mismatches.
             let pending = engine.pending.take().ok_or(StatusCode::CONFLICT)?;
             if pending.expires <= Instant::now()
-                || body != pending.token
+                || !bool::from(body.as_bytes().ct_eq(pending.token.as_bytes()))
                 || pending.project != Some(project)
             {
                 return Err(StatusCode::CONFLICT);
