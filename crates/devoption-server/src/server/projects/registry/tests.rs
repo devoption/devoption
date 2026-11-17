@@ -336,6 +336,59 @@ impl Fixture {
 }
 
 #[test]
+fn source_inspection_refuses_registry_contention_and_recovers_after_release() {
+    let f = Fixture::new();
+    let catalog = f.projects.directory.load().unwrap().unwrap();
+    let project = catalog
+        .projects()
+        .iter()
+        .find(|p| p.id() == f.source)
+        .unwrap();
+    let url = format!(
+        "/projects/{}/builds/{}",
+        hex(&f.source.to_bytes()),
+        hex(&project.repositories()[0].to_bytes()),
+    );
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .start_paused(true)
+        .build()
+        .unwrap()
+        .block_on(async {
+            let guard = f.projects.registry.as_ref().unwrap().lock().await;
+            // Keep the lock held through the response. Awaiting it must time out,
+            // even though Tokio's paused clock makes the regression fail quickly.
+            let response = tokio::time::timeout(
+                Duration::from_secs(1),
+                f.app.clone().oneshot(f.request("GET", &url, "", false)),
+            )
+            .await
+            .expect("source inspection waited for the registry lock")
+            .unwrap();
+            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            let body = axum::body::to_bytes(response.into_body(), 1024)
+                .await
+                .unwrap();
+            assert_eq!(&body[..], b"Registry configuration unavailable.");
+            drop(guard);
+
+            let response = f
+                .app
+                .clone()
+                .oneshot(f.request("GET", &url, "", false))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .unwrap();
+            assert!(String::from_utf8_lossy(&body).contains("Source checks passed"));
+        });
+}
+
+#[test]
 fn guarded_review_approval_status_project_download_and_yank_flow() {
     let f = Fixture::new();
     let archive = f.url(

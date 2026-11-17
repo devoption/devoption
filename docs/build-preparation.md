@@ -21,6 +21,11 @@ after sign-in.
   encoding or inspection limits prevented a check. It never substitutes success
   for a failed read.
 
+When a package registry is configured, source inspection returns HTTP 503 with
+**Registry configuration unavailable.** if the registry engine is busy or its
+configuration cannot be verified. It does not wait for the engine lock. Retry
+after the registry operation completes; the response is not cached.
+
 The next action follows the commit and working-tree observations. Missing commits
 or Git changes direct you to resolve source changes; failed reads offer a retry.
 A clean Git observation offers **Continue to build review** when the Linux runner

@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Return the existing uncached registry-unavailable response from source checks
+  when the registry engine is busy, instead of waiting for its lock
+  ([#424](https://github.com/devoption/devoption/issues/424)).
+
 - Compare publication, recovery and ingestion review tokens in constant time for
   equal-length inputs while preserving single-use rejection behavior
   ([#420](https://github.com/devoption/devoption/issues/420)).
