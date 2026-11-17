@@ -10,7 +10,7 @@ pub(super) fn routes(projects: Projects) -> Router {
         let Some((project, repository)) = ids else { return missing(); };
         let root = projects.root.clone();
         let bindings=if let Some(registry)=&projects.registry {
-            match registry.lock().await.bindings() {Ok(bindings)=>bindings,Err(_)=>return (StatusCode::SERVICE_UNAVAILABLE,[(CACHE_CONTROL,"no-store")],"Registry configuration unavailable.").into_response()}
+            match registry.try_lock().map_err(|_| StatusCode::SERVICE_UNAVAILABLE).and_then(|engine| engine.bindings()) {Ok(bindings)=>bindings,Err(_)=>return (StatusCode::SERVICE_UNAVAILABLE,[(CACHE_CONTROL,"no-store")],"Registry configuration unavailable.").into_response()}
         } else {devoption_registry::HostedRegistries::default()};
         let execution_available = projects.execution.is_some();
         let loaded = projects.access(move |directory| {
