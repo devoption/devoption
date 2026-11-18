@@ -183,6 +183,19 @@ impl History {
         {
             return Err(Error::UnknownAttempt);
         }
+        self.bind_work_path(id, root, path)
+    }
+
+    pub(super) fn work_binding_exists(&self, id: JobId) -> Result<bool, Error> {
+        Ok(self.read_snapshot(&key("owned", id), 64)?.is_some())
+    }
+
+    pub(super) fn bind_work_path(
+        &mut self,
+        id: JobId,
+        root: &Path,
+        path: &Path,
+    ) -> Result<(), Error> {
         if path.parent() != Some(root) {
             return Err(Error::Unsafe);
         }

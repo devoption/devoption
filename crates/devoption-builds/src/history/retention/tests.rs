@@ -374,3 +374,70 @@ fn unrelated_or_corrupt_output_preserves_staged_files_until_verified_retry() {
     assert!(!path.exists());
     assert!(!output.exists());
 }
+
+#[test]
+fn staged_queue_refuses_binding_failure_without_publishing_an_attempt() {
+    let (_dir, work, mut store, plan) = fixture();
+    let unsafe_path = work.path().join("not-an-owned-token");
+    std::fs::create_dir(&unsafe_path).unwrap();
+    assert!(store.queue_staged(plan, work.path(), &unsafe_path).is_err());
+    assert!(store.load().unwrap().is_empty());
+    assert!(unsafe_path.exists());
+}
+
+#[test]
+fn staged_queue_binding_survives_restart_and_allows_retention() {
+    let (dir, work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    let path = work.path().join(format!("{:032x}", 1));
+    std::fs::create_dir(&path).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    std::fs::write(path.join("staged"), b"fixture").unwrap();
+    let job = store
+        .queue_staged(plan.clone(), work.path(), &path)
+        .unwrap();
+    assert!(store.work_binding_exists(job.id()).unwrap());
+    assert_eq!(store.load().unwrap()[0].state(), &State::Queued);
+    drop(store);
+    let mut store = History::open(dir.path().to_str().unwrap()).unwrap();
+    store.recover_interrupted().unwrap();
+    store.confirm_interrupted_cleanup().unwrap();
+    let (mut new, _) = stage(&mut store, work.path(), plan, 2);
+    cancel(&mut store, &mut new);
+    store
+        .set_retention_policy(project, Policy::new(1).unwrap())
+        .unwrap();
+    let status = store
+        .reconcile_retention(project, Some(work.path()), || Ok(vec![]))
+        .unwrap();
+    assert!(!status.failed);
+    assert_eq!(status.removed, 1);
+    assert!(!path.exists());
+    assert!(store.audit_exists(job.id()).unwrap());
+}
+
+#[test]
+fn allocation_skips_binding_left_before_history_publication() {
+    let (_dir, work, mut store, plan) = fixture();
+    let path = work.path().join(format!("{:032x}", 1));
+    std::fs::create_dir(&path).unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let old_id = JobId::from_bytes([42; 16]);
+    store.bind_work_path(old_id, work.path(), &path).unwrap();
+    let mut calls = 0;
+    let job = store
+        .queue_using(plan, |bytes| {
+            calls += 1;
+            *bytes = if calls == 1 {
+                old_id.to_bytes()
+            } else {
+                [43; 16]
+            };
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(calls, 2);
+    assert_ne!(job.id(), old_id);
+    assert!(store.work_binding_exists(old_id).unwrap());
+    assert!(path.exists());
+}

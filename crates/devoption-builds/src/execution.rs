@@ -531,9 +531,9 @@ fn prepare_profile(
             },
         )
         .map_err(io::Error::other)?;
-        let job = history.queue(plan).map_err(io::Error::other)?;
-        history
-            .bind_work(job.id(), &config.work, &directory)
+        let staged_digest = inputs::digest_tree(&directory.join("source"))?;
+        let job = history
+            .queue_staged(plan, &config.work, &directory)
             .map_err(io::Error::other)?;
         Ok(Review {
             job,
@@ -542,7 +542,7 @@ fn prepare_profile(
             directory: directory.clone(),
             token,
             created: Instant::now(),
-            staged_digest: inputs::digest_tree(&directory.join("source"))?,
+            staged_digest,
             vendor: staged_vendor,
         })
     })();
