@@ -211,10 +211,31 @@ impl History {
             getrandom::fill(bytes).map_err(|_| Error::Randomness)
         })
     }
+    /// Bind private staging before publishing a queued execution attempt.
+    pub(crate) fn queue_staged(
+        &mut self,
+        plan: BuildPlan,
+        root: &std::path::Path,
+        path: &std::path::Path,
+    ) -> Result<BuildJob, Error> {
+        self.queue_prepared(
+            plan,
+            |bytes| getrandom::fill(bytes).map_err(|_| Error::Randomness),
+            Some((root, path)),
+        )
+    }
     fn queue_using(
         &mut self,
         plan: BuildPlan,
+        random: impl FnMut(&mut [u8; 16]) -> Result<(), Error>,
+    ) -> Result<BuildJob, Error> {
+        self.queue_prepared(plan, random, None)
+    }
+    fn queue_prepared(
+        &mut self,
+        plan: BuildPlan,
         mut random: impl FnMut(&mut [u8; 16]) -> Result<(), Error>,
+        staging: Option<(&std::path::Path, &std::path::Path)>,
     ) -> Result<BuildJob, Error> {
         let mut records = self.load()?;
         if records.len() == MAX_JOBS {
@@ -225,10 +246,16 @@ impl History {
             let mut bytes = [0; 16];
             random(&mut bytes)?;
             let id = JobId::from_bytes(bytes);
-            if records.iter().any(|record| record.id == id) || self.audit_exists(id)? {
+            if records.iter().any(|record| record.id == id)
+                || self.audit_exists(id)?
+                || self.work_binding_exists(id)?
+            {
                 continue;
             }
             let job = BuildJob::queued(id, plan);
+            if let Some((root, path)) = staging {
+                self.bind_work_path(id, root, path)?;
+            }
             records.push(Record::from_job(&job));
             self.publish(&records)?;
             return Ok(job);

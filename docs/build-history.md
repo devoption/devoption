@@ -34,6 +34,12 @@ and retains the poisoned-writer/pending-file behavior described below. If public
 was visible before a durability error, reopen and inspect the saved summary; never
 reconstruct a queued job from it.
 
+Execution preparation computes its staged-source digest and durably binds the
+private work directory before publishing the queued summary. A digest or binding
+failure therefore leaves no queued attempt. If publication fails after binding,
+the binding remains reserved and allocation skips its ID; publication durability
+errors still require reopening and inspecting history as described above.
+
 `record(&BuildJob)` updates only an existing attempt; unknown IDs are rejected.
 Updates must retain attempt, project, repository, commit and source identity and follow the job lifecycle's
 permitted edges; Interrupted is terminal. Identical repeated observations are
