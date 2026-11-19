@@ -2,11 +2,12 @@
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from check_app_installation import CASES, IMAGE_SHA256, host, require_guest, validate_report
+from check_app_installation import CASES, IMAGE_SHA256, host, require_guest, validate_report, wait_with_progress
 
 
 def report():
@@ -37,6 +38,23 @@ class AppAcceptanceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 require_guest()
 
+    def test_vm_progress_is_bounded_and_does_not_extend_the_deadline(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            serial = Path(temporary) / 'serial.log'
+            serial.write_bytes(b'discarded-prefix' + b'x' * 8192)
+            process = Mock()
+            process.wait.side_effect = [subprocess.TimeoutExpired('qemu', 15), 0]
+            with patch('check_app_installation.time.monotonic', side_effect=[0, 0, 5, 5]), \
+                    patch('builtins.print') as output:
+                wait_with_progress(process, serial, 20)
+            self.assertEqual([call.kwargs['timeout'] for call in process.wait.call_args_list], [15, 15])
+            self.assertEqual(output.call_args_list[0].args[0], 'x' * 8192)
+            process.wait.side_effect = subprocess.TimeoutExpired('qemu', 15)
+            with patch('check_app_installation.time.monotonic', side_effect=[0, 0, 20]), \
+                    patch('builtins.print'):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    wait_with_progress(process, serial, 20)
+
     def test_existing_report_is_preserved_before_any_vm_action(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'report.json'
@@ -61,6 +79,10 @@ class AppAcceptanceTests(unittest.TestCase):
                 self.assertIn('mount_tag=output', shares[1])
                 self.assertNotIn('hostfwd', ' '.join(arguments))
                 results = Path(shares[1].split('path=', 1)[1].split(',', 1)[0])
+                user_data = (results.parent / 'seed/user-data').read_text()
+                self.assertIn('if ! env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash', user_data)
+                self.assertIn('ci_vm_packages.sh installer-guest; then', user_data)
+                self.assertIn("poweroff\n      exit 1\n    fi", user_data)
                 (results / 'report.json').write_text(json.dumps(report()))
                 class Process:
                     returncode = 0

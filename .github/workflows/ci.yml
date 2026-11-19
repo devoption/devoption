@@ -176,11 +176,10 @@ jobs:
         run: python3 scripts/check_app_installation.py --prepare "$RUNNER_TEMP/app-install-inputs" --binary target/release/devoption --runtime target/release/devoption-runtime --caddy-archive "$RUNNER_TEMP/devoption-proxy-test/caddy.tar.gz"
       - name: Install private VM acceptance tools
         if: matrix.suite != 'records'
-        # Include package configuration after bounded mirror downloads/retries.
+        # HTTPS Ubuntu sources and bounded package setup; no acceptance skips.
         timeout-minutes: 5
         run: |
-          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=60 update
-          sudo env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=60 install -y --no-install-recommends qemu-system-x86 qemu-utils xorriso
+          sudo env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash scripts/ci_vm_packages.sh vm-tools
           if [ -e /dev/kvm ]; then sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
       - name: Exercise unified installation and approved app deployment in a fresh private VM
         if: matrix.suite == 'bundle'

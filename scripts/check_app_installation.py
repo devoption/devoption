@@ -317,6 +317,27 @@ def validate_report(report):
     return report
 
 
+def wait_with_progress(process, serial, timeout):
+    deadline = time.monotonic() + timeout
+    offset = 0
+    while True:
+        try:
+            process.wait(timeout=max(0, min(15, deadline - time.monotonic())))
+            return
+        except subprocess.TimeoutExpired:
+            if serial.exists():
+                with serial.open('rb') as stream:
+                    end = stream.seek(0, os.SEEK_END)
+                    stream.seek(max(offset, end - 8192))
+                    progress = stream.read(8192)
+                    offset = end
+                if progress:
+                    print(progress.decode(errors='replace'), flush=True)
+            print('Waiting for private VM acceptance completion.', flush=True)
+            if time.monotonic() >= deadline:
+                raise
+
+
 def host(inputs, report, base_image=None, timeout=900):
     if report.exists() or report.is_symlink():
         raise ValueError('Use a fresh report path; never replace prior evidence.')
@@ -329,6 +350,7 @@ def host(inputs, report, base_image=None, timeout=900):
                 raise ValueError('Cached Ubuntu base image differs from the reviewed pin.')
             base = base_image
         else:
+            print('Downloading and verifying pinned Ubuntu VM image.', flush=True)
             base = root / 'base.img'; image(base)
         run('qemu-img', 'create', '-f', 'qcow2', '-F', 'qcow2', '-b', base, root / 'disk.qcow2', '8G')
         seed = root / 'seed'; seed.mkdir()
@@ -356,10 +378,15 @@ runcmd:
   - [mount, -t, 9p, -o, 'trans=virtio,version=9p2000.L', inputs, /inputs]
   - [cp, -r, /inputs/., /srv/devoption-install-proof/]
   - [mount, -t, 9p, -o, 'trans=virtio,version=9p2000.L', output, /output]
-  - [sh, -c, 'apt-get update && apt-get install -y --no-install-recommends git sudo build-essential']
-  - [touch, /run/devoption-app-install-guest]
-  - [systemctl, daemon-reload]
-  - [systemctl, start, --no-block, devoption-install-acceptance.service]
+  - |
+    if ! env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash /srv/devoption-install-proof/repository/scripts/ci_vm_packages.sh installer-guest; then
+      echo 'Guest prerequisite package setup failed.' >&2
+      poweroff
+      exit 1
+    fi
+    touch /run/devoption-app-install-guest
+    systemctl daemon-reload
+    systemctl start --no-block devoption-install-acceptance.service
 ''')
         if shutil.which('xorriso'):
             run('xorriso', '-as', 'mkisofs', '-quiet', '-output', root / 'seed.iso', '-volid', 'cidata', '-joliet', '-rock', seed)
@@ -378,7 +405,8 @@ runcmd:
         with (root / 'qemu.log').open('wb') as log:
             process = subprocess.Popen(command, stdout=log, stderr=log)
             try:
-                process.wait(timeout=timeout)
+                print('Booting private VM; streaming bounded serial progress every 15 seconds.', flush=True)
+                wait_with_progress(process, root / 'serial.log', timeout)
                 result = validate_report(json.loads((results / 'report.json').read_text()))
                 expected = json.loads((inputs / 'metadata.json').read_text())
                 if any(result[key] != expected[key] for key in ('source_commit', 'binary_sha256', 'runtime_sha256')):

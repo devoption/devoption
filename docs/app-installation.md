@@ -225,9 +225,15 @@ crate cache available. It vendors the public static-site fixture and copies a
 bounded toolchain and reviewed binaries into a new directory. Host mode requires
 QEMU/qemu-img and xorriso (or macOS hdiutil), downloads the existing pinned Ubuntu
 image and boots a fresh private disk. An optional `--base-image` accepts only the
-same pinned image hash. The guest installs Git/sudo/build-essential from Ubuntu archives; package
-acquisition needs network access. No host root, SSH credentials, forwarded ports
-or host trust changes are needed. The VM and its copied state are removed afterward.
+same pinned image hash. The guest installs Git/sudo/build-essential from signed
+Ubuntu HTTPS archives using the disposable-only `scripts/ci_vm_packages.sh`
+helper. Package setup limits retries, connection/lock waits and each apt phase;
+missing indexes fail setup. CI uses the same helper for host QEMU tools without
+rewriting host source configuration. Package acquisition needs network access.
+The harness streams at most 8 KiB of new serial output every 15 seconds while
+waiting, and retains the existing 15-minute VM deadline and complete-report gate.
+A guest package setup failure powers off the VM without issuing a success report.
+No host root, SSH credentials, forwarded ports or host trust changes are needed. The VM and its copied state are removed afterward.
 
 Acceptance uses the real `plan`, `apply`, `enroll`, `start` and `status` commands,
 synthetic terminal enrollment, test-CA HTTPS sign-in, a managed repository, approved

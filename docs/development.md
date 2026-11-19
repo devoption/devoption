@@ -127,8 +127,13 @@ its own locked release workspace and has a 15-minute job deadline. This repeats
 compilation to reduce elapsed time without transferring compiled artifacts between
 runners. Matrix fail-fast is disabled so a failed suite does not cancel the others.
 The required gate consumes the combined matrix result and requires every selected
-suite to pass. VM tool installation has a three-minute step deadline, two apt
-download retries, 30-second HTTP/HTTPS timeouts and a 60-second package-lock wait.
+suite to pass. VM tool installation has a five-minute step deadline and uses the
+disposable-only
+`scripts/ci_vm_packages.sh` helper: signed Ubuntu HTTPS sources, two apt retries,
+15-second HTTP/HTTPS timeouts, a 30-second package-lock wait, and 120/150-second
+update/install deadlines (with ten-second forced-stop grace). Missing indexes fail
+setup. The unified-installer guest uses the same bounded helper for its build
+prerequisites; its serial output is streamed while acceptance runs.
 These bounds fail stalled setup promptly; they do not turn failed acceptance into
 a passing check.
 
