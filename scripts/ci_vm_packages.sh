@@ -17,10 +17,13 @@ case "${1:-}" in
     cd -- "${2:?Provide the prepared guest package directory.}"
     sha256sum --check --strict SHA256SUMS
     shopt -s nullglob
-    packages=(./*.deb)
+    # APT's no-download path must find complete archives in its own cache;
+    # keep that cache writable inside the disposable VM, with absolute paths.
+    packages=("$PWD"/*.deb)
     if [[ ${#packages[@]} == 0 ]]; then echo 'No prepared guest packages.' >&2; exit 1; fi
     timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get \
       -o Dir::Etc::sourcelist=/dev/null -o 'Dir::Etc::sourceparts=-' \
+      -o "Dir::Cache::archives=$PWD" \
       --no-download install -y --no-install-recommends "${packages[@]}"
     exit
     ;;

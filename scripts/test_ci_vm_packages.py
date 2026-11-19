@@ -98,4 +98,5 @@ sys.exit(1 if os.environ['VM_TEST_FAILURE'] in ('update', 'install') and os.envi
                     args = log.read_text().splitlines()
                     self.assertIn('--no-download', args)
                     self.assertIn('Dir::Etc::sourcelist=/dev/null', args)
-                    self.assertIn('./' + package.name, args)
+                    self.assertIn(str(package), args)
+                    self.assertIn('Dir::Cache::archives=' + str(root), args)

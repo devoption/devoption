@@ -381,7 +381,7 @@ def host(inputs, report, base_image=None, timeout=900):
         run('qemu-img', 'create', '-f', 'qcow2', '-F', 'qcow2', '-b', base, root / 'disk.qcow2', '8G')
         seed = root / 'seed'; seed.mkdir()
         (seed / 'meta-data').write_text('instance-id: devoption-app-install\nlocal-hostname: app-install-fixture\n')
-        package_mode = 'installer-guest-offline /inputs/guest-packages' if (inputs / 'guest-packages').is_dir() else 'installer-guest'
+        package_mode = 'installer-guest-offline /srv/devoption-install-proof/guest-packages' if (inputs / 'guest-packages').is_dir() else 'installer-guest'
         (seed / 'user-data').write_text('''#cloud-config
 users: []
 disable_root: true

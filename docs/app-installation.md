@@ -230,8 +230,9 @@ set on its disposable Ubuntu runner using signed HTTPS archives and an empty apt
 status file, without installing those packages on the host. `--prepare` receives
 that new directory through `--guest-packages`; it copies the bounded `.deb` set
 and records SHA-256 checksums. The guest verifies those bytes and installs only
-local packages with `--no-download`, so compiler acquisition does not depend on
-guest networking. Missing dependencies or checksum mismatches fail acceptance.
+local packages with `--no-download`, using absolute package paths and the VM's
+writable copied package directory as apt's archive cache. The original shared
+inputs remain read-only; compiler acquisition does not depend on guest networking. Missing dependencies or checksum mismatches fail acceptance.
 
 When `--guest-packages` is omitted for a manual rehearsal, the guest acquires its
 prerequisites from signed Ubuntu HTTPS archives using the disposable-only

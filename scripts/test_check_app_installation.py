@@ -121,7 +121,7 @@ class AppAcceptanceTests(unittest.TestCase):
                 results = Path(shares[1].split('path=', 1)[1].split(',', 1)[0])
                 user_data = (results.parent / 'seed/user-data').read_text()
                 self.assertIn('if ! env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash', user_data)
-                self.assertIn('ci_vm_packages.sh installer-guest-offline /inputs/guest-packages; then', user_data)
+                self.assertIn('ci_vm_packages.sh installer-guest-offline /srv/devoption-install-proof/guest-packages; then', user_data)
                 self.assertIn("poweroff\n      exit 1\n    fi", user_data)
                 (results / 'report.json').write_text(json.dumps(report()))
                 class Process:
