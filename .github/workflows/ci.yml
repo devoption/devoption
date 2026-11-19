@@ -171,9 +171,13 @@ jobs:
       - name: Build, test and package a reusable library on the disposable runner
         if: matrix.suite == 'bundle'
         run: python3 scripts/check_library_build.py --disposable-system-host --binary target/release/devoption
+      - name: Download signed guest prerequisites on the disposable runner
+        if: matrix.suite == 'bundle'
+        timeout-minutes: 5
+        run: sudo env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash scripts/ci_vm_packages.sh installer-guest-download "$RUNNER_TEMP/app-install-packages"
       - name: Prepare unified installer acceptance inputs from the selected source build
         if: matrix.suite == 'bundle'
-        run: python3 scripts/check_app_installation.py --prepare "$RUNNER_TEMP/app-install-inputs" --binary target/release/devoption --runtime target/release/devoption-runtime --caddy-archive "$RUNNER_TEMP/devoption-proxy-test/caddy.tar.gz"
+        run: python3 scripts/check_app_installation.py --prepare "$RUNNER_TEMP/app-install-inputs" --binary target/release/devoption --runtime target/release/devoption-runtime --caddy-archive "$RUNNER_TEMP/devoption-proxy-test/caddy.tar.gz" --guest-packages "$RUNNER_TEMP/app-install-packages"
       - name: Install private VM acceptance tools
         if: matrix.suite != 'records'
         # HTTPS Ubuntu sources and bounded package setup; no acceptance skips.

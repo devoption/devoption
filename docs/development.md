@@ -123,17 +123,19 @@ VM installation; `records` covers HTTPS and scoped/managed PostgreSQL;
 `upgrade` covers prior-preview upgrade, recovery and four kernel boots; `apps`
 covers independent app deployments, real build-retention disk reclamation with
 saved-release rollback, and their three kernel boots. Each suite builds
-its own locked release workspace and has a 15-minute job deadline. This repeats
-compilation to reduce elapsed time without transferring compiled artifacts between
+its own locked release workspace. The bundle job has a 30-minute deadline;
+the other suites have 15-minute deadlines. This repeats compilation to reduce elapsed time without transferring compiled artifacts between
 runners. Matrix fail-fast is disabled so a failed suite does not cancel the others.
 The required gate consumes the combined matrix result and requires every selected
-suite to pass. VM tool installation has a five-minute step deadline and uses the
-disposable-only
-`scripts/ci_vm_packages.sh` helper: signed Ubuntu HTTPS sources, two apt retries,
+suite to pass. VM tool installation has a five-minute step deadline and uses
+the disposable-only `scripts/ci_vm_packages.sh` helper: signed Ubuntu HTTPS sources, two apt retries,
 15-second HTTP/HTTPS timeouts, a 30-second package-lock wait, and 120/150-second
 update/install deadlines (with ten-second forced-stop grace). Missing indexes fail
-setup. The unified-installer guest uses the same bounded helper for its build
-prerequisites; its serial output is streamed while acceptance runs.
+setup. CI downloads the full installer-guest prerequisite closure with an empty
+apt status file on the runner, without installing those packages there. The VM
+verifies the prepared checksums and installs local packages with `--no-download`;
+its serial output is streamed while acceptance runs. Manual rehearsals without
+prepared packages retain bounded guest acquisition.
 These bounds fail stalled setup promptly; they do not turn failed acceptance into
 a passing check.
 

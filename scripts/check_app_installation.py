@@ -39,7 +39,7 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def prepare(output, binary, runtime, caddy_archive):
+def prepare(output, binary, runtime, caddy_archive, guest_packages=None):
     if sys.platform != 'linux' or os.geteuid() == 0:
         raise ValueError('Prepare as an unprivileged user with the pinned Linux toolchain.')
     # mkdir without exist_ok prevents replacing prior inputs or accepting stale evidence.
@@ -71,6 +71,8 @@ def prepare(output, binary, runtime, caddy_archive):
     (output / 'devoption').chmod(0o755)
     (output / 'devoption-runtime').chmod(0o755)
     copy_fixture_repository(output / 'repository')
+    if guest_packages is not None:
+        copy_guest_packages(guest_packages, output / 'guest-packages')
     from prepare_build_config import verify_vendor
     verify_vendor(output / 'Cargo.lock', vendor, archives)
     metadata = {'source_commit': run('git', '-C', ROOT, 'rev-parse', 'HEAD').decode().strip(),
@@ -80,6 +82,25 @@ def prepare(output, binary, runtime, caddy_archive):
         metadata[key + '_sha256'] = run(binary, 'build-input-digest', output / key).decode().strip()
     (output / 'metadata.json').write_text(json.dumps(metadata))
     print('Prepared reviewed binaries, bounded toolchain, authenticated vendor tree and public fixture sources.', flush=True)
+
+
+def copy_guest_packages(source, destination):
+    packages = sorted(source.glob('*.deb'))
+    if not packages or len(packages) > 256:
+        raise ValueError('Provide a bounded complete guest package set from ci_vm_packages.sh.')
+    destination.mkdir()
+    checksums = []
+    total = 0
+    for package in packages:
+        if package.is_symlink() or not package.is_file() or not re.fullmatch(r'[A-Za-z0-9_.+%:~\-]+\.deb', package.name):
+            raise ValueError('Invalid prepared guest package file.')
+        total += package.stat().st_size
+        if total > 512 * 1024**2:
+            raise ValueError('Guest package set exceeds the copy bound.')
+        target = destination / package.name
+        shutil.copyfile(package, target)
+        checksums.append(digest(target) + '  ' + package.name + '\n')
+    (destination / 'SHA256SUMS').write_text(''.join(checksums))
 
 
 def copy_fixture_repository(repository):
@@ -360,6 +381,7 @@ def host(inputs, report, base_image=None, timeout=900):
         run('qemu-img', 'create', '-f', 'qcow2', '-F', 'qcow2', '-b', base, root / 'disk.qcow2', '8G')
         seed = root / 'seed'; seed.mkdir()
         (seed / 'meta-data').write_text('instance-id: devoption-app-install\nlocal-hostname: app-install-fixture\n')
+        package_mode = 'installer-guest-offline /inputs/guest-packages' if (inputs / 'guest-packages').is_dir() else 'installer-guest'
         (seed / 'user-data').write_text('''#cloud-config
 users: []
 disable_root: true
@@ -384,7 +406,7 @@ runcmd:
   - [cp, -r, /inputs/., /srv/devoption-install-proof/]
   - [mount, -t, 9p, -o, 'trans=virtio,version=9p2000.L', output, /output]
   - |
-    if ! env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash /srv/devoption-install-proof/repository/scripts/ci_vm_packages.sh installer-guest; then
+    if ! env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash /srv/devoption-install-proof/repository/scripts/ci_vm_packages.sh @GUEST_PACKAGE_MODE@; then
       echo 'Guest prerequisite package setup failed.' >&2
       poweroff
       exit 1
@@ -392,7 +414,7 @@ runcmd:
     touch /run/devoption-app-install-guest
     systemctl daemon-reload
     systemctl start --no-block devoption-install-acceptance.service
-''')
+'''.replace('@GUEST_PACKAGE_MODE@', package_mode))
         if shutil.which('xorriso'):
             run('xorriso', '-as', 'mkisofs', '-quiet', '-output', root / 'seed.iso', '-volid', 'cidata', '-joliet', '-rock', seed)
         elif platform.system() == 'Darwin':
@@ -442,7 +464,7 @@ def main():
     mode.add_argument('--prepare', type=Path)
     mode.add_argument('--inputs', type=Path)
     mode.add_argument('--guest', action='store_true')
-    for name in ('binary', 'runtime', 'caddy-archive', 'report', 'base-image'):
+    for name in ('binary', 'runtime', 'caddy-archive', 'report', 'base-image', 'guest-packages'):
         parser.add_argument('--' + name, type=Path)
     parser.add_argument('--timeout', type=int, default=900)
     args = parser.parse_args()
@@ -458,7 +480,7 @@ def main():
         finally:
             run('systemctl', 'poweroff')
     elif args.prepare and all((args.binary, args.runtime, args.caddy_archive)):
-        prepare(args.prepare.resolve(), args.binary.resolve(strict=True), args.runtime.resolve(strict=True), args.caddy_archive.resolve(strict=True))
+        prepare(args.prepare.resolve(), args.binary.resolve(strict=True), args.runtime.resolve(strict=True), args.caddy_archive.resolve(strict=True), args.guest_packages.resolve(strict=True) if args.guest_packages else None)
     elif args.inputs and args.report:
         host(args.inputs.resolve(strict=True), args.report.resolve(), args.base_image.resolve(strict=True) if args.base_image else None, args.timeout)
     else:

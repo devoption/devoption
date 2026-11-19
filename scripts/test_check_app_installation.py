@@ -1,4 +1,5 @@
 """Acceptance evidence must be complete and bound to the selected isolated VM."""
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from check_app_installation import CASES, IMAGE_SHA256, copy_fixture_repository, host, require_guest, validate_report, wait_with_progress
+from check_app_installation import CASES, IMAGE_SHA256, copy_fixture_repository, copy_guest_packages, host, require_guest, validate_report, wait_with_progress
 
 
 def report():
@@ -49,6 +50,25 @@ class AppAcceptanceTests(unittest.TestCase):
             self.assertEqual((target / 'scripts/check_app_installation.py').read_bytes(), b'fixture Python entrypoint')
             self.assertFalse((target / 'scripts/unrelated.sh').exists())
 
+    def test_guest_package_inputs_are_copied_exactly_and_empty_sets_fail(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / 'source'; source.mkdir()
+            with self.assertRaisesRegex(ValueError, 'complete guest package set'):
+                copy_guest_packages(source, root / 'empty')
+            package = source / 'fixture_1_amd64.deb'
+            package.write_bytes(b'public synthetic package bytes')
+            target = root / 'prepared'
+            copy_guest_packages(source, target)
+            self.assertEqual((target / package.name).read_bytes(), package.read_bytes())
+            expected = hashlib.sha256(package.read_bytes()).hexdigest() + '  ' + package.name + '\n'
+            self.assertEqual((target / 'SHA256SUMS').read_text(), expected)
+            with self.assertRaises(FileExistsError):
+                copy_guest_packages(source, target)
+            package.unlink(); package.symlink_to(target / package.name)
+            with self.assertRaisesRegex(ValueError, 'Invalid prepared'):
+                copy_guest_packages(source, root / 'symlink')
+
     def test_guest_mode_requires_all_explicit_opt_in_guards(self):
         with patch('check_app_installation.os.geteuid', return_value=1000):
             with self.assertRaises(ValueError):
@@ -89,6 +109,7 @@ class AppAcceptanceTests(unittest.TestCase):
             root = Path(temporary)
             inputs = root / 'inputs'; inputs.mkdir()
             (inputs / 'metadata.json').write_text(json.dumps(report()))
+            (inputs / 'guest-packages').mkdir()
             output = root / 'report.json'
             def launch(arguments, **kwargs):
                 shares = [arguments[i + 1] for i, arg in enumerate(arguments) if arg == '-virtfs']
@@ -100,7 +121,7 @@ class AppAcceptanceTests(unittest.TestCase):
                 results = Path(shares[1].split('path=', 1)[1].split(',', 1)[0])
                 user_data = (results.parent / 'seed/user-data').read_text()
                 self.assertIn('if ! env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash', user_data)
-                self.assertIn('ci_vm_packages.sh installer-guest; then', user_data)
+                self.assertIn('ci_vm_packages.sh installer-guest-offline /inputs/guest-packages; then', user_data)
                 self.assertIn("poweroff\n      exit 1\n    fi", user_data)
                 (results / 'report.json').write_text(json.dumps(report()))
                 class Process:

@@ -1,4 +1,5 @@
 """Disposable apt setup refuses implicit use and propagates setup failures."""
+import hashlib
 import itertools
 import json
 import os
@@ -23,7 +24,7 @@ class VmPackageTests(unittest.TestCase):
 
     @unittest.skipUnless(UBUNTU, 'Ubuntu 24.04 fixture command wiring')
     def test_signed_sources_bounded_phases_and_failed_update_stops_install(self):
-        for mode, failure in itertools.product(('vm-tools', 'installer-guest'), ('', 'update', 'install')):
+        for mode, failure in itertools.product(('vm-tools', 'installer-guest', 'installer-guest-download'), ('', 'update', 'install')):
             with self.subTest(mode=mode, failure=failure), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 log = root / 'commands.jsonl'
@@ -41,7 +42,10 @@ sys.exit(1 if os.environ['VM_TEST_FAILURE'] in ('update', 'install') and os.envi
                 (root / 'timeout').chmod(0o755)
                 env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
                            DEVOPTION_DISPOSABLE_VM_PACKAGES='1', VM_TEST_LOG=str(log), VM_TEST_FAILURE=failure)
-                result = subprocess.run(['bash', str(SCRIPT), mode], env=env, capture_output=True)
+                command = ['bash', str(SCRIPT), mode]
+                if mode == 'installer-guest-download':
+                    command.append(str(root / 'packages'))
+                result = subprocess.run(command, env=env, capture_output=True)
                 self.assertEqual(result.returncode, 1 if failure else 0, result.stderr)
                 commands = [json.loads(line) for line in log.read_text().splitlines()]
                 self.assertEqual(len(commands), 1 if failure == 'update' else 2)
@@ -61,3 +65,37 @@ sys.exit(1 if os.environ['VM_TEST_FAILURE'] in ('update', 'install') and os.envi
                     self.assertEqual(commands[1]['args'][:2], ['--kill-after=10s', '150s'])
                     expected = ['qemu-system-x86', 'qemu-utils', 'xorriso'] if mode == 'vm-tools' else ['git', 'sudo', 'build-essential']
                     self.assertEqual(commands[1]['args'][-3:], expected)
+                    if mode == 'installer-guest-download':
+                        args = commands[1]['args']
+                        self.assertIn('--download-only', args)
+                        self.assertIn('Dir::Cache::archives=' + str(root / 'packages'), args)
+                        status = next(a.split('=', 1)[1] for a in args if a.startswith('Dir::State::status='))
+                        self.assertNotEqual(status, '/var/lib/dpkg/status')
+                        self.assertFalse(Path(status).exists())
+
+    @unittest.skipUnless(UBUNTU, 'Ubuntu 24.04 fixture command wiring')
+    def test_offline_guest_verifies_checksums_and_forbids_downloads(self):
+        for corrupt in (False, True):
+            with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                package = root / 'fixture_1_amd64.deb'
+                package.write_bytes(b'public synthetic package')
+                (root / 'SHA256SUMS').write_text(hashlib.sha256(package.read_bytes()).hexdigest() + '  ' + package.name + '\n')
+                if corrupt:
+                    package.write_bytes(b'changed')
+                (root / 'id').write_text('#!/bin/sh\necho 0\n')
+                (root / 'id').chmod(0o755)
+                (root / 'timeout').write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$VM_TEST_LOG"\n')
+                (root / 'timeout').chmod(0o755)
+                log = root / 'commands'
+                env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
+                           DEVOPTION_DISPOSABLE_VM_PACKAGES='1', VM_TEST_LOG=str(log))
+                result = subprocess.run(['bash', str(SCRIPT), 'installer-guest-offline', str(root)], env=env, capture_output=True)
+                self.assertEqual(result.returncode, 1 if corrupt else 0, result.stderr)
+                if corrupt:
+                    self.assertFalse(log.exists())
+                else:
+                    args = log.read_text().splitlines()
+                    self.assertIn('--no-download', args)
+                    self.assertIn('Dir::Etc::sourcelist=/dev/null', args)
+                    self.assertIn('./' + package.name, args)

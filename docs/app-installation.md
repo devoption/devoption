@@ -225,15 +225,28 @@ crate cache available. It vendors the public static-site fixture and copies a
 bounded toolchain and reviewed binaries into a new directory. Host mode requires
 QEMU/qemu-img and xorriso (or macOS hdiutil), downloads the existing pinned Ubuntu
 image and boots a fresh private disk. An optional `--base-image` accepts only the
-same pinned image hash. The guest installs Git/sudo/build-essential from signed
-Ubuntu HTTPS archives using the disposable-only `scripts/ci_vm_packages.sh`
-helper. Package setup limits retries, connection/lock waits and each apt phase;
-missing indexes fail setup. CI uses the same helper for host QEMU tools without
-rewriting host source configuration. Package acquisition needs network access.
+same pinned image hash. CI downloads the full Git/sudo/build-essential dependency
+set on its disposable Ubuntu runner using signed HTTPS archives and an empty apt
+status file, without installing those packages on the host. `--prepare` receives
+that new directory through `--guest-packages`; it copies the bounded `.deb` set
+and records SHA-256 checksums. The guest verifies those bytes and installs only
+local packages with `--no-download`, so compiler acquisition does not depend on
+guest networking. Missing dependencies or checksum mismatches fail acceptance.
+
+When `--guest-packages` is omitted for a manual rehearsal, the guest acquires its
+prerequisites from signed Ubuntu HTTPS archives using the disposable-only
+`scripts/ci_vm_packages.sh` helper. Host downloads and manual guest acquisition
+limit retries, connection/lock waits and each apt phase; missing indexes fail
+setup. CI uses the same helper for host QEMU tools without rewriting source
+configuration. Network access is still needed for the pinned VM image and host
+package downloads.
+
 The harness streams at most 8 KiB of new serial output every 15 seconds while
 waiting, and retains the existing 15-minute VM deadline and complete-report gate.
 A guest package setup failure powers off the VM without issuing a success report.
-No host root, SSH credentials, forwarded ports or host trust changes are needed. The VM and its copied state are removed afterward.
+No host root, SSH credentials, forwarded ports or host trust changes are needed
+by the VM harness; CI's separate package-download step requires root only on its
+disposable runner. The VM and its copied state are removed afterward.
 
 Acceptance uses the real `plan`, `apply`, `enroll`, `start` and `status` commands,
 synthetic terminal enrollment, test-CA HTTPS sign-in, a managed repository, approved

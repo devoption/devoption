@@ -12,8 +12,19 @@ if [[ "$ID" != ubuntu || "${VERSION_CODENAME:-}" != noble ]]; then
 fi
 case "${1:-}" in
   vm-tools) packages=(qemu-system-x86 qemu-utils xorriso) ;;
-  installer-guest) packages=(git sudo build-essential) ;;
-  *) echo 'Select vm-tools or installer-guest.' >&2; exit 1 ;;
+  installer-guest|installer-guest-download) packages=(git sudo build-essential) ;;
+  installer-guest-offline)
+    cd -- "${2:?Provide the prepared guest package directory.}"
+    sha256sum --check --strict SHA256SUMS
+    shopt -s nullglob
+    packages=(./*.deb)
+    if [[ ${#packages[@]} == 0 ]]; then echo 'No prepared guest packages.' >&2; exit 1; fi
+    timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get \
+      -o Dir::Etc::sourcelist=/dev/null -o 'Dir::Etc::sourceparts=-' \
+      --no-download install -y --no-install-recommends "${packages[@]}"
+    exit
+    ;;
+  *) echo 'Select vm-tools, installer-guest, installer-guest-download or installer-guest-offline.' >&2; exit 1 ;;
 esac
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
@@ -31,4 +42,18 @@ options=(-o "Dir::Etc::sourcelist=$scratch/ubuntu.list" -o 'Dir::Etc::sourcepart
   -o APT::Get::List-Cleanup=0 -o Acquire::Languages=none -o Acquire::Retries=2
   -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 -o DPkg::Lock::Timeout=30)
 timeout --kill-after=10s 120s apt-get "${options[@]}" -o APT::Update::Error-Mode=any update
-timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get "${options[@]}" install -y --no-install-recommends "${packages[@]}"
+install_options=()
+if [[ "$1" == installer-guest-download ]]; then
+  destination="${2:?Provide a new absolute guest package directory.}"
+  [[ "$destination" == /* ]]
+  mkdir -- "$destination"
+  chmod 755 "$destination"
+  # Resolve the full dependency closure, even when tools already exist on the
+  # runner. Neither dpkg status nor apt's auto-install state may change on host.
+  touch "$scratch/status"
+  options+=(-o "Dir::State::status=$scratch/status"
+    -o "Dir::State::extended_states=$scratch/extended_states"
+    -o "Dir::Cache::archives=$destination")
+  install_options=(--download-only)
+fi
+timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get "${options[@]}" "${install_options[@]}" install -y --no-install-recommends "${packages[@]}"
