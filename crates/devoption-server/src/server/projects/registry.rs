@@ -23,9 +23,48 @@ use storage::Root;
 pub(in crate::server) struct Engine {
     root: Root,
     candidates: PackageStore,
-    policy: Option<Publications>,
+    policy: Policy,
     pending: Option<Pending>,
     owner: OwnerId,
+}
+enum Policy {
+    Ready(Publications),
+    Recovery,
+    Unavailable,
+}
+impl Policy {
+    fn open(
+        root: &Root,
+        owner: OwnerId,
+        catalog: &Catalog,
+        candidates: &PackageStore,
+    ) -> Result<Self, ()> {
+        match Publications::open(&root.policy, owner) {
+            Ok(policy) => {
+                policy.check_registry(&root.binding).map_err(|_| ())?;
+                Ok(Self::Ready(policy))
+            }
+            Err(_) => {
+                let recovery =
+                    Publications::review_recovery(&root.policy, owner, owner, catalog, candidates)
+                        .map_err(|_| ())?;
+                recovery.check_registry(&root.binding).map_err(|_| ())?;
+                Ok(Self::Recovery)
+            }
+        }
+    }
+    fn ready(&self) -> Result<&Publications, StatusCode> {
+        match self {
+            Self::Ready(policy) => Ok(policy),
+            _ => Err(StatusCode::SERVICE_UNAVAILABLE),
+        }
+    }
+    fn ready_mut(&mut self) -> Result<&mut Publications, StatusCode> {
+        match self {
+            Self::Ready(policy) => Ok(policy),
+            _ => Err(StatusCode::SERVICE_UNAVAILABLE),
+        }
+    }
 }
 enum Decision {
     Normal(Review),
@@ -54,26 +93,7 @@ impl Engine {
                 .load()
                 .map_err(|_| ())?
                 .unwrap_or_default();
-            let policy = match Publications::open(&root.policy, owner) {
-                Ok(policy) => {
-                    policy.check_registry(&root.binding).map_err(|_| ())?;
-                    Some(policy)
-                }
-                Err(_) => {
-                    let recovery = Publications::review_recovery(
-                        &root.policy,
-                        owner,
-                        owner,
-                        &catalog,
-                        &candidates,
-                    )
-                    .map_err(|_| ())?;
-                    if recovery.check_registry(&root.binding).is_err() {
-                        return Err(());
-                    }
-                    None
-                }
-            };
+            let policy = Policy::open(&root, owner, &catalog, &candidates)?;
             root.verify()?;
             Ok(Self {
                 root,
@@ -140,11 +160,12 @@ impl Engine {
         });
         Ok(body)
     }
-    fn reopen(&mut self) {
-        self.policy = None;
-        self.policy = Publications::open(&self.root.policy, self.owner)
-            .ok()
-            .filter(|policy| policy.check_registry(&self.root.binding).is_ok());
+    fn reopen(&mut self, catalog: &Catalog) -> Result<(), StatusCode> {
+        // Release the ordinary handle/lock before inspecting an interrupted log.
+        self.policy = Policy::Unavailable;
+        self.policy = Policy::open(&self.root, self.owner, catalog, &self.candidates)
+            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+        Ok(())
     }
 }
 fn hex(bytes: &[u8]) -> String {
@@ -364,8 +385,7 @@ async fn handle(
                     let project = project_id(&project).ok_or(StatusCode::NOT_FOUND)?;
                     let bytes = engine
                         .policy
-                        .as_ref()
-                        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?
+                        .ready()?
                         .index_entry(
                             engine.owner,
                             project,
@@ -430,8 +450,7 @@ fn operate(
                 .change()?;
             let review = engine
                 .policy
-                .as_ref()
-                .ok_or(StatusCode::SERVICE_UNAVAILABLE)?
+                .ready()?
                 .review(engine.owner, catalog, &engine.candidates, c, change)
                 .map_err(mapped)?;
             engine.save(Some(*project), Some(c.clone()), Decision::Normal(review))?
@@ -441,8 +460,10 @@ fn operate(
             if !body.is_empty() {
                 return Err(StatusCode::BAD_REQUEST);
             }
-            if engine.policy.is_some() {
-                return Err(StatusCode::CONFLICT);
+            match engine.policy {
+                Policy::Ready(_) => return Err(StatusCode::CONFLICT),
+                Policy::Unavailable => return Err(StatusCode::SERVICE_UNAVAILABLE),
+                Policy::Recovery => {}
             }
             let review = Publications::review_recovery(
                 &engine.root.policy,
@@ -452,9 +473,9 @@ fn operate(
                 &engine.candidates,
             )
             .map_err(mapped)?;
-            if review.decision().coordinates().registry() != &engine.root.binding {
-                return Err(StatusCode::CONFLICT);
-            }
+            review
+                .check_registry(&engine.root.binding)
+                .map_err(mapped)?;
             engine.save(None, None, Decision::Recovery(review))?
         }
         Action::Approve | Action::RecoveryApprove => {
@@ -474,8 +495,7 @@ fn operate(
             } = &mut *engine;
             let result = match (action, pending.decision) {
                 (Action::Approve, Decision::Normal(review)) => policy
-                    .as_mut()
-                    .ok_or(StatusCode::SERVICE_UNAVAILABLE)?
+                    .ready_mut()?
                     .approve(owner, catalog, candidates, review),
                 (Action::RecoveryApprove, Decision::Recovery(review)) => {
                     Publications::approve_recovery(
@@ -489,8 +509,9 @@ fn operate(
                 }
                 _ => return Err(StatusCode::CONFLICT),
             };
-            engine.reopen();
+            let reopened = engine.reopen(catalog);
             result.map_err(mapped)?;
+            reopened?;
             json!({"applied":true})
         }
         Action::Status => {
@@ -498,18 +519,14 @@ fn operate(
             engine.source(catalog, *project, c)?;
             let s = engine
                 .policy
-                .as_ref()
-                .ok_or(StatusCode::SERVICE_UNAVAILABLE)?
+                .ready()?
                 .status(engine.owner, catalog, &engine.candidates, c)
                 .map_err(mapped)?;
             json!({"registry":c.registry().id().as_str(),"index":c.registry().index(),"name":c.name(),"version":c.version(),"source_project":hex(&s.source.to_bytes()),"repository":hex(&s.repository.to_bytes()),"commit":s.commit,"source_sha256":hex(s.source_sha256.bytes()),"candidate_sha256":hex(s.candidate_sha256.bytes()),"archive_sha256":hex(s.archive_sha256.bytes()),"archive_bytes":s.archive_bytes,"readers":s.readers.iter().map(|id|hex(&id.to_bytes())).collect::<Vec<_>>(),"yanked":s.yanked,"events_used":s.events_used,"event_capacity":s.event_capacity})
         }
         Action::Index | Action::Archive => {
             let (project, c) = coordinates.as_ref().ok_or(StatusCode::BAD_REQUEST)?;
-            let policy = engine
-                .policy
-                .as_ref()
-                .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+            let policy = engine.policy.ready()?;
             if matches!(action, Action::Index) {
                 return Ok((
                     policy

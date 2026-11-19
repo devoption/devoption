@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Keep registry policy reopen failures unavailable instead of enabling recovery;
+  require validated pending decisions before issuing recovery reviews
+  ([#418](https://github.com/devoption/devoption/issues/418)).
+
 - Finish staged-source hashing and work-directory binding before publishing queued
   build reviews, so preparation failures do not leave unbound history records
   ([#413](https://github.com/devoption/devoption/issues/413)).

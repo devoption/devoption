@@ -199,9 +199,7 @@ impl Selection<'_> {
         if !approve {
             engine.pending = None;
         }
-        if engine.policy.is_none() {
-            return Err(StatusCode::SERVICE_UNAVAILABLE);
-        }
+        engine.policy.ready()?;
         if approve {
             // Every approval attempt consumes the review, including mismatches.
             let pending = engine.pending.take().ok_or(StatusCode::CONFLICT)?;
