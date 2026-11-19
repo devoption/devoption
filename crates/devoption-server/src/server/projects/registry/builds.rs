@@ -29,10 +29,7 @@ impl Engine {
         self.root
             .verify()
             .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
-        let policy = self
-            .policy
-            .as_ref()
-            .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+        let policy = self.policy.ready()?;
         let bytes = self
             .root
             .public_archives(source.request())
@@ -90,9 +87,7 @@ impl Engine {
         prepared
             .vendor
             .revalidate(
-                self.policy
-                    .as_ref()
-                    .ok_or(StatusCode::SERVICE_UNAVAILABLE)?,
+                self.policy.ready()?,
                 self.owner,
                 catalog,
                 &self.candidates,

@@ -581,8 +581,8 @@ fn durable_policy_survives_controller_restart_and_pending_review_tokens_do_not()
 }
 
 #[test]
-fn recovery_routes_complete_the_exact_pending_revocation_after_restart() {
-    for linked in [false, true] {
+fn recovery_routes_complete_the_exact_pending_revocation_after_reopen_or_restart() {
+    for (linked, restart) in [(false, false), (true, false), (false, true), (true, true)] {
         let mut f = Fixture::new();
         f.publish();
         let token = f.prepare("{\"action\":\"readers\",\"readers\":[]}");
@@ -594,8 +594,19 @@ fn recovery_routes_complete_the_exact_pending_revocation_after_restart() {
         } else {
             fs::rename(&final_path, &pending).unwrap();
         }
-        f.restart().unwrap();
-        f.sign_in_fixture();
+        if restart {
+            f.restart().unwrap();
+            f.sign_in_fixture();
+        } else {
+            let catalog = f.projects.directory.load().unwrap().unwrap();
+            f.projects
+                .registry
+                .as_ref()
+                .unwrap()
+                .blocking_lock()
+                .reopen(&catalog)
+                .unwrap();
+        }
         assert_eq!(
             f.send("GET", &f.url(f.source, "status"), "").0,
             StatusCode::SERVICE_UNAVAILABLE
@@ -631,6 +642,73 @@ fn recovery_routes_complete_the_exact_pending_revocation_after_restart() {
         );
         assert_eq!(
             f.send("GET", &f.url(f.source, "index"), "").0,
+            StatusCode::OK
+        );
+    }
+}
+
+#[test]
+fn failed_reopen_does_not_enable_recovery_after_storage_becomes_available() {
+    for failure in ["locked", "corrupt", "binding"] {
+        let mut f = Fixture::new();
+        f.publish();
+        let catalog = f.projects.directory.load().unwrap().unwrap();
+        let policy = f.registry.join("policy");
+        let record = policy.join(format!("{:064x}.policy", 0));
+        let saved = fs::read(&record).unwrap();
+        {
+            let mut engine = f.projects.registry.as_ref().unwrap().blocking_lock();
+            engine.policy = Policy::Unavailable;
+            let binding = engine.root.binding.clone();
+            let other = if failure == "locked" {
+                Some(Publications::open(policy.to_str().unwrap(), engine.owner).unwrap())
+            } else {
+                None
+            };
+            if failure == "corrupt" {
+                fs::write(&record, b"corrupt policy").unwrap();
+            }
+            if failure == "binding" {
+                engine.root.binding = HostedRegistry::new(
+                    RegistryId::new("other").unwrap(),
+                    "sparse+https://other.example.test/index/",
+                )
+                .unwrap();
+            }
+            assert_eq!(
+                engine.reopen(&catalog),
+                Err(StatusCode::SERVICE_UNAVAILABLE),
+                "{failure}"
+            );
+            drop(other);
+            engine.root.binding = binding;
+        }
+        fs::write(&record, &saved).unwrap();
+        // A later filesystem change must not turn an unclassified open failure
+        // into recovery authority. Only fresh successful inspection can do that.
+        let pending = policy.join(".publication-policy.pending");
+        fs::rename(&record, &pending).unwrap();
+        let (status, headers, _) = f.send("POST", "/package-registry/recovery/prepare", "");
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{failure}");
+        assert_eq!(headers[CACHE_CONTROL], "no-store");
+        assert_eq!(
+            f.send("GET", &f.url(f.source, "status"), "").0,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert!(
+            f.projects
+                .registry
+                .as_ref()
+                .unwrap()
+                .blocking_lock()
+                .pending
+                .is_none()
+        );
+        assert_eq!(fs::read(&pending).unwrap(), saved);
+        f.restart().unwrap();
+        f.sign_in_fixture();
+        assert_eq!(
+            f.send("POST", "/package-registry/recovery/prepare", "").0,
             StatusCode::OK
         );
     }
@@ -884,7 +962,7 @@ fn complete_project_index_uses_the_existing_authenticated_admission_and_live_gra
     assert_eq!(f.send("GET", &path, "").0, StatusCode::NOT_FOUND);
     let source_path = path.replace(&hex(&f.consumer.to_bytes()), &hex(&f.source.to_bytes()));
     assert_eq!(f.send("GET", &source_path, "").0, StatusCode::OK);
-    f.projects.registry.as_ref().unwrap().blocking_lock().policy = None;
+    f.projects.registry.as_ref().unwrap().blocking_lock().policy = Policy::Unavailable;
     assert_eq!(
         f.send("GET", &source_path, "").0,
         StatusCode::SERVICE_UNAVAILABLE

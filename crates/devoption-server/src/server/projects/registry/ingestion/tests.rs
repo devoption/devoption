@@ -137,7 +137,7 @@ fn stage_reviews_are_single_use_bound_to_attempt_project_action_and_expiry() {
             .unwrap_err(),
         StatusCode::NOT_FOUND
     );
-    engine.policy = None;
+    engine.policy = Policy::Unavailable;
     assert_eq!(
         selected
             .operate(&mut engine, false, "", || true)

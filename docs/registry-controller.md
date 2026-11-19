@@ -262,8 +262,14 @@ status, or explicitly prepare recovery if the service is recovery-only.
 
 ## Recovery, validation and remaining work
 
-A failed write drops/reopens the ordinary policy handle only to observe current
-state; it does not repair it. While blocked, normal data/status calls return 503.
+After a native policy approval attempt, the controller drops/reopens the ordinary policy
+handle only to observe current state; it does not repair it. Recovery-only mode
+requires a fresh successful check of the complete pending decision and every
+registry binding, using the same checks as startup. Other reopen failures leave
+the policy unavailable: normal data/status and recovery preparation return 503,
+without issuing a recovery nonce. Stop the controller, inspect the retained
+storage and restart with verified inputs; reopening is not retried automatically.
+An approval response of 503 does not prove the decision failed to commit.
 The separate recovery preparation/approval uses the exact [fresh owner recovery
 contract](package-publication-policy.md#fresh-review-of-an-interrupted-decision),
 including complete prefix, candidate, current catalog, inode/link and capacity
@@ -274,8 +280,11 @@ Router tests cover complete publication/status/download/yank/revocation flow,
 preparation without access, owner/member/forged identity/origin/CSRF refusal,
 request bounds, stale/replayed/cross-project reviews, logout during body delivery,
 external writer exclusion, restart/nonces, config/permission/ancestry refusal and
-both complete recovery boundaries with a pending revocation. A real loopback HTTP
-fixture returns the exact approved archive to an owner and refuses anonymity.
+both complete recovery boundaries with a pending revocation after reopen or
+restart. Reopen lock contention, corrupt records and registry mismatches remain
+unavailable even if storage later becomes recoverable, until fresh inspection on
+restart. A real loopback HTTP fixture returns the exact approved archive to an
+owner and refuses anonymity.
 CLI process tests additionally exercise actual startup, owner sign-in, default
 disablement, opted-in controls and unsafe configuration refusal before listening.
 All use synthetic identities/source and disposable private directories. Native
