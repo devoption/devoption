@@ -70,15 +70,7 @@ def prepare(output, binary, runtime, caddy_archive):
         shutil.copyfile(original, output / name)
     (output / 'devoption').chmod(0o755)
     (output / 'devoption-runtime').chmod(0o755)
-    repository = output / 'repository'; repository.mkdir()
-    shutil.copyfile(ROOT / 'Cargo.toml', repository / 'Cargo.toml')
-    for directory in ('scripts', 'examples/systemd', 'examples/caddy', 'examples/static-site'):
-        target = repository / directory; target.mkdir(parents=True)
-        for path in (ROOT / directory).rglob('*'):
-            if path.is_file() and (directory != 'scripts' or path.suffix == '.py'):
-                destination = target / path.relative_to(ROOT / directory)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(path, destination)
+    copy_fixture_repository(output / 'repository')
     from prepare_build_config import verify_vendor
     verify_vendor(output / 'Cargo.lock', vendor, archives)
     metadata = {'source_commit': run('git', '-C', ROOT, 'rev-parse', 'HEAD').decode().strip(),
@@ -88,6 +80,19 @@ def prepare(output, binary, runtime, caddy_archive):
         metadata[key + '_sha256'] = run(binary, 'build-input-digest', output / key).decode().strip()
     (output / 'metadata.json').write_text(json.dumps(metadata))
     print('Prepared reviewed binaries, bounded toolchain, authenticated vendor tree and public fixture sources.', flush=True)
+
+
+def copy_fixture_repository(repository):
+    repository.mkdir()
+    shutil.copyfile(ROOT / 'Cargo.toml', repository / 'Cargo.toml')
+    for directory in ('scripts', 'examples/systemd', 'examples/caddy', 'examples/static-site'):
+        target = repository / directory; target.mkdir(parents=True)
+        for path in (ROOT / directory).rglob('*'):
+            if path.is_file() and (
+                    directory != 'scripts' or path.suffix == '.py' or path.name == 'ci_vm_packages.sh'):
+                destination = target / path.relative_to(ROOT / directory)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, destination)
 
 
 def require_guest():

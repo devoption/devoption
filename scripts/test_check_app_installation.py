@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from check_app_installation import CASES, IMAGE_SHA256, host, require_guest, validate_report, wait_with_progress
+from check_app_installation import CASES, IMAGE_SHA256, copy_fixture_repository, host, require_guest, validate_report, wait_with_progress
 
 
 def report():
@@ -29,6 +29,25 @@ class AppAcceptanceTests(unittest.TestCase):
                 candidate = dict(good, **{key: value})
                 with self.assertRaises(ValueError):
                     validate_report(candidate)
+
+    def test_prepared_repository_contains_the_exact_guest_package_helper(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / 'source'; source.mkdir()
+            (source / 'Cargo.toml').write_bytes(b'fixture manifest')
+            for directory in ('scripts', 'examples/systemd', 'examples/caddy', 'examples/static-site'):
+                (source / directory).mkdir(parents=True)
+            scripts = source / 'scripts'
+            helper = b'#!/usr/bin/env bash\nexit 0\n'
+            (scripts / 'ci_vm_packages.sh').write_bytes(helper)
+            (scripts / 'check_app_installation.py').write_bytes(b'fixture Python entrypoint')
+            (scripts / 'unrelated.sh').write_bytes(b'not a fixture input')
+            target = root / 'prepared/repository'; target.parent.mkdir()
+            with patch('check_app_installation.ROOT', source):
+                copy_fixture_repository(target)
+            self.assertEqual((target / 'scripts/ci_vm_packages.sh').read_bytes(), helper)
+            self.assertEqual((target / 'scripts/check_app_installation.py').read_bytes(), b'fixture Python entrypoint')
+            self.assertFalse((target / 'scripts/unrelated.sh').exists())
 
     def test_guest_mode_requires_all_explicit_opt_in_guards(self):
         with patch('check_app_installation.os.geteuid', return_value=1000):
