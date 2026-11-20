@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Use signed Ubuntu HTTPS sources and bounded package setup for CI VM tools and
+  installer prerequisites; prepare the guest package closure on the runner for
+  verified offline installation from an absolute VM-local archive cache,
+  include the helper in VM inputs and stream bounded guest serial progress
+  ([#443](https://github.com/devoption/devoption/issues/443)).
+
 - Keep registry policy reopen failures unavailable instead of enabling recovery;
   require validated pending decisions before issuing recovery reviews
   ([#418](https://github.com/devoption/devoption/issues/418)).
