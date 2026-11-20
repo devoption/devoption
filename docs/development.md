@@ -135,7 +135,13 @@ setup. CI downloads the full installer-guest prerequisite closure with an empty
 apt status file on the runner, without installing those packages there. The VM
 verifies the prepared checksums and installs local packages with `--no-download`;
 its serial output is streamed while acceptance runs. Manual rehearsals without
-prepared packages retain bounded guest acquisition.
+prepared packages retain bounded guest acquisition. The prepared closure includes
+the guest's version-coupled systemd/service family, and every install uses
+`--no-remove` to refuse removal plans before mutation. On Ubuntu, Python checks
+include a real apt solver simulation with synthetic old/new init and runtime
+packages, isolated status/cache/source paths and byte-preservation checks on the
+fixture status. The test verifies refusal of an incomplete upgrade and acceptance
+of a coherent one without removals.
 These bounds fail stalled setup promptly; they do not turn failed acceptance into
 a passing check.
 

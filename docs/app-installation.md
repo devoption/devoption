@@ -232,7 +232,12 @@ that new directory through `--guest-packages`; it copies the bounded `.deb` set
 and records SHA-256 checksums. The guest verifies those bytes and installs only
 local packages with `--no-download`, using absolute package paths and the VM's
 writable copied package directory as apt's archive cache. The original shared
-inputs remain read-only; compiler acquisition does not depend on guest networking. Missing dependencies or checksum mismatches fail acceptance.
+inputs remain read-only; compiler acquisition does not depend on guest networking.
+The prepared closure includes systemd, systemd-sysv, systemd-resolved,
+systemd-timesyncd, udev and libpam-systemd so library updates have matching service
+packages for the pinned image. Every package install uses `--no-remove`: an
+incompatible closure is refused before dpkg can remove existing guest packages.
+Missing dependencies or checksum mismatches also fail acceptance.
 
 When `--guest-packages` is omitted for a manual rehearsal, the guest acquires its
 prerequisites from signed Ubuntu HTTPS archives using the disposable-only

@@ -12,7 +12,13 @@ if [[ "$ID" != ubuntu || "${VERSION_CODENAME:-}" != noble ]]; then
 fi
 case "${1:-}" in
   vm-tools) packages=(qemu-system-x86 qemu-utils xorriso) ;;
-  installer-guest|installer-guest-download) packages=(git sudo build-essential) ;;
+  installer-guest) packages=(git sudo build-essential) ;;
+  installer-guest-download)
+    # libsystemd0 is part of the tool closure. Include matching service packages
+    # so a repository update cannot strand the pinned image's exact-version deps.
+    packages=(git sudo build-essential systemd systemd-sysv systemd-resolved
+      systemd-timesyncd udev libpam-systemd)
+    ;;
   installer-guest-offline)
     cd -- "${2:?Provide the prepared guest package directory.}"
     sha256sum --check --strict SHA256SUMS
@@ -24,7 +30,7 @@ case "${1:-}" in
     timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get \
       -o Dir::Etc::sourcelist=/dev/null -o 'Dir::Etc::sourceparts=-' \
       -o "Dir::Cache::archives=$PWD" \
-      --no-download install -y --no-install-recommends "${packages[@]}"
+      --no-download --no-remove install -y --no-install-recommends "${packages[@]}"
     exit
     ;;
   *) echo 'Select vm-tools, installer-guest, installer-guest-download or installer-guest-offline.' >&2; exit 1 ;;
@@ -59,4 +65,4 @@ if [[ "$1" == installer-guest-download ]]; then
     -o "Dir::Cache::archives=$destination")
   install_options=(--download-only)
 fi
-timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get "${options[@]}" "${install_options[@]}" install -y --no-install-recommends "${packages[@]}"
+timeout --kill-after=10s 150s env DEBIAN_FRONTEND=noninteractive apt-get "${options[@]}" "${install_options[@]}" --no-remove install -y --no-install-recommends "${packages[@]}"
