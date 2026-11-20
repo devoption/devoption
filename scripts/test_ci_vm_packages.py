@@ -64,7 +64,12 @@ sys.exit(1 if os.environ['VM_TEST_FAILURE'] in ('update', 'install') and os.envi
                 if len(commands) == 2:
                     self.assertEqual(commands[1]['args'][:2], ['--kill-after=10s', '150s'])
                     expected = ['qemu-system-x86', 'qemu-utils', 'xorriso'] if mode == 'vm-tools' else ['git', 'sudo', 'build-essential']
-                    self.assertEqual(commands[1]['args'][-3:], expected)
+                    if mode == 'installer-guest-download':
+                        expected += ['systemd', 'systemd-sysv', 'systemd-resolved',
+                                     'systemd-timesyncd', 'udev', 'libpam-systemd']
+                    args = commands[1]['args']
+                    self.assertEqual(args[args.index('--no-install-recommends') + 1:], expected)
+                    self.assertIn('--no-remove', args)
                     if mode == 'installer-guest-download':
                         args = commands[1]['args']
                         self.assertIn('--download-only', args)
@@ -97,6 +102,7 @@ sys.exit(1 if os.environ['VM_TEST_FAILURE'] in ('update', 'install') and os.envi
                 else:
                     args = log.read_text().splitlines()
                     self.assertIn('--no-download', args)
+                    self.assertIn('--no-remove', args)
                     self.assertIn('Dir::Etc::sourcelist=/dev/null', args)
                     self.assertIn(str(package), args)
                     self.assertIn('Dir::Cache::archives=' + str(root), args)

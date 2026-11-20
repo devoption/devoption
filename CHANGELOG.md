@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Include matching init/service packages in offline CI guest prerequisites and
+  refuse apt plans that remove installed packages when repository versions advance
+  ([#445](https://github.com/devoption/devoption/issues/445)).
+
 - Use signed Ubuntu HTTPS sources and bounded package setup for CI VM tools and
   installer prerequisites; prepare the guest package closure on the runner for
   verified offline installation from an absolute VM-local archive cache,
