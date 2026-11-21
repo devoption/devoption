@@ -206,6 +206,37 @@ fn codec_roundtrips_states_rejects_corruption_duplicates_and_trailing_bytes() {
     }
     assert!(codec::encode(&[base.clone(), base]).is_err());
 }
+
+#[test]
+fn codec_preserves_known_queued_cancellation_and_keeps_old_cancellations_ambiguous() {
+    let (_temp, _path, job) = fixture();
+    let mut record = Record::from_job(&job);
+    record.state = State::Cancelled;
+    record.completion = Some(1);
+    record.cleanup_confirmed = true;
+    for never_run in [false, true] {
+        record.cancelled_before_run = never_run;
+        let bytes = codec::encode(&[record.clone()]).unwrap();
+        assert_eq!(bytes[21 + 120], if never_run { 10 } else { 8 });
+        assert!(codec::decode(&bytes).unwrap() == vec![record.clone()]);
+    }
+    record.state = State::Interrupted;
+    assert!(codec::encode(&[record]).is_err());
+}
+
+#[test]
+fn missing_running_checkpoint_does_not_classify_started_cancellation_as_never_run() {
+    let (_temp, path, job) = fixture();
+    let mut store = History::open(&path).unwrap();
+    let mut job = store.queue(job.plan().clone()).unwrap();
+    job.apply(crate::jobs::RunnerEvent::observed(&job, State::Running))
+        .unwrap();
+    // Simulate a failed running checkpoint; persisted state is still Queued.
+    job.apply(crate::jobs::RunnerEvent::observed(&job, State::Cancelled))
+        .unwrap();
+    store.record(&job).unwrap();
+    assert!(!store.load().unwrap()[0].cancelled_before_run);
+}
 #[test]
 fn recovery_preserves_completed_claims_and_interrupts_running() {
     let (_temp, path, job) = fixture();

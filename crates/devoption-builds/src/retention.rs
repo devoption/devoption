@@ -41,6 +41,8 @@ pub struct Attempt<'a> {
     pub completion: Option<u64>,
     /// Explicit process reconciliation, especially after lost supervision.
     pub cleanup_confirmed: bool,
+    /// Verified queued-to-cancelled transition; false for unknown prior history.
+    pub cancelled_before_run: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,8 +61,9 @@ pub struct Plan {
     pub retained: Vec<(JobId, KeepReason)>,
 }
 
-/// Count all terminal outcomes toward the newest-N window. Older protected
-/// attempts are retained in addition to that window, rather than consuming it.
+/// Count terminal outcomes except never-run cancellations toward the newest-N
+/// window. Never-run cancellations remain subject to all protection checks.
+/// Older protected attempts are retained in addition to that window.
 /// `references` must include every saved release (including rollback evidence)
 /// and active promotion. Unknown references and ambiguous input fail closed.
 ///
@@ -76,6 +79,9 @@ pub fn plan(
     let mut ids = HashSet::new();
     let mut completions = HashSet::new();
     for attempt in attempts {
+        if attempt.cancelled_before_run && *attempt.state != State::Cancelled {
+            return Err(Error::InvalidSnapshot);
+        }
         if !ids.insert(attempt.id) {
             return Err(Error::InvalidSnapshot);
         }
@@ -98,6 +104,7 @@ pub fn plan(
     let newest: HashSet<_> = terminal
         .iter()
         .rev()
+        .filter(|attempt| !attempt.cancelled_before_run)
         .take(usize::from(policy.count()))
         .map(|attempt| attempt.id)
         .collect();

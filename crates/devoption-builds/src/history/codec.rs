@@ -43,7 +43,15 @@ pub(super) fn encode_with_watermark(records: &[Record], watermark: u64) -> Resul
         bytes.extend(r.repository);
         bytes.extend(r.commit.as_bytes());
         bytes.extend(r.source);
-        bytes.push(state_tag(&r.state));
+        if r.cancelled_before_run && r.state != State::Cancelled {
+            return Err(Error::Corrupt);
+        }
+        // Tag 8 remains conservative for historical/started cancellations.
+        bytes.push(if r.cancelled_before_run {
+            10
+        } else {
+            state_tag(&r.state)
+        });
         if let State::Succeeded(a) = &r.state {
             bytes.extend(a.sha256().bytes());
             bytes.extend(a.bytes().to_be_bytes());
@@ -124,6 +132,7 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
             6 => State::Failed(Failure::Terminated),
             7 => State::Failed(Failure::ArtifactRejected),
             8 => State::Cancelled,
+            10 if !legacy => State::Cancelled,
             9 => State::Interrupted,
             _ => return Err(Error::Corrupt),
         };
@@ -164,6 +173,7 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
             state,
             completion,
             cleanup_confirmed,
+            cancelled_before_run: !legacy && r[120] == 10,
         });
     }
     if !legacy {

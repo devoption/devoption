@@ -111,6 +111,7 @@ pub struct BuildJob {
     id: JobId,
     plan: BuildPlan,
     state: State,
+    cancelled_before_run: bool,
 }
 
 impl RunnerEvent {
@@ -129,6 +130,7 @@ impl BuildJob {
             id,
             plan,
             state: State::Queued,
+            cancelled_before_run: false,
         }
     }
 
@@ -141,6 +143,7 @@ impl BuildJob {
             id,
             plan,
             state: State::Interrupted,
+            cancelled_before_run: false,
         }
     }
 
@@ -167,6 +170,10 @@ impl BuildJob {
         &self.state
     }
 
+    pub(crate) fn cancelled_before_run(&self) -> bool {
+        self.cancelled_before_run
+    }
+
     /// Cancel an attempt that has not started. A running job requires a runner's
     /// confirmed cancellation/cleanup event; a request alone cannot mark it stopped.
     pub fn cancel_queued(&mut self) -> Result<(), Error> {
@@ -174,6 +181,7 @@ impl BuildJob {
             return Err(Error::InvalidTransition);
         }
         self.state = State::Cancelled;
+        self.cancelled_before_run = true;
         Ok(())
     }
 
@@ -200,6 +208,7 @@ impl BuildJob {
         if !allowed {
             return Err(Error::InvalidTransition);
         }
+        self.cancelled_before_run = self.state == State::Queued && event.state == State::Cancelled;
         self.state = event.state;
         Ok(())
     }
