@@ -73,7 +73,11 @@ that history directory, separately for each stable project identity. History mus
 be explicitly configured; unavailable storage cannot be treated as a saved policy.
 Saving explains cleanup and exceptions before the action. Members cannot change it.
 
-All terminal outcomes count, including failed, cancelled and interrupted attempts.
+Terminal outcomes count, including failed, interrupted and started-then-cancelled
+attempts. A recorded queued-to-cancelled transition does not consume a slot: its
+staging and output are eligible for normal audited cleanup even below the limit,
+subject to the same reference and confirmed-cleanup protections. Older cancelled
+records without that transition evidence conservatively continue to count.
 A durable increasing completion sequence orders transitions; input row order and
 wall-clock timestamps do not determine new completions. The newest N are retained.
 Older queued/running attempts, unconfirmed process cleanup, active promotion and
@@ -157,7 +161,9 @@ bytes. Version 1 with its one-byte count and 161-byte records remains readable. 
 - Exact commit: 40 lowercase ASCII hex bytes, nonzero.
 - Source snapshot digest: 32 bytes.
 - State tag: one byte (Queued 0, Running 1, Succeeded 2, preparation/exit/timeout/
-  terminated/artifact failures 3–7, Cancelled 8, Interrupted 9).
+  terminated/artifact failures 3–7, Cancelled 8, Interrupted 9, and version-2
+  queued-to-cancelled 10). Tag 8 does not establish whether execution started.
+  Older readers refuse the new tag; downgrading requires compatible software.
 - Artifact digest and big-endian size: 32 and 8 bytes. Non-success states require
   all zeros; success requires 1 byte–4 MiB. These are metadata claims, not artifact proof.
 

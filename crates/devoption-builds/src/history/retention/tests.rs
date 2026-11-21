@@ -33,10 +33,80 @@ fn stage(
 }
 
 fn cancel(store: &mut History, job: &mut BuildJob) {
-    job.cancel_queued().unwrap();
+    // Existing retention fixtures represent attempts that actually started.
+    job.apply(crate::jobs::RunnerEvent::observed(job, State::Running))
+        .unwrap();
+    store.record(job).unwrap();
+    job.apply(crate::jobs::RunnerEvent::observed(job, State::Cancelled))
+        .unwrap();
     let mut output = crate::output::BuildOutput::for_plan(job.plan()).unwrap();
     output.append(crate::output::Stream::Stderr, b"compiler output");
     store.checkpoint(job, &output).unwrap();
+}
+
+#[test]
+fn discarded_reviews_preserve_success_and_are_audited_after_restart() {
+    let (dir, work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    store
+        .set_retention_policy(project, Policy::new(1).unwrap())
+        .unwrap();
+    let (mut successful, successful_path) = stage(&mut store, work.path(), plan.clone(), 1);
+    successful
+        .apply(crate::jobs::RunnerEvent::observed(
+            &successful,
+            State::Running,
+        ))
+        .unwrap();
+    store.record(&successful).unwrap();
+    let artifact =
+        crate::jobs::ArtifactMetadata::new(devoption_registry::Sha256::digest(b"fixture"), 7)
+            .unwrap();
+    successful
+        .apply(crate::jobs::RunnerEvent::observed(
+            &successful,
+            State::Succeeded(artifact),
+        ))
+        .unwrap();
+    store.record(&successful).unwrap();
+    let successful_bytes = std::fs::read(successful_path.join("artifact/bytes")).unwrap();
+    let mut discarded = Vec::new();
+    for n in 2..=4 {
+        let (mut job, path) = stage(&mut store, work.path(), plan.clone(), n);
+        job.cancel_queued().unwrap();
+        let output = crate::output::BuildOutput::for_plan(job.plan()).unwrap();
+        store.checkpoint(&job, &output).unwrap();
+        store.record(&job).unwrap(); // Idempotent observations preserve the distinction.
+        discarded.push((job.id(), path));
+    }
+    drop(store);
+    let mut store = History::open(dir.path().to_str().unwrap()).unwrap();
+    // Even a never-run cancellation stays protected while referenced.
+    let protected = discarded[0].0;
+    let status = store
+        .reconcile_retention(project, Some(work.path()), || Ok(vec![protected]))
+        .unwrap();
+    assert!(!status.failed);
+    assert_eq!(
+        (status.retained, status.protected, status.removed),
+        (Some(2), Some(1), 2)
+    );
+    assert!(discarded[0].1.exists());
+    let status = store
+        .reconcile_retention(project, Some(work.path()), || Ok(vec![]))
+        .unwrap();
+    assert!(!status.failed);
+    assert_eq!((status.retained, status.removed), (Some(1), 1));
+    assert_eq!(store.load().unwrap()[0].id(), successful.id());
+    assert_eq!(
+        std::fs::read(successful_path.join("artifact/bytes")).unwrap(),
+        successful_bytes
+    );
+    for (id, path) in discarded {
+        assert!(!path.exists());
+        assert!(store.audit_exists(id).unwrap());
+        assert!(store.load_output(id).is_err());
+    }
 }
 
 #[test]

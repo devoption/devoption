@@ -17,6 +17,7 @@ fn attempt(sequence: u64, state: &State) -> Attempt<'_> {
         state,
         completion: Some(sequence),
         cleanup_confirmed: true,
+        cancelled_before_run: false,
     }
 }
 
@@ -29,6 +30,36 @@ fn limits_are_positive_bounded_and_default_to_ten() {
     for count in [0, MAX_RETAINED + 1, u16::MAX] {
         assert_eq!(Policy::new(count), Err(Error::InvalidLimit));
     }
+}
+
+#[test]
+fn never_run_cancellations_skip_window_but_keep_safety_protections() {
+    let mut attempts: Vec<_> = (1..=5).map(|i| attempt(i, &State::Cancelled)).collect();
+    for attempt in &mut attempts[1..] {
+        attempt.cancelled_before_run = true;
+    }
+    attempts[2].cleanup_confirmed = false;
+    let result = plan(project(1), Policy::new(1).unwrap(), &attempts, &[id(4)]).unwrap();
+    assert_eq!(result.candidates, [id(2), id(5)]);
+    assert_eq!(
+        result.retained,
+        [
+            (id(1), KeepReason::Newest),
+            (id(3), KeepReason::CleanupUnconfirmed),
+            (id(4), KeepReason::Referenced),
+        ]
+    );
+    assert_eq!(
+        plan(project(1), Policy::default(), &attempts[1..2], &[])
+            .unwrap()
+            .candidates,
+        [id(2)]
+    );
+    attempts[1].state = &State::Interrupted;
+    assert_eq!(
+        plan(project(1), Policy::default(), &attempts, &[]),
+        Err(Error::InvalidSnapshot)
+    );
 }
 
 #[test]

@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Exclude recorded never-run cancelled reviews from build retention slots while
+  preserving reference protection, audited cleanup and older ambiguous records
+  ([#412](https://github.com/devoption/devoption/issues/412)).
+
 - Include matching init/service packages in offline CI guest prerequisites and
   refuse apt plans that remove installed packages when repository versions advance
   ([#445](https://github.com/devoption/devoption/issues/445)).

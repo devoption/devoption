@@ -257,6 +257,7 @@ impl History {
                 state: &r.state,
                 completion: r.completion,
                 cleanup_confirmed: r.cleanup_confirmed,
+                cancelled_before_run: r.cancelled_before_run,
             })
             .collect();
         let refs = references()?;

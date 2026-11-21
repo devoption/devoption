@@ -44,6 +44,7 @@ pub struct Record {
     state: State,
     completion: Option<u64>,
     cleanup_confirmed: bool,
+    cancelled_before_run: bool,
 }
 impl Record {
     fn from_job(job: &BuildJob) -> Self {
@@ -57,6 +58,7 @@ impl Record {
             state: job.state().clone(),
             completion: None,
             cleanup_confirmed: false,
+            cancelled_before_run: false,
         }
     }
     pub fn id(&self) -> JobId {
@@ -276,6 +278,7 @@ impl History {
         }
         next.completion = old.completion;
         next.cleanup_confirmed = old.cleanup_confirmed;
+        next.cancelled_before_run = old.cancelled_before_run;
         if *old == next {
             return Ok(());
         }
@@ -283,6 +286,7 @@ impl History {
             return Err(Error::Transition);
         }
         if terminal(&next.state) {
+            next.cancelled_before_run = old.state == State::Queued && job.cancelled_before_run();
             next.completion = Some(self.watermark()?.checked_add(1).ok_or(Error::Capacity)?);
             // Interrupted never proves process termination. Other runner terminal
             // events require cleanup; queued cancellation has no child to stop.

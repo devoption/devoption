@@ -535,7 +535,14 @@ mod tests {
             devoption_projects::ProjectId::from_bytes(f.history.load().unwrap()[0].project);
         let project = plan.details().project;
         let mut newer = f.history.queue(plan).unwrap();
-        newer.cancel_queued().unwrap();
+        // A discarded review cannot displace the original successful package.
+        newer
+            .apply(RunnerEvent::observed(&newer, State::Running))
+            .unwrap();
+        f.history.record(&newer).unwrap();
+        newer
+            .apply(RunnerEvent::observed(&newer, State::Cancelled))
+            .unwrap();
         f.history.record(&newer).unwrap();
         f.history
             .set_retention_policy(project, crate::retention::Policy::new(1).unwrap())
