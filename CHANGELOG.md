@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Read build retention release references once per reconciliation, batch history
+  compaction into a single snapshot publication after file removal, and scope
+  post-build and replaced-review cleanup to the affected project
+  ([#409](https://github.com/devoption/devoption/issues/409)).
+
 - Include supported `rlib` libraries in the source snapshot unsupported-target
   message ([#414](https://github.com/devoption/devoption/issues/414)).
 

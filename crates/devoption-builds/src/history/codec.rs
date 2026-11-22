@@ -189,9 +189,9 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Vec<Record>, Error> {
     Ok(records)
 }
 
-pub(super) fn watermark(bytes: &[u8]) -> Result<u64, Error> {
+pub(super) fn decode_with_watermark(bytes: &[u8]) -> Result<(Vec<Record>, u64), Error> {
     let records = decode(bytes)?;
-    Ok(if bytes[8] == 1 {
+    let watermark = if bytes[8] == 1 {
         records
             .iter()
             .filter_map(|r| r.completion)
@@ -199,5 +199,10 @@ pub(super) fn watermark(bytes: &[u8]) -> Result<u64, Error> {
             .unwrap_or(0)
     } else {
         u64::from_be_bytes(bytes[13..21].try_into().unwrap())
-    })
+    };
+    Ok((records, watermark))
+}
+
+pub(super) fn watermark(bytes: &[u8]) -> Result<u64, Error> {
+    Ok(decode_with_watermark(bytes)?.1)
 }

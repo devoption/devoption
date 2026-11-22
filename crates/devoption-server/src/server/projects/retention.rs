@@ -33,20 +33,37 @@ pub(super) fn reconcile(
     catalog: &Catalog,
     selected: Option<ProjectId>,
 ) {
-    let lock = config.map(Configuration::retention_lock).transpose();
-    for project in catalog
+    reconcile_with(history, config, catalog, selected, release_references);
+}
+
+fn reconcile_with(
+    history: &mut History,
+    config: Option<&Configuration>,
+    catalog: &Catalog,
+    selected: Option<ProjectId>,
+    references: impl FnOnce() -> Result<Vec<JobId>, devoption_builds::history::Error>,
+) {
+    let projects: Vec<_> = catalog
         .projects()
         .iter()
         .filter(|p| selected.is_none_or(|id| p.id() == id))
-    {
-        let result = if lock.is_ok() {
-            history.reconcile_retention(
+        .collect();
+    if projects.is_empty() {
+        return;
+    }
+    let lock = config.map(Configuration::retention_lock).transpose();
+    let refs = match &lock {
+        Ok(_) => references(),
+        Err(_) => Err(devoption_builds::history::Error::Unavailable),
+    };
+    for project in projects {
+        let result = match &refs {
+            Ok(refs) => history.reconcile_retention(
                 project.id(),
                 config.map(Configuration::work_root),
-                release_references,
-            )
-        } else {
-            Err(devoption_builds::history::Error::Unavailable)
+                || Ok(refs.clone()),
+            ),
+            Err(error) => Err(*error),
         };
         let status = result.unwrap_or_else(|_| RetentionStatus {
             failed: true,
@@ -69,7 +86,7 @@ pub(super) fn reconcile(
     }
 }
 
-pub(in crate::server) async fn reconcile_projects(projects: Projects) {
+pub(in crate::server) async fn reconcile_projects(projects: Projects, selected: Option<ProjectId>) {
     let engine = match projects.execution.clone() {
         Some(e) => Some(e.lock_owned().await),
         None => None,
@@ -88,7 +105,7 @@ pub(in crate::server) async fn reconcile_projects(projects: Projects) {
                 &mut history,
                 engine.as_ref().map(|e| &e.config),
                 &catalog,
-                None,
+                selected,
             );
         }
     })
@@ -215,5 +232,66 @@ pub(super) async fn show(projects: Projects, id: ProjectId) -> axum::response::R
             [(CACHE_CONTROL, "no-store")],
         )
             .into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn reconcile_reads_references_once_across_projects_and_respects_selection() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().canonicalize().unwrap().join("history");
+        std::fs::create_dir(&path).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let mut history = History::open(path.to_str().unwrap()).unwrap();
+        let mut catalog = Catalog::default();
+        let first = catalog.create_project("First").unwrap();
+        let second = catalog.create_project("Second").unwrap();
+        let third = catalog.create_project("Third").unwrap();
+
+        let mut calls = 0;
+        reconcile_with(&mut history, None, &catalog, None, || {
+            calls += 1;
+            Ok(Vec::new())
+        });
+        assert_eq!(calls, 1);
+        for project in [first, second, third] {
+            assert_eq!(
+                history.retention_status(project).unwrap(),
+                Some(RetentionStatus {
+                    retained: Some(0),
+                    protected: Some(0),
+                    ..Default::default()
+                })
+            );
+        }
+
+        // Selecting an unknown project skips reference lookup entirely.
+        let mut skipped_calls = 0;
+        reconcile_with(
+            &mut history,
+            None,
+            &catalog,
+            Some(ProjectId::from_bytes([0xff; 16])),
+            || {
+                skipped_calls += 1;
+                Ok(Vec::new())
+            },
+        );
+        assert_eq!(skipped_calls, 0);
+
+        // Selecting one project updates only that project's status.
+        let mut selected_calls = 0;
+        reconcile_with(&mut history, None, &catalog, Some(second), || {
+            selected_calls += 1;
+            Err(devoption_builds::history::Error::Unavailable)
+        });
+        assert_eq!(selected_calls, 1);
+        assert!(!history.retention_status(first).unwrap().unwrap().failed);
+        assert!(history.retention_status(second).unwrap().unwrap().failed);
+        assert!(!history.retention_status(third).unwrap().unwrap().failed);
     }
 }
