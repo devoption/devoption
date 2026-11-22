@@ -7,6 +7,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Include supported `rlib` libraries in the source snapshot unsupported-target
+  message ([#414](https://github.com/devoption/devoption/issues/414)).
+
 - Exclude recorded never-run cancelled reviews from build retention slots while
   preserving reference protection, audited cleanup and older ambiguous records
   ([#412](https://github.com/devoption/devoption/issues/412)).

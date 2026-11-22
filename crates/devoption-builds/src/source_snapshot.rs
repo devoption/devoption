@@ -363,7 +363,7 @@ impl fmt::Display for Error {
             Self::DuplicateObject => "source snapshot supplies a duplicate object",
             Self::ExtraObject => "source snapshot supplies an unreferenced object",
             Self::UnsupportedTarget => {
-                "source snapshot requires one standalone conventional Rust binary or cdylib"
+                "source snapshot requires one standalone conventional Rust binary, cdylib or rlib"
             }
             Self::UnsupportedMode => "source snapshot supports only regular non-executable files",
             Self::EmptyTree => "source snapshot contains an empty tree",
