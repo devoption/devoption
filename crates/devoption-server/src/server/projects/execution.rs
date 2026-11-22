@@ -17,6 +17,11 @@ type Admission = (
     Option<tokio::sync::OwnedMutexGuard<super::registry::Engine>>,
 );
 
+enum ActionOutcome {
+    Approved(Box<Admission>),
+    Prepared { discarded: Option<ProjectId> },
+}
+
 pub(super) struct Engine {
     pub(super) config: Configuration,
     owner: OwnerId,
@@ -279,7 +284,7 @@ async fn action(
     };
     let catalog_guard = projects.gate.clone().lock_owned().await;
     let cleanup_projects = projects.clone();
-    let result = tokio::task::spawn_blocking(move || -> Result<Option<Admission>, StatusCode> {
+    let result = tokio::task::spawn_blocking(move || -> Result<ActionOutcome, StatusCode> {
         let _catalog_guard = catalog_guard;
         if registry_guard.is_some()
             && projects
@@ -362,7 +367,7 @@ async fn action(
             engine_guard.dependencies = None;
             engine_guard.active = Some((project, repository));
             engine_guard.cancel = Arc::new(AtomicBool::new(false));
-            Ok(Some((
+            Ok(ActionOutcome::Approved(Box::new((
                 review,
                 source,
                 engine_guard.owner,
@@ -372,8 +377,12 @@ async fn action(
                 Approvals::default(),
                 engine_guard.cancel.clone(),
                 registry_guard,
-            )))
+            ))))
         } else {
+            let discarded = engine_guard
+                .pending
+                .as_ref()
+                .map(|previous| previous.job.plan().details().project);
             if let Some(previous) = engine_guard.pending.take() {
                 previous
                     .discard(&mut history_guard)
@@ -415,12 +424,13 @@ async fn action(
             })?;
             engine_guard.dependencies = dependencies;
             engine_guard.pending = Some(review);
-            Ok(None)
+            Ok(ActionOutcome::Prepared { discarded })
         }
     })
     .await;
     match result {
-        Ok(Ok(Some((review, source, owner, approvals, cancel, mut registry_guard)))) => {
+        Ok(Ok(ActionOutcome::Approved(admission))) => {
+            let (review, source, owner, approvals, cancel, mut registry_guard) = *admission;
             tokio::task::spawn_blocking(move || {
                 let result = devoption_builds::execution::execute(
                     review,
@@ -441,7 +451,12 @@ async fn action(
                 let mut history = history.blocking_lock();
                 let _gate = cleanup_projects.gate.blocking_lock();
                 if let Ok(Some(catalog)) = cleanup_projects.directory.load() {
-                    super::retention::reconcile(&mut history, Some(&engine.config), &catalog, None);
+                    super::retention::reconcile(
+                        &mut history,
+                        Some(&engine.config),
+                        &catalog,
+                        Some(project),
+                    );
                 }
                 engine.active = None;
                 if let Err(error) = &result {
@@ -451,8 +466,10 @@ async fn action(
             });
             StatusCode::ACCEPTED.into_response()
         }
-        Ok(Ok(None)) => {
-            super::retention::reconcile_projects(cleanup_projects).await;
+        Ok(Ok(ActionOutcome::Prepared { discarded })) => {
+            if let Some(discarded) = discarded {
+                super::retention::reconcile_projects(cleanup_projects, Some(discarded)).await;
+            }
             StatusCode::NO_CONTENT.into_response()
         }
         Ok(Err(status)) => failure(status),

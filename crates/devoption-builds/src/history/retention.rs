@@ -238,17 +238,31 @@ impl History {
         self.publish(&records)
     }
 
-    /// Owns no release store. `references` must freshly observe every saved
-    /// release under a cross-process promotion/cleanup lock held by the caller.
-    /// Each candidate is rechecked immediately before removal. Pending work stays
-    /// in history until all owned files are removed, so restart retries it.
+    /// Owns no release store. `references` is observed once per reconciliation
+    /// and must freshly observe every saved release under a cross-process
+    /// promotion/cleanup lock held by the caller for the entire call. Pending
+    /// work stays in history until removed candidates' owned files are deleted
+    /// and the compacted snapshot is published once, so restart retries it.
     pub fn reconcile_retention(
         &mut self,
         project: ProjectId,
         work: Option<&Path>,
-        mut references: impl FnMut() -> Result<Vec<JobId>, Error>,
+        references: impl FnOnce() -> Result<Vec<JobId>, Error>,
     ) -> Result<RetentionStatus, Error> {
-        let records = self.load()?;
+        self.reconcile_retention_using(project, work, references, |f, b| f.write_all(b))
+    }
+
+    fn reconcile_retention_using(
+        &mut self,
+        project: ProjectId,
+        work: Option<&Path>,
+        references: impl FnOnce() -> Result<Vec<JobId>, Error>,
+        publish_history: impl FnOnce(&mut File, &[u8]) -> io::Result<()>,
+    ) -> Result<RetentionStatus, Error> {
+        let (mut records, watermark) = match self.read_snapshot(RECORD, codec::MAX_BYTES)? {
+            Some(bytes) => codec::decode_with_watermark(&bytes)?,
+            None => (Vec::new(), 0),
+        };
         let attempts: Vec<_> = records
             .iter()
             .map(|r| Attempt {
@@ -273,16 +287,26 @@ impl History {
             ),
             ..Default::default()
         };
+        if plan.candidates.is_empty() {
+            return Ok(status);
+        }
+        let index: std::collections::HashMap<JobId, usize> = records
+            .iter()
+            .enumerate()
+            .map(|(i, record)| (record.id, i))
+            .collect();
+        let mut pruned = std::collections::HashSet::new();
+        let mut reclaimed_bytes: u64 = 0;
+        let mut unlinked_root: Option<File> = None;
+        let mut unlinked_output = false;
         for id in plan.candidates {
-            if references()?.contains(&id) {
-                status.retained = status.retained.map(|count| count + 1);
-                status.protected = status.protected.map(|count| count + 1);
-                continue;
-            }
-            match self.prune(id, work) {
+            let result = index.get(&id).ok_or(Error::UnknownAttempt).and_then(|&i| {
+                self.prune_files(&records[i], work, &mut unlinked_root, &mut unlinked_output)
+            });
+            match result {
                 Ok(bytes) => {
-                    status.removed += 1;
-                    status.reclaimed_bytes = status.reclaimed_bytes.saturating_add(bytes);
+                    pruned.insert(id);
+                    reclaimed_bytes = reclaimed_bytes.saturating_add(bytes);
                 }
                 Err(_) => {
                     status.failed = true;
@@ -290,15 +314,48 @@ impl History {
                 }
             }
         }
+        if !pruned.is_empty() {
+            records.retain(|r| !pruned.contains(&r.id));
+            let commit = (|| -> Result<(), Error> {
+                if let Some(root) = unlinked_root {
+                    root.sync_all().map_err(|_| Error::Unavailable)?;
+                }
+                if unlinked_output {
+                    self.directory.sync_all().map_err(|_| Error::Unavailable)?;
+                }
+                // Publish removal once after all pruned files are unlinked.
+                // Audit and owned-path bindings remain as compact durable
+                // metadata, preserving ID non-reuse and interruption evidence.
+                let snapshot = codec::encode_with_watermark(&records, watermark)?;
+                self.publish_retention_snapshot(
+                    RECORD,
+                    &snapshot,
+                    codec::MAX_BYTES,
+                    publish_history,
+                )
+            })();
+            match commit {
+                Ok(()) => {
+                    status.removed = pruned.len();
+                    status.reclaimed_bytes = reclaimed_bytes;
+                }
+                Err(_) => {
+                    status.failed = true;
+                    status.retained = status.retained.map(|count| count + pruned.len());
+                }
+            }
+        }
         Ok(status)
     }
 
-    fn prune(&mut self, id: JobId, work: Option<&Path>) -> Result<u64, Error> {
-        let mut records = self.load()?;
-        let record = records
-            .iter()
-            .find(|r| r.id == id)
-            .ok_or(Error::UnknownAttempt)?;
+    fn prune_files(
+        &mut self,
+        record: &Record,
+        work: Option<&Path>,
+        unlinked_root: &mut Option<File>,
+        unlinked_output: &mut bool,
+    ) -> Result<u64, Error> {
+        let id = record.id;
         if !terminal(&record.state) || !record.cleanup_confirmed {
             return Err(Error::Transition);
         }
@@ -349,7 +406,7 @@ impl History {
                     bytes += remove_contents(&job, self.uid, identity(&job)?.0, 0)?;
                     same_child(&root, name, &job)?;
                     unlinkat(&root, name, AtFlags::REMOVEDIR).map_err(|_| Error::Unavailable)?;
-                    root.sync_all().map_err(|_| Error::Unavailable)?;
+                    *unlinked_root = Some(root);
                 }
                 Err(rustix::io::Errno::NOENT) => {} // prior interrupted removal
                 Err(_) => return Err(Error::Unsafe),
@@ -368,15 +425,8 @@ impl History {
             bytes += data.len() as u64;
             unlinkat(&self.directory, output.as_str(), AtFlags::empty())
                 .map_err(|_| Error::Unavailable)?;
-            self.directory.sync_all().map_err(|_| Error::Unavailable)?;
+            *unlinked_output = true;
         }
-        // Publish removal last. Audit and owned-path binding remain as compact
-        // durable metadata, preserving ID non-reuse and interruption evidence.
-        records.retain(|r| r.id != id);
-        let snapshot = codec::encode_with_watermark(&records, self.watermark()?)?;
-        self.publish_retention_snapshot(RECORD, &snapshot, codec::MAX_BYTES, |f, b| {
-            f.write_all(b)
-        })?;
         Ok(bytes)
     }
 }

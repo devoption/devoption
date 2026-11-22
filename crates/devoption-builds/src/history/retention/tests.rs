@@ -323,7 +323,7 @@ fn partial_retention_publication_is_retryable_without_resetting_history() {
 }
 
 #[test]
-fn references_are_rechecked_before_deletion_and_changed_directories_are_refused() {
+fn references_are_read_once_and_changed_directories_are_refused() {
     let (_dir, work, mut store, plan) = fixture();
     let project = plan.details().project;
     let (mut old, path) = stage(&mut store, work.path(), plan.clone(), 1);
@@ -337,10 +337,10 @@ fn references_are_rechecked_before_deletion_and_changed_directories_are_refused(
     let status = store
         .reconcile_retention(project, Some(work.path()), || {
             calls += 1;
-            Ok(if calls == 1 { vec![] } else { vec![old.id()] })
+            Ok(vec![old.id()])
         })
         .unwrap();
-    assert_eq!(calls, 2);
+    assert_eq!(calls, 1);
     assert_eq!((status.removed, status.protected), (0, Some(1)));
     assert!(path.join("artifact/bytes").exists());
     let preserved = path.with_extension("preserved");
@@ -355,6 +355,160 @@ fn references_are_rechecked_before_deletion_and_changed_directories_are_refused(
     assert_eq!(status.reclaimed_bytes, 0);
     assert_eq!(std::fs::read(path.join("unrelated")).unwrap(), b"preserve");
     assert!(preserved.join("artifact/bytes").exists());
+}
+
+#[test]
+fn multi_candidate_reconcile_reads_references_and_compacts_history_once() {
+    let (_dir, work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    let mut staged = Vec::new();
+    for n in 1..=15 {
+        let (mut job, path) = stage(&mut store, work.path(), plan.clone(), n);
+        cancel(&mut store, &mut job);
+        staged.push((job.id(), path));
+    }
+    let watermark_before = store.watermark().unwrap();
+    store
+        .set_retention_policy(project, Policy::new(1).unwrap())
+        .unwrap();
+    let mut reference_calls = 0;
+    let mut history_publishes = 0;
+    let status = store
+        .reconcile_retention_using(
+            project,
+            Some(work.path()),
+            || {
+                reference_calls += 1;
+                Ok(vec![])
+            },
+            |f, b| {
+                history_publishes += 1;
+                f.write_all(b)
+            },
+        )
+        .unwrap();
+    assert_eq!(reference_calls, 1);
+    assert_eq!(history_publishes, 1);
+    assert!(!status.failed);
+    assert_eq!(
+        (status.retained, status.protected, status.removed),
+        (Some(1), Some(0), 14)
+    );
+    assert!(status.reclaimed_bytes >= 14 * 6 * 4096);
+    assert_eq!(store.watermark().unwrap(), watermark_before);
+    let remaining = store.load().unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].id(), staged[14].0);
+    for (id, path) in &staged[..14] {
+        assert!(!path.exists());
+        assert!(store.audit_exists(*id).unwrap());
+    }
+    assert!(staged[14].1.exists());
+    // Follow-up reconcile with no candidates does not rewrite history.
+    let mut follow_up_publishes = 0;
+    let follow_up = store
+        .reconcile_retention_using(
+            project,
+            Some(work.path()),
+            || Ok(vec![]),
+            |f, b| {
+                follow_up_publishes += 1;
+                f.write_all(b)
+            },
+        )
+        .unwrap();
+    assert_eq!(follow_up_publishes, 0);
+    assert!(!follow_up.failed);
+    assert_eq!((follow_up.retained, follow_up.removed), (Some(1), 0));
+}
+
+#[test]
+fn partial_failure_compacts_only_pruned_candidates_once() {
+    let (_dir, work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    let mut staged = Vec::new();
+    for n in 1..=5 {
+        let (mut job, path) = stage(&mut store, work.path(), plan.clone(), n);
+        cancel(&mut store, &mut job);
+        staged.push((job.id(), path));
+    }
+    let external = tempfile::NamedTempFile::new().unwrap();
+    symlink(external.path(), staged[1].1.join("source/link")).unwrap();
+    store
+        .set_retention_policy(project, Policy::new(1).unwrap())
+        .unwrap();
+    let mut history_publishes = 0;
+    let status = store
+        .reconcile_retention_using(
+            project,
+            Some(work.path()),
+            || Ok(vec![]),
+            |f, b| {
+                history_publishes += 1;
+                f.write_all(b)
+            },
+        )
+        .unwrap();
+    assert_eq!(history_publishes, 1);
+    assert!(status.failed);
+    assert_eq!(
+        (status.retained, status.protected, status.removed),
+        (Some(2), Some(0), 3)
+    );
+    let ids: Vec<_> = store.load().unwrap().into_iter().map(|r| r.id()).collect();
+    assert_eq!(ids, vec![staged[1].0, staged[4].0]);
+    assert!(staged[1].1.join("artifact/bytes").exists());
+    assert!(external.path().exists());
+    for i in [0, 2, 3] {
+        assert!(!staged[i].1.exists());
+        assert!(store.audit_exists(staged[i].0).unwrap());
+    }
+}
+
+#[test]
+fn failed_compaction_preserves_records_reports_failure_and_retries_cleanly() {
+    let (_dir, work, mut store, plan) = fixture();
+    let project = plan.details().project;
+    let mut staged = Vec::new();
+    for n in 1..=4 {
+        let (mut job, path) = stage(&mut store, work.path(), plan.clone(), n);
+        cancel(&mut store, &mut job);
+        staged.push((job.id(), path));
+    }
+    store
+        .set_retention_policy(project, Policy::new(1).unwrap())
+        .unwrap();
+    let status = store
+        .reconcile_retention_using(
+            project,
+            Some(work.path()),
+            || Ok(vec![]),
+            |f, b| {
+                f.write_all(&b[..16])?;
+                Err(io::Error::other("injected compaction failure"))
+            },
+        )
+        .unwrap();
+    assert!(status.failed);
+    assert_eq!(
+        (status.retained, status.removed, status.reclaimed_bytes),
+        (Some(4), 0, 0)
+    );
+    assert_eq!(store.load().unwrap().len(), 4);
+    for (id, path) in &staged[..3] {
+        assert!(!path.exists());
+        assert!(store.audit_exists(*id).unwrap());
+    }
+    let retry = store
+        .reconcile_retention(project, Some(work.path()), || Ok(vec![]))
+        .unwrap();
+    assert!(!retry.failed);
+    assert_eq!(
+        (retry.retained, retry.removed, retry.reclaimed_bytes),
+        (Some(1), 3, 0)
+    );
+    assert_eq!(store.load().unwrap().len(), 1);
+    assert_eq!(store.load().unwrap()[0].id(), staged[3].0);
 }
 
 #[test]

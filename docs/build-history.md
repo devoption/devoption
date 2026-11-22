@@ -87,14 +87,16 @@ limit. Interrupted attempts become cleanup-eligible only after startup has stopp
 and verified the complete old build unit; recovery never resumes a workload.
 
 Cleanup runs after final execution checkpoints, after replacing a prepared review,
-after a setting change and before listening after restart. The controller holds
+after a setting change and before listening after restart. Post-build,
+replaced-review and setting-change cleanups reconcile only the affected project;
+startup reconciles all catalog projects. The controller holds
 execution, history and catalog gates in that order. The installed promotion broker
 also uses the work root's private `retention.lock`, with nonblocking exclusive
 flock, through copying the artifact and saving its immutable release. Cleanup holds
 that same lock while observing references and deleting. The strict `retention-references` broker query refuses corrupt manifests,
 unfinished promotions and missing deployment/recovery targets. Lookup failures
-preserve builds, and every candidate gets a fresh reference check immediately
-before removal. Existing local release bytes are never rewritten or removed.
+preserve builds, and references are observed once under that lock per
+reconciliation rather than re-queried per candidate. Existing local release bytes are never rewritten or removed.
 
 Preparation binds each allocated attempt to its exact direct staging child, root
 and child device/inode in private `build-owned-ID.bin` metadata. Cleanup accepts
@@ -108,8 +110,9 @@ the trusted platform OS user remain outside the contract.
 
 Before deletion it durably writes `build-audit-ID.bin`, containing the compact
 terminal identity/source/artifact claims and completion metadata. History keeps
-the original record until removal finishes, then atomically compacts it while
-preserving the completion high-water mark. Audit and owned-path metadata remain;
+the original records until removal finishes, then atomically compacts all pruned
+candidates in one snapshot publication while preserving the completion
+high-water mark. Audit and owned-path metadata remain;
 allocation consults audits to prevent reuse. If interrupted after partial tree,
 directory or output removal, restart retries from the retained record and binding.
 Missing already-removed paths are harmless; replacement identities are refused.
