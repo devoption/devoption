@@ -1,4 +1,11 @@
-use std::{env, ffi::OsString, path::PathBuf, process::ExitCode};
+use std::{
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
+
+use devoption_server::{PublicOrigin, ServerOptions};
 
 #[cfg(unix)]
 mod recovery;
@@ -114,119 +121,9 @@ fn main() -> ExitCode {
         }
     };
 
-    if let Some(ServeOptions {
-        port,
-        data_directory,
-        repository_root,
-        managed_repository_root,
-        build_history_directory,
-        public_origin,
-        execution_enabled,
-        deployment_enabled,
-        project_secrets_key_file,
-        package_registry_directory,
-    }) = options
-    {
-        let result = if let Some(directory) = package_registry_directory {
-            devoption_server::run_with_package_registry(
-                port,
-                data_directory.as_deref().expect("validated owner"),
-                managed_repository_root
-                    .as_deref()
-                    .or(repository_root.as_deref()),
-                managed_repository_root.is_some(),
-                build_history_directory.as_deref(),
-                public_origin,
-                devoption_server::RegistryOptions {
-                    directory: &directory,
-                    project_secrets_key_file: project_secrets_key_file.as_deref(),
-                    build_execution: execution_enabled,
-                    app_deployment: deployment_enabled,
-                },
-            )
-        } else if let Some(key_file) = project_secrets_key_file {
-            devoption_server::run_with_project_secrets(
-                port,
-                data_directory.as_deref().expect("validated owner"),
-                managed_repository_root
-                    .as_deref()
-                    .or(repository_root.as_deref()),
-                managed_repository_root.is_some(),
-                build_history_directory.as_deref(),
-                public_origin,
-                devoption_server::ProjectSecretsOptions {
-                    key_file: &key_file,
-                    build_execution: execution_enabled,
-                    app_deployment: deployment_enabled,
-                },
-            )
-        } else if deployment_enabled {
-            devoption_server::run_with_deployments(
-                port,
-                data_directory.as_deref().expect("validated owner"),
-                managed_repository_root
-                    .as_deref()
-                    .or(repository_root.as_deref())
-                    .expect("validated root"),
-                managed_repository_root.is_some(),
-                build_history_directory
-                    .as_deref()
-                    .expect("validated history"),
-                public_origin,
-            )
-        } else if execution_enabled {
-            devoption_server::run_with_execution(
-                port,
-                data_directory.as_deref().expect("validated owner"),
-                managed_repository_root
-                    .as_deref()
-                    .or(repository_root.as_deref())
-                    .expect("validated repository root"),
-                managed_repository_root.is_some(),
-                build_history_directory
-                    .as_deref()
-                    .expect("validated history"),
-                public_origin,
-            )
-        } else if let Some(origin) = public_origin {
-            devoption_server::run_with_public_origin(
-                port,
-                data_directory
-                    .as_deref()
-                    .expect("public origin requires data directory"),
-                managed_repository_root
-                    .as_deref()
-                    .or(repository_root.as_deref()),
-                managed_repository_root.is_some(),
-                build_history_directory.as_deref(),
-                origin,
-            )
-        } else if let Some(history) = build_history_directory {
-            devoption_server::run_with_build_history(
-                port,
-                data_directory
-                    .as_deref()
-                    .expect("history requires data directory"),
-                managed_repository_root
-                    .as_deref()
-                    .or(repository_root.as_deref()),
-                managed_repository_root.is_some(),
-                &history,
-            )
-        } else if let Some(root) = managed_repository_root {
-            devoption_server::run_with_managed_repository_root(
-                port,
-                data_directory.as_deref(),
-                &root,
-            )
-        } else {
-            devoption_server::run_with_repository_root(
-                port,
-                data_directory.as_deref(),
-                repository_root.as_deref(),
-            )
-        };
-        if let Err(error) = result {
+    if let Some(options) = options {
+        let port = options.port;
+        if let Err(error) = devoption_server::run_with_options(options) {
             eprintln!("error: could not serve on 127.0.0.1:{port}: {error}");
             return ExitCode::FAILURE;
         }
@@ -236,38 +133,17 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-struct ServeOptions {
-    package_registry_directory: Option<PathBuf>,
-    project_secrets_key_file: Option<PathBuf>,
-    port: u16,
-    data_directory: Option<PathBuf>,
-    repository_root: Option<PathBuf>,
-    managed_repository_root: Option<PathBuf>,
-    build_history_directory: Option<PathBuf>,
-    public_origin: Option<devoption_server::PublicOrigin>,
-    execution_enabled: bool,
-    deployment_enabled: bool,
-}
-
-fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
-    let mut package_registry_directory = None;
-    let mut project_secrets_key_file = None;
-    let mut public_origin = None;
-    let mut execution_enabled = false;
-    let mut deployment_enabled = false;
+fn serve_options(mut args: &[OsString]) -> Result<ServerOptions<'_>, &'static str> {
+    let mut options = ServerOptions::default();
     let mut port = None;
-    let mut data_directory = None;
-    let mut repository_root = None;
-    let mut managed_repository_root = None;
-    let mut build_history_directory = None;
     while !args.is_empty() {
         let [flag, value, rest @ ..] = args else {
             return Err("serve options require a value");
         };
-        if flag == "--build-execution" && value == "enabled" && !execution_enabled {
-            execution_enabled = true;
-        } else if flag == "--app-deployment" && value == "enabled" && !deployment_enabled {
-            deployment_enabled = true;
+        if flag == "--build-execution" && value == "enabled" && !options.execution_enabled {
+            options.execution_enabled = true;
+        } else if flag == "--app-deployment" && value == "enabled" && !options.deployment_enabled {
+            options.deployment_enabled = true;
         } else if flag == "--port" && port.is_none() {
             port = Some(
                 value
@@ -275,90 +151,52 @@ fn serve_options(mut args: &[OsString]) -> Result<ServeOptions, &'static str> {
                     .and_then(|value| value.parse::<u16>().ok())
                     .ok_or("port must be an integer from 0 to 65535")?,
             );
-        } else if flag == "--public-origin" && public_origin.is_none() {
-            public_origin = Some(devoption_server::PublicOrigin::parse(
+        } else if flag == "--public-origin" && options.public_origin.is_none() {
+            options.public_origin = Some(PublicOrigin::parse(
                 value.to_str().ok_or("public origin must be UTF-8")?,
             )?);
-        } else if flag == "--package-registry-dir" && package_registry_directory.is_none() {
-            let path = PathBuf::from(value);
+        } else if flag == "--package-registry-dir" && options.package_registry_directory.is_none() {
+            let path = Path::new(value);
             if !path.is_absolute() {
                 return Err("package registry requires an absolute path");
             }
-            package_registry_directory = Some(path);
-        } else if flag == "--data-dir" && data_directory.is_none() {
-            let path = PathBuf::from(value);
+            options.package_registry_directory = Some(path);
+        } else if flag == "--data-dir" && options.data_directory.is_none() {
+            let path = Path::new(value);
             if !path.is_absolute() {
                 return Err("data directory requires an absolute path");
             }
-            data_directory = Some(path);
-        } else if flag == "--project-secrets-key-file" && project_secrets_key_file.is_none() {
-            let path = PathBuf::from(value);
+            options.data_directory = Some(path);
+        } else if flag == "--project-secrets-key-file" && options.project_secrets_key_file.is_none()
+        {
+            let path = Path::new(value);
             if !path.is_absolute() {
                 return Err("project secrets key requires an absolute path");
             }
-            project_secrets_key_file = Some(path);
-        } else if flag == "--build-history-dir" && build_history_directory.is_none() {
-            let path = PathBuf::from(value);
+            options.project_secrets_key_file = Some(path);
+        } else if flag == "--build-history-dir" && options.build_history_directory.is_none() {
+            let path = Path::new(value);
             if !path.is_absolute() {
                 return Err("build history requires an absolute path");
             }
-            build_history_directory = Some(path);
+            options.build_history_directory = Some(path);
         } else if (flag == "--repository-root" || flag == "--managed-repository-root")
-            && repository_root.is_none()
-            && managed_repository_root.is_none()
+            && options.repository_root.is_none()
         {
-            let path = PathBuf::from(value);
+            let path = Path::new(value);
             if !path.is_absolute() {
                 return Err("repository root requires an absolute path");
             }
-            if flag == "--managed-repository-root" {
-                managed_repository_root = Some(path);
-            } else {
-                repository_root = Some(path);
-            }
+            options.repository_root = Some(path);
+            options.managed_repository = flag == "--managed-repository-root";
         } else {
             return Err("unsupported or duplicate serve option");
         }
         args = rest;
     }
-    if (repository_root.is_some() || managed_repository_root.is_some()) && data_directory.is_none()
-    {
-        return Err("repository root requires --data-dir with an existing configured owner");
-    }
-    if build_history_directory.is_some() && data_directory.is_none() {
-        return Err("build history requires --data-dir with an existing configured owner");
-    }
-    if package_registry_directory.is_some() && data_directory.is_none() {
-        return Err("package registry requires --data-dir with an existing owner");
-    }
-    if project_secrets_key_file.is_some() && data_directory.is_none() {
-        return Err("project secrets require --data-dir with an existing configured owner");
-    }
-    if public_origin.is_some() && data_directory.is_none() {
-        return Err("public origin requires --data-dir with an existing configured owner");
-    }
-    if deployment_enabled && !execution_enabled {
-        return Err("app deployment requires --build-execution enabled");
-    }
-    if execution_enabled
-        && (data_directory.is_none()
-            || build_history_directory.is_none()
-            || (repository_root.is_none() && managed_repository_root.is_none()))
-    {
-        return Err("build execution requires owner, repository and history directories");
-    }
-    Ok(ServeOptions {
-        package_registry_directory,
-        project_secrets_key_file,
-        deployment_enabled,
-        execution_enabled,
-        public_origin,
-        port: port.unwrap_or(3000),
-        data_directory,
-        repository_root,
-        managed_repository_root,
-        build_history_directory,
-    })
+    options.port = port.unwrap_or(3000);
+    options.validate()?;
+    Ok(options)
 }
 
 #[cfg(test)]
@@ -367,8 +205,10 @@ mod deployment_options_tests {
     #[test]
     fn deployment_is_explicit_and_requires_the_existing_build_storage_contract() {
         assert!(!serve_options(&[]).unwrap().deployment_enabled);
-        let parse =
-            |args: &[&str]| serve_options(&args.iter().map(OsString::from).collect::<Vec<_>>());
+        let parse = |args: &[&str]| {
+            serve_options(&args.iter().map(OsString::from).collect::<Vec<_>>())
+                .map(|options| options.deployment_enabled)
+        };
         assert!(parse(&["--app-deployment", "enabled"]).is_err());
         assert!(
             parse(&[
@@ -391,7 +231,7 @@ mod deployment_options_tests {
             "--build-history-dir",
             "/history",
         ];
-        assert!(parse(&selected).unwrap().deployment_enabled);
+        assert!(parse(&selected).unwrap());
         let mut duplicate = selected.to_vec();
         duplicate.extend(["--app-deployment", "enabled"]);
         assert!(parse(&duplicate).is_err());
@@ -426,16 +266,16 @@ mod project_secrets_options_tests {
         ] {
             assert!(serve_options(&options(&values)).is_err());
         }
-        let selected = serve_options(&options(&[
+        let args = options(&[
             "--data-dir",
             "/private/data",
             "--project-secrets-key-file",
             "/private/key",
-        ]))
-        .unwrap();
+        ]);
+        let selected = serve_options(&args).unwrap();
         assert_eq!(
             selected.project_secrets_key_file,
-            Some(PathBuf::from("/private/key"))
+            Some(Path::new("/private/key"))
         );
         assert!(!selected.execution_enabled);
         assert!(!selected.deployment_enabled);
@@ -449,6 +289,7 @@ mod package_registry_options_tests {
     fn registry_requires_one_absolute_root_and_owner_storage() {
         let parse = |args: Vec<&str>| {
             serve_options(&args.into_iter().map(OsString::from).collect::<Vec<_>>())
+                .map(|options| options.package_registry_directory.map(Path::to_path_buf))
         };
         for args in [
             vec!["--package-registry-dir", "relative", "--data-dir", "/owner"],
@@ -471,15 +312,7 @@ mod package_registry_options_tests {
             "/registry",
         ])
         .unwrap();
-        assert_eq!(
-            options.package_registry_directory,
-            Some(PathBuf::from("/registry"))
-        );
-        assert!(
-            parse(vec!["--data-dir", "/owner"])
-                .unwrap()
-                .package_registry_directory
-                .is_none()
-        );
+        assert_eq!(options, Some(PathBuf::from("/registry")));
+        assert!(parse(vec!["--data-dir", "/owner"]).unwrap().is_none());
     }
 }

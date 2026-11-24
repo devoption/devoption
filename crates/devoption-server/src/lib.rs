@@ -1,6 +1,6 @@
 //! Local HTTP service and its authentication, session, and owner-storage components.
 //!
-//! The CLI starts the service through [`run`]; this crate owns HTTP/runtime behavior
+//! The CLI starts the service through [`run_with_options`]; this crate owns HTTP/runtime behavior
 //! and uses devoption-ui for rendering. Existing-owner HTTP sign-in is available
 //! with explicitly configured storage; local/SSH setup is explicit and browser
 //! owner enrollment routes remain closed. Existing owners can invite members or
@@ -11,12 +11,7 @@ mod server;
 #[cfg(unix)]
 mod users;
 
-pub use server::{
-    ProjectSecretsOptions, PublicOrigin, RegistryOptions, run, run_with_build_history,
-    run_with_deployments, run_with_execution, run_with_managed_repository_root,
-    run_with_package_registry, run_with_project_secrets, run_with_public_origin,
-    run_with_repository_root,
-};
+pub use server::{PublicOrigin, ServerOptions, run, run_with_options};
 
 #[cfg(unix)]
 pub mod browser_session;

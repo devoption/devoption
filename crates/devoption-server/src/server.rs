@@ -38,263 +38,89 @@ mod projects;
 #[cfg(all(test, unix))]
 mod session_tests;
 
-/// Run the loopback service from synchronous startup code, owning its Tokio runtime.
-/// Validate optional existing storage before binding and announce the address on stdout.
-/// Return startup or server I/O errors; no session is issued at startup.
-pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
-    run_with_repository_root(port, data_directory, None)
-}
-
-/// Optional repository access is granted only by explicit local configuration.
-/// The browser can select a relative checkout, never the permitted root.
-pub fn run_with_repository_root(
-    port: u16,
-    data_directory: Option<&Path>,
-    repository_root: Option<&Path>,
-) -> io::Result<()> {
-    run_with_roots(
-        port,
-        data_directory,
-        repository_root,
-        false,
-        None,
-        None,
-        ExecutionMode::Disabled.into(),
-    )
-}
-
-/// Explicit creation capability in a selected private repository root. Existing
-/// entries remain untouched; this grants no build, hook or execution authority.
-pub fn run_with_managed_repository_root(
-    port: u16,
-    data_directory: Option<&Path>,
-    repository_root: &Path,
-) -> io::Result<()> {
-    run_with_roots(
-        port,
-        data_directory,
-        Some(repository_root),
-        true,
-        None,
-        None,
-        ExecutionMode::Disabled.into(),
-    )
-}
-
-/// Recover explicitly selected history before listening, retaining its writer lock.
-/// This records interrupted supervision, not process cleanup or execution admission.
-pub fn run_with_build_history(
-    port: u16,
-    data_directory: &Path,
-    repository_root: Option<&Path>,
-    managed: bool,
-    history_directory: &Path,
-) -> io::Result<()> {
-    if managed && repository_root.is_none() {
-        return Err(io::Error::other("managed repository mode requires a root"));
-    }
-    run_with_roots(
-        port,
-        Some(data_directory),
-        repository_root,
-        managed,
-        Some(history_directory),
-        None,
-        ExecutionMode::Disabled.into(),
-    )
-}
-
-/// Serve one explicitly configured HTTPS origin behind a local TLS proxy.
-/// The listener remains loopback-only and an existing owner is mandatory.
-pub fn run_with_public_origin(
-    port: u16,
-    data_directory: &Path,
-    repository_root: Option<&Path>,
-    managed: bool,
-    history_directory: Option<&Path>,
-    origin: PublicOrigin,
-) -> io::Result<()> {
-    if managed && repository_root.is_none() {
-        return Err(io::Error::other("managed repository mode requires a root"));
-    }
-    run_with_roots(
-        port,
-        Some(data_directory),
-        repository_root,
-        managed,
-        history_directory,
-        Some(origin),
-        ExecutionMode::Disabled.into(),
-    )
-}
-
-pub fn run_with_execution(
-    port: u16,
-    data_directory: &Path,
-    repository_root: &Path,
-    managed: bool,
-    history_directory: &Path,
-    public_origin: Option<PublicOrigin>,
-) -> io::Result<()> {
-    run_with_roots(
-        port,
-        Some(data_directory),
-        Some(repository_root),
-        managed,
-        Some(history_directory),
-        public_origin,
-        ExecutionMode::Builds.into(),
-    )
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum ExecutionMode {
-    Disabled,
-    Builds,
-    Deployments,
-}
-
-pub fn run_with_deployments(
-    port: u16,
-    data_directory: &Path,
-    repository_root: &Path,
-    managed: bool,
-    history_directory: &Path,
-    public_origin: Option<PublicOrigin>,
-) -> io::Result<()> {
-    run_with_roots(
-        port,
-        Some(data_directory),
-        Some(repository_root),
-        managed,
-        Some(history_directory),
-        public_origin,
-        ExecutionMode::Deployments.into(),
-    )
-}
-
-/// Explicit installation-key opt-in; no credentials are created by startup.
-pub struct ProjectSecretsOptions<'a> {
-    pub key_file: &'a Path,
-    pub build_execution: bool,
-    pub app_deployment: bool,
-}
-
-/// Enable encrypted management alongside the existing optional workloads.
-pub fn run_with_project_secrets(
-    port: u16,
-    data: &Path,
-    repositories: Option<&Path>,
-    managed: bool,
-    history: Option<&Path>,
-    origin: Option<PublicOrigin>,
-    secrets: ProjectSecretsOptions<'_>,
-) -> io::Result<()> {
-    if (managed && repositories.is_none())
-        || (secrets.app_deployment && !secrets.build_execution)
-        || (secrets.build_execution && (repositories.is_none() || history.is_none()))
-    {
-        return Err(io::Error::other(
-            "invalid project secrets startup capabilities",
-        ));
-    }
-    let execution = if secrets.app_deployment {
-        ExecutionMode::Deployments
-    } else if secrets.build_execution {
-        ExecutionMode::Builds
-    } else {
-        ExecutionMode::Disabled
-    };
-    run_with_roots(
-        port,
-        Some(data),
-        repositories,
-        managed,
-        history,
-        origin,
-        Capabilities {
-            execution,
-            key: Some(secrets.key_file),
-            registry: None,
-        },
-    )
-}
-
-/// Explicit existing registry-root opt-in, preserving other selected capabilities.
-pub struct RegistryOptions<'a> {
-    pub directory: &'a Path,
+/// Startup configuration for the loopback HTTP service.
+/// Storage paths and capabilities are opt-in.
+#[derive(Default)]
+pub struct ServerOptions<'a> {
+    /// Loopback port. Zero selects an available port.
+    pub port: u16,
+    pub data_directory: Option<&'a Path>,
+    pub repository_root: Option<&'a Path>,
+    /// Permit authenticated creation of repositories within the selected root.
+    pub managed_repository: bool,
+    pub build_history_directory: Option<&'a Path>,
+    pub public_origin: Option<PublicOrigin>,
+    pub execution_enabled: bool,
+    pub deployment_enabled: bool,
     pub project_secrets_key_file: Option<&'a Path>,
-    pub build_execution: bool,
-    pub app_deployment: bool,
-}
-pub fn run_with_package_registry(
-    port: u16,
-    data: &Path,
-    repositories: Option<&Path>,
-    managed: bool,
-    history: Option<&Path>,
-    origin: Option<PublicOrigin>,
-    options: RegistryOptions<'_>,
-) -> io::Result<()> {
-    if (managed && repositories.is_none())
-        || (options.app_deployment && !options.build_execution)
-        || (options.build_execution && (repositories.is_none() || history.is_none()))
-    {
-        return Err(io::Error::other(
-            "invalid package registry startup capabilities",
-        ));
-    }
-    let execution = if options.app_deployment {
-        ExecutionMode::Deployments
-    } else if options.build_execution {
-        ExecutionMode::Builds
-    } else {
-        ExecutionMode::Disabled
-    };
-    run_with_roots(
-        port,
-        Some(data),
-        repositories,
-        managed,
-        history,
-        origin,
-        Capabilities {
-            execution,
-            key: options.project_secrets_key_file,
-            registry: Some(options.directory),
-        },
-    )
+    pub package_registry_directory: Option<&'a Path>,
 }
 
-struct Capabilities<'a> {
-    execution: ExecutionMode,
-    key: Option<&'a Path>,
-    registry: Option<&'a Path>,
-}
-impl From<ExecutionMode> for Capabilities<'_> {
-    fn from(execution: ExecutionMode) -> Self {
-        Self {
-            execution,
-            key: None,
-            registry: None,
+impl ServerOptions<'_> {
+    /// Check option dependencies before opening storage or binding a listener.
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.managed_repository && self.repository_root.is_none() {
+            return Err("managed repository mode requires a root");
         }
+        if self.data_directory.is_none() {
+            if self.repository_root.is_some() {
+                return Err(
+                    "repository root requires --data-dir with an existing configured owner",
+                );
+            }
+            if self.build_history_directory.is_some() {
+                return Err("build history requires --data-dir with an existing configured owner");
+            }
+            if self.package_registry_directory.is_some() {
+                return Err("package registry requires --data-dir with an existing owner");
+            }
+            if self.project_secrets_key_file.is_some() {
+                return Err("project secrets require --data-dir with an existing configured owner");
+            }
+            if self.public_origin.is_some() {
+                return Err("public origin requires --data-dir with an existing configured owner");
+            }
+        }
+        if self.deployment_enabled && !self.execution_enabled {
+            return Err("app deployment requires --build-execution enabled");
+        }
+        if self.execution_enabled
+            && (self.data_directory.is_none()
+                || self.repository_root.is_none()
+                || self.build_history_directory.is_none())
+        {
+            return Err("build execution requires owner, repository and history directories");
+        }
+        Ok(())
     }
 }
 
-fn run_with_roots(
-    port: u16,
-    data_directory: Option<&Path>,
-    repository_root: Option<&Path>,
-    managed: bool,
-    history_directory: Option<&Path>,
-    public_origin: Option<PublicOrigin>,
-    capabilities: Capabilities<'_>,
-) -> io::Result<()> {
-    let Capabilities {
-        execution,
-        key,
-        registry,
-    } = capabilities;
+/// Run the loopback service with optional owner storage and default capabilities.
+pub fn run(port: u16, data_directory: Option<&Path>) -> io::Result<()> {
+    run_with_options(ServerOptions {
+        port,
+        data_directory,
+        ..ServerOptions::default()
+    })
+}
+
+/// Run the loopback service from synchronous startup code, owning its Tokio runtime.
+/// Validate capabilities and existing storage before binding and announce the address
+/// on stdout. No session is issued at startup.
+pub fn run_with_options(options: ServerOptions<'_>) -> io::Result<()> {
+    options.validate().map_err(io::Error::other)?;
+    let ServerOptions {
+        port,
+        data_directory,
+        repository_root,
+        managed_repository: managed,
+        build_history_directory: history_directory,
+        public_origin,
+        execution_enabled,
+        deployment_enabled,
+        project_secrets_key_file: key,
+        package_registry_directory: registry,
+    } = options;
     // Validate storage before binding; only an absent record is unconfigured.
     // Retain the same descriptor through the service. Selecting storage grants
     // no enrollment permission; only an already-present owner can sign in.
@@ -323,7 +149,7 @@ fn run_with_roots(
         ));
     }
     #[cfg(not(unix))]
-    let _ = managed;
+    let _ = (managed, deployment_enabled);
     #[cfg(not(unix))]
     if data_directory.is_some()
         || repository_root.is_some()
@@ -411,7 +237,7 @@ fn run_with_roots(
         None => None,
     };
     #[cfg(unix)]
-    if execution != ExecutionMode::Disabled {
+    if execution_enabled {
         let config = devoption_builds::execution::Configuration::open()?;
         config.check_storage(
             data_directory.ok_or_else(|| io::Error::other("builds require owner storage"))?,
@@ -431,7 +257,7 @@ fn run_with_roots(
         );
     }
     #[cfg(not(unix))]
-    if execution != ExecutionMode::Disabled {
+    if execution_enabled {
         return Err(io::Error::other("build execution requires Linux"));
     }
     #[cfg(unix)]
@@ -498,7 +324,7 @@ fn run_with_roots(
                 projects = Some(configured_projects.with_history(history));
             }
             #[cfg(unix)]
-            if execution == ExecutionMode::Deployments {
+            if deployment_enabled {
                 projects
                     .as_mut()
                     .expect("configured projects")
@@ -820,6 +646,42 @@ fn local_host(authority: &str, bound_port: u16) -> Option<&'static str> {
 mod tests {
     use super::*;
     use axum::body::Body;
+
+    #[test]
+    fn startup_rejects_invalid_capabilities_before_opening_storage() {
+        let data_directory = Some(Path::new("unused-owner-store"));
+        let cases = [
+            (
+                ServerOptions {
+                    data_directory,
+                    managed_repository: true,
+                    ..ServerOptions::default()
+                },
+                "managed repository mode requires a root",
+            ),
+            (
+                ServerOptions {
+                    data_directory,
+                    deployment_enabled: true,
+                    ..ServerOptions::default()
+                },
+                "app deployment requires --build-execution enabled",
+            ),
+            (
+                ServerOptions {
+                    data_directory,
+                    repository_root: Some(Path::new("unused-repository-root")),
+                    execution_enabled: true,
+                    ..ServerOptions::default()
+                },
+                "build execution requires owner, repository and history directories",
+            ),
+        ];
+
+        for (options, expected) in cases {
+            assert_eq!(run_with_options(options).unwrap_err().to_string(), expected);
+        }
+    }
 
     #[test]
     fn omitted_ports_mean_http_port_80_not_the_listener_default() {

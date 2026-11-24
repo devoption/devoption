@@ -5,6 +5,12 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Changed
+
+- Consolidate server startup into a single `ServerOptions` entry point with shared
+  capability validation for the CLI and server
+  ([#421](https://github.com/devoption/devoption/issues/421)).
+
 ### Fixed
 
 - Read build retention release references once per reconciliation, batch history
