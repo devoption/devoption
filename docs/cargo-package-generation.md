@@ -18,12 +18,17 @@ attestation of source authorization or build approval/success.
 
 All captured source files remain in the package under `name-version/`, including
 the committed lockfile. The original manifest bytes are saved as `Cargo.toml.orig`.
-`Cargo.toml` is replaced with a deterministic normalized manifest containing the
-same package name/version/edition, explicit conventional library target,
+`Cargo.toml` is replaced with a deterministic normalized manifest generated directly
+from the verified source snapshot's admitted package name/version/edition and sorted
+`direct_dependencies`, with an explicit conventional library target,
 `build=false`, disabled automatic binary/example/test/benchmark discovery, and
 exact direct dependency requirements/default-feature settings. Hosted registry
-aliases become their exact reviewed `registry-index` URL. Public dependencies
-receive Cargo's canonical crates.io index URL. Registry aliases are never resolved
+aliases resolve through the snapshot's explicit `HostedRegistries` bindings to their
+exact reviewed `registry-index` URL. Public dependencies
+receive Cargo's canonical crates.io index URL. Candidate index `deps` are derived
+from that same admitted representation, and stored-candidate decoding revalidates
+the retained `Cargo.toml.orig`/`Cargo.lock` through Cargo input admission instead of
+re-parsing manifest dependencies separately. Registry aliases are never resolved
 from repository configuration or the process environment.
 
 Captured paths whose first component case-insensitively matches `Cargo.toml.orig`,

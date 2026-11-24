@@ -13,6 +13,7 @@ use toml::{Table, Value};
 pub const MAX_MANIFEST_BYTES: usize = 64 * 1024;
 pub const MAX_LOCKFILE_BYTES: usize = 512 * 1024;
 pub const MAX_DEPENDENCY_EDGES: usize = 4096;
+pub const CRATES_IO_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
 const CRATES_IO_SOURCE: &str = "registry+https://github.com/rust-lang/crates.io-index";
 
 /// Caller-declared expectations. A future verified snapshot must supply these;
@@ -61,13 +62,25 @@ impl LockedDependencies {
     }
 }
 
+/// One admitted direct normal dependency from the root manifest.
+/// Values are validated and owned by `InspectedInputs`; no Debug impl exposes private names.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DirectDependency {
+    pub name: String,
+    pub requirement: String,
+    pub default_features: bool,
+    pub origin: CargoOrigin,
+}
+
 /// Internally consistent supplied inputs, without a provider or source proof.
 /// No Debug implementation prints package metadata implicitly.
 pub struct InspectedInputs {
     package: String,
     version: String,
+    edition: &'static str,
     hashes: InputHashes,
     packages: Vec<LockedPackage>,
+    direct_dependencies: Vec<DirectDependency>,
     edges: Vec<LockedDependencies>,
     target: SourceTarget,
     hosted_registries: HostedRegistries,
@@ -77,6 +90,9 @@ impl InspectedInputs {
     pub fn package_dependencies(&self) -> &[LockedDependencies] {
         &self.edges
     }
+    pub fn direct_dependencies(&self) -> &[DirectDependency] {
+        &self.direct_dependencies
+    }
     pub fn target(&self) -> &SourceTarget {
         &self.target
     }
@@ -85,6 +101,9 @@ impl InspectedInputs {
     }
     pub fn version(&self) -> &str {
         &self.version
+    }
+    pub fn edition(&self) -> &str {
+        self.edition
     }
     pub fn hashes(&self) -> InputHashes {
         self.hashes
@@ -176,9 +195,12 @@ fn inspect_expected(
     if !crate::package_name_valid(root_name) || !crate::exact_version(root_version) {
         return Err(Error::InvalidPackage);
     }
-    if !matches!(string(package.get("edition"))?, "2021" | "2024")
-        || package.get("build").and_then(Value::as_bool) != Some(false)
-    {
+    let edition = match string(package.get("edition"))? {
+        "2021" => "2021",
+        "2024" => "2024",
+        _ => return Err(Error::Unsupported),
+    };
+    if package.get("build").and_then(Value::as_bool) != Some(false) {
         return Err(Error::Unsupported);
     }
     let target = match manifest.get("lib") {
@@ -210,28 +232,27 @@ fn inspect_expected(
     let mut direct = BTreeMap::new();
     if let Some(dependencies) = manifest.get("dependencies") {
         for (name, value) in table(Some(dependencies))? {
-            let (requirement, origin) = match value {
-                Value::String(pin) => (pin.as_str(), CargoOrigin::CratesIo),
+            let (requirement, default_features, origin) = match value {
+                Value::String(pin) => (pin.as_str(), true, CargoOrigin::CratesIo),
                 Value::Table(dependency) => {
                     keys(dependency, &["version", "default-features", "registry"])?;
-                    if dependency
-                        .get("default-features")
-                        .is_some_and(|v| v.as_bool() != Some(false))
-                    {
-                        return Err(Error::Unsupported);
-                    }
+                    let default_features = match dependency.get("default-features") {
+                        None => true,
+                        Some(v) if v.as_bool() == Some(false) => false,
+                        Some(_) => return Err(Error::Unsupported),
+                    };
                     let origin = if let Some(value) = dependency.get("registry") {
                         let binding = registries
                             .named(string(Some(value))?)
                             .ok_or(Error::Unsupported)?;
                         CargoOrigin::DevOption(binding.id().clone())
                     } else {
-                        if dependency.get("default-features").is_none() {
+                        if default_features {
                             return Err(Error::Unsupported);
                         }
                         CargoOrigin::CratesIo
                     };
-                    (string(dependency.get("version"))?, origin)
+                    (string(dependency.get("version"))?, default_features, origin)
                 }
                 _ => return Err(Error::Unsupported),
             };
@@ -239,7 +260,18 @@ fn inspect_expected(
             if !crate::package_name_valid(name) || !crate::exact_version(pin) {
                 return Err(Error::Unsupported);
             }
-            direct.insert(name.as_str(), (pin, origin));
+            direct.insert(
+                name.as_str(),
+                (
+                    pin,
+                    DirectDependency {
+                        name: name.into(),
+                        requirement: requirement.into(),
+                        default_features,
+                        origin,
+                    },
+                ),
+            );
         }
     }
     if direct.len() > crate::MAX_PACKAGES {
@@ -343,11 +375,11 @@ fn inspect_expected(
         || edges[root].iter().any(|&i| {
             direct
                 .get(nodes[i].name.as_str())
-                .is_none_or(|(pin, origin)| {
+                .is_none_or(|(pin, dependency)| {
                     // Cargo ignores build metadata in version requirements. Full locked
                     // versions and checksums remain in the dependency request identity.
                     release_version(pin) != release_version(&nodes[i].version)
-                        || nodes[i].origin.as_ref() != Some(origin)
+                        || nodes[i].origin.as_ref() != Some(&dependency.origin)
                 })
         })
     {
@@ -387,11 +419,17 @@ fn inspect_expected(
             })
         })
         .collect::<Result<Vec<_>, Error>>()?;
+    let direct_dependencies = direct
+        .into_values()
+        .map(|(_, dependency)| dependency)
+        .collect();
     Ok(InspectedInputs {
         package: root_name.into(),
         version: root_version.into(),
+        edition,
         hashes: actual,
         packages,
+        direct_dependencies,
         edges: package_edges,
         target,
         hosted_registries: registries.clone(),

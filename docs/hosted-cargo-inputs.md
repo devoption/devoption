@@ -111,6 +111,14 @@ to an installation or public registry. This is a Cargo/metadata proof, not a
 platform-hosted consumer acceptance test, OS network-isolation proof, access-control
 acceptance or evidence of globally reachable distribution.
 
+`InspectedInputs` also exposes the admitted `edition()` and sorted
+`direct_dependencies()` (`DirectDependency` entries carrying exact name, version
+requirement, `default_features`, and `CargoOrigin`), which `SourceSnapshot`
+preserves so [Cargo package generation](cargo-package-generation.md) emits both
+normalized manifests and candidate index `deps` from that single admitted
+representation rather than re-parsing `Cargo.toml`. `HostedRegistries::named`
+looks up an explicit binding by logical registry name.
+
 `InspectedInputs::package_dependencies()` additionally exposes each registry node's
 validated outgoing lock edges, preserving full origin/version/checksum identities
 in canonical package order. This reports supplied lock claims; it does not verify
