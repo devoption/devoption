@@ -7,6 +7,12 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Expose admitted package edition and direct dependencies from Cargo input
+  inspection and verified source snapshots, and generate normalized Cargo
+  package manifests and candidate index dependencies directly from those
+  admitted inputs instead of re-parsing `Cargo.toml`
+  ([#416](https://github.com/devoption/devoption/issues/416)).
+
 - Consolidate server startup into a single `ServerOptions` entry point with shared
   capability validation for the CLI and server
   ([#421](https://github.com/devoption/devoption/issues/421)).

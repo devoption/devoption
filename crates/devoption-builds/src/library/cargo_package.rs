@@ -1,7 +1,10 @@
 //! Deterministic Cargo artifacts from verified library plans; no publication/I/O.
 use super::{MAX_PACKAGE_BYTES, source_tar, staging::StagedSource};
 use crate::BuildPlan;
-use devoption_registry::{HostedRegistry, Sha256};
+use devoption_registry::{
+    CargoOrigin, HostedRegistries, HostedRegistry, RegistryId, Sha256,
+    cargo_inputs::{self, CRATES_IO_INDEX, DirectDependency},
+};
 use flate2::{Compression, GzBuilder};
 use serde_json::json;
 use std::{
@@ -9,7 +12,7 @@ use std::{
     io::{self, Write},
 };
 
-const PUBLIC_INDEX: &str = "https://github.com/rust-lang/crates.io-index";
+const PUBLIC_INDEX: &str = CRATES_IO_INDEX;
 pub const MAX_INDEX_LINE_BYTES: usize = 256 * 1024;
 
 /// Owned archive/index bytes bound to source-stage provenance. `from_plan` does
@@ -65,20 +68,13 @@ impl CargoPackage {
             .find(|file| file.path() == "Cargo.toml")
             .ok_or_else(invalid)?
             .bytes();
+        let registries = source.request().hosted_registries();
         let normalized = normalized_manifest(
             source.package(),
             source.version(),
-            original,
-            |alias, _, _| {
-                source
-                    .request()
-                    .hosted_registries()
-                    .bindings()
-                    .iter()
-                    .find(|binding| binding.id().as_str() == alias)
-                    .map(|binding| binding.index().to_owned())
-                    .ok_or_else(invalid)
-            },
+            source.edition(),
+            source.direct_dependencies(),
+            registries,
         )?;
         let mut files: BTreeMap<&str, &[u8]> = source
             .files()
@@ -98,11 +94,7 @@ impl CargoPackage {
             return Err(invalid());
         }
         let sha256 = Sha256::digest(&archive);
-        let index_line = index_metadata(
-            &staged,
-            sha256,
-            &toml::from_str(&normalized).map_err(|_| invalid())?,
-        )?;
+        let index_line = index_metadata(&staged, sha256, source.direct_dependencies(), registries)?;
         let name = source.package().to_ascii_lowercase();
         let index_path = index_location(&name);
         Ok(Self {
@@ -200,11 +192,6 @@ impl CargoPackage {
         let mut remaining = MAX_PACKAGE_BYTES;
         let files = super::vendor::archive::read(&archive, &package, &mut remaining)
             .map_err(|_| Error::Integrity)?;
-        let manifest: toml::Table =
-            std::str::from_utf8(files.get("Cargo.toml").ok_or(Error::Integrity)?)
-                .map_err(|_| Error::Integrity)?
-                .parse()
-                .map_err(|_| Error::Integrity)?;
         // Reverse only the two generated manifest changes and require every
         // retained source byte/path to match the canonical source archive.
         let mut original_files = files.clone();
@@ -224,63 +211,30 @@ impl CargoPackage {
             return Err(Error::Integrity);
         }
         // The admitted lock retains each exact hosted dependency's index URL;
-        // recover it there rather than trusting the generated manifest's URL.
-        let lock: toml::Table =
-            std::str::from_utf8(files.get("Cargo.lock").ok_or(Error::Integrity)?)
-                .map_err(|_| Error::Integrity)?
-                .parse()
-                .map_err(|_| Error::Integrity)?;
+        // recover bindings there and revalidate original inputs through admission.
+        let lock = files.get("Cargo.lock").ok_or(Error::Integrity)?;
+        let registries = recover_registries(&original, lock)?;
+        let inputs = cargo_inputs::inspect_with_registries(&original, lock, &registries)
+            .map_err(|_| Error::Integrity)?;
+        if inputs.package() != coordinates.name()
+            || inputs.version() != coordinates.version()
+            || !inputs.target().is_library()
+        {
+            return Err(Error::Integrity);
+        }
         let normalized = normalized_manifest(
-            coordinates.name(),
-            coordinates.version(),
-            &original,
-            |_, name, pin| {
-                let version = pin.strip_prefix('=').ok_or_else(invalid)?;
-                let rows = lock
-                    .get("package")
-                    .and_then(toml::Value::as_array)
-                    .ok_or_else(invalid)?;
-                let root = rows
-                    .iter()
-                    .find(|row| row.get("source").is_none())
-                    .ok_or_else(invalid)?;
-                let edges = root
-                    .get("dependencies")
-                    .and_then(toml::Value::as_array)
-                    .ok_or_else(invalid)?;
-                let mut matches = rows.iter().filter(|row| {
-                    let Some(source) = row.get("source").and_then(toml::Value::as_str) else {
-                        return false;
-                    };
-                    row.get("name").and_then(toml::Value::as_str) == Some(name)
-                        && row.get("version").and_then(toml::Value::as_str) == Some(version)
-                        && edges.iter().any(|edge| {
-                            edge.as_str().is_some_and(|edge| {
-                                edge == name
-                                    || edge == format!("{name} {version}")
-                                    || edge == format!("{name} {version} ({source})")
-                            })
-                        })
-                });
-                let row = matches.next().ok_or_else(invalid)?;
-                if matches.next().is_some() {
-                    return Err(invalid());
-                }
-                let source = row
-                    .get("source")
-                    .and_then(toml::Value::as_str)
-                    .ok_or_else(invalid)?;
-                Ok(source
-                    .strip_prefix("registry+")
-                    .unwrap_or(source)
-                    .to_owned())
-            },
+            inputs.package(),
+            inputs.version(),
+            inputs.edition(),
+            inputs.direct_dependencies(),
+            &registries,
         )
         .map_err(|_| Error::Integrity)?;
         if files.get("Cargo.toml").map(Vec::as_slice) != Some(normalized.as_bytes()) {
             return Err(Error::Integrity);
         }
-        let expected = index_metadata(&source, sha256, &manifest).map_err(|_| Error::Integrity)?;
+        let expected = index_metadata(&source, sha256, inputs.direct_dependencies(), &registries)
+            .map_err(|_| Error::Integrity)?;
         if index_path != index_location(&coordinates.name().to_ascii_lowercase())
             || index_line != expected
         {
@@ -334,70 +288,72 @@ pub(super) fn index_location(name: &str) -> String {
         _ => format!("{}/{}/{name}", &name[..2], &name[2..4]),
     }
 }
-// Both generation and decoding derive the exact index bytes from the packaged
-// normalized manifest, including destination-relative dependency namespaces.
+fn registry_index<'a>(
+    origin: &CargoOrigin,
+    registries: &'a HostedRegistries,
+) -> io::Result<&'a str> {
+    match origin {
+        CargoOrigin::CratesIo => Ok(PUBLIC_INDEX),
+        CargoOrigin::DevOption(id) => registries
+            .named(id.as_str())
+            .map(HostedRegistry::index)
+            .ok_or_else(invalid),
+    }
+}
+
+// Both generation and decoding derive the exact index bytes from the admitted
+// direct dependencies, including destination-relative dependency namespaces.
 fn index_metadata(
     source: &StagedSource,
     sha256: Sha256,
-    manifest: &toml::Table,
+    dependencies: &[DirectDependency],
+    registries: &HostedRegistries,
 ) -> io::Result<Vec<u8>> {
     let coordinates = source.coordinates();
-    let package = manifest
-        .get("package")
-        .and_then(toml::Value::as_table)
-        .ok_or_else(invalid)?;
-    if package.get("name").and_then(toml::Value::as_str) != Some(coordinates.name())
-        || package.get("version").and_then(toml::Value::as_str) != Some(coordinates.version())
+    let mut entries = Vec::with_capacity(dependencies.len());
+    for DirectDependency {
+        name,
+        requirement,
+        default_features,
+        origin,
+    } in dependencies
     {
-        return Err(invalid());
-    }
-    let mut dependencies = Vec::new();
-    if let Some(value) = manifest.get("dependencies") {
-        let entries = value.as_table().ok_or_else(invalid)?;
-        let ordered: BTreeMap<_, _> = entries.iter().collect();
-        for (name, value) in ordered {
-            let fields = value.as_table().ok_or_else(invalid)?;
-            if fields.len() != 3 {
-                return Err(invalid());
-            }
-            let version = fields
-                .get("version")
-                .and_then(toml::Value::as_str)
-                .ok_or_else(invalid)?;
-            let defaults = fields
-                .get("default-features")
-                .and_then(toml::Value::as_bool)
-                .ok_or_else(invalid)?;
-            let index = fields
-                .get("registry-index")
-                .and_then(toml::Value::as_str)
-                .ok_or_else(invalid)?;
-            dependencies.push(json!({"name":name,"req":version,"features":[],"optional":false,"default_features":defaults,"target":null,"kind":"normal","registry":if index == coordinates.registry().index() { None } else { Some(index) }}));
-        }
+        let index = registry_index(origin, registries)?;
+        entries.push(json!({
+            "name": name,
+            "req": requirement,
+            "features": [],
+            "optional": false,
+            "default_features": default_features,
+            "target": null,
+            "kind": "normal",
+            "registry": if index == coordinates.registry().index() { None } else { Some(index) }
+        }));
     }
     let checksum: String = sha256.bytes().iter().map(|b| format!("{b:02x}")).collect();
-    let mut line = serde_json::to_vec(&json!({"name":coordinates.name(),"vers":coordinates.version(),"deps":dependencies,"cksum":checksum,"features":{},"yanked":false})).map_err(|_| invalid())?;
+    let mut line = serde_json::to_vec(&json!({
+        "name": coordinates.name(),
+        "vers": coordinates.version(),
+        "deps": entries,
+        "cksum": checksum,
+        "features": {},
+        "yanked": false
+    }))
+    .map_err(|_| invalid())?;
     line.push(b'\n');
     if line.len() > MAX_INDEX_LINE_BYTES {
         return Err(invalid());
     }
     Ok(line)
 }
+
 fn normalized_manifest(
     name: &str,
     version: &str,
-    original: &[u8],
-    registry_index: impl Fn(&str, &str, &str) -> io::Result<String>,
+    edition: &str,
+    dependencies: &[DirectDependency],
+    registries: &HostedRegistries,
 ) -> io::Result<String> {
-    let manifest: toml::Table =
-        toml::from_str(std::str::from_utf8(original).map_err(|_| invalid())?)
-            .map_err(|_| invalid())?;
-    let edition = manifest
-        .get("package")
-        .and_then(toml::Value::as_table)
-        .and_then(|package| package.get("edition"))
-        .and_then(toml::Value::as_str)
-        .ok_or_else(invalid)?;
     // All interpolated source values are already constrained by source admission;
     // quote through JSON for canonical ASCII TOML string escaping.
     let quote = |value: &str| serde_json::to_string(value).map_err(|_| invalid());
@@ -408,43 +364,156 @@ fn normalized_manifest(
         quote(edition)?,
         quote(&name.replace('-', "_"))?
     );
-    if let Some(entries) = manifest.get("dependencies").and_then(toml::Value::as_table) {
-        // Explicit sort independent of TOML map backend/configuration.
-        let ordered: BTreeMap<_, _> = entries.iter().collect();
-        for (name, value) in ordered {
-            let (version, defaults, index) = if let Some(pin) = value.as_str() {
-                (pin, true, PUBLIC_INDEX.to_owned())
-            } else {
-                let fields = value.as_table().ok_or_else(invalid)?;
-                let pin = fields
-                    .get("version")
-                    .and_then(toml::Value::as_str)
-                    .ok_or_else(invalid)?;
-                let index =
-                    if let Some(alias) = fields.get("registry").and_then(toml::Value::as_str) {
-                        registry_index(alias, name, pin)?
-                    } else {
-                        PUBLIC_INDEX.to_owned()
-                    };
-                (
-                    pin,
-                    fields
-                        .get("default-features")
-                        .and_then(toml::Value::as_bool)
-                        .unwrap_or(true),
-                    index,
-                )
-            };
-            normalized += &format!(
-                "[dependencies.{}]\nversion={}\ndefault-features={}\nregistry-index={}\n",
-                quote(name)?,
-                quote(version)?,
-                defaults,
-                quote(&index)?
-            );
-        }
+    for DirectDependency {
+        name,
+        requirement,
+        default_features,
+        origin,
+    } in dependencies
+    {
+        let index = registry_index(origin, registries)?;
+        normalized += &format!(
+            "[dependencies.{}]\nversion={}\ndefault-features={}\nregistry-index={}\n",
+            quote(name)?,
+            quote(requirement)?,
+            default_features,
+            quote(index)?
+        );
     }
     Ok(normalized)
+}
+
+fn recover_registries(
+    original: &[u8],
+    lock: &[u8],
+) -> Result<HostedRegistries, super::staging::Error> {
+    use super::staging::Error;
+    if original.len() > cargo_inputs::MAX_MANIFEST_BYTES
+        || lock.len() > cargo_inputs::MAX_LOCKFILE_BYTES
+    {
+        return Err(Error::Integrity);
+    }
+    let manifest: toml::Table = std::str::from_utf8(original)
+        .map_err(|_| Error::Integrity)?
+        .parse()
+        .map_err(|_| Error::Integrity)?;
+    let lock: toml::Table = std::str::from_utf8(lock)
+        .map_err(|_| Error::Integrity)?
+        .parse()
+        .map_err(|_| Error::Integrity)?;
+    let rows = lock
+        .get("package")
+        .and_then(toml::Value::as_array)
+        .ok_or(Error::Integrity)?;
+    let mut roots = rows.iter().filter(|row| row.get("source").is_none());
+    let root = roots.next().ok_or(Error::Integrity)?;
+    if roots.next().is_some() {
+        return Err(Error::Integrity);
+    }
+    let edges = match root.get("dependencies") {
+        Some(value) => value.as_array().ok_or(Error::Integrity)?.as_slice(),
+        None => &[],
+    };
+    let public_source = format!("registry+{PUBLIC_INDEX}");
+    let mut by_alias: BTreeMap<String, HostedRegistry> = BTreeMap::new();
+    if let Some(dependencies) = manifest.get("dependencies") {
+        let entries = dependencies.as_table().ok_or(Error::Integrity)?;
+        for (name, value) in entries {
+            let Some(fields) = value.as_table() else {
+                continue;
+            };
+            let Some(alias) = fields.get("registry") else {
+                continue;
+            };
+            let alias = alias.as_str().ok_or(Error::Integrity)?;
+            let pin = fields
+                .get("version")
+                .and_then(toml::Value::as_str)
+                .and_then(|v| v.strip_prefix('='))
+                .ok_or(Error::Integrity)?;
+            let pin_release = release_version(pin);
+            let mut matches = rows.iter().filter(|row| {
+                let Some(source) = row.get("source").and_then(toml::Value::as_str) else {
+                    return false;
+                };
+                let Some(version) = row.get("version").and_then(toml::Value::as_str) else {
+                    return false;
+                };
+                source != public_source
+                    && row.get("name").and_then(toml::Value::as_str) == Some(name.as_str())
+                    && release_version(version) == pin_release
+                    && edges.iter().any(|edge| {
+                        edge.as_str().is_some_and(|edge| {
+                            edge == name
+                                || edge == format!("{name} {version}")
+                                || edge == format!("{name} {version} ({source})")
+                        })
+                    })
+            });
+            let row = matches.next().ok_or(Error::Integrity)?;
+            if matches.next().is_some() {
+                return Err(Error::Integrity);
+            }
+            let source = row
+                .get("source")
+                .and_then(toml::Value::as_str)
+                .ok_or(Error::Integrity)?;
+            let binding = binding_from_lock_source(alias, source)?;
+            if let Some(existing) = by_alias.get(alias) {
+                if existing != &binding {
+                    return Err(Error::Integrity);
+                }
+            } else {
+                by_alias.insert(alias.to_owned(), binding);
+            }
+        }
+    }
+    let mut synthetic = 0usize;
+    for row in rows {
+        let Some(source) = row.get("source").and_then(toml::Value::as_str) else {
+            continue;
+        };
+        if source == public_source || by_alias.values().any(|b| b.lock_source() == source) {
+            continue;
+        }
+        let alias = loop {
+            let candidate = format!("transitive-{synthetic}");
+            synthetic += 1;
+            if !by_alias.contains_key(&candidate) {
+                break candidate;
+            }
+        };
+        let binding = binding_from_lock_source(&alias, source)?;
+        by_alias.insert(alias, binding);
+    }
+    HostedRegistries::new(by_alias.into_values().collect()).map_err(|_| Error::Integrity)
+}
+
+fn binding_from_lock_source(
+    alias: &str,
+    source: &str,
+) -> Result<HostedRegistry, super::staging::Error> {
+    use super::staging::Error;
+    let index = if source.starts_with("sparse+") {
+        source
+    } else {
+        source
+            .strip_prefix("registry+")
+            .filter(|index| !index.starts_with("sparse+"))
+            .ok_or(Error::Integrity)?
+    };
+    let id = RegistryId::new(alias).map_err(|_| Error::Integrity)?;
+    let binding = HostedRegistry::new(id, index).map_err(|_| Error::Integrity)?;
+    if binding.lock_source() != source {
+        return Err(Error::Integrity);
+    }
+    Ok(binding)
+}
+
+fn release_version(version: &str) -> &str {
+    version
+        .split_once('+')
+        .map_or(version, |(release, _)| release)
 }
 
 fn invalid() -> io::Error {

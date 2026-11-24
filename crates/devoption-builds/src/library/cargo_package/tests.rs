@@ -1041,11 +1041,42 @@ fn decoder_rejects_coordinated_archive_and_index_edits() {
         encoder.write_all(&tar).unwrap();
         changed.archive = encoder.finish().unwrap();
         changed.sha256 = Sha256::digest(&changed.archive);
-        let manifest = std::str::from_utf8(&files["Cargo.toml"])
+        let manifest: toml::Table = std::str::from_utf8(&files["Cargo.toml"])
             .unwrap()
             .parse()
             .unwrap();
-        changed.index_line = index_metadata(&changed.source, changed.sha256, &manifest).unwrap();
+        let deps: Vec<_> = manifest["dependencies"]
+            .as_table()
+            .unwrap()
+            .iter()
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .map(|(name, value)| {
+                let fields = value.as_table().unwrap();
+                let index = fields["registry-index"].as_str().unwrap();
+                json!({
+                    "name": name,
+                    "req": fields["version"].as_str().unwrap(),
+                    "features": [],
+                    "optional": false,
+                    "default_features": fields["default-features"].as_bool().unwrap(),
+                    "target": null,
+                    "kind": "normal",
+                    "registry": if index == changed.source.coordinates().registry().index() { None } else { Some(index) }
+                })
+            })
+            .collect();
+        let mut line = serde_json::to_vec(&json!({
+            "name": changed.source.coordinates().name(),
+            "vers": changed.source.coordinates().version(),
+            "deps": deps,
+            "cksum": checksum(&changed.archive),
+            "features": {},
+            "yanked": false
+        }))
+        .unwrap();
+        line.push(b'\n');
+        changed.index_line = line;
         // Archive, index and outer digest agree; only the source binding detects this.
         assert_eq!(
             CargoPackage::decode(&changed.encode()).err(),
@@ -1071,5 +1102,192 @@ fn decoder_uses_source_qualified_direct_lock_edges() {
         &format!("'private-base 0.1.0 ({INDEX})','bridge'"),
         &rows, "pub fn value() {}\n", None,
     )).unwrap();
+    assert!(CargoPackage::decode(&package.encode()).unwrap() == package);
+}
+
+#[test]
+fn package_generation_uses_admitted_direct_dependencies_and_edition() {
+    let second_index = "https://other.example.test/index";
+    let registries = HostedRegistries::new(vec![
+        binding(),
+        HostedRegistry::new(RegistryId::new("other").unwrap(), second_index).unwrap(),
+    ])
+    .unwrap();
+    let manifest = "\
+[package]
+name = 'admitted-helper'
+version = '0.2.0'
+edition = '2021'
+build = false
+
+[lib]
+name = 'admitted_helper'
+crate-type = ['rlib']
+
+[dependencies]
+z-public = '=1.0.1'
+a-public-min = { version = '=1.0.0', default-features = false }
+m-hosted = { version = '=0.1.0', registry = 'team' }
+b-hosted-min = { version = '=0.2.0', registry = 'other', default-features = false }
+";
+    let lock = format!(
+        "version = 4
+[[package]]
+name = 'admitted-helper'
+version = '0.2.0'
+dependencies = ['a-public-min', 'b-hosted-min', 'm-hosted', 'z-public']
+[[package]]
+name = 'a-public-min'
+version = '1.0.0'
+source = 'registry+{PUBLIC_INDEX}'
+checksum = '{}'
+[[package]]
+name = 'b-hosted-min'
+version = '0.2.0+meta.1'
+source = 'registry+{second_index}'
+checksum = '{}'
+[[package]]
+name = 'm-hosted'
+version = '0.1.0'
+source = '{INDEX}'
+checksum = '{}'
+[[package]]
+name = 'z-public'
+version = '1.0.1+build.9'
+source = 'registry+{PUBLIC_INDEX}'
+checksum = '{}'
+",
+        checksum(b"a-public-min"),
+        checksum(b"b-hosted-min"),
+        checksum(b"m-hosted"),
+        checksum(b"z-public"),
+    );
+    let source = ProofFixture::with_files(&[
+        ("Cargo.toml", manifest.as_bytes()),
+        ("Cargo.lock", lock.as_bytes()),
+        ("src/lib.rs", b"pub fn ok() {}\n"),
+    ])
+    .verify_with_registries(&registries)
+    .unwrap();
+    assert_eq!(source.edition(), "2021");
+    assert!(
+        source.direct_dependencies()
+            == [
+                DirectDependency {
+                    name: "a-public-min".into(),
+                    requirement: "=1.0.0".into(),
+                    default_features: false,
+                    origin: CargoOrigin::CratesIo,
+                },
+                DirectDependency {
+                    name: "b-hosted-min".into(),
+                    requirement: "=0.2.0".into(),
+                    default_features: false,
+                    origin: CargoOrigin::DevOption(RegistryId::new("other").unwrap()),
+                },
+                DirectDependency {
+                    name: "m-hosted".into(),
+                    requirement: "=0.1.0".into(),
+                    default_features: true,
+                    origin: CargoOrigin::DevOption(RegistryId::new("team").unwrap()),
+                },
+                DirectDependency {
+                    name: "z-public".into(),
+                    requirement: "=1.0.1".into(),
+                    default_features: true,
+                    origin: CargoOrigin::CratesIo,
+                },
+            ]
+    );
+    let package = CargoPackage::from_source(binding(), [1; 16], [2; 16], &source).unwrap();
+    let files = unpack(&package);
+    let normalized: toml::Table = std::str::from_utf8(&files["admitted-helper-0.2.0/Cargo.toml"])
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(normalized["package"]["edition"].as_str(), Some("2021"));
+    assert_eq!(
+        normalized["dependencies"]["a-public-min"]["default-features"].as_bool(),
+        Some(false)
+    );
+    assert_eq!(
+        normalized["dependencies"]["b-hosted-min"]["registry-index"].as_str(),
+        Some(second_index)
+    );
+    assert_eq!(
+        normalized["dependencies"]["m-hosted"]["default-features"].as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        normalized["dependencies"]["z-public"]["version"].as_str(),
+        Some("=1.0.1")
+    );
+    let row: serde_json::Value = serde_json::from_slice(package.index_line()).unwrap();
+    assert_eq!(
+        row["deps"],
+        json!([
+            {"name":"a-public-min","req":"=1.0.0","features":[],"optional":false,"default_features":false,"target":null,"kind":"normal","registry":PUBLIC_INDEX},
+            {"name":"b-hosted-min","req":"=0.2.0","features":[],"optional":false,"default_features":false,"target":null,"kind":"normal","registry":second_index},
+            {"name":"m-hosted","req":"=0.1.0","features":[],"optional":false,"default_features":true,"target":null,"kind":"normal","registry":null},
+            {"name":"z-public","req":"=1.0.1","features":[],"optional":false,"default_features":true,"target":null,"kind":"normal","registry":PUBLIC_INDEX},
+        ])
+    );
+    assert!(CargoPackage::decode(&package.encode()).unwrap() == package);
+}
+
+#[test]
+fn decoder_round_trips_transitive_hosted_registry_dependencies() {
+    let other_index = "sparse+https://other.example.test/index/";
+    let registries = HostedRegistries::new(vec![
+        binding(),
+        HostedRegistry::new(RegistryId::new("other").unwrap(), other_index).unwrap(),
+    ])
+    .unwrap();
+    let manifest = "\
+[package]
+name = 'transitive-helper'
+version = '0.1.0'
+edition = '2024'
+build = false
+
+[lib]
+name = 'transitive_helper'
+crate-type = ['rlib']
+
+[dependencies]
+direct-hosted = { version = '=0.1.0', registry = 'team' }
+";
+    let lock = format!(
+        "version = 4
+[[package]]
+name = 'transitive-helper'
+version = '0.1.0'
+dependencies = ['direct-hosted']
+[[package]]
+name = 'direct-hosted'
+version = '0.1.0'
+source = '{INDEX}'
+checksum = '{}'
+dependencies = ['indirect-hosted']
+[[package]]
+name = 'indirect-hosted'
+version = '0.1.0'
+source = '{other_index}'
+checksum = '{}'
+",
+        checksum(b"direct-hosted"),
+        checksum(b"indirect-hosted"),
+    );
+    let source = ProofFixture::with_files(&[
+        ("Cargo.toml", manifest.as_bytes()),
+        ("Cargo.lock", lock.as_bytes()),
+        ("src/lib.rs", b"pub fn ok() {}\n"),
+    ])
+    .verify_with_registries(&registries)
+    .unwrap();
+    let package = CargoPackage::from_source(binding(), [3; 16], [4; 16], &source).unwrap();
+    let row: serde_json::Value = serde_json::from_slice(package.index_line()).unwrap();
+    assert_eq!(row["deps"].as_array().unwrap().len(), 1);
+    assert_eq!(row["deps"][0]["name"], "direct-hosted");
     assert!(CargoPackage::decode(&package.encode()).unwrap() == package);
 }

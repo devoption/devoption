@@ -95,7 +95,7 @@ impl HostedRegistries {
     pub fn bindings(&self) -> &[HostedRegistry] {
         &self.0
     }
-    pub(crate) fn named(&self, name: &str) -> Option<&HostedRegistry> {
+    pub fn named(&self, name: &str) -> Option<&HostedRegistry> {
         self.0.iter().find(|b| b.id.as_str() == name)
     }
     pub(crate) fn source(&self, source: &str) -> Option<&HostedRegistry> {
@@ -143,6 +143,9 @@ mod tests {
         ])
         .unwrap();
         assert_eq!(set.bindings()[0].id().as_str(), "other");
+        assert!(set.named("team") == Some(&sparse));
+        assert!(set.named("other").is_some());
+        assert!(set.named("missing").is_none());
         assert!(
             set == HostedRegistries::new(vec![
                 binding("other", "https://other.example.test/index"),

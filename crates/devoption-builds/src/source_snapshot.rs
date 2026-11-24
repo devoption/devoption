@@ -62,6 +62,8 @@ pub struct SourceSnapshot {
     files: Vec<SourceFile>,
     package: String,
     version: String,
+    edition: String,
+    direct_dependencies: Vec<cargo_inputs::DirectDependency>,
     target: cargo_inputs::SourceTarget,
     sha256: Sha256,
 }
@@ -87,6 +89,12 @@ impl SourceSnapshot {
     }
     pub fn version(&self) -> &str {
         &self.version
+    }
+    pub fn edition(&self) -> &str {
+        &self.edition
+    }
+    pub fn direct_dependencies(&self) -> &[cargo_inputs::DirectDependency] {
+        &self.direct_dependencies
     }
     pub fn binary(&self) -> Option<&str> {
         match self.target {
@@ -247,6 +255,8 @@ pub fn verify_with_registries(
         files,
         package: inputs.package().into(),
         version: inputs.version().into(),
+        edition: inputs.edition().into(),
+        direct_dependencies: inputs.direct_dependencies().to_vec(),
         target: inputs.target().clone(),
     })
 }

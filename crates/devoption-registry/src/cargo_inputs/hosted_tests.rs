@@ -287,3 +287,62 @@ fn inspected_edges_preserve_exact_transitive_origins_and_checksums() {
             .all(|p| p.dependencies().is_empty())
     );
 }
+
+#[test]
+fn inspected_inputs_expose_edition_and_sorted_direct_dependencies() {
+    let inputs =
+        inspect_with_registries(manifest().as_bytes(), locked().as_bytes(), &bindings()).unwrap();
+    assert_eq!(inputs.edition(), "2024");
+    assert!(
+        inputs.direct_dependencies()
+            == [
+                DirectDependency {
+                    name: "helper".into(),
+                    requirement: "=0.1.0".into(),
+                    default_features: true,
+                    origin: CargoOrigin::DevOption(RegistryId::new("team").unwrap()),
+                },
+                DirectDependency {
+                    name: "shared".into(),
+                    requirement: "=1.0.0".into(),
+                    default_features: true,
+                    origin: CargoOrigin::CratesIo,
+                },
+            ]
+    );
+    let disabled = manifest()
+        .replace("edition='2024'", "edition='2021'")
+        .replace(
+            "version='=0.1.0',registry='team'",
+            "version='=0.1.0',registry='team',default-features=false",
+        )
+        .replace(
+            "shared='=1.0.0'",
+            "shared={version='=1.0.0',default-features=false}",
+        );
+    let inputs =
+        inspect_with_registries(disabled.as_bytes(), locked().as_bytes(), &bindings()).unwrap();
+    assert_eq!(inputs.edition(), "2021");
+    assert!(
+        inputs.direct_dependencies()
+            == [
+                DirectDependency {
+                    name: "helper".into(),
+                    requirement: "=0.1.0".into(),
+                    default_features: false,
+                    origin: CargoOrigin::DevOption(RegistryId::new("team").unwrap()),
+                },
+                DirectDependency {
+                    name: "shared".into(),
+                    requirement: "=1.0.0".into(),
+                    default_features: false,
+                    origin: CargoOrigin::CratesIo,
+                },
+            ]
+    );
+    let empty_manifest = "[package]\nname='empty'\nversion='0.1.0'\nedition='2021'\nbuild=false\n";
+    let empty_lock = "version=4\n[[package]]\nname='empty'\nversion='0.1.0'\n";
+    let inputs = inspect(empty_manifest.as_bytes(), empty_lock.as_bytes()).unwrap();
+    assert_eq!(inputs.edition(), "2021");
+    assert!(inputs.direct_dependencies().is_empty());
+}
