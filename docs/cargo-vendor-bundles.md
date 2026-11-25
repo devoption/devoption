@@ -61,9 +61,11 @@ wasip2's default features select std and forward bitflags to wit-bindgen, whose
 default features are disabled by wasip2. Only its optional bitflags edge is
 admitted. The pinned wit-bindgen build script copies and links its included
 `src/rt/libwit_bindgen_cabi.a` canonical-ABI allocator on wasm32; it has no build
-dependencies. Direct root dependencies on public wit-bindgen and incoming edges
-from any package other than pinned wasip2 are refused, preventing default macro
-or async activation hidden by an incomplete supplied lock. Root feature requests
+dependencies. Direct root public wit-bindgen is also admitted with exactly
+`version = "=0.46.0", default-features = false`; additional keys, including
+features, are refused. Incoming edges from any package other than pinned wasip2
+remain refused, preventing default macro or async activation hidden by an
+incomplete supplied lock. Root feature requests
 remain unsupported. Inactive optional declarations and feature definitions in
 these authenticated manifests grant no permission to acquire extra packages.
 The included `wasi-cli@0.2.0.wasm` is an inert archive member; `@` is accepted in
@@ -164,9 +166,10 @@ The broker derives this fixed child from the existing attempt token and mounts
 it read-only at `/vendor`. The worker accepts only direct directory-source
 replacement configuration with explicit matching registry identities; Cargo stays
 locked, offline, uncredentialed and inside the existing isolation/resource policy.
-When registry support is disabled, the existing installed global vendor and
-lockfile configuration remains the build path. Missing, corrupt or unauthorized
-configured-registry inputs fail; they do not select that legacy path.
+When registry support is disabled, the installed global vendor and lockfile
+configuration remains the build path. With registry support enabled, the exact
+operator-audited public app profile below can also select that path. Missing,
+corrupt or unauthorized registry inputs never trigger a retry through it.
 
 Inputs belong to the attempt and follow existing history/retention cleanup. They
 are never a shared persistent vendor store: a restart forgets pending reviews,
@@ -193,3 +196,87 @@ grants remained rejected. Existing library publication, independent consumers,
 version update, retained older lock and staged-input corruption checks passed.
 This is disposable installation evidence, not a production rollout or a general
 Cargo feature/build-script compatibility claim.
+
+## Operator-audited public app profile
+
+Under [#452](https://github.com/devoption/devoption/issues/452), a public-only
+WASIp2 `cdylib` selects the installed prepared vendor when its **entire** committed
+lockfile SHA-256 equals `lock_sha256` in the installed build configuration.
+Selection happens before registry acquisition, at both preparation and approval;
+it is never a fallback after a registry or integrity error. The ordinary source
+validator still requires exact direct versions and a closed lock graph, refusing
+root features, aliases, target/build dependencies and other unsupported manifest
+semantics. Direct public wit-bindgen must use exactly `=0.46.0` with explicit
+`default-features = false`; no extra features can be requested on either path.
+
+This reuses the existing `prepare_profile(..., None)` contract: the operator
+vouches for the complete prepared dependency tree, including all manifests,
+checksums, executable build scripts and possible proc macros. The configured
+`vendor_sha256` authenticates actual tree paths, file bytes and modes. Preparation,
+approval and execution rehash prepared inputs; the isolated worker enforces
+read-only input mounts and Cargo uses per-file checksums with `--locked --offline`. A hash
+is an integrity binding, not an audit or permission to download packages. The
+operator must verify upstream archive checksums against the approved lock before
+preparing vendor inputs; archive acquisition remains outside hosted builds.
+
+We considered expanding the independent archive allowlist to the full serde_json
+closure. That would embed serde build-script, conditional dependency and proc-macro
+policy in the minimal static-site exception. The prepared profile is the smaller
+fit: it restores an existing operator trust boundary without broadening that
+exception or implementing a partial Cargo feature resolver. There is one installed
+prepared lock, including its root package and edges, rather than a new profile
+store or automatic acceptance of other public packages.
+
+The trusted `tests/fixtures/records-json` fixture pins wasip2 `1.0.1+wasi-0.2.4`,
+wit-bindgen `0.46.0`, serde_json `1.0.154` and the exact JSON closure: itoa
+`1.0.18`, memchr `2.8.3`, serde/serde_core/serde_derive `1.0.229`, proc-macro2
+`1.0.107`, quote `1.0.47`, syn `3.0.9`, unicode-ident `1.0.27`, zmij `1.0.23`
+(and bitflags `2.13.2`). Serde's derive/proc-macro packages are retained in the
+lock/vendor closure; the fixture requests no derive feature. Their presence
+is not a general proc-macro exception. Operators audit the entire prepared
+closure, including dormant packages. The fixture includes upstream-generated
+`devoption:app/records` imports, parses JSON, and exports a WASIp2 HTTP handler.
+
+Every project containing a hosted-registry package still uses registry
+materialization and current publication/reader grants, even if its lock matches
+the configured prepared lock. Mixed JSON/hosted-library apps outside the restricted
+manifest and pinned static-site policies remain unsupported. Other public locks
+also retain the existing registry policy. No grant, isolation or runtime records
+permission is conferred by selecting prepared inputs.
+
+### Validation and rollout
+
+Ordinary builds tests cover exact-lock selection, checksum/edge/additional-node
+mutations, unsafe wit-bindgen declarations, static-site compatibility and refusal
+to select prepared inputs for hosted packages. Server tests exercise selection
+with registry support enabled, missing public archive refusal on the registry
+path, and refusal to bypass hosted consumer grants. Existing archive mutation and
+private library consumer tests remain in place.
+
+The explicit trusted Cargo proof requires a preverified Cargo vendor tree for
+that fixture, its tree digest (the installed `vendor_sha256` algorithm), and a
+Rust toolchain with the `wasm32-wasip2` target and linker. It downloads nothing:
+
+```sh
+DEVOPTION_TEST_WASIP2_VENDOR=/absolute/prepared/vendor \
+DEVOPTION_TEST_WASIP2_VENDOR_SHA256=THE_VERIFIED_TREE_SHA256 \
+cargo test -p devoption-builds --lib prepared_records_json_build \
+  --locked --offline -- --ignored --nocapture
+```
+
+`DEVOPTION_TEST_WASIP2_RUSTC` optionally selects the matching installed compiler.
+The proof uses fresh Cargo homes and targets, verifies a component containing the
+records import, builds the existing static-site example, then mutates a disposable
+vendor copy and checks both tree-digest
+and Cargo checksum refusal. It does not exercise Linux broker isolation, owner
+HTTP approval or runtime/database behavior.
+
+Rollout requires a separately authorized controller update. Before enabling the
+profile, audit the app's exact committed lock, verify all archive checksums, and
+prepare its complete vendor directory using trusted operator tooling. Set the
+installed `vendor_sha256` and `lock_sha256` to those verified inputs using the
+existing installation workflow; retain previous configuration and vendor inputs
+for rollback. Preserve toolchain hashes, storage roots and registry/grant settings.
+Restart the owning controller to load the updated configuration, then exercise a
+fresh review/approval build and mutation refusals on a disposable installation
+before any live rollout. No live deployment is performed by this change.

@@ -326,6 +326,10 @@ async fn action(
             &bindings,
         )
         .map_err(|_| StatusCode::CONFLICT)?;
+        let prepared_app = engine_guard
+            .config
+            .uses_prepared_app_dependencies(&source)
+            .map_err(|_| StatusCode::CONFLICT)?;
         if approve {
             let review = engine_guard.pending.as_ref().ok_or(StatusCode::CONFLICT)?;
             let plan = review.job.plan().details();
@@ -341,10 +345,15 @@ async fn action(
             {
                 return Err(StatusCode::CONFLICT);
             }
+            if registry_guard.is_some() && engine_guard.dependencies.is_none() != prepared_app {
+                return Err(StatusCode::CONFLICT);
+            }
             review
                 .verify_dependency_inputs()
                 .map_err(|_| StatusCode::CONFLICT)?;
-            if let Some(registry) = &registry_guard {
+            if let Some(registry) = &registry_guard
+                && !prepared_app
+            {
                 registry.revalidate_dependencies(
                     &catalog,
                     project,
@@ -391,8 +400,16 @@ async fn action(
             engine_guard.dependencies = None;
             let dependencies = registry_guard
                 .as_ref()
-                .map(|registry| registry.prepare_dependencies(&catalog, project, &source))
-                .transpose()?;
+                .map(|registry| {
+                    registry.prepare_dependencies_for_review(
+                        &catalog,
+                        project,
+                        &source,
+                        prepared_app,
+                    )
+                })
+                .transpose()?
+                .flatten();
             let review = if let Some(prepared) = &dependencies {
                 devoption_builds::execution::prepare_with_vendor(
                     &engine_guard.config,

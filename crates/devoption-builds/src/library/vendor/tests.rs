@@ -596,3 +596,65 @@ fn public_static_site_closure_is_pinned_without_relaxing_the_generic_profile() {
             .any(|f| f.path().ends_with("/src/rt/libwit_bindgen_cabi.a"))
     );
 }
+
+#[test]
+fn direct_runtime_only_wit_bindgen_keeps_the_pinned_archive_policy() {
+    use crate::source_snapshot::tests::ProofFixture;
+    let manifest = String::from_utf8(
+        include_bytes!("../../../../../examples/static-site/Cargo.toml").to_vec(),
+    )
+    .unwrap()
+        + "wit-bindgen={version='=0.46.0',default-features=false}\n";
+    let lock = include_str!("../../../../../examples/static-site/Cargo.lock")
+        .replace(" \"wasip2\",", " \"wasip2\",\n \"wit-bindgen\",");
+    let source = ProofFixture::with_files(&[
+        ("Cargo.toml", manifest.as_bytes()),
+        ("Cargo.lock", lock.as_bytes()),
+        ("src/lib.rs", b"pub fn fixture() {}"),
+    ])
+    .verify()
+    .unwrap();
+    let archives: [&[u8]; 3] = [
+        include_bytes!("../../../tests/fixtures/wasip2-closure/wasip2-1.0.1+wasi-0.2.4.crate"),
+        include_bytes!("../../../tests/fixtures/wasip2-closure/wit-bindgen-0.46.0.crate"),
+        include_bytes!("../../../tests/fixtures/wasip2-closure/bitflags-2.13.2.crate"),
+    ];
+    let public: Vec<_> = archives
+        .iter()
+        .map(
+            |bytes| crate::library::publication::dependencies::PublicArchive {
+                package: source
+                    .request()
+                    .packages()
+                    .iter()
+                    .find(|p| p.archive_sha256 == Sha256::digest(bytes))
+                    .unwrap(),
+                bytes,
+            },
+        )
+        .collect();
+    let f = Fixture::new();
+    let captured = f
+        .policy
+        .locked_archives(OWNER, f.first, &f.catalog, &f.candidates, &source, &public)
+        .unwrap();
+    f.policy
+        .vendor_inputs(OWNER, &f.catalog, &f.candidates, &source, &captured)
+        .unwrap();
+    let graph =
+        devoption_registry::cargo_inputs::inspect(manifest.as_bytes(), lock.as_bytes()).unwrap();
+    for dep in [
+        "'=0.46.0'",
+        "{version='=0.46.0'}",
+        "{version='=0.46.0',default-features=false,features=['macros']}",
+        "{version='=0.46.0',default-features=false,features=['async']}",
+    ] {
+        assert!(
+            wasip2::context(
+                format!("[dependencies]\nwit-bindgen={dep}").as_bytes(),
+                graph.package_dependencies()
+            )
+            .is_err()
+        );
+    }
+}
