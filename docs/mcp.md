@@ -212,11 +212,10 @@ that a subsequent Codex tool call fails with an observed HTTP 401. It also runs
 the app-server OAuth login, delivers consent to its real loopback callback
 listener, verifies the matching successful completion notification, and reads
 through a newly consented native client runtime before revoking that grant.
-Ephemeral
-client runtime is created; no model turn is started, no model-provider request is
-made, and no API key is forwarded. Codex can attempt background catalog/plugin
-connections during startup; the restricted proxy rejects those CONNECT requests
-without contacting their hosts and reports the count.
+Ephemeral client runtime is created; no model turn is started, no model-provider
+request is made, and no API key is forwarded. Codex can attempt background
+catalog/plugin connections during startup; the restricted proxy rejects those
+CONNECT requests without contacting their hosts and reports the count.
 
 All fixture processes, test trust and Codex credentials are temporary. The checker
 requests graceful Rust fixture shutdown using `DEVOPTION_MCP_FIXTURE_STOP` so the

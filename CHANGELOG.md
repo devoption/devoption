@@ -19,6 +19,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Rejoin the split ephemeral client runtime sentence in the MCP Codex check
+  documentation ([#411](https://github.com/devoption/devoption/issues/411)).
+
 - Admit registry-enabled public WASIp2 apps through the exact operator-audited
   prepared lock/vendor profile, and permit pinned runtime-only direct wit-bindgen
   imports while retaining registry grant checks and feature/checksum refusals
