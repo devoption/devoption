@@ -20,6 +20,33 @@ impl Engine {
         HostedRegistries::new(vec![self.root.binding.clone()])
             .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)
     }
+    /// `prepared_app` comes from the installed configuration's exact-lock selector.
+    /// Never retry a failed registry acquisition through prepared inputs.
+    pub(in crate::server::projects) fn prepare_dependencies_for_review(
+        &self,
+        catalog: &Catalog,
+        project: ProjectId,
+        source: &SourceSnapshot,
+        prepared_app: bool,
+    ) -> Result<Option<Prepared>, StatusCode> {
+        if prepared_app {
+            if source
+                .request()
+                .packages()
+                .iter()
+                .any(|p| p.origin != CargoOrigin::CratesIo)
+                || !matches!(
+                    source.target(),
+                    devoption_registry::cargo_inputs::SourceTarget::Cdylib { .. }
+                )
+            {
+                return Err(StatusCode::CONFLICT);
+            }
+            return Ok(None);
+        }
+        self.prepare_dependencies(catalog, project, source)
+            .map(Some)
+    }
     pub(in crate::server::projects) fn prepare_dependencies(
         &self,
         catalog: &Catalog,

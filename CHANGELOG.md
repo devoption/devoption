@@ -19,6 +19,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Admit registry-enabled public WASIp2 apps through the exact operator-audited
+  prepared lock/vendor profile, and permit pinned runtime-only direct wit-bindgen
+  imports while retaining registry grant checks and feature/checksum refusals
+  ([#452](https://github.com/devoption/devoption/issues/452)).
+
 - Read build retention release references once per reconciliation, batch history
   compaction into a single snapshot publication after file removal, and scope
   post-build and replaced-review cleanup to the affected project

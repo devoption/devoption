@@ -65,9 +65,8 @@ pub(super) fn check(
     Ok(true)
 }
 
-/// The allocator runtime is admitted only through wasip2's audited dependency
-/// declaration (which disables wit-bindgen defaults). Direct/default wit-bindgen
-/// would activate macros/async, even if a supplied lock falsely omits their edges.
+/// The allocator runtime permits a direct exact runtime-only declaration too.
+/// Defaults/macros/async must remain disabled even when a false lock omits edges.
 pub(super) fn context(
     root: &[u8],
     graph: &[devoption_registry::cargo_inputs::LockedDependencies],
@@ -82,7 +81,15 @@ pub(super) fn context(
         .and_then(|deps| deps.get("wit-bindgen"))
         && (dep.is_str() || dep.as_table().is_some_and(|t| !t.contains_key("registry")))
     {
-        return Err(Error::Invalid);
+        let table = dep.as_table().ok_or(Error::Invalid)?;
+        if table.get("version").and_then(toml::Value::as_str) != Some("=0.46.0")
+            || table.get("default-features").and_then(toml::Value::as_bool) != Some(false)
+            || table
+                .keys()
+                .any(|k| !["version", "default-features"].contains(&k.as_str()))
+        {
+            return Err(Error::Invalid);
+        }
     }
     for node in graph {
         if node.dependencies().iter().any(|p| pinned(p, 1)) && !pinned(node.package(), 0) {

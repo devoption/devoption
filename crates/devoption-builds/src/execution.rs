@@ -1,5 +1,8 @@
 //! Opt-in Linux build integration. Operator-installed broker is the OS boundary.
 mod attempt_vendor;
+mod dependency_profile;
+#[cfg(test)]
+mod dependency_profile_tests;
 mod inputs;
 use crate::{
     BuildPlan, EnvironmentEntry, Limits, PlanInput,
@@ -152,6 +155,11 @@ impl Configuration {
         result.revalidate()?;
         Ok(result)
     }
+    /// Select only the operator-audited public app lock. This is selection, not
+    /// verification: prepare/approval/execution still rehash prepared inputs.
+    pub fn uses_prepared_app_dependencies(&self, source: &SourceSnapshot) -> io::Result<bool> {
+        dependency_profile::matches(source, self.lock_hash)
+    }
     pub fn check_storage(
         &self,
         owner: &Path,
@@ -297,6 +305,8 @@ impl Review {
     pub fn verify_dependency_inputs(&self) -> io::Result<()> {
         if let Some(vendor) = &self.vendor {
             vendor.verify()?;
+        } else {
+            self.configuration.revalidate()?;
         }
         Ok(())
     }
@@ -375,6 +385,7 @@ fn prepare_profile(
     history: &mut History,
     vendor: Option<Arc<crate::library::vendor::VendorInputs>>,
 ) -> io::Result<Review> {
+    dependency_profile::validate(source.direct_dependencies())?;
     config.revalidate()?;
     if vendor.is_none() && source.request().lockfile_sha256() != config.lock_hash {
         return Err(io::Error::other(

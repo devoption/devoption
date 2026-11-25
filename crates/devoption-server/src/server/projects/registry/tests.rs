@@ -1011,6 +1011,13 @@ fn consumer_dependency_review_reacquires_current_policy_and_exact_archives() {
             .prepare_dependencies(&catalog, f.consumer, &source)
             .is_err()
     );
+    // Even a mistakenly selected prepared profile cannot bypass hosted grants.
+    assert!(
+        engine
+            .blocking_lock()
+            .prepare_dependencies_for_review(&catalog, f.consumer, &source, true,)
+            .is_err()
+    );
     f.publish();
     let prepared = engine
         .blocking_lock()
@@ -1081,4 +1088,67 @@ fn operator_public_archives_are_bounded_private_and_not_symlinked() {
     fs::remove_file(&path).unwrap();
     symlink("/dev/null", &path).unwrap();
     assert!(engine.root.public_archives(&request).is_err());
+}
+
+#[test]
+fn prepared_public_app_skips_registry_materialization_without_an_error_fallback() {
+    let f = Fixture::new();
+    let root = f.registry.parent().unwrap().join("repositories");
+    let tree = root.join("consumer");
+    private(&tree.join("src"));
+    for (path, bytes) in [
+        (
+            "Cargo.toml",
+            include_bytes!(
+                "../../../../../devoption-builds/tests/fixtures/records-json/Cargo.toml"
+            )
+            .as_slice(),
+        ),
+        (
+            "Cargo.lock",
+            include_bytes!(
+                "../../../../../devoption-builds/tests/fixtures/records-json/Cargo.lock"
+            )
+            .as_slice(),
+        ),
+        ("src/lib.rs", b"pub fn fixture() {}".as_slice()),
+    ] {
+        fs::write(tree.join(path), bytes).unwrap();
+    }
+    git(&tree, &["init", "-b", "main"]);
+    git(&tree, &["add", "--all"]);
+    git(&tree, &["commit", "-m", "fixture"]);
+    let root = PermittedRoot::open_absolute(&root).unwrap();
+    let repository = f
+        .projects
+        .directory
+        .writer()
+        .unwrap()
+        .attach_repository(f.consumer, &root, Path::new("consumer"))
+        .unwrap();
+    let catalog = f.projects.directory.load().unwrap().unwrap();
+    let engine = f.projects.registry.as_ref().unwrap().blocking_lock();
+    let source = registered::capture_with_registries(
+        &catalog,
+        f.consumer,
+        repository,
+        &root,
+        &git(&tree, &["rev-parse", "HEAD"]),
+        devoption_builds::execution::registry(),
+        &engine.bindings().unwrap(),
+    )
+    .unwrap();
+    // The configuration selector is covered by builds' exact-lock mutation tests.
+    // With that selection, no per-registry archives or publications are required.
+    assert!(
+        engine
+            .prepare_dependencies_for_review(&catalog, f.consumer, &source, true)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        engine
+            .prepare_dependencies_for_review(&catalog, f.consumer, &source, false)
+            .is_err()
+    );
 }
