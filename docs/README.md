@@ -29,6 +29,7 @@ applications; project-specific roles remain planned.
 - [Deployment-bound secrets and scoped HTTPS integrations](app-https.md)
 - [Durable scoped HTTPS deliveries and restart/deduplication proof](durable-deliveries.md)
 - [Broader proposed app job contract](background-jobs-proposal.md)
+- [Configurable project workflow policy delivery plan](project-workflow-policy.md) — planning only
 - [Same-schema preview upgrades and full-state recovery](platform-upgrades.md)
 - [Signed preview upgrade, interruption and reboot acceptance](bundle-upgrade-acceptance.md)
 - [Ubuntu HTTPS system-service and reboot rehearsal](public-linux-rehearsal.md)
