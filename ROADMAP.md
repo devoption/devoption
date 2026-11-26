@@ -156,6 +156,9 @@ Once the single-server path is usable, extend the platform around it:
   workflows with changesets, reviews, repeatable pipelines and visible results.
   Carry source identity and approvals through testing, dependency/vulnerability
   checks, artifact promotion and deployment, with enforceable security gates.
+  The [opt-in project workflow policy plan](docs/project-workflow-policy.md)
+  splits [#41](https://github.com/devoption/devoption/issues/41) into proposed
+  delivery slices; configurable workflow enforcement remains unimplemented.
 - **Registries and packages.** Grow the existing dependency contract into verified
   acquisition and storage, private and public package registries, and controlled
   upstream proxy/cache services. Preserve package origin and integrity, apply

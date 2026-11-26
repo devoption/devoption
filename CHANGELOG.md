@@ -7,6 +7,10 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Document the proposed opt-in project workflow policy delivery slices and
+  acceptance matrix, keeping runtime enforcement explicitly unimplemented
+  ([#456](https://github.com/devoption/devoption/issues/456)).
+
 - Expose admitted package edition and direct dependencies from Cargo input
   inspection and verified source snapshots, and generate normalized Cargo
   package manifests and candidate index dependencies directly from those
