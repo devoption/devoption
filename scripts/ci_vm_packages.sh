@@ -11,7 +11,12 @@ if [[ "$ID" != ubuntu || "${VERSION_CODENAME:-}" != noble ]]; then
   exit 1
 fi
 case "${1:-}" in
-  vm-tools) packages=(qemu-system-x86 qemu-utils xorriso) ;;
+  vm-tools)
+    packages=(qemu-system-x86 qemu-utils xorriso)
+    if [[ "${2:-}" == apps && ! -x /usr/sbin/sshd ]]; then
+      packages+=(openssh-server)
+    fi
+    ;;
   installer-guest) packages=(git sudo build-essential) ;;
   installer-guest-download)
     # libsystemd0 is part of the tool closure. Include matching service packages
