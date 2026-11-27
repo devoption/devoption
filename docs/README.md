@@ -26,6 +26,7 @@ applications; project-specific roles remain planned.
 - [Verified Ubuntu bundle installer, safe retries and validation limits](bundle-installation.md)
 - [Project environment secrets and key custody](project-secrets.md)
 - [Independent project app deployments and hostnames](multiple-apps.md)
+- [Centrally managed clusters and application instances](cluster-management-proposal.md) — proposal and delivery sequence only
 - [Deployment-bound secrets and scoped HTTPS integrations](app-https.md)
 - [Durable scoped HTTPS deliveries and restart/deduplication proof](durable-deliveries.md)
 - [Broader proposed app job contract](background-jobs-proposal.md)
