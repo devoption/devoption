@@ -3,7 +3,9 @@
 Status: Accepted in [PR #236](https://github.com/devoption/devoption/pull/236)
 under [#229](https://github.com/devoption/devoption/issues/229). The opt-in
 [build](../web-app-builds.md) and [private runtime](../web-app-deployments.md)
-integrations implement the selected profile; public-host acceptance remains open.
+integrations implement the selected profile. The [public cloud report](../public-cloud-acceptance.md)
+records the later local deployment acceptance. The [managed cluster CLI](../managed-clusters.md)
+extends placement to prepared nodes without changing this guest ABI decision.
 
 ## Decision
 

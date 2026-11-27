@@ -160,7 +160,10 @@ supported starter web app with its first local commit, then open source checks.
 Existing-checkout attachment is an optional inspection/import path. Source editing,
 arbitrary commits and Git hosting remain unavailable. The selected
 web app has an opt-in [Linux build workflow](web-app-builds.md) and
-[private same-node deployment](web-app-deployments.md).
+[private local deployment](web-app-deployments.md). Operators can deploy saved
+releases to separate instances on prepared Linux nodes using the
+[managed cluster CLI](managed-clusters.md). Cluster management is outside the
+browser and MCP interfaces.
 
 Standalone reusable Rust libraries have a separate [review, build and source-download flow](library-builds.md).
 Registry publication and cross-project package distribution remain unimplemented.

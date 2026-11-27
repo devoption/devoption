@@ -12,8 +12,8 @@ steps you already trust — source, checks, build, and deploy — without adding
 promises beyond what is implemented and validated here.
 
 The sequence below expresses direction, not delivery dates or release promises.
-GitHub issues define individual changes. The immediate functional delivery track
-below takes priority; product release approval remains a separate gate.
+GitHub issues define individual changes. The completed local delivery track and managed-node preview below have distinct
+validation scopes. Product release approval remains a separate gate.
 
 ## Available today
 
@@ -34,6 +34,8 @@ The development preview supports:
   updates, explicit return to a saved release and approved restart recovery.
 - [Independent project app slots](docs/multiple-apps.md), each with a reviewed
   hostname/listener and separate deployment/recovery state.
+- [Managed nodes and application instances](docs/managed-clusters.md) via the
+  operator CLI, with reviewed placement, release staging and lifecycle actions.
 - [Two-host HTTPS configuration](docs/app-hostnames.md), local routing/certificate
   status, and [bounded same-node snapshots and staged restore](docs/same-node-recovery.md).
 
@@ -47,8 +49,9 @@ data-preserving removal/reinstallation. It does not prove fresh platform
 compilation, public cloud DNS, ACME issuance/renewal or external reachability.
 A later [fresh cloud acceptance run](docs/public-cloud-acceptance.md) passed those
 steps, including accelerated certificate renewal, updates, reboot, same-node
-restore and data-preserving reinstall. Its single-node/trusted-app limits apply;
-product release approval remains separate.
+restore and data-preserving reinstall. That run covered one Ubuntu host and a
+trusted app. It does not validate managed-node public ingress or cross-host
+recovery.
 
 The supported profile is trusted Rust/WASIp2 apps in explicit project slots on Ubuntu
 24.04 x86_64, with explicit operator-installed build and deployment support.
@@ -60,10 +63,10 @@ multi-tenant hosting and project-specific team roles remain unimplemented.
 [build contracts](docs/build-plans.md) remain separate from this selected
 [Wasm implementation contract](docs/decisions/0004-first-wasm-web-app.md).
 
-## Immediate priority: one VM, platform DNS, deployed web-app DNS
+## Completed local deployment track
 
-The next functional milestone is the owner's complete single-node path, tracked
-in [#228](https://github.com/devoption/devoption/issues/228):
+The first end-to-end installation and deployment track was validated on one
+Ubuntu VM, as tracked in [#228](https://github.com/devoption/devoption/issues/228):
 
 1. Create a cloud VM and install DevOption.
 2. Point a platform DNS name at the server and log into DevOption over HTTPS.
@@ -72,11 +75,7 @@ in [#228](https://github.com/devoption/devoption/issues/228):
 5. Point a second DNS name at the same server and route it to the app.
 6. Access the app through that name, deploy an update, and keep it usable after restart.
 
-This path now takes priority over broader platform expansion and optional
-maintenance. Each implementation task must advance one of these steps or remove
-an evidenced blocker to it. Prefer connecting existing components over adding
-more standalone contracts. Keep individual PRs reviewable, but complete each
-user-visible capability before moving to optional improvements.
+This path remains a regression baseline as the platform expands.
 
 ### Delivery sequence
 
@@ -101,7 +100,7 @@ against the accepted [Wasm-first direction](docs/decisions/0001-platform-boundar
 and #230/#233 explicitly add public hosting beyond their earlier local-only scope.
 Unaffected integrity, authorization and recovery criteria remain applicable.
 
-### Keep the first path small
+### Local acceptance scope
 
 Start with one owner, one Ubuntu 24.04 x86_64 VM and one trusted Rust HTTP web app.
 The selected [Wasm contract](docs/decisions/0004-first-wasm-web-app.md) now has
@@ -127,11 +126,12 @@ readiness. The provisional [v0.1.0 milestone](https://github.com/devoption/devop
 and [release approval gate #21](https://github.com/devoption/devoption/issues/21)
 remain separate from functional acceptance.
 
-Themes, UI refactoring, optional authentication maintenance, MCP expansion, package hosting,
-teams, configurable workflow engines and multi-server orchestration are deferred
-unless a concrete blocker to this path is established. Creating the task series
-is not permission to spend money, create credentials, change DNS or repository
-security, execute real workloads, merge changes or publish releases.
+## Managed-node validation
+
+The cluster CLI passed disposable OpenSSH and systemd tests for two instances
+on one prepared node. A real controller-to-node pilot still needs to verify
+cross-host deployment, independent instance recovery after reboot, and public
+HTTPS. The [operator guide](docs/managed-clusters.md) describes setup and limits.
 
 ## Optional MCP, across the platform
 
@@ -150,7 +150,7 @@ promise compatibility with every AI client or subscription.
 
 ## Later direction
 
-Once the single-server path is usable, extend the platform around it:
+Extend the completed local deployment track and the managed-node preview:
 
 - **Integrated source, review and pipelines.** Connect source editing and Git
   workflows with changesets, reviews, repeatable pipelines and visible results.
@@ -170,9 +170,10 @@ Once the single-server path is usable, extend the platform around it:
 - **Teams and access.** Extend shared workspace membership with project roles,
   scoped service access and shared audit history. Apply those permissions
   consistently to source, pipelines, packages, deployments and MCP.
-- **Multi-server orchestration.** Build on proven single-server operations to add
-  server enrollment, workload placement, coordinated rollouts, health monitoring
-  and recovery across servers, while retaining explicit access and resource bounds.
+- **Cluster orchestration.** Build on explicit CLI attachment and placement to
+  add managed provisioning, coordinated rollouts, cross-host recovery and
+  retention. The [cluster proposal](docs/cluster-management-proposal.md)
+  describes broader design work.
 
 Progress is tracked through [repository issues](https://github.com/devoption/devoption/issues)
 and the [changelog](CHANGELOG.md). Implemented behavior belongs in the user guide;

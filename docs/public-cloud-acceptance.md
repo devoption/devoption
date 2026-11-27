@@ -5,7 +5,9 @@ temporary DigitalOcean VM completed the [first-app runbook](first-web-app.md)
 for [#234](https://github.com/devoption/devoption/issues/234), including the
 public installation and hostname evidence for #230 and #233. The VM and its two
 added DNS records were removed afterward. These are recorded results, not a live
-demo or a product release approval.
+demo or a product release approval. This was one platform and app host. It
+does not extend to the [managed-node CLI](managed-clusters.md) or its public
+ingress and cross-host recovery.
 
 ## Environment and source installation
 

@@ -1,10 +1,12 @@
 # From a node to a maintained web app
 
-Use this path for the current single-node capability: one owner, one trusted
+Use this local deployment path for one owner, one trusted
 stateless Rust/WASIp2 app and two HTTPS hostnames. Source editing and node setup
 are operator actions; build review, release promotion, deployment, health and
 rollback are available in the interface. There is no browser code editor,
-arbitrary framework build, database or app login in this first profile.
+arbitrary framework build, database or app login in this first profile. For
+remote deployment from a controller to prepared nodes, see the
+[managed cluster CLI](managed-clusters.md).
 
 Start with a disposable Ubuntu 24.04 x86_64 VM. A production VM is unnecessary
 for development validation. The [public cloud acceptance](public-cloud-acceptance.md)

@@ -1,4 +1,8 @@
-# Independent hosted apps on one node
+# Independent local app slots
+
+This guide covers project slots on the controller host. To deploy a release to
+a prepared remote node and run multiple instances of one source project, use
+the [managed cluster CLI](managed-clusters.md).
 
 The opt-in deployment broker supports one to eight explicitly configured project
 slots. Each slot binds one saved project to one HTTPS hostname, loopback listener,

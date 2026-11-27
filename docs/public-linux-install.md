@@ -1,4 +1,7 @@
-# Single-node platform installation with HTTPS
+# Install the platform host with HTTPS
+
+This guide prepares the platform and optional local app ingress. For remote
+instance placement and separate node setup, see [managed clusters](managed-clusters.md).
 
 For installation without compiling DevOption, see the
 [verified bundle installer](bundle-installation.md). It currently requires an
