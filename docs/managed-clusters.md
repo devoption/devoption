@@ -50,9 +50,9 @@ or credentials.
 
 ## Install the controller and node adapter
 
-These files are available in the repository and preview bundle helpers. From a
-reviewed checkout, install the adapter alongside the root-owned local broker
-on the controller and every node:
+Install these cluster tools from a reviewed repository checkout. The preview
+bundle inventory remains unchanged. Install the adapter alongside the
+root-owned local broker on the controller and every node:
 
 ```sh
 sudo install -o root -g root -m 0755 scripts/cluster_broker.py \
