@@ -183,16 +183,16 @@ jobs:
         # HTTPS Ubuntu sources and bounded package setup; no acceptance skips.
         timeout-minutes: 5
         run: |
-          sudo env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash scripts/ci_vm_packages.sh vm-tools
+          sudo env DEVOPTION_DISPOSABLE_VM_PACKAGES=1 bash scripts/ci_vm_packages.sh vm-tools ${{ matrix.suite }}
           if [ -e /dev/kvm ]; then sudo setfacl -m "u:$(id -un):rw" /dev/kvm; fi
       - name: Exercise unified installation and approved app deployment in a fresh private VM
         if: matrix.suite == 'bundle'
         run: |
           python3 scripts/check_app_installation.py --inputs "$RUNNER_TEMP/app-install-inputs" --report "$RUNNER_TEMP/app-install-report.json"
           cat "$RUNNER_TEMP/app-install-report.json"
-      - name: Verify authenticated independent app deployments on the disposable runner
+      - name: Verify independent local and managed-node app deployments
         if: matrix.suite == 'apps'
-        run: python3 scripts/check_multi_app.py --disposable-system-host --binary target/release/devoption --runtime target/release/devoption-runtime --caddy "$RUNNER_TEMP/devoption-proxy-test/caddy" --reboot-fixture "$RUNNER_TEMP/multi-app-reboot"
+        run: python3 scripts/check_multi_app.py --disposable-system-host --binary target/release/devoption --runtime target/release/devoption-runtime --caddy "$RUNNER_TEMP/devoption-proxy-test/caddy" --reboot-fixture "$RUNNER_TEMP/multi-app-reboot" --cluster-proof
       - name: Prove scoped record writes and granted reads with disposable Unix-only PostgreSQL
         if: matrix.suite == 'records'
         run: |

@@ -40,7 +40,7 @@ def run(*args, timeout=180):
     return result.stdout
 
 
-def check(binary, runtime, caddy, reboot_fixture=None):
+def check(binary, runtime, caddy, reboot_fixture=None, cluster_proof=False):
     if sys.platform != 'linux' or os.geteuid() == 0:
         raise ValueError('Use an unprivileged user on a fresh disposable Linux systemd host')
     reserved = (STATE, CONFIG, BUILD_CONFIG, BROKER, WORKER, BUILD_BROKER, BUILD_WORKER)
@@ -310,6 +310,14 @@ def check(binary, runtime, caddy, reboot_fixture=None):
                 for value in policy.values():
                     shutil.copyfile(value, reboot_fixture/Path(value).name)
             print('Two authenticated builds/releases/deployments, protected HTTPS origins, retention disk reclamation with saved-release rollback, update/stop isolation and independent service recovery passed.')
+            if cluster_proof:
+                import check_cluster_node
+                # Stop the source controller before temporarily switching this
+                # disposable host to node mode. Existing source slots stay separate.
+                controller.terminate(); controller.wait(timeout=15); controller = None
+                check_cluster_node.check(run, root, STATE, CONFIG, config, projects[0],
+                                         (releases[0], newer), ROOT/'scripts/cluster_broker.py')
+
         finally:
             if controller is not None:
                 controller.terminate(); controller.wait(timeout=15)
@@ -329,5 +337,6 @@ if __name__ == '__main__':
     for name in ('binary', 'runtime', 'caddy'):
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--reboot-fixture', type=Path)
+    parser.add_argument('--cluster-proof', action='store_true')
     args = parser.parse_args()
-    check(*(getattr(args, name).resolve(strict=True) for name in ('binary', 'runtime', 'caddy')), args.reboot_fixture)
+    check(*(getattr(args, name).resolve(strict=True) for name in ('binary', 'runtime', 'caddy')), args.reboot_fixture, args.cluster_proof)
