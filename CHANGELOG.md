@@ -23,6 +23,9 @@ Entries describe implemented changes, not the roadmap.
 
 ### Fixed
 
+- Make the deployment broker duplicate-receipt test independent of filesystem
+  enumeration order ([#460](https://github.com/devoption/devoption/issues/460)).
+
 - Refuse to plan or start a fresh preview upgrade while another attempt needs
   recovery, without replacing its owner notice
   ([#458](https://github.com/devoption/devoption/issues/458)).
