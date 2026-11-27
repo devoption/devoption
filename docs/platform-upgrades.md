@@ -61,6 +61,10 @@ HTTPS, and arrange a maintenance window. Stop other administrative mutations.
 The existing base services must be active and publicly healthy before a new
 attempt. A plan checks authenticity, manifests, installed bytes/ownership/modes,
 configuration, accounts, ports, storage and current private/public readiness.
+Both plan and apply check upgrade history before reporting a fresh attempt.
+If a different attempt still needs recovery, neither command replaces its owner
+notice or starts a new transaction. Use the earlier attempt's reviewed inputs
+and attempt number for status and recovery before planning another attempt.
 
 ```bash
 upgrade_args=(
