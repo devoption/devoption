@@ -42,17 +42,20 @@ HELPERS = (
     "build_broker.py", "build_worker.py", "deployment_broker.py",
     "prepare_build_config.py", "prepare_platform_service.py",
     "configure_app_hostname.py", "recovery_snapshot.py",
+    "cluster_broker.py", "cluster_control.py",
 )
 DOCUMENTS = (
     "public-linux-install.md", "private-linux-install.md", "web-app-builds.md",
     "web-app-deployments.md", "app-hostnames.md", "same-node-recovery.md",
-    "release-bundles.md",
+    "release-bundles.md", "managed-clusters.md", "cluster-management-proposal.md",
+    "multiple-apps.md", "app-records.md",
 )
 SOURCE_FILES = (
     "LICENSE", "Cargo.lock", "rust-toolchain.toml", "release-metadata.toml",
     "CHANGELOG.md", "examples/caddy/Caddyfile",
     "examples/systemd/devoption.service", "examples/systemd/devoption-public.service",
     "examples/systemd/caddy-devoption.service",
+    "examples/systemd/devoption-cluster-recover.service",
     *("scripts/" + name for name in HELPERS),
     *("docs/" + name for name in DOCUMENTS),
     *VENDOR_FILES,

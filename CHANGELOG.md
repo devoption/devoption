@@ -5,11 +5,17 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Manage prepared Linux clusters and independently scoped application instances
+  from a controller CLI, with pinned SSH, verified release staging, reviewed
+  lifecycle operations and durable node receipts
+  ([#463](https://github.com/devoption/devoption/issues/463)).
+
 ### Changed
 
 - Propose centrally managed clusters, explicit node membership and independent
-  application instances, with scoped delivery and validation gates; remote
-  management remains unimplemented
+  application instances, with scoped delivery and validation gates
   ([#461](https://github.com/devoption/devoption/issues/461)).
 
 - Document the proposed opt-in project workflow policy delivery slices and

@@ -1,0 +1,15 @@
+[Unit]
+Description=Recover reviewed DevOption managed-node instances
+ConditionPathExists=/etc/devoption/cluster-node.toml
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=devoption-cluster
+ExecStart=/usr/bin/sudo -n /usr/local/libexec/devoption-cluster-broker cluster-recover
+# Up to eight slots reconcile serially under the broker lock.
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target

@@ -117,9 +117,11 @@ unimplemented.
 
 The [roadmap](../ROADMAP.md) owns remaining public-host acceptance and broader
 platform expansion beyond the selected trusted single-node app profile.
-The [cluster management proposal](cluster-management-proposal.md) describes
-central control, node membership and independent application instances, with
-sequenced implementation gates; remote node management remains unimplemented.
+The optional [managed cluster CLI](managed-clusters.md) uses an independent
+private controller catalog and host-pinned SSH to reach a forced node command.
+A separate adapter verifies immutable artifacts and review bindings before
+calling the existing runtime broker for operator-prepared instance slots.
+The [cluster proposal](cluster-management-proposal.md) tracks broader work.
 
 [Product goals](product.md) define the external-harness boundary and optional MCP
 parity with human operations.

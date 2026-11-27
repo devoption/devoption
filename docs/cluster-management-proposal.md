@@ -1,9 +1,10 @@
 # Centrally managed clusters and application instances
 
-Status: proposed technical design for
-[#461](https://github.com/devoption/devoption/issues/461). Cluster creation,
-node enrollment, remote control and multiple instances of one project are
-**not implemented**. This proposal grants no infrastructure or execution authority.
+Status: design direction for [#461](https://github.com/devoption/devoption/issues/461).
+[#463](https://github.com/devoption/devoption/issues/463) tracks a narrower
+[managed cluster CLI](managed-clusters.md) using prepared Linux nodes and
+host-pinned SSH. The following sections describe the broader proposal,
+including capabilities that remain unimplemented.
 
 ## Current boundary
 
