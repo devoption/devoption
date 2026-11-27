@@ -233,6 +233,7 @@ class Upgrade:
     def preflight(self, starting=False):
         record = self.record()
         if starting and record is None:
+            self.check_history()
             if self.old.path(RECEIPT).read_bytes() != canonical(self.old.identity):
                 raise ValueError('Previous reservation does not identify the installed version.')
         pending = record is not None and record['phase'] not in TERMINAL
@@ -273,16 +274,14 @@ class Upgrade:
             if self.old.path(name).exists() or self.old.path(name).is_symlink():
                 raise ValueError('App/build opt-ins need their coordinated upgrade path; this path supports the base bundle installation only.')
 
-    def initialize(self):
-        parent = self.old.path(STATE + '/upgrades')
-        for directory in (parent,):
-            self.old.safe(directory / 'record')
-            if not directory.exists():
-                directory.mkdir(mode=0o700)
-                sync_directory(directory.parent)
-            info = directory.lstat()
-            if not stat.S_ISDIR(info.st_mode) or info.st_uid != self.host.root_uid or stat.S_IMODE(info.st_mode) != 0o700:
-                raise ValueError('Upgrade directories must be private and administrator-owned.')
+    def check_history(self):
+        parent = self.directory.parent
+        self.old.safe(parent / 'record')
+        if not parent.exists():
+            return
+        info = parent.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != self.host.root_uid or stat.S_IMODE(info.st_mode) != 0o700:
+            raise ValueError('Upgrade directories must be private and administrator-owned.')
         entries = list(parent.iterdir())
         if len(entries) > 100:
             raise ValueError('Upgrade history limit reached; archive verified terminal transactions manually.')
@@ -295,6 +294,13 @@ class Upgrade:
             other = json.loads(self.private(directory / 'transaction.json'), object_pairs_hook=unique_object)
             if other.get('phase') not in TERMINAL:
                 raise ValueError('Another upgrade requires recovery before starting a new attempt.')
+
+    def initialize(self):
+        # Fresh apply has already checked history under the installer lock.
+        parent = self.directory.parent
+        if not parent.exists():
+            parent.mkdir(mode=0o700)
+            sync_directory(parent.parent)
         if not self.directory.exists():
             self.directory.mkdir(mode=0o700)
             sync_directory(parent)

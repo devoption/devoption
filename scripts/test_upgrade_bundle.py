@@ -264,6 +264,28 @@ class UpgradeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'App/build opt-ins'):
             Upgrade(self.installer, self.candidate, attempt=3).apply()
 
+    def test_fresh_plan_and_apply_gate_history_before_publishing_notice(self):
+        self.upgrade.notify = True
+        self.assertEqual(self.upgrade.preflight(starting=True)['phase'], 'not-started')
+        self.assertFalse(self.upgrade.directory.parent.exists())
+
+        self.upgrade.initialize()
+        notice = self.installer.path(NOTICE)
+        before = notice.read_bytes()
+        next_attempt = Upgrade(self.installer, self.candidate, attempt=2, notify=True)
+        with patch.object(self.host, 'stop') as stop:
+            for run in (lambda: next_attempt.preflight(starting=True), next_attempt.apply):
+                with self.assertRaisesRegex(ValueError, 'Another upgrade requires recovery'):
+                    run()
+                self.assertEqual(notice.read_bytes(), before)
+                self.assertFalse(next_attempt.directory.exists())
+            stop.assert_not_called()
+
+        self.upgrade.recover(confirm=True)
+        self.assertEqual(next_attempt.preflight(starting=True)['phase'], 'not-started')
+        self.assertEqual(json.loads(notice.read_bytes())['attempt'], 2)
+        self.assertFalse(next_attempt.directory.exists())
+
     def test_proxy_schema_and_unsupported_version_paths_are_rejected(self):
         for change in ('path', 'schema', 'proxy'):
             candidate = deepcopy(self.candidate)

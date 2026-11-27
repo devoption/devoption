@@ -127,7 +127,16 @@ class DeploymentTests(unittest.TestCase):
         duplicate.mkdir(parents=True,mode=0o700); duplicate.parent.chmod(0o700)
         (duplicate/'receipt.toml').write_bytes(self.receipt_path.read_bytes())
         (duplicate/'receipt.toml').chmod(0o600)
-        with self.assertRaises(ValueError): self.promote()
+        duplicate_component = duplicate/'component.wasm'
+        duplicate_component.write_bytes(self.component)
+        duplicate_component.chmod(0o600)
+        listdir = os.listdir
+        for reverse in (False, True):
+            with self.subTest(reverse=reverse), patch.object(
+                broker.os, 'listdir', side_effect=lambda fd: sorted(listdir(fd), reverse=reverse)
+            ):
+                with self.assertRaisesRegex(ValueError, '^duplicate build receipt$'):
+                    self.promote()
 
     def test_invalid_ids_and_interrupted_promotion_do_not_overwrite(self):
         with self.assertRaises(ValueError): broker.promote(self.config, '../bad', '0'*64, ())
