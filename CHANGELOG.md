@@ -7,6 +7,11 @@ Entries describe implemented changes, not the roadmap.
 
 ### Changed
 
+- Propose centrally managed clusters, explicit node membership and independent
+  application instances, with scoped delivery and validation gates; remote
+  management remains unimplemented
+  ([#461](https://github.com/devoption/devoption/issues/461)).
+
 - Document the proposed opt-in project workflow policy delivery slices and
   acceptance matrix, keeping runtime enforcement explicitly unimplemented
   ([#456](https://github.com/devoption/devoption/issues/456)).
