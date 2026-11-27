@@ -215,6 +215,9 @@ class ClusterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'in progress'):
                 with self.catalog.locked():
                     pass
+        parent_alias = self.catalog.path.with_name('parent-alias')
+        parent_alias.symlink_to(self.catalog.path.parent)
+        self.assertEqual(lab.Store(parent_alias / self.catalog.path.name).path, self.catalog.path)
         link = self.catalog.path.with_name('alias')
         link.symlink_to(self.catalog.path)
         with self.assertRaisesRegex(ValueError, 'canonical'):

@@ -79,7 +79,8 @@ def private_file(fd):
 
 class Store:
     def __init__(self, path):
-        self.path = path.absolute()
+        path = path.absolute()
+        self.path = path.parent.resolve(strict=True) / path.name
 
     @contextmanager
     def locked(self):
