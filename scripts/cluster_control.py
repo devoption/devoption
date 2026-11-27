@@ -22,6 +22,9 @@ BROKER = '/usr/local/libexec/devoption-cluster-broker'
 MAX_PACKET = 6 * 1024 * 1024
 MAX_CATALOG = 2 * 1024 * 1024
 REVIEW_SECONDS = 300
+STOP_CATALOG_RESERVE = 256 * 1024
+CATALOG_TRANSITION_MARGIN = 32 * 1024
+TERMINAL_STATES = {'succeeded', 'failed', 'not_applied', 'revoked'}
 SSH = '/usr/bin/ssh'
 
 
@@ -115,10 +118,14 @@ class Store:
                     raise ValueError('unsupported catalog format')
             yield data
 
-    def save(self, data):
-        payload = json.dumps(data, sort_keys=True, separators=(',', ':')).encode()
-        if len(payload) > MAX_CATALOG:
-            raise ValueError('catalog capacity reached')
+    @staticmethod
+    def encode(data):
+        return json.dumps(data, sort_keys=True, separators=(',', ':')).encode()
+
+    def save(self, data, reserve=0):
+        payload = self.encode(data)
+        if len(payload) > MAX_CATALOG - reserve:
+            raise ValueError('catalog capacity reached; prune settled operations before adding more')
         fd, temp = tempfile.mkstemp(prefix='.catalog-', dir=self.path)
         try:
             with os.fdopen(fd, 'wb') as stream:
@@ -202,8 +209,8 @@ class Controller:
     def __init__(self, store, data, transport):
         self.store, self.data, self.transport = store, data, transport
 
-    def save(self):
-        self.store.save(self.data)
+    def save(self, reserve=0):
+        self.store.save(self.data, reserve)
 
     def get(self, collection, key):
         if identifier(key) not in self.data[collection]:
@@ -217,7 +224,7 @@ class Controller:
             raise ValueError('duplicate cluster name or cluster capacity reached')
         key = new_id()
         clusters[key] = {'name': name}
-        self.save()
+        self.save(STOP_CATALOG_RESERVE + CATALOG_TRANSITION_MARGIN)
         return {'cluster': key, **clusters[key]}
 
     def attach_node(self, cluster, node, epoch, host, port, user, public_key):
@@ -235,7 +242,7 @@ class Controller:
         if found.get('target') != candidate['target'] or not isinstance(found.get('instances'), list):
             raise ValueError('node did not confirm exact membership')
         nodes[node] = candidate
-        self.save()
+        self.save(STOP_CATALOG_RESERVE + CATALOG_TRANSITION_MARGIN)
         return found
 
     def disable_node(self, node):
@@ -273,7 +280,7 @@ class Controller:
             raise ValueError('hostname is already bound to another instance')
         entry = {'cluster': cluster, 'node': node_id, 'source': project, 'hostname': hostname, 'name': name}
         instances[instance] = entry
-        self.save()
+        self.save(STOP_CATALOG_RESERVE + CATALOG_TRANSITION_MARGIN)
         return {'instance': instance, **entry}
 
     def placement(self, instance):
@@ -344,7 +351,11 @@ class Controller:
                   'source': entry['source'], 'args': args, 'candidate': candidate, 'current': current,
                   'record_grant': observed['record_grant']}
         records[operation] = record
-        self.save()
+        try:
+            self.save(CATALOG_TRANSITION_MARGIN + (STOP_CATALOG_RESERVE if action == 'start' else 0))
+        except (ValueError, OSError):
+            del records[operation]
+            raise
         return record
 
     def approve(self, operation):
@@ -362,16 +373,19 @@ class Controller:
             reply = self.transport.request(node, 'apply', instance, **record['args'])
             self.accept_receipt(record, reply)
         except (ValueError, OSError):
-            pass
-        return record
+            return record
+        return dict(record, reason=reply['reason']) if 'reason' in reply else record
 
     def accept_receipt(self, record, reply):
         binding = json.dumps([record['target'], record['instance'], record['args']],
                              sort_keys=True, separators=(',', ':')).encode()
         if (reply.get('operation') != record['args']['operation']
                 or reply.get('request') != hashlib.sha256(binding).hexdigest()
-                or reply.get('state') not in ('succeeded', 'failed', 'unknown')):
+                or reply.get('state') not in {'succeeded', 'failed', 'not_applied', 'unknown'}):
             raise ValueError('invalid operation receipt')
+        reason = reply.get('reason')
+        if reason is not None and (not isinstance(reason, str) or len(reason) > 96):
+            raise ValueError('invalid operation receipt reason')
         record['state'] = reply['state']
         self.save()
 
@@ -382,6 +396,11 @@ class Controller:
                 observed = self.observe(record['instance'], operation=operation)
                 if observed.get('receipt'):
                     self.accept_receipt(record, observed['receipt'])
+                elif (observed.get('receipt', False) is None
+                      and type(observed.get('receipt_checked_at')) is int
+                      and observed['receipt_checked_at'] >= record['args']['expires']):
+                    record['state'] = 'not_applied'
+                    self.save()
             except (OSError, ValueError):
                 pass
         return record
@@ -395,11 +414,27 @@ class Controller:
                             else record['state'])}
             for key, record in self.data['operations'].items() if record['instance'] == instance}}
 
+    def prune_operations(self, instance, keep):
+        self.get('instances', instance)
+        if not 0 <= keep <= 4096:
+            raise ValueError('keep must be from 0 to 4096')
+        records = self.data['operations']
+        settled = sorted((record['args']['expires'], key) for key, record in records.items()
+                         if record['instance'] == instance and record['state'] in TERMINAL_STATES)
+        removed = [key for _, key in settled[:max(0, len(settled) - keep)]]
+        for key in removed:
+            del records[key]
+        self.save()
+        return {'instance': instance, 'removed': removed}
+
     def inventory(self):
-        return {key: {
+        result = {key: {
             ident: ({'cluster': entry['target']['cluster'], 'enabled': entry['enabled'],
                      'endpoint': entry['ssh']['host']} if key == 'nodes' else entry)
             for ident, entry in self.data[key].items()} for key in ('clusters', 'nodes', 'instances')}
+        result['capacity'] = {'bytes': len(self.store.encode(self.data)), 'limit': MAX_CATALOG,
+                              'stop_reserve': STOP_CATALOG_RESERVE, 'operations': len(self.data['operations'])}
+        return result
 
 
 def parser():
@@ -410,14 +445,14 @@ def parser():
     definitions = {
         'create-cluster': ('name',), 'attach-node': ('cluster', 'node', 'epoch', 'host', 'port', 'user', 'public_key'),
         'disable-node': ('node',), 'attach-instance': ('cluster', 'node_id', 'instance', 'project', 'name'),
-        'inventory': (), 'operations': ('instance',), 'node-status': ('node',), 'status': ('instance',),
+        'inventory': (), 'operations': ('instance',), 'prune-operations': ('instance', 'keep'), 'node-status': ('node',), 'status': ('instance',),
         'stage': ('instance', 'source_release'), 'review-start': ('instance', 'release', 'health'),
         'review-stop': ('instance',), 'approve': ('operation',), 'reconcile': ('operation',),
     }
     for name, fields in definitions.items():
         sub = commands.add_parser(name)
         for field in fields:
-            sub.add_argument(field, type=int if field == 'port' else str)
+            sub.add_argument(field, type=int if field in ('port', 'keep') else str)
         if name == 'status':
             sub.add_argument('--logs', action='store_true')
     return result

@@ -1,6 +1,7 @@
 """Controller plus independently configured node protocol fixtures."""
 import base64
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -156,7 +157,11 @@ class ClusterTests(unittest.TestCase):
             with patch.object(runtime, 'unit_state', return_value={'ActiveState': 'active', 'ControlGroup': '/foreign'}):
                 with self.assertRaisesRegex(ValueError, 'unrecorded'):
                     node.cluster_stage(runtime, slot, self.package, self.fingerprint)
+            stale = slot['state'] / '.cluster-stage-abcdefgh'
+            stale.mkdir()
+            (stale / 'component.wasm').write_bytes(b'partial stage')
             saved_release = node.cluster_stage(runtime, slot, self.package, self.fingerprint)['release']
+            self.assertFalse(stale.exists())
             self.assertEqual(node.cluster_stage(runtime, slot, self.package, self.fingerprint)['release'], saved_release)
             review = c.review(instance, 'start', saved_release, 'ok')
             args = review['args']
@@ -165,7 +170,9 @@ class ClusterTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'changed'):
                 node.cluster_mutate(runtime, slot, binding, dict(args, fingerprint='0'*64))
             slot['fingerprint'] = '1'*64
-            self.assertEqual(c.approve(args['operation'])['state'], 'unknown')
+            refusal = c.approve(args['operation'])
+            self.assertEqual(refusal['state'], 'not_applied')
+            self.assertEqual(refusal['reason'], 'destination changed after review')
             self.assertIsNone(runtime.desired(slot))
             fresh = c.review(instance, 'start', saved_release, 'ok')['args']
             receipt = node.cluster_mutate(runtime, slot, binding, fresh)
@@ -178,6 +185,85 @@ class ClusterTests(unittest.TestCase):
             self.assertEqual(saved['operations'][pending]['state'], 'revoked')
             with self.assertRaisesRegex(ValueError, 'disabled'):
                 c.approve(pending)
+
+    def test_source_export_uses_distinct_operator_and_read_only_configuration(self):
+        source = self.config['state'] / 'deployment.toml'
+        policy = self.config['state'] / 'cluster-export.toml'
+        source.write_text('uid = 1001\n')
+        policy.write_text('operator_uid = 1002\n')
+        args = ['export', PROJECT, 'a'*64]
+        def broker_config():
+            self.assertEqual(os.environ['SUDO_UID'], '1001')
+            return self.config
+        with (patch.object(runtime, 'CONFIG', source), patch.object(node, 'EXPORT_CONFIG', policy),
+              patch.object(node, 'protected'), patch.object(runtime, 'configuration', side_effect=broker_config)):
+            with patch.dict(os.environ, SUDO_UID='1001'):
+                with self.assertRaisesRegex(ValueError, 'not the configured'):
+                    node.configuration(runtime, False, args)
+            with patch.dict(os.environ, SUDO_UID='1002'):
+                self.assertIs(node.configuration(runtime, False, args), self.config)
+                self.assertEqual(os.environ['SUDO_UID'], '1002')
+                with self.assertRaisesRegex(ValueError, 'requires export'):
+                    node.configuration(runtime, False, ['cluster-recover'])
+                policy.write_text('operator_uid = 1001\n')
+                with patch.dict(os.environ, SUDO_UID='1001'):
+                    with self.assertRaisesRegex(ValueError, 'must differ'):
+                        node.configuration(runtime, False, args)
+
+    def test_adapter_rejects_unreviewed_broker_without_executing_it(self):
+        path = self.config['state'] / 'broker'
+        path.write_bytes(Path(runtime.__file__).read_bytes())
+        with patch.object(node, 'BROKER', path), patch.object(node, 'ADAPTER', path), patch.object(node, 'protected'):
+            self.assertTrue(callable(node.local_broker().configuration))
+            path.write_text("raise AssertionError('must not execute')\n")
+            with self.assertRaisesRegex(ValueError, 'unsupported local broker'):
+                node.local_broker()
+
+    def test_lost_refusal_settles_only_after_node_observes_expiry(self):
+        self.init()
+        instance = 'b'*32
+        with self.catalog.locked() as saved:
+            c = lab.Controller(self.catalog, saved, self.transport)
+            cluster = c.create_cluster('West')['cluster']
+            binding, slots = self.peer(c, cluster, 1, [instance])
+            slot = slots[instance]
+            c.attach_instance(cluster, binding['node'], instance, PROJECT, 'Demo')
+            request = c.review(instance, 'stop')['args']
+            slot['fingerprint'] = '1'*64
+            self.transport.receipt_loss = True
+            self.assertEqual(c.approve(request['operation'])['state'], 'unknown')
+            self.assertEqual(c.reconcile(request['operation'])['state'], 'unknown')
+            with patch.object(node.time, 'time', return_value=request['expires']):
+                self.assertEqual(c.reconcile(request['operation'])['state'], 'not_applied')
+
+    def test_operation_capacity_keeps_stop_available_and_prune_preserves_unknown(self):
+        self.init()
+        instance = 'b'*32
+        with self.catalog.locked() as saved:
+            c = lab.Controller(self.catalog, saved, self.transport)
+            cluster = c.create_cluster('West')['cluster']
+            binding, slots = self.peer(c, cluster, 1, [instance])
+            slot = slots[instance]
+            c.attach_instance(cluster, binding['node'], instance, PROJECT, 'Demo')
+            release = node.cluster_stage(runtime, slot, self.package, self.fingerprint)['release']
+            first = c.review(instance, 'start', release, 'ok')['args']['operation']
+            self.assertEqual(c.approve(first)['state'], 'succeeded')
+            # The node's normal receipt allocation is now full.
+            receipts = slot['state'] / 'cluster-receipts'
+            self.assertEqual(len(list(receipts.iterdir())), 1)
+            limit = len(self.catalog.encode(saved)) + lab.CATALOG_TRANSITION_MARGIN + 2048
+            with patch.object(node, 'RECEIPT_LIMIT', 1), patch.object(lab, 'MAX_CATALOG', limit):
+                with self.assertRaisesRegex(ValueError, 'catalog capacity'):
+                    c.review(instance, 'start', release, 'ok')
+                records = saved['operations']
+                self.assertEqual(list(records), [first])
+                stop = c.review(instance, 'stop')['args']['operation']
+                self.transport.receipt_loss = True
+                self.assertEqual(c.approve(stop)['state'], 'unknown')
+                self.assertEqual(c.prune_operations(instance, 0)['removed'], [first])
+                self.assertIn(stop, records)
+                self.assertEqual(c.reconcile(stop)['state'], 'succeeded')
+                self.assertEqual(c.inventory()['capacity']['operations'], 1)
 
     def test_records_bind_to_destination_and_require_fresh_staging_after_change(self):
         self.init()

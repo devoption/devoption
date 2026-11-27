@@ -16,6 +16,7 @@ SSH_UNIT = 'devoption-cluster-proof-ssh.service'
 SSH_PORT = 15339
 APP_PORT = 15340
 NODE_CONFIG = cluster_broker.NODE_CONFIG
+EXPORT_CONFIG = cluster_broker.EXPORT_CONFIG
 ADAPTER = cluster_broker.ADAPTER
 
 
@@ -41,7 +42,7 @@ def check(run, root, state, config_path, config, project, releases, adapter):
     sshd = shutil.which('sshd') or '/usr/sbin/sshd'
     if not Path(sshd).is_file():
         raise ValueError('cluster acceptance requires OpenSSH server')
-    if any(p.exists() or p.is_symlink() for p in (ADAPTER, NODE_CONFIG)):
+    if any(p.exists() or p.is_symlink() for p in (ADAPTER, NODE_CONFIG, EXPORT_CONFIG)):
         raise ValueError('existing cluster adapter or node configuration')
     if run('systemctl', 'show', SSH_UNIT, '-p', 'LoadState', '--value').strip() != b'not-found':
         raise ValueError('reserved cluster SSH fixture unit exists')
@@ -65,6 +66,7 @@ def check(run, root, state, config_path, config, project, releases, adapter):
     controller_key = Transport(staged)
     installed = False
     activated = False
+    export_configured = False
     ssh_started = False
     created_sshd_directory = False
 
@@ -76,7 +78,16 @@ def check(run, root, state, config_path, config, project, releases, adapter):
     try:
         run('sudo', '-n', 'install', '-m755', adapter, ADAPTER)
         installed = True
-        packages = [json.loads(run('sudo', '-n', ADAPTER, 'export', project, release)) for release in releases]
+        # Model two distinct callers on the disposable host. Only the fixture's
+        # existing root runner may set the synthetic caller for this check.
+        operator_uid = config['uid'] + 1
+        install(f'operator_uid = {operator_uid}\n', EXPORT_CONFIG, '600')
+        export_configured = True
+        refused = subprocess.run(['sudo', '-n', str(ADAPTER), 'export', project, releases[0]],
+                                 capture_output=True, timeout=15)
+        assert refused.returncode and b'not the configured cluster export operator' in refused.stderr
+        packages = [json.loads(run('sudo', '-n', 'env', f'SUDO_UID={operator_uid}',
+                                   ADAPTER, 'export', project, release)) for release in releases]
         assert [package['release'] for package in packages] == list(releases)
         for private in (staged, host):
             run('/usr/bin/ssh-keygen', '-q', '-t', 'ed25519', '-N', '', '-f', private)
@@ -179,6 +190,8 @@ StrictModes yes
         if activated:
             run('sudo', '-n', 'rm', '-f', '--', NODE_CONFIG)
             run('sudo', '-n', 'install', '-m644', source, config_path)
+        if export_configured:
+            run('sudo', '-n', 'rm', '--', EXPORT_CONFIG)
         if installed:
             run('sudo', '-n', 'rm', '--', ADAPTER)
         if created_sshd_directory:

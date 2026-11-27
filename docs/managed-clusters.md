@@ -59,17 +59,33 @@ sudo install -o root -g root -m 0755 scripts/cluster_broker.py \
   /usr/local/libexec/devoption-cluster-broker
 ```
 
-On the controller, the operator running the CLI uses the UID authorized in
-`deployment.toml` to export existing saved releases. If required, grant it only
-`/usr/local/libexec/devoption-cluster-broker export *` via a validated sudoers
-entry. The adapter validates exactly one project and release digest and never
-exports credential material. Keep `/etc/devoption/cluster-node.toml` absent on
-the controller. Use a persistent private directory and protect its parents.
-Back up its catalog and control key separately. The CLI accepts an existing
-private Ed25519 SSH identity as a separate file. Keep it outside the catalog.
+Use the deployment broker from the same reviewed checkout. The adapter checks
+the broker's exact executable digest before loading its private interface. A
+bundle upgrade that changes the broker needs a matching reviewed adapter
+before cluster commands or boot recovery will run.
+
+On the controller, run the CLI under a dedicated non-root operator account
+that differs from the platform service account. Set `operator_uid` to that
+account's numeric UID in root-owned mode 0600
+`/etc/devoption/cluster-export.toml`. The adapter rejects the platform service
+UID even if it was mistakenly configured in both files. Grant the operator
+only `/usr/local/libexec/devoption-cluster-broker export *` in sudoers, without
+`SETENV`. The adapter validates exactly one project and release digest and
+exports no credential material. Keep `/etc/devoption/cluster-node.toml`
+absent on the controller.
+
+Keep the catalog and SSH private keys in storage private to the operator.
+Do not grant the platform service account access. Each invocation selects an
+existing Ed25519 key with `--identity`. Use a different key per node or cluster
+to limit the effect of a leaked key. Compromise of the operator account exposes
+control over all nodes whose keys that account can read. For key rotation, add
+the new public key with the same forced-command restrictions, verify a node
+status request with the new identity, then remove the old authorized key.
 
 On each node configure a dedicated SSH control user with the UID selected in
-that node's `deployment.toml`. Use a root-owned authorized key file and allow
+that node's `deployment.toml`. Do not run a platform web service or any
+other untrusted process under this dedicated node UID. Use a root-owned
+authorized key file and allow
 only the prepared controller's public key. An example entry is:
 
 ```text
@@ -128,7 +144,8 @@ cluster-control --state "$CATALOG" inventory
 ## Stage, deploy, observe and recover
 
 Stage a release from the controller's saved releases. Staging verifies the
-component framing and digest and writes an immutable destination release. It
+component framing and digest and writes an immutable destination release. The
+node records source provenance as asserted by the trusted controller. It
 does not start an app and does not copy the source runtime grants. Use the
 destination release digest printed by `stage` for a deployment review. The
 review includes the exact target, source and destination release, hostname,
@@ -154,9 +171,13 @@ restore data. Resource and hostname bindings are part of the review and must
 still be valid.
 
 The CLI consumes an approval before sending an operation. If the response is
-lost, it reports an unknown outcome. Use `reconcile OPERATION` and
+lost, it reports an unknown outcome. A known pre-execution refusal reports
+`not_applied` and a reason. Use `reconcile OPERATION` and
 `status INSTANCE` to read the durable node receipt and current observation.
-A failed receipt also warrants inspection. The broker can stop a failed
+When the node checks for a receipt after expiry and finds none, reconciliation
+reports `not_applied`. Keep controller and node clocks synchronized, within ten
+seconds, to avoid immediate approval refusals. A failed receipt also warrants
+inspection. The broker can stop a failed
 candidate during startup. An unknown or failed result does not automatically
 retry or launch an instance elsewhere.
 
@@ -164,7 +185,9 @@ To recover after boot, an operator can configure a local systemd oneshot to
 run `/usr/bin/sudo -n /usr/local/libexec/devoption-cluster-broker cluster-recover`
 as the configured control UID, after the node's network and required resources
 are ready. Start with the [recovery unit example](../examples/systemd/devoption-cluster-recover.service)
-and confirm its user and ordering. Grant that exact command separately with sudoers. SSH keys still
+and replace `SET_CONTROL_USER` with the dedicated node account. Confirm the
+unit's ordering and grant that exact command separately with sudoers. Recovery
+waits up to 15 seconds for a busy broker. SSH keys still
 force only `cluster-node`. Recovery restarts only previously healthy approved
 running intent whose runtime and bindings still match. Stopped intent stays
 stopped. Review and redeploy if a changed destination fingerprint prevents
@@ -182,10 +205,13 @@ recovery. A failure for one slot does not stop recovery of a sibling.
   retired identities, and automated SSH host key rotation are not supported.
 - Back up the controller catalog, each instance's data and each node's release
   and intent files separately. The normal broker's limit of 32 releases per
-  slot applies. Node receipts are retained, with a limit of 4,096 per slot.
-  The controller catalog is capped at 2 MiB and is serialized per operation.
-  Inspect capacity before running out. No automatic history deletion or
-  membership reassignment is provided.
+  slot applies. Node receipts are retained, with 4,096 normal entries per slot
+  and 64 extra reserved for stops. Node release and receipt pruning are not
+  supported yet. The controller catalog is capped at 2 MiB and reserves 256 KiB
+  for stop reviews. Check usage with `inventory`. Back up the catalog, then use
+  `prune-operations INSTANCE KEEP` to retain the specified number of settled
+  entries for an instance and remove older ones. Pending reviews and unknown
+  outcomes are preserved.
 - The local tests exercise two logical clusters with independent files and
   failure cases. The disposable Linux acceptance path uses real OpenSSH and
   systemd to check two instances, update, rollback, stop and running/stopped

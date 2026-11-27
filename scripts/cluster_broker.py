@@ -6,6 +6,7 @@ behavior. Installing this adapter does not change existing broker fingerprints.
 """
 import base64
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -23,6 +24,11 @@ import types
 BROKER = Path('/usr/local/libexec/devoption-deployment-broker')
 ADAPTER = Path('/usr/local/libexec/devoption-cluster-broker')
 NODE_CONFIG = Path('/etc/devoption/cluster-node.toml')
+EXPORT_CONFIG = Path('/etc/devoption/cluster-export.toml')
+# Reviewed private interface. Keep the underlying broker unchanged for local installs.
+BROKER_SHA256 = '7ffbca67be9a7eb65cad60a668daaaa88da418237942a7882d04b66ce8342fdd'
+RECEIPT_LIMIT = 4096
+STOP_RECEIPT_RESERVE = 64
 MAX_COMPONENT = 4 * 1024 * 1024
 MAX_PACKET = 6 * 1024 * 1024
 HEX = re.compile(r'[0-9a-f]{64}\Z')
@@ -48,9 +54,56 @@ def local_broker():
         code = stream.read(131073)
     if len(code) > 131072:
         raise ValueError('local broker exceeds the supported size')
+    if hashlib.sha256(code).hexdigest() != BROKER_SHA256:
+        raise ValueError('unsupported local broker version; install the matching reviewed cluster adapter')
     module = types.ModuleType('_devoption_local_broker')
     exec(compile(code, str(BROKER), 'exec'), module.__dict__)
     return module
+
+
+def configuration(runtime, node_mode, args):
+    if node_mode:
+        if args not in (['cluster-node'], ['cluster-recover']):
+            raise ValueError('node mode does not export controller releases')
+        return runtime.configuration()
+    if len(args) != 3 or args[0] != 'export':
+        raise ValueError('source mode requires export PROJECT RELEASE')
+    require_hex(args[1], ID)
+    require_hex(args[2], HEX)
+    protected(EXPORT_CONFIG)
+    policy = tomllib.loads(runtime.read_regular(EXPORT_CONFIG, 4096, 0).decode())
+    caller = os.environ.get('SUDO_UID', '')
+    if (policy.keys() != {'operator_uid'} or type(policy['operator_uid']) is not int
+            or policy['operator_uid'] <= 0 or caller != str(policy['operator_uid'])):
+        raise ValueError('caller is not the configured cluster export operator')
+    runtime.protected(runtime.CONFIG)
+    source = tomllib.loads(runtime.read_regular(runtime.CONFIG, 65536, 0).decode())
+    service_uid = source.get('uid')
+    if type(service_uid) is not int or service_uid <= 0 or service_uid == policy['operator_uid']:
+        raise ValueError('export operator UID must differ from platform service UID')
+    # Reuse the broker's protected configuration validation only. The adapter
+    # has already bound this call to read-only export and the distinct operator.
+    os.environ['SUDO_UID'] = str(service_uid)
+    try:
+        return runtime.configuration()
+    finally:
+        os.environ['SUDO_UID'] = caller
+
+
+class Refusal(ValueError):
+    pass
+
+
+def lock_broker(lock, recovery):
+    deadline = time.monotonic() + (15 if recovery else 0)
+    while True:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.25)
 
 
 def validate_receipt(runtime, receipt, component):
@@ -86,7 +139,25 @@ def sync_directory(path):
         os.close(fd)
 
 
+def clean_stage_dirs(runtime, state):
+    # Only called while holding the broker lock. Leave unrecognized contents alone.
+    for directory in state.iterdir():
+        if not re.fullmatch(r'\.cluster-stage-[a-z0-9_]{8}', directory.name):
+            continue
+        if not stat.S_ISDIR(directory.lstat().st_mode):
+            continue
+        runtime.protected(directory)
+        files = list(directory.iterdir())
+        if any(file.name not in ('manifest.json', 'component.wasm', 'records.json')
+               or not stat.S_ISREG(file.lstat().st_mode) for file in files):
+            continue
+        for file in files:
+            file.unlink()
+        directory.rmdir()
+
+
 def save_release(runtime, config, receipt, component, origin):
+    clean_stage_dirs(runtime, config['state'])
     manifest = {**receipt, 'policy': runtime.POLICY, 'runtime': 'wasmtime-49.0.4'}
     manifest['cluster_origin'] = origin
     records = runtime.record_policy(config, receipt['project'])
@@ -218,6 +289,7 @@ def cluster_status(runtime, slot, operation=None, logs=False):
     if operation is not None:
         path = slot['state'] / 'cluster-receipts' / require_hex(operation, ID)
         result['receipt'] = json.loads(runtime.read_regular(path, 4096, 0)) if path.exists() else None
+        result['receipt_checked_at'] = int(time.time())
     return result
 
 
@@ -241,26 +313,27 @@ def cluster_mutate(runtime, slot, binding, args):
     cluster_owned(runtime, slot)
     now = int(time.time())
     if not now < args['expires'] <= now + 310:
-        raise ValueError('approval expired or node clock differs')
+        raise Refusal('approval expired or node clock differs')
     if fingerprint != slot['fingerprint'] or expected != runtime.digest(runtime.canonical(runtime.desired(slot))):
-        raise ValueError('destination changed after review')
+        raise Refusal('destination changed after review')
     if not slot.get('ingress') or args['hostname'] != slot['ingress']['app_hostname']:
-        raise ValueError('reviewed hostname changed')
+        raise Refusal('reviewed hostname changed')
     if action == 'start':
         manifest = runtime.load_release(slot, require_hex(args['release'], HEX))
         if not cluster_origin_matches(slot, manifest):
-            raise ValueError('release is not bound to this deployment instance')
+            raise Refusal('release is not bound to this deployment instance')
         if manifest.get('records') != runtime.record_policy(slot, slot['project']):
-            raise ValueError('record grant changed; stage the release again')
+            raise Refusal('record grant changed; stage the release again')
         if not isinstance(args['health'], str) or not re.fullmatch(r'[\x20-\x7e]{1,128}', args['health']):
-            raise ValueError('invalid health body')
-    if sum(1 for _ in receipts.iterdir()) >= 4096:
-        raise ValueError('operation history capacity reached')
+            raise Refusal('invalid health body')
+    limit = RECEIPT_LIMIT + (STOP_RECEIPT_RESERVE if action == 'stop' else 0)
+    if sum(1 for _ in receipts.iterdir()) >= limit:
+        raise Refusal('operation history capacity reached')
     receipt = {'operation': op, 'request': request_hash, 'state': 'unknown'}
     runtime.atomic(path, receipt)
     try:
         if action == 'start':
-            runtime.start(slot, args['release'], args['health'], fingerprint, expected)
+            runtime.start(slot, args['release'], args['health'], fingerprint, generation=expected)
         else:
             runtime.dispatch(slot, ['stop'])
     except (ValueError, OSError, subprocess.SubprocessError):
@@ -297,7 +370,11 @@ def cluster_node(runtime, binding, slots, packet):
         keys = {'action', 'operation', 'generation', 'fingerprint', 'expires', 'hostname'}
         if (args.get('action') == 'start' and args.keys() == keys | {'release', 'health'}
                 or args.get('action') == 'stop' and args.keys() == keys):
-            return cluster_mutate(runtime, slot, binding, args)
+            try:
+                return cluster_mutate(runtime, slot, binding, args)
+            except Refusal as error:
+                return {'operation': args['operation'], 'state': 'not_applied', 'reason': str(error),
+                        'request': runtime.digest(runtime.canonical([binding, slot['project'], args]))}
     raise ValueError('unsupported cluster operation')
 
 
@@ -359,9 +436,9 @@ def main():
     node_mode = os.path.lexists(NODE_CONFIG)
     packet = read_cluster_packet() if node_mode and args == ['cluster-node'] else None
     runtime = local_broker()
-    config = runtime.configuration()
+    config = configuration(runtime, node_mode, args)
     with (config['state'] / 'broker.lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        lock_broker(lock, args == ['cluster-recover'])
         result = execute(runtime, config, args, node_mode, packet)
     print(json.dumps(result))
 
@@ -369,6 +446,7 @@ def main():
 if __name__ == '__main__':
     try:
         main()
-    except (ValueError, OSError, TypeError, KeyError, subprocess.SubprocessError) as error:
-        print('Cluster broker refused request: ' + str(error), file=sys.stderr)
+    except Exception as error:
+        print('Cluster broker refused request: ' + (str(error) if isinstance(error, (ValueError, OSError))
+                                                    else type(error).__name__), file=sys.stderr)
         sys.exit(1)

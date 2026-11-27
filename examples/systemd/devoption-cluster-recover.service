@@ -6,7 +6,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-User=devoption-cluster
+User=SET_CONTROL_USER
 ExecStart=/usr/bin/sudo -n /usr/local/libexec/devoption-cluster-broker cluster-recover
 # Up to eight slots reconcile serially under the broker lock.
 TimeoutStartSec=15min
