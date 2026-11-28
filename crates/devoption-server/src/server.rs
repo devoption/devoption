@@ -310,6 +310,12 @@ pub fn run_with_options(options: ServerOptions<'_>) -> io::Result<()> {
             }
         })
         .transpose()?;
+    #[cfg(unix)]
+    if let Some(saml) = owner_auth.as_ref().and_then(|(auth, _)| auth.saml()) {
+        saml.state.lock().map_err(|_| io::Error::other("SAML state unavailable"))?.configuration
+            .validate_origin(public_origin.as_ref().map(PublicOrigin::as_str))
+            .map_err(|_| io::Error::other("SAML requires its verified HTTPS public origin; use local/SSH recovery after changing the origin"))?;
+    }
     Builder::new_current_thread()
         .enable_all()
         .build()?

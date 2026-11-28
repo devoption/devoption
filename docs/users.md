@@ -4,7 +4,9 @@ The existing first owner remains the installation administrator. Members share
 all projects and the same configured repository, build, secrets and deployment
 capabilities. Membership is a trust decision: there is no project-specific access
 or read-only role. User management and registration settings belong only to the
-owner. Each account has its own display profile.
+owner and configured [SAML administrators](saml.md). Each account has its own display profile.
+SAML users receive full administration access through provider app assignment;
+manage their admission at the provider, not in the local member list.
 
 ## Invite someone
 
@@ -66,10 +68,10 @@ a fresh `/auth/challenge` pair before reading a bounded JSON object carried as
 `text/plain;charset=UTF-8`. These share the owner's one-worker/five-attempts-per-minute
 budget. Registration never issues a session. `GET /auth/registration` reveals only
 the open/closed setting. `GET /auth/account` reveals the current account's role.
-Owner-only `GET /auth/users` lists addresses/statuses; CSRF-protected `POST /auth/users`
+Administrator-only `GET /auth/users` lists addresses/statuses; CSRF-protected `POST /auth/users`
 handles invitations, registration, approval, disabling and removal. `GET /settings/users`
-is independently owner-checked. Roles are determined from the persisted owner ID,
-never browser-provided claims. No CORS or bearer-token alternative is enabled.
+is independently administrator-checked. Local roles are determined from the persisted owner ID; SAML administrator
+authority is issued only after the verified SAML flow. Neither trusts browser-provided roles. No CORS or bearer-token alternative is enabled.
 
 One session per account is retained in memory for at most one hour; signing in
 again rotates only that account's session. Logout affects only its matching token

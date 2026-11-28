@@ -51,6 +51,8 @@ pub struct Session {
     token: Option<[u8; TOKEN_BYTES]>,
     csrf_token: Option<[u8; CSRF_TOKEN_BYTES]>,
     expires_at: Instant,
+    #[cfg(unix)]
+    saml_administrator: bool,
 }
 
 impl Session {
@@ -83,7 +85,15 @@ impl Session {
             token: Some(token),
             csrf_token: None,
             expires_at,
+            #[cfg(unix)]
+            saml_administrator: false,
         })
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn saml_administrator(mut self) -> Self {
+        self.saml_administrator = true;
+        self
     }
 
     /// Only the issuer binds independently generated entropy before activation.

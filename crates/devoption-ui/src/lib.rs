@@ -15,6 +15,8 @@ mod mcp;
 pub use mcp::{render_mcp_consent, render_mcp_grants};
 mod auth;
 mod users;
+const SAML: &str = include_str!("../assets/saml.js");
+const SAML_STYLES: &str = include_str!("../assets/saml.css");
 const ACCOUNTS: &str = include_str!("../assets/accounts.js");
 pub fn render_users() -> String {
     render_with_account(Page::Users, true)
@@ -521,6 +523,11 @@ fn document(title: &str, body: &str) -> String {
     document_with_styles(title, body, "")
 }
 fn document_with_styles(title: &str, body: &str, overview_styles: &str) -> String {
+    let saml = if body.contains("id=\"saml-panel\"") || body.contains("id=\"saml-signin\"") {
+        format!("<style>{SAML_STYLES}</style><script>{SAML}</script>")
+    } else {
+        String::new()
+    };
     format!(
         "<!doctype html>
 <html lang=\"en\">
@@ -537,6 +544,7 @@ fn document_with_styles(title: &str, body: &str, overview_styles: &str) -> Strin
 <script>{PROJECT_SECRETS}</script>
   <script>{PROFILE}</script>
   <script>{ACCOUNTS}</script>
+  {saml}
   <script>{REPOSITORY_CREATE}</script>
   <script>{REPOSITORY_STATUS}</script>
   <script>{PROJECT_FILTER}</script>

@@ -37,7 +37,11 @@ requires the captures in the contribution guide.
 ## Checks
 
 For checks, you also need Python **3.11+** and Node.js **22.22.3**. No Python or npm
-packages are required. From the repository folder, run:
+packages are required. SAML signing tests also require the `openssl` command-line
+tool. They generate short-lived signing material in a private temporary directory,
+remove the generated files after loading, and keep it only in test-process memory.
+No private signing key is stored in the repository or needed by the platform
+binary. From the repository folder, run:
 
 ```sh
 cargo build --workspace --locked --offline

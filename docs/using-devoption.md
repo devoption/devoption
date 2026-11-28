@@ -95,6 +95,14 @@ checks do not replace real keyboard or browser review. Existing
 documented capture fixtures; historical browser checks are not a fresh audit of
 every page in every theme.
 
+## SAML single sign-on
+
+With an existing owner and explicit HTTPS public origin, administrators can enable
+[SAML SSO](saml.md) from **Profile → Manage workspace users**. Every admitted SSO
+user receives full administrator access. Local password sign-in and registration
+can be disabled after successful SSO verification. Provider assignment and existing
+session revocation are separate; see the SAML guide for limits and SSH recovery.
+
 ## HTTP authentication in the current preview
 
 This local preview binds to `127.0.0.1` and accepts only `127.0.0.1` or `localhost`

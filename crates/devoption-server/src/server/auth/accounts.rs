@@ -23,7 +23,7 @@ pub(super) fn routes() -> Router<AuthState> {
         .route("/auth/user-sign-in", post(sign_in))
         .route("/auth/register", post(register))
 }
-fn json_response(value: Value) -> Response {
+pub(super) fn json_response(value: Value) -> Response {
     (
         [
             (CACHE_CONTROL, "no-store"),
@@ -43,7 +43,7 @@ async fn registration(State(state): State<AuthState>) -> Response {
         .accounts(false, |_, users| Ok(users.load()?.registration))
         .await
     {
-        Ok(enabled) => json_response(json!({"registration": enabled})),
+        Ok(enabled) => json_response(json!({"registration": enabled && state.auth.local_auth()})),
         Err(error) => service_error(error),
     }
 }
@@ -51,21 +51,17 @@ async fn account(State(state): State<AuthState>, headers: HeaderMap) -> Response
     let Some(id) = browser_session::authenticate_read(&headers, &state.session) else {
         return browser_session::empty(StatusCode::UNAUTHORIZED);
     };
-    match state
-        .auth
-        .accounts(false, move |owner, _| {
-            Ok(owner
-                .load()
-                .map_err(std::io::Error::other)?
-                .is_some_and(|record| record.identity() == id))
-        })
-        .await
-    {
-        Ok(owner) => json_response(json!({"role": if owner { "Owner" } else { "Member" }})),
+    match is_owner(&state, id).await {
+        Ok(owner) => json_response(
+            json!({"role": if state.session.saml_administrator(id) { "Administrator" } else if owner { "Owner" } else { "Member" }}),
+        ),
         Err(error) => service_error(error),
     }
 }
-async fn is_owner(state: &AuthState, id: IdentityId) -> Result<bool, ServiceError> {
+pub(super) async fn is_owner(state: &AuthState, id: IdentityId) -> Result<bool, ServiceError> {
+    if state.session.saml_administrator(id) {
+        return Ok(true);
+    }
     state
         .auth
         .accounts(false, move |owner, _| {
@@ -101,8 +97,9 @@ async fn list(State(state): State<AuthState>, headers: HeaderMap) -> Response {
     let Some(id) = browser_session::authenticate_read(&headers, &state.session) else {
         return browser_session::empty(StatusCode::UNAUTHORIZED);
     };
+    let saml_admin = state.session.saml_administrator(id);
     match state.auth.accounts(false, move |owner, users| {
-        if !owner.load().map_err(std::io::Error::other)?.is_some_and(|record| record.identity() == id) { return Ok(None); }
+        if !saml_admin && !owner.load().map_err(std::io::Error::other)?.is_some_and(|record| record.identity() == id) { return Ok(None); }
         let accounts = users.load()?;
         Ok(Some(json!({"registration": accounts.registration, "users": accounts.users.iter().map(|user| json!({"email": user.email, "status": user.status})).collect::<Vec<_>>()})))
     }).await {
@@ -137,10 +134,11 @@ async fn manage(State(state): State<AuthState>, request: Request) -> Response {
         .auth
         .accounts(false, move |owner, users| {
             // Recheck server-owned identity inside the serialized mutation.
-            if !owner
-                .load()
-                .map_err(std::io::Error::other)?
-                .is_some_and(|record| record.identity() == id)
+            if !session.saml_administrator(id)
+                && !owner
+                    .load()
+                    .map_err(std::io::Error::other)?
+                    .is_some_and(|record| record.identity() == id)
             {
                 return Ok(None);
             }
@@ -228,6 +226,9 @@ struct Registration {
     invitation: String,
 }
 async fn register(State(state): State<AuthState>, request: Request) -> Response {
+    if !state.auth.local_auth() {
+        return browser_session::empty(StatusCode::FORBIDDEN);
+    }
     if !state.preauth.consume(request.headers()) {
         return browser_session::empty(StatusCode::FORBIDDEN);
     }
@@ -237,8 +238,14 @@ async fn register(State(state): State<AuthState>, request: Request) -> Response 
     };
     match state
         .auth
-        .accounts(true, move |_, users| {
-            users.enroll(&form.email, &form.password, &form.invitation)
+        .accounts(true, {
+            let auth = state.auth.clone();
+            move |_, users| {
+                if !auth.local_auth() {
+                    return Ok(false);
+                }
+                users.enroll(&form.email, &form.password, &form.invitation)
+            }
         })
         .await
     {

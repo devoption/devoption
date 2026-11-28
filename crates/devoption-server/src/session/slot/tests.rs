@@ -341,3 +341,38 @@ fn different_accounts_keep_independent_sessions_and_csrf_pairs() {
     slot.revoke_identity(FIRST_ID);
     assert_eq!(slot.authenticate(Some(&FIRST)), None);
 }
+
+#[cfg(unix)]
+#[test]
+fn saml_grants_cap_lifetime_and_revocation_preserves_local_sessions() {
+    let slot = SessionSlot::default();
+    let identity = IdentityId::from_bytes([45; 16]);
+    for requested in [Duration::from_secs(30), Duration::from_secs(3600)] {
+        let before = Instant::now();
+        let issued = crate::owner_auth::service::issue_saml(identity, &slot, requested).unwrap();
+        let after = Instant::now();
+        let active = slot.active.lock().unwrap();
+        let expiry = active
+            .iter()
+            .find(|s| s.identity == identity)
+            .unwrap()
+            .expires_at;
+        let expected = requested.min(crate::saml::SESSION_LIFETIME);
+        assert!(expiry >= before + expected && expiry <= after + expected);
+        drop(active);
+        assert!(slot.saml_administrator(identity));
+        assert_eq!(
+            slot.authenticate(Some(issued.session_token())),
+            Some(identity)
+        );
+    }
+    let local = IdentityId::from_bytes([46; 16]);
+    slot.activate(
+        Session::new(local, [47; TOKEN_BYTES], Duration::from_secs(60)).unwrap(),
+        &[47; TOKEN_BYTES],
+    )
+    .unwrap();
+    slot.revoke_saml();
+    assert!(!slot.saml_administrator(identity));
+    assert_eq!(slot.authenticate(Some(&[47; TOKEN_BYTES])), Some(local));
+}

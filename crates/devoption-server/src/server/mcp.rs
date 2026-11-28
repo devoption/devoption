@@ -147,7 +147,7 @@ impl Mcp {
             .ok_or(StatusCode::UNAUTHORIZED)?;
         if !self
             .auth
-            .mcp_access(token.identity)
+            .mcp_access(token.identity, &self.session)
             .await
             .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?
         {

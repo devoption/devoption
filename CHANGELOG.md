@@ -5,6 +5,14 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+### Added
+
+- Configure SAML SSO with pinned provider metadata, browser-bound signed-response
+  validation, independent administrator sessions, optional group restrictions,
+  all-session revocation and verified local-auth disablement; signed tests generate
+  disposable signing material instead of storing private keys in the repository
+  ([#467](https://github.com/devoption/devoption/issues/467)).
+
 ## [0.1.0-preview.4] - 2026-11-27
 
 ### Added
