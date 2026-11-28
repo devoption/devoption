@@ -7,6 +7,9 @@ create GitHub releases, distribute bundles or upload to a registry. The existing
 [release approval process](releases.md) and #21 remain applicable. There is still
 no published product release; the prepared source version is `0.1.0-preview.4`.
 Its schema-2 metadata declares fresh installation only, without an upgrade source.
+The prepared notes include the source-installed managed-node CLI. Refresh an
+existing untagged preview in a reviewed preparation PR rather than asking the
+proposal tool to select a new version.
 Preview.4 has no signed packet or retained validation draft yet; existing
 preview.3 evidence remains bound to the earlier candidate.
 Signed-packet installer acceptance and the owner publication gate remain pending; see the

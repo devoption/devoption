@@ -5,6 +5,8 @@ Entries describe implemented changes, not the roadmap.
 
 ## [Unreleased]
 
+## [0.1.0-preview.4] - 2026-11-27
+
 ### Added
 
 - Manage prepared Linux clusters and independently scoped application instances
@@ -12,7 +14,46 @@ Entries describe implemented changes, not the roadmap.
   lifecycle operations and durable node receipts
   ([#463](https://github.com/devoption/devoption/issues/463)).
 
+- Add three explicitly illustrative Code, Builds and Releases image concepts for
+  owner review, keeping source checks, build approval, release promotion and
+  deployment approval distinct; no interface behavior changes
+  ([#315](https://github.com/devoption/devoption/issues/315)).
+
+- Add an explicitly illustrative Overview image concept for review, grounded in
+  current runtime/monitoring boundaries; no interface behavior changes
+  ([#352](https://github.com/devoption/devoption/issues/352)).
+
+- Propose a separate durable app-job contract with PostgreSQL admission/leases,
+  exact release/grant binding, receiver-side idempotency and restart/restore fault
+  acceptance; background execution remains unimplemented
+  ([#296](https://github.com/devoption/devoption/issues/296)).
+
+- Distinguish fixed host HTTP outcome classes in worker telemetry while preserving
+  request/5xx totals, health-probe exclusion and version-1 consumers; retain no
+  routes, raw errors or request identifiers in the new counters
+  ([#373](https://github.com/devoption/devoption/issues/373)).
+
+- Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
+  denial through a disposable, certificate-verified native client check; document
+  matching client/callback settings and keep production authentication unchanged
+  ([#367](https://github.com/devoption/devoption/issues/367)).
+
+- Add opt-in authenticated HTTP MCP with pre-registered OAuth clients, explicit
+  consent, S256 PKCE, expiring revocable read grants, fresh account checks,
+  five bounded observation tools and private audit records
+  ([#362](https://github.com/devoption/devoption/issues/362)).
+
+- Reserve the signed `0.1.0-preview.3` validation candidate from reviewed source
+  `dbe5a5c`, after exact-main checks, signing, independent Actions readback and
+  local ZIP/proof verification. Preserve earlier reservations and false publication
+  eligibility. Retain the original ZIP under its reserved tag and unpublished draft,
+  with workflow readback and a separate local download/proof/archive verification
+  ([#357](https://github.com/devoption/devoption/issues/357)).
+
 ### Changed
+
+- Refresh topology and release guidance for local deployments and prepared
+  managed nodes ([#465](https://github.com/devoption/devoption/issues/465)).
 
 - Propose centrally managed clusters, explicit node membership and independent
   application instances, with scoped delivery and validation gates
@@ -31,69 +72,6 @@ Entries describe implemented changes, not the roadmap.
 - Consolidate server startup into a single `ServerOptions` entry point with shared
   capability validation for the CLI and server
   ([#421](https://github.com/devoption/devoption/issues/421)).
-
-### Fixed
-
-- Make the deployment broker duplicate-receipt test independent of filesystem
-  enumeration order ([#460](https://github.com/devoption/devoption/issues/460)).
-
-- Refuse to plan or start a fresh preview upgrade while another attempt needs
-  recovery, without replacing its owner notice
-  ([#458](https://github.com/devoption/devoption/issues/458)).
-
-- Rejoin the split ephemeral client runtime sentence in the MCP Codex check
-  documentation ([#411](https://github.com/devoption/devoption/issues/411)).
-
-- Admit registry-enabled public WASIp2 apps through the exact operator-audited
-  prepared lock/vendor profile, and permit pinned runtime-only direct wit-bindgen
-  imports while retaining registry grant checks and feature/checksum refusals
-  ([#452](https://github.com/devoption/devoption/issues/452)).
-
-- Read build retention release references once per reconciliation, batch history
-  compaction into a single snapshot publication after file removal, and scope
-  post-build and replaced-review cleanup to the affected project
-  ([#409](https://github.com/devoption/devoption/issues/409)).
-
-- Include supported `rlib` libraries in the source snapshot unsupported-target
-  message ([#414](https://github.com/devoption/devoption/issues/414)).
-
-- Exclude recorded never-run cancelled reviews from build retention slots while
-  preserving reference protection, audited cleanup and older ambiguous records
-  ([#412](https://github.com/devoption/devoption/issues/412)).
-
-- Include matching init/service packages in offline CI guest prerequisites and
-  refuse apt plans that remove installed packages when repository versions advance
-  ([#445](https://github.com/devoption/devoption/issues/445)).
-
-- Use signed Ubuntu HTTPS sources and bounded package setup for CI VM tools and
-  installer prerequisites; prepare the guest package closure on the runner for
-  verified offline installation from an absolute VM-local archive cache,
-  include the helper in VM inputs and stream bounded guest serial progress
-  ([#443](https://github.com/devoption/devoption/issues/443)).
-
-- Keep registry policy reopen failures unavailable instead of enabling recovery;
-  require validated pending decisions before issuing recovery reviews
-  ([#418](https://github.com/devoption/devoption/issues/418)).
-
-- Finish staged-source hashing and work-directory binding before publishing queued
-  build reviews, so preparation failures do not leave unbound history records
-  ([#413](https://github.com/devoption/devoption/issues/413)).
-
-- Return the existing uncached registry-unavailable response from source checks
-  when the registry engine is busy, instead of waiting for its lock
-  ([#424](https://github.com/devoption/devoption/issues/424)).
-
-- Compare publication, recovery and ingestion review tokens in constant time for
-  equal-length inputs while preserving single-use rejection behavior
-  ([#420](https://github.com/devoption/devoption/issues/420)).
-
-- Bind stored Cargo package files and generated manifests to their retained staged
-  source, refusing coordinated archive/index edits with recomputed checksums
-  ([#437](https://github.com/devoption/devoption/issues/437)).
-
-## [0.1.0-preview.4] - 2026-11-14
-
-### Changed
 
 - Prepare preview.4 with reviewed fresh-install-only support metadata and updated
   authenticated read-only MCP limitations
@@ -320,61 +298,83 @@ Entries describe implemented changes, not the roadmap.
   case acceptance, leading zeros, adapter errors and access checks
   ([#207](https://github.com/devoption/devoption/issues/207)).
 
-### Added
+### Fixed
 
-- Add three explicitly illustrative Code, Builds and Releases image concepts for
-  owner review, keeping source checks, build approval, release promotion and
-  deployment approval distinct; no interface behavior changes
-  ([#315](https://github.com/devoption/devoption/issues/315)).
+- Make the deployment broker duplicate-receipt test independent of filesystem
+  enumeration order ([#460](https://github.com/devoption/devoption/issues/460)).
 
-- Add an explicitly illustrative Overview image concept for review, grounded in
-  current runtime/monitoring boundaries; no interface behavior changes
-  ([#352](https://github.com/devoption/devoption/issues/352)).
+- Refuse to plan or start a fresh preview upgrade while another attempt needs
+  recovery, without replacing its owner notice
+  ([#458](https://github.com/devoption/devoption/issues/458)).
 
-- Propose a separate durable app-job contract with PostgreSQL admission/leases,
-  exact release/grant binding, receiver-side idempotency and restart/restore fault
-  acceptance; background execution remains unimplemented
-  ([#296](https://github.com/devoption/devoption/issues/296)).
+- Rejoin the split ephemeral client runtime sentence in the MCP Codex check
+  documentation ([#411](https://github.com/devoption/devoption/issues/411)).
 
-- Distinguish fixed host HTTP outcome classes in worker telemetry while preserving
-  request/5xx totals, health-probe exclusion and version-1 consumers; retain no
-  routes, raw errors or request identifiers in the new counters
-  ([#373](https://github.com/devoption/devoption/issues/373)).
+- Admit registry-enabled public WASIp2 apps through the exact operator-audited
+  prepared lock/vendor profile, and permit pinned runtime-only direct wit-bindgen
+  imports while retaining registry grant checks and feature/checksum refusals
+  ([#452](https://github.com/devoption/devoption/issues/452)).
 
-- Prove Codex CLI OAuth login, all five read-only MCP tools and post-revocation
-  denial through a disposable, certificate-verified native client check; document
-  matching client/callback settings and keep production authentication unchanged
-  ([#367](https://github.com/devoption/devoption/issues/367)).
+- Read build retention release references once per reconciliation, batch history
+  compaction into a single snapshot publication after file removal, and scope
+  post-build and replaced-review cleanup to the affected project
+  ([#409](https://github.com/devoption/devoption/issues/409)).
 
-- Add opt-in authenticated HTTP MCP with pre-registered OAuth clients, explicit
-  consent, S256 PKCE, expiring revocable read grants, fresh account checks,
-  five bounded observation tools and private audit records
-  ([#362](https://github.com/devoption/devoption/issues/362)).
+- Include supported `rlib` libraries in the source snapshot unsupported-target
+  message ([#414](https://github.com/devoption/devoption/issues/414)).
 
-- Reserve the signed `0.1.0-preview.3` validation candidate from reviewed source
-  `dbe5a5c`, after exact-main checks, signing, independent Actions readback and
-  local ZIP/proof verification. Preserve earlier reservations and false publication
-  eligibility. Retain the original ZIP under its reserved tag and unpublished draft,
-  with workflow readback and a separate local download/proof/archive verification
-  ([#357](https://github.com/devoption/devoption/issues/357)).
+- Exclude recorded never-run cancelled reviews from build retention slots while
+  preserving reference protection, audited cleanup and older ambiguous records
+  ([#412](https://github.com/devoption/devoption/issues/412)).
+
+- Include matching init/service packages in offline CI guest prerequisites and
+  refuse apt plans that remove installed packages when repository versions advance
+  ([#445](https://github.com/devoption/devoption/issues/445)).
+
+- Use signed Ubuntu HTTPS sources and bounded package setup for CI VM tools and
+  installer prerequisites; prepare the guest package closure on the runner for
+  verified offline installation from an absolute VM-local archive cache,
+  include the helper in VM inputs and stream bounded guest serial progress
+  ([#443](https://github.com/devoption/devoption/issues/443)).
+
+- Keep registry policy reopen failures unavailable instead of enabling recovery;
+  require validated pending decisions before issuing recovery reviews
+  ([#418](https://github.com/devoption/devoption/issues/418)).
+
+- Finish staged-source hashing and work-directory binding before publishing queued
+  build reviews, so preparation failures do not leave unbound history records
+  ([#413](https://github.com/devoption/devoption/issues/413)).
+
+- Return the existing uncached registry-unavailable response from source checks
+  when the registry engine is busy, instead of waiting for its lock
+  ([#424](https://github.com/devoption/devoption/issues/424)).
+
+- Compare publication, recovery and ingestion review tokens in constant time for
+  equal-length inputs while preserving single-use rejection behavior
+  ([#420](https://github.com/devoption/devoption/issues/420)).
+
+- Bind stored Cargo package files and generated manifests to their retained staged
+  source, refusing coordinated archive/index edits with recomputed checksums
+  ([#437](https://github.com/devoption/devoption/issues/437)).
 
 <!-- devoption-release-metadata:start -->
 ### Release compatibility and support
 
 - Preview version: `0.1.0-preview.4`; supported platform: Ubuntu 24.04 amd64.
 - Installation: fresh only. Upgrades from earlier platform versions are unsupported.
-- Data compatibility: Fresh installation only. This preview includes shared workspace accounts, operational telemetry, authenticated read-only MCP and approved library/package workflows; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state.
+- Data compatibility: Fresh installation only. This preview includes shared workspace accounts, operational telemetry, authenticated read-only MCP, approved library/package workflows and an operator CLI for prepared managed nodes; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state.
 - Configuration compatibility: Dedicated Ubuntu 24.04 amd64 with explicitly reviewed owner, repository, build and app configuration. Existing source, custom, base-bundle and app-capable installations are not approved upgrade sources for this preview; no automatic configuration conversion is provided.
 - Migration: none implemented. No migration runs for a fresh installation. Migration of existing accounts, sessions, catalogs, build history, secrets or deployment state requires a separate reviewed compatibility and recovery contract.
 - Binary rollback: unsupported. No cross-version rollback or upgrade recovery path is declared for preview.4. Preserve the prior installation and its verified packets/backups before a separately approved transition; replacing only executables is not recovery. The earlier preview.1-to-preview.2 base-bundle acceptance does not establish preview.4 compatibility.
 - Support status: development preview.
-- Warning: Trusted single-node Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.
+- Warning: Trusted Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.
+- Warning: Managed-node deployment uses a separately source-installed operator CLI with explicit placement; it is not bundled. Public managed-node ingress and cross-host recovery are unverified. Host-mediated HTTPS secrets on managed nodes are unsupported.
 - Warning: Workspace members share all projects and configured capabilities; project-specific roles and read-only membership are unavailable.
 - Warning: Monitoring covers the DevOption Wasm worker, not separate native backends or external proxy traffic. Active users are per-app anonymous browser estimates; telemetry history resets on worker restart.
 - Warning: Security scanning remains unimplemented. Optional authenticated read-only MCP requires explicit client registration and user consent; grants are revocable and reset on restart. External harnesses are clients; DevOption does not host agents.
 - Warning: Preview.4 signed-packet installation acceptance and the issue #21 release gate remain pending. Source-built CI and earlier retained preview packets do not replace validation of this candidate.
 - Warning: Unattended upgrades, automatic publication, stable promotion and DigitalOcean image distribution remain unavailable. No production-readiness claim is made.
-- Metadata SHA-256: `611a118525eb8a31d79b8c51a9eead26dcc8a8768ebd812d48967a4a44408e61` (metadata identity, not artifact provenance).
+- Metadata SHA-256: `9b6bdac74b6e1b365bd8a335730de85a1ca2f538b631be13fa428ebd36e33883` (metadata identity, not artifact provenance).
 <!-- devoption-release-metadata:end -->
 
 ## [0.1.0-preview.3] - 2026-10-31

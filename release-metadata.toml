@@ -9,7 +9,7 @@ installation = "fresh-only"
 upgrade_from = []
 data_schema = 1
 configuration_schema = 1
-data = "Fresh installation only. This preview includes shared workspace accounts, operational telemetry, authenticated read-only MCP and approved library/package workflows; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state."
+data = "Fresh installation only. This preview includes shared workspace accounts, operational telemetry, authenticated read-only MCP, approved library/package workflows and an operator CLI for prepared managed nodes; no prior-preview data import, migration or cross-version upgrade path is declared. Do not overwrite an existing installation's state."
 configuration = "Dedicated Ubuntu 24.04 amd64 with explicitly reviewed owner, repository, build and app configuration. Existing source, custom, base-bundle and app-capable installations are not approved upgrade sources for this preview; no automatic configuration conversion is provided."
 
 [migration]
@@ -23,7 +23,8 @@ instructions = "No cross-version rollback or upgrade recovery path is declared f
 [support]
 status = "development-preview"
 warnings = [
-  "Trusted single-node Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.",
+  "Trusted Rust/WASIp2 workload profile only; arbitrary applications and hostile multi-tenant hosting are unsupported.",
+  "Managed-node deployment uses a separately source-installed operator CLI with explicit placement; it is not bundled. Public managed-node ingress and cross-host recovery are unverified. Host-mediated HTTPS secrets on managed nodes are unsupported.",
   "Workspace members share all projects and configured capabilities; project-specific roles and read-only membership are unavailable.",
   "Monitoring covers the DevOption Wasm worker, not separate native backends or external proxy traffic. Active users are per-app anonymous browser estimates; telemetry history resets on worker restart.",
   "Security scanning remains unimplemented. Optional authenticated read-only MCP requires explicit client registration and user consent; grants are revocable and reset on restart. External harnesses are clients; DevOption does not host agents.",

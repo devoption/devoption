@@ -5,7 +5,9 @@ This reconciles #19, #20, #131, #230, #233 and #234 against main
 [PR #255](https://github.com/devoption/devoption/pull/255). It records the selected
 trusted WASIp2 profile and existing evidence. The original reconciliation task was
 [#256](https://github.com/devoption/devoption/issues/256); the #19 update below adds
-its separately authorized disposable validation evidence. No product release is approved.
+its separately authorized disposable validation evidence. This report does not
+cover the later [managed-node CLI](managed-clusters.md). No product release is
+approved.
 
 | Issue | Disposition | Evidence / remaining scope |
 | --- | --- | --- |

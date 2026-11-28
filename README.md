@@ -11,9 +11,12 @@ owner/member sign-in, and appearance preferences. An opt-in [Linux build runner]
 can build trusted standalone Wasm HTTP apps with embedded assets through review
 and approval in the interface.
 The opt-in [private app runtime](docs/web-app-deployments.md) adds saved releases,
-reviewed deployment, health/log/stop controls and restart recovery on the same node.
+reviewed local deployment, health/log/stop controls and restart recovery.
 [Independent app slots](docs/multiple-apps.md) give configured projects separate
-HTTPS hostnames, runtime state and lifecycle controls. Authentication supports an owner and [shared workspace members](docs/users.md)
+HTTPS hostnames, runtime state and lifecycle controls. Operators can also use the
+[cluster CLI](docs/managed-clusters.md) to deploy saved releases to prepared Linux
+nodes, including separate instances of one project. Authentication supports an
+owner and [shared workspace members](docs/users.md)
 through invitations or owner-approved registration.
 There is no published release. An explicit [HTTPS proxy setup](docs/public-linux-install.md)
 has [fresh cloud installation, public DNS/ACME and lifecycle evidence](docs/public-cloud-acceptance.md)

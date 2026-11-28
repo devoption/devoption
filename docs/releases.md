@@ -3,7 +3,9 @@
 There is no published product release. The prepared source version is
 `0.1.0-preview.4`, with reviewed fresh-install-only metadata. It includes the
 operational Overview and monitoring, shared workspace accounts, authenticated
-read-only MCP, and the current trusted app and library/package workflows.
+read-only MCP, the trusted app and library/package workflows, and the
+[source-installed managed-node CLI](managed-clusters.md). Managed nodes were
+exercised with disposable OpenSSH and systemd, not with a production rollout.
 No prior preview is declared as a supported upgrade source for this version; see [release metadata](release-metadata.md).
 
 Preview.1 and preview.2 remain immutable signed validation packets in the

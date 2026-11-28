@@ -7,7 +7,9 @@ original repository objects, prepared toolchain/vendor trees, installed binaries
 helpers, configuration and Caddy state to remain available. It never installs a
 restore or starts an app.
 
-Use it before operator maintenance on a trusted single-node installation. All
+Use it before operator maintenance on the original installation. This is not
+a cross-node restore or a backup of the
+[cluster catalog](managed-clusters.md#limits-and-maintenance). All
 writers must remain stopped throughout creation; the tool checks the named system
 unit, legacy workers and every configured project-slot worker/validation unit,
 holds existing writer locks, compares source

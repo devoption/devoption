@@ -19,7 +19,8 @@ Keep proposals visibly separate until accepted. Priorities belong in the
 
 - Broader application subsets and host capabilities beyond decision 0004.
 - Broader build isolation, resource enforcement and deployment topology beyond
-  the implemented single-node profile; public-host acceptance remains open.
+  local deployment and the [managed-node CLI](../managed-clusters.md), including
+  coordinated rollouts, multi-host recovery and managed-node public acceptance.
 - Package registry/proxy protocols and rollout details; no hosted service is implied.
 
 Resolve these through scoped issues and explicit decisions. Existing proposals,

@@ -1,5 +1,8 @@
 # Deploy a web app on the same node
 
+This guide covers the browser-managed runtime on the platform host. For remote
+instance deployment from a controller shell, use [managed clusters](managed-clusters.md).
+
 This opt-in Linux workflow follows [building through the interface](web-app-builds.md).
 It promotes successful Wasm builds into local releases and runs approved apps
 behind a private loopback HTTP listener. Use the separate [app hostname flow](app-hostnames.md) to configure HTTPS ingress.

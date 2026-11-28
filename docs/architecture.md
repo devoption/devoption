@@ -113,15 +113,18 @@ is separate from browser mutations, with explicit browser consent, current accou
 checks, expiring revocable grants, and private audit writes. Security scans remain
 unimplemented.
 
-## Planned flow and unresolved boundaries
+## Managed-node deployments
 
-The [roadmap](../ROADMAP.md) owns remaining public-host acceptance and broader
-platform expansion beyond the selected trusted single-node app profile.
 The optional [managed cluster CLI](managed-clusters.md) uses an independent
 private controller catalog and host-pinned SSH to reach a forced node command.
 A separate adapter verifies immutable artifacts and review bindings before
 calling the existing runtime broker for operator-prepared instance slots.
-The [cluster proposal](cluster-management-proposal.md) tracks broader work.
+The local browser deployment path keeps its separate project and host scope.
+
+## Planned flow and unresolved boundaries
+
+The [roadmap](../ROADMAP.md) owns remaining acceptance and priorities. The
+[cluster proposal](cluster-management-proposal.md) tracks broader work.
 
 [Product goals](product.md) define the external-harness boundary and optional MCP
 parity with human operations.

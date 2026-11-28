@@ -8,13 +8,15 @@ including capabilities that remain unimplemented.
 
 ## Current boundary
 
-The [architecture](architecture.md) describes implemented behavior. Today the
-controller invokes a fixed local privileged broker; deployment reviews in
+The [architecture](architecture.md) describes implemented behavior. The browser
+controller invokes a fixed local privileged broker; its deployment reviews in
 `crates/devoption-server/src/server/projects/deployment.rs` are keyed by project.
 `scripts/deployment_broker.py` verifies local configuration, artifact bytes,
 runtime fingerprints and approved intent. [Independent app slots](multiple-apps.md)
 bind different projects to separate resources on that same host. Those slots do
-not provide remote placement or multiple installations of one project.
+not provide remote placement or multiple installations of one project. The
+separate cluster CLI supports explicit placement and independent instances on
+prepared nodes.
 
 ## Proposed ownership model
 
@@ -162,7 +164,9 @@ must keep working without cluster configuration. A later explicit migration can
 map it to a local cluster and instance records after backup and compatibility
 validation; browsing the new feature must never rewrite local deployment state.
 
-Disposable Linux multi-node acceptance is required before claiming central
-remote management works. Existing same-node checks remain regression gates.
+The current CLI has disposable OpenSSH and systemd evidence for two instances
+on one node. A pilot on separate hosts is needed for cross-host networking,
+public ingress and full multi-node reboot acceptance. Existing local deployment
+checks remain regression gates.
 No production rollout, cloud account integration, DNS change or workload launch
 is included in this proposal.
