@@ -22,7 +22,8 @@ The Rust workspace has seven crates. The running service uses
 | `devoption-ui` | HTML rendering and browser assets |
 
 Server APIs live under `devoption_server`; the CLI is a binary without a library
-facade. Authentication, [shared workspace users](users.md), owner storage and the opt-in [project environment secret store](project-secrets.md) remain server modules. Executable
+facade. Authentication, [shared workspace users](users.md), owner storage,
+[SAML SSO](saml.md) and the opt-in [project environment secret store](project-secrets.md) remain server modules. Executable
 integration tests stay with the CLI; domain logic remains in domain crates.
 
 Use focused references for details rather than loading every subsystem:

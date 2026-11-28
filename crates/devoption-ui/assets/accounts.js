@@ -20,12 +20,12 @@
         const response = await request("/auth/account");
         if (response.status !== 200) return;
         const { role } = await response.json();
-        if (current !== roleVersion || !["Owner", "Member"].includes(role)) return;
+        if (current !== roleVersion || !["Owner", "Administrator", "Member"].includes(role)) return;
         const note = byId("profile-note");
         if (note) note.textContent = `Role: ${role}`;
         const label = byId("profile-role");
         if (label) label.querySelector("strong").textContent = role;
-        if (manage) manage.hidden = role !== "Owner";
+        if (manage) manage.hidden = !["Owner", "Administrator"].includes(role);
       } catch { /* Role remains unspecified until checked. */ }
     });
     const panel = byId("users-panel");

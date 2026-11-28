@@ -112,6 +112,18 @@ impl From<u16> for RequestOrigin {
 }
 
 impl RequestOrigin {
+    pub(super) fn check_saml_callback(
+        &self,
+        request: &Request,
+    ) -> Result<(), axum::http::StatusCode> {
+        // This exception exists only on the SAML ACS router. The callback itself
+        // requires the one-use browser-bound flow and a pinned, signed Response.
+        match self {
+            Self::Public(origin) if origin.host_valid(request) => Ok(()),
+            _ => Err(axum::http::StatusCode::BAD_REQUEST),
+        }
+    }
+
     pub(super) fn check(&self, request: &Request) -> Result<(), axum::http::StatusCode> {
         use axum::http::StatusCode;
         match self {

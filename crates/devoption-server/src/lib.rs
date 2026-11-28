@@ -7,6 +7,8 @@
 //! enable owner-approved registration; members share the workspace. Configured page reads require a session;
 //! Sign in and the unconfigured preview remain public.
 
+#[cfg(unix)]
+mod saml;
 mod server;
 #[cfg(unix)]
 mod users;

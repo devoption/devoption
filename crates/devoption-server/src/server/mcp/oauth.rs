@@ -73,7 +73,7 @@ async fn browser(s: &Mcp, headers: &HeaderMap, mutation: bool) -> Result<Identit
         browser_session::authenticate_read(headers, &s.session)
     }
     .ok_or(StatusCode::UNAUTHORIZED)?;
-    match s.auth.mcp_access(identity).await {
+    match s.auth.mcp_access(identity, &s.session).await {
         Ok(true) => Ok(identity),
         Ok(false) => Err(StatusCode::FORBIDDEN),
         Err(_) => Err(StatusCode::SERVICE_UNAVAILABLE),
@@ -230,7 +230,7 @@ pub(super) async fn token(State(s): State<Mcp>, request: Request) -> Response {
     {
         return error("invalid_grant");
     }
-    if !matches!(s.auth.mcp_access(code.identity).await, Ok(true)) {
+    if !matches!(s.auth.mcp_access(code.identity, &s.session).await, Ok(true)) {
         return error("invalid_grant");
     }
     let value = match random() {
