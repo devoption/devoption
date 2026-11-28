@@ -129,6 +129,7 @@ impl Error for ServiceError {
 struct State {
     store: OwnerStore,
     users: Option<crate::users::Store>,
+    saml: Option<Arc<crate::saml::Store>>,
     worker: Arc<Semaphore>,
     attempts: Mutex<VecDeque<Instant>>,
 }
@@ -150,6 +151,7 @@ impl OwnerAuthService {
             state: Arc::new(State {
                 store,
                 users: None,
+                saml: None,
                 worker: Arc::new(Semaphore::new(1)),
                 attempts: Mutex::new(VecDeque::with_capacity(MAX_ATTEMPTS)),
             }),
@@ -158,14 +160,23 @@ impl OwnerAuthService {
 
     pub(crate) fn with_users(store: OwnerStore) -> std::io::Result<Self> {
         let users = crate::users::Store::new(&store)?;
+        let saml = Some(Arc::new(crate::saml::Store::open(&store)?));
         Ok(Self {
             state: Arc::new(State {
                 store,
                 users: Some(users),
+                saml,
                 worker: Arc::new(Semaphore::new(1)),
                 attempts: Mutex::new(VecDeque::with_capacity(MAX_ATTEMPTS)),
             }),
         })
+    }
+
+    pub(crate) fn saml(&self) -> Option<Arc<crate::saml::Store>> {
+        self.state.saml.clone()
+    }
+    pub(crate) fn local_auth(&self) -> bool {
+        self.state.saml.as_ref().is_none_or(|s| s.local_auth())
     }
 
     /// Serialize durable account operations with authentication and activation.
@@ -193,7 +204,14 @@ impl OwnerAuthService {
     }
 
     /// Fresh account checks for delegated MCP access; no session or authority is issued.
-    pub(crate) async fn mcp_access(&self, identity: IdentityId) -> Result<bool, ServiceError> {
+    pub(crate) async fn mcp_access(
+        &self,
+        identity: IdentityId,
+        session: &SessionSlot,
+    ) -> Result<bool, ServiceError> {
+        if session.saml_administrator(identity) {
+            return Ok(true);
+        }
         self.accounts(false, move |owner, users| {
             let Some(record) = owner.load().map_err(std::io::Error::other)? else {
                 return Ok(false);
@@ -216,7 +234,11 @@ impl OwnerAuthService {
         password: String,
         slot: Arc<SessionSlot>,
     ) -> Result<Option<BrowserCredentials>, ServiceError> {
+        let saml = self.saml();
         self.accounts(true, move |_, users| {
+            if saml.as_ref().is_some_and(|s| !s.local_auth()) {
+                return Ok(None);
+            }
             let Some(identity) = users.authenticate(&email, &password)? else {
                 return Ok(None);
             };
@@ -251,7 +273,11 @@ impl OwnerAuthService {
     /// bound to one session with a one-hour absolute lifetime.
     /// The caller supplies no identity, token, or lifetime. HTTP transport is separate.
     pub async fn sign_in(&self, password: String) -> Result<Option<IssuedSession>, ServiceError> {
+        let saml = self.saml();
         self.run(move |store| {
+            if saml.as_ref().is_some_and(|s| !s.local_auth()) {
+                return Ok(None);
+            }
             sign_in_with_entropy(store, &password, |bytes| {
                 getrandom::fill(bytes).map_err(|_| ServiceError::Unavailable)
             })
@@ -304,6 +330,28 @@ impl OwnerAuthService {
     }
 }
 
+pub(crate) fn issue_saml(
+    identity: IdentityId,
+    slot: &SessionSlot,
+    lifetime: Duration,
+) -> Result<BrowserCredentials, ServiceError> {
+    let mut grant = issue(identity, |bytes| {
+        getrandom::fill(bytes).map_err(|_| ServiceError::Unavailable)
+    })?;
+    // Independently rotating identities; a short absolute lifetime limits provider-side removal lag.
+    grant.session = Session::new(
+        identity,
+        grant.token,
+        lifetime.min(crate::saml::SESSION_LIFETIME),
+    )
+    .map_err(|_| ServiceError::Unavailable)?
+    .with_csrf(grant.csrf_token)
+    .saml_administrator();
+    grant
+        .activate_browser(slot)
+        .map_err(|_| ServiceError::Unavailable)
+}
+
 fn sign_in_with_entropy(
     store: &OwnerStore,
     password: &str,
@@ -316,7 +364,7 @@ fn sign_in_with_entropy(
     issue(identity, fill).map(Some)
 }
 
-fn issue(
+pub(crate) fn issue(
     identity: IdentityId,
     mut fill: impl FnMut(&mut [u8]) -> Result<(), ServiceError>,
 ) -> Result<IssuedSession, ServiceError> {

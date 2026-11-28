@@ -128,7 +128,7 @@ pub(crate) fn named_credentials(
     ))
 }
 
-fn named_session(headers: &HeaderMap, cookie_name: &str) -> Option<[u8; TOKEN_BYTES]> {
+pub(crate) fn named_session(headers: &HeaderMap, cookie_name: &str) -> Option<[u8; TOKEN_BYTES]> {
     if headers.contains_key(AUTHORIZATION) {
         return None;
     }

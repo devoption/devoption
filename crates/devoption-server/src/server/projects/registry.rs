@@ -317,7 +317,12 @@ async fn handle(
     target: Target,
     request: Request,
 ) -> axum::response::Response {
-    if projects.owner != Some(identity) {
+    if projects.owner != Some(identity)
+        && !projects
+            .registry_session
+            .as_ref()
+            .is_some_and(|s| s.saml_administrator(identity))
+    {
         return failure(StatusCode::FORBIDDEN);
     }
     let (Some(engine), Some(session)) = (projects.registry, projects.registry_session) else {

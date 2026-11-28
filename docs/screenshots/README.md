@@ -45,10 +45,12 @@ Use stable filenames; Git retains earlier captures. All default captures use
 | Releases | `/releases` | Unavailable state | `releases.jpg` |
 | Infrastructure | `/infrastructure` | Unavailable state | `infrastructure.jpg` |
 | Profile | `/settings/profile` | Save disposable name Alex Morgan; owner user-management link and initials visible | `profile.jpg` |
-| Users | `/settings/users` | Real disposable member/application workflow; 1280 × 1100; no invitation code visible | `users.jpg` |
+| Users | `/settings/users` | Disposable SAML administrator; closed local registration, no local members; 1280 × 1100 | `users.jpg` |
 | Create account | `/join` | Open registration; 1280 × 1000 | `join.jpg` |
 | Appearance | `/settings/appearance` | Signed in; 1280 × 900 | `appearance.jpg` |
-| Sign in | `/sign-in` | Signed out | `sign-in.jpg` |
+| Sign in | `/sign-in` | Signed out; disposable SAML provider enabled alongside local sign-in | `sign-in.jpg` |
+| SAML settings | `/settings/users` | Verified synthetic provider; section crop from 1280 × 1400 viewport | `saml-settings.jpg` |
+| SSO-only sign-in | `/sign-in` | Local authentication disabled after successful synthetic SSO; 1280 × 900 | `sign-in-sso-only.jpg` |
 | MCP consent | `/oauth/authorize?...` | Authenticated disposable client, before consent; 1280 × 1000 | `mcp-consent.jpg` |
 | MCP client access | `/mcp/grants` | One disposable active grant, before revocation; 1280 × 1000 | `mcp-grants.jpg` |
 | Account | `/sign-in` | Signed in | `account.jpg` |
@@ -312,3 +314,19 @@ because the Browser plugin was unavailable. Page identity, visible content,
 console health, screenshots, callback/PKCE exchange, actual project reads and
 browser revocation passed. This synthetic proxy is browser/handler evidence, not
 public DNS/TLS or external harness compatibility acceptance.
+
+## SAML settings and sign-in
+
+Use the [disposable signed SAML fixture](../saml.md#validation-and-captures).
+Capture Sign in before signing in, then follow its SSO button and the synthetic
+IdP's Continue control. The browser proxy has no real TLS certificate; if the
+303 redirect chain reaches a certificate error, navigate directly to the platform
+URL after the callback. Confirm the callback returned 303 and the real session
+cookie works. This is synthetic callback/cookie evidence, not a public TLS check.
+
+Capture Users at 1280 × 1100 with the main canvas at the top. Capture the SAML
+section itself at a 1280 × 1400 viewport for `saml-settings.jpg`; its XML contains
+only the publicly known fixture certificate. After verified SSO, disable local
+authentication through the real settings form and confirm SSO sessions are
+revoked. Capture the signed-out SSO-only state at 1280 × 900. Check 320, 375,
+768 and 1280 pixel widths for overflow. No live identity-provider settings change.

@@ -21,6 +21,7 @@ applications; project-specific roles remain planned.
 - [Clean local installation, app lifecycle and recovery evidence](clean-local-rehearsal.md)
 - [Quick start](../README.md#quick-start)
 - [Current preview user guide](using-devoption.md)
+- [SAML single sign-on and provider-managed access](saml.md)
 - [Authenticated read-only MCP and client registration](mcp.md)
 - [Same-node snapshot and staged recovery](same-node-recovery.md)
 - [Private Ubuntu installation, backup and recovery](private-linux-install.md)

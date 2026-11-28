@@ -35,6 +35,24 @@ pub struct SessionSlot {
 }
 
 impl SessionSlot {
+    #[cfg(unix)]
+    pub(crate) fn saml_administrator(&self, identity: IdentityId) -> bool {
+        self.active.lock().is_ok_and(|active| {
+            active.iter().any(|s| {
+                s.identity == identity
+                    && s.saml_administrator
+                    && s.token.is_some()
+                    && Instant::now() < s.expires_at
+            })
+        })
+    }
+    #[cfg(unix)]
+    pub(crate) fn revoke_saml(&self) {
+        if let Ok(mut active) = self.active.lock() {
+            active.retain(|s| !s.saml_administrator);
+        }
+    }
+
     /// Atomically retain a live session, replacing only this account’s prior session.
     /// The issuer must have authenticated its identity and supplied fresh entropy.
     /// Validating the session/token pair here does not authenticate a password.

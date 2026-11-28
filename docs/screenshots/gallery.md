@@ -204,3 +204,13 @@ fixture; the capture records no build or deployment.
 ![Explicit read-only client consent](mcp-consent.jpg)
 
 ![Per-account client revocation](mcp-grants.jpg)
+
+## SAML single sign-on
+
+The [SAML guide](../saml.md) describes the implemented protocol and limits. These
+captures use a disposable synthetic identity provider and publicly known test
+signing key; they do not prove Google assignment or public TLS acceptance.
+
+![Verified SAML settings with a synthetic identity provider](saml-settings.jpg)
+
+![SSO-only sign-in after disabling local authentication](sign-in-sso-only.jpg)

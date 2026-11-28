@@ -1,6 +1,7 @@
 //! Existing-owner HTTP authentication. No enrollment or owner creation routes.
 
 mod accounts;
+mod saml;
 
 use super::{SharedSession, protect_origin};
 use crate::{
@@ -35,26 +36,32 @@ pub(super) fn routes(
     origin: impl Into<super::RequestOrigin>,
     session: SharedSession,
 ) -> Router {
+    let origin = origin.into();
+    let state = AuthState {
+        auth,
+        preauth: Arc::new(PreAuthCsrf::default()),
+        session,
+    };
+    let saml_routes = saml::configured_routes(state.clone(), origin.clone());
     let app = Router::new()
         .merge(accounts::routes())
+        .merge(saml::routes())
         .route("/auth/session", post(recover_session))
         .route("/auth/challenge", post(challenge))
         .route("/auth/sign-in", post(sign_in))
         .route("/auth/sign-out", post(sign_out))
-        .with_state(AuthState {
-            auth,
-            preauth: Arc::new(PreAuthCsrf::default()),
-            session,
-        });
+        .with_state(state);
     // Include Host/Origin and method rejections in the non-cacheable boundary.
-    protect_origin(app, origin).layer(middleware::map_response(
-        |mut response: Response| async move {
-            response
-                .headers_mut()
-                .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-            response
-        },
-    ))
+    protect_origin(app, origin)
+        .merge(saml_routes)
+        .layer(middleware::map_response(
+            |mut response: Response| async move {
+                response
+                    .headers_mut()
+                    .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
+                response
+            },
+        ))
 }
 
 async fn recover_session(State(state): State<AuthState>, headers: HeaderMap) -> Response {

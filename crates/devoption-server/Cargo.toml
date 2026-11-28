@@ -35,6 +35,8 @@ sha2 = { version = "=0.11.1", default-features = false }
 url = "=2.5.8"
 getrandom = { version = "=0.4.3", default-features = false }
 rustix = { version = "=1.1.5", features = ["fs", "process"] }
+saml-rs = { version = "=0.8.0", default-features = false, features = ["crypto-rustcrypto"] }
+time = { version = "=0.3.55", default-features = false, features = ["parsing"] }
 
 [target.'cfg(unix)'.dev-dependencies]
 tempfile = "=3.27.0"

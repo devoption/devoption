@@ -1,12 +1,14 @@
 const SIGN_IN: &str = r#"
         <section class="auth" aria-label="Account access">
-          <form id="signin-form" action="/auth/sign-in" method="post">
+          <div id="local-auth-controls"><form id="signin-form" action="/auth/sign-in" method="post">
             <label for="auth-email">Email address <span>(leave blank for owner)</span></label>
             <input id="auth-email" name="email" type="email" autocomplete="username" maxlength="254" disabled>
             <label for="auth-password">Password</label>
             <input id="auth-password" name="password" type="password" autocomplete="current-password" required maxlength="1024" aria-describedby="auth-status" disabled>
             <button id="auth-submit" class="action-button primary" type="submit" disabled>Sign in</button>
-          </form>
+          </form></div>
+          <button id="saml-signin" class="action-button primary" type="button" hidden disabled>Sign in with SSO</button>
+          <p id="saml-signin-status" role="status" hidden></p>
           <div id="auth-signed-in" hidden>
             <a class="action-button primary" href="/">Open workspace <span aria-hidden="true">→</span></a>
             <button class="action-button" type="button" data-signout disabled>Sign out</button>
@@ -63,7 +65,7 @@ pub(super) fn render(account_available: bool) -> String {
 pub(super) fn render_join() -> String {
     let page = render(true);
     let start = page
-        .find("          <form id=\"signin-form\"")
+        .find("          <div id=\"local-auth-controls\"><form id=\"signin-form\"")
         .expect("sign-in form");
     let end = page[start..]
         .find("        </section>")

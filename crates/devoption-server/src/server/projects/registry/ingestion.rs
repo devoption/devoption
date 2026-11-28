@@ -40,7 +40,12 @@ async fn handle(
     request: Request,
     approve: bool,
 ) -> axum::response::Response {
-    if projects.owner != Some(identity) {
+    if projects.owner != Some(identity)
+        && !projects
+            .registry_session
+            .as_ref()
+            .is_some_and(|s| s.saml_administrator(identity))
+    {
         return failure(StatusCode::FORBIDDEN);
     }
     let Some((project, attempt)) = project_id(&project).zip(project_id(&attempt)) else {
